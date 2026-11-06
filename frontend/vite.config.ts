@@ -3,6 +3,11 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
-  server: { port: 5173, host: true },
+  // 开发服务器把 /api 反代到本机 API，生产由 nginx 承担同样的转发。
+  server: {
+    port: 5173,
+    host: true,
+    proxy: { "/api": { target: "http://localhost:8000", changeOrigin: true } },
+  },
   preview: { port: 5173, host: true },
 });

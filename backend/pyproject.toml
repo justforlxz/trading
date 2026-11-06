@@ -27,6 +27,8 @@ dev = [
   "ruff>=0.8,<1.0",
   # 测试 oracle：NYSE 日历的独立实现（只用于比对，不参与运行时）
   "exchange_calendars>=4.13,<5.0",
+  # 测试 oracle：相关/显著性对拍（只用于比对，运行时实现是 stdlib 纯函数）
+  "scipy>=1.14,<2.0",
 ]
 
 [tool.hatch.build.targets.wheel]

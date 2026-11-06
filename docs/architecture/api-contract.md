@@ -14,7 +14,7 @@
 | 请求追踪 | 请求头 `X-Request-Id`（可选）；响应头回传；服务端生成 UUIDv4 兜底 |
 | 幂等 | 写接口支持 `Idempotency-Key`；同 key 重复请求返回首次结果（`200`），不重复执行 |
 | 分页 | 游标分页：`?limit=&cursor=`，`limit` 默认 50、上限 200；响应含 `next_cursor`（末页为 `null`） |
-| 排序 | 列表默认按业务时间倒序（`-as_of`、`-created_at`），显式 `sort` 参数可覆盖 |
+| 排序 | 列表默认按业务时间倒序（`-as_of`、`-created_at`），显式 `sort` 参数可覆盖。**例外（固定升序）**：`/market/candles`、`/market/equity-candles`、`/backtests/{run_id}/equity`、`/backtests/{run_id}/trades`，按时间升序返回以便直接绘图与逐笔核对 |
 | 长任务 | 一律异步：返回 `202` + `Location: /api/v1/ops/job-runs/{id}`，客户端轮询任务状态 |
 
 ### 1.1 错误信封

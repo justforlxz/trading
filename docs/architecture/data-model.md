@@ -1,6 +1,6 @@
 # 数据模型（P1）
 
-单一 PostgreSQL 16 实例，按限界上下文分 schema：`market`、`research`、`opportunity`、`strategy`、`backtest`、`ops`。跨 schema 只允许外键引用 `market.instrument` 与 `research.target_symbol`，其余禁止互相 JOIN 业务表。
+单一 PostgreSQL 16 实例，按限界上下文分 schema：`market`、`research`、`opportunity`、`strategy`、`backtest`、`ops`。跨 schema 外键白名单固定为三张表：`market.instrument`、`research.target_symbol`、`strategy.strategy`（与 `adr/0002-single-postgres-schema.md` 一致），其余禁止互相 JOIN 业务表。
 
 约定先行，表结构后列。
 
@@ -78,7 +78,7 @@ K 线锚定规则（实测，见 `docs/risk/external-dependencies.md`）：
 | `source_name` | TEXT NULL | 当前实际取数源，`yahoo` / `okx_index` / `none` |
 | `mapping_status` | TEXT | `mapped` / `unmapped` / `private`（如 OPENAI、ANTHROPIC 无公开行情） |
 
-唯一键：`UNIQUE (symbol, exchange)`。幂等：按 `(symbol, exchange)` upsert。
+唯一键：`UNIQUE NULLS NOT DISTINCT (symbol, exchange)`。**必须**使用 PG15+ 的 `NULLS NOT DISTINCT`（本项目 PG16）：`exchange` 允许为 NULL（私有/未上市标的），而默认唯一约束把 NULL 视为互不相等，会导致重复同步时 `ON CONFLICT (symbol, exchange)` 无法命中既有行、每次同步新增一条重复记录。幂等：`INSERT ... ON CONFLICT (symbol, exchange) DO UPDATE`。
 
 ### candle（合约 K 线）
 
@@ -134,7 +134,7 @@ K 线锚定规则（实测，见 `docs/risk/external-dependencies.md`）：
 
 ### target_symbol（目标股票）
 
-`id`、`symbol`、`exchange`、`display_name`、`instrument_id`（对应合约，可空）、`enabled`、`note`、`created_at`。唯一键：`UNIQUE (symbol, exchange)`。重复添加返回已存在记录（200），不产生副本。
+`id`、`symbol`、`exchange`（**NOT NULL**，创建时必填，取值 `XNAS`/`XNYS`/`NYSE_ARCA`；目标是用户显式添加的股票，不允许未知交易所）、`display_name`、`instrument_id`（对应合约，可空）、`enabled`、`note`、`created_at`。唯一键：`UNIQUE (symbol, exchange)`（两列均非空，无需 `NULLS NOT DISTINCT`）。重复添加返回已存在记录（200），不产生副本。
 
 ### relation_snapshot（关系快照头）
 
@@ -150,7 +150,7 @@ K 线锚定规则（实测，见 `docs/risk/external-dependencies.md`）：
 
 ### market_snapshot（全市场特征截面）
 
-`id`、`run_id`（或 `as_of`）、`instrument_id`、`ret_1d`、`ret_5d`、`ret_20d`、`vol_20d`、`atr_14`、`volume_z`、`high_20d`、`low_20d`、`extras JSONB`。唯一键：`UNIQUE (as_of, instrument_id)`。
+`id`、`as_of`（截面时刻，唯一键的一部分）、`run_id`（可空，产生该截面的扫描批次，仅用于溯源，不参与唯一性）、`instrument_id`、`ret_1d`、`ret_5d`、`ret_20d`、`vol_20d`、`atr_14`、`volume_z`、`high_20d`、`low_20d`、`extras JSONB`。唯一键：`UNIQUE (as_of, instrument_id)`。
 
 ## 4. opportunity schema
 

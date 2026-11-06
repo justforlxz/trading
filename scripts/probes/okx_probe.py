@@ -109,6 +109,9 @@ def cmd_history_depth(inst_id: str, bar: str) -> None:
         print(f"page {page}: n={len(rows)} newest={rows[0][0]} oldest={rows[-1][0]}")
         after = rows[-1][0]
         time.sleep(0.2)
+    if total == 0:
+        print("ABORT: history-candles returned 0 rows (empty result is a failure, not success)")
+        raise SystemExit(2)
     print(f"total={total} newest_open_time={newest} oldest_open_time={oldest}")
 
 

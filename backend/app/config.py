@@ -63,6 +63,16 @@ class Settings(BaseSettings):
     basis_alert_bps: int = 500
     stale_after_seconds: int = 600
 
+    # 研究域默认参数（请求体未显式给定时由 API/任务填充）。
+    # 相关性窗口按 K 线根数切，不随时段开关变化。
+    research_bar: str = "1d"
+    relation_window_bars: int = 60
+    relation_lag_max: int = 5
+    relation_stability_window: int = 20
+    # 系数变化超过该阈值或符号翻转即视为显著变化。
+    relation_change_threshold: float = 0.2
+    relative_strength_lookback: int = 60
+
 
 @lru_cache
 def get_settings() -> Settings:

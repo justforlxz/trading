@@ -120,20 +120,29 @@
 
 ### 3.3 targets 与关系
 
-**`GET/POST /api/v1/targets`** — POST body `{symbol, exchange, display_name?, note?}`；重复添加返回 `200` 与已存在记录，不产生副本。DELETE 为软删除（`enabled=false`）。
+**`GET/POST /api/v1/targets`** — POST body `{symbol, exchange, display_name?, note?}`；`exchange` 必填且只接受 `XNAS` / `XNYS` / `NYSE_ARCA`（缺失或非法返回 `422 VALIDATION_ERROR`）。重复添加返回 `200` 与已存在记录，不产生副本；首次创建为 `201`。`GET` 默认只列 `enabled=true`，`enabled=false` 只看已软删除记录。DELETE 为软删除（`enabled=false`，行仍在），返回被更新的记录。
 
-**`POST /api/v1/targets/{id}/relations/recompute`** — body `{window_bars, method, price_basis, as_of}`，`202`，产出 `relation_snapshot` + `relation_edge`。
+target 记录字段：`id`、`symbol`、`exchange`、`display_name`、`note`、`instrument_id`、`enabled`、`created_at`。`instrument_id` 由 `market.instrument.uly` 首段与 `symbol` 匹配得到，无匹配时为 `null`。
 
-**`GET /api/v1/targets/{id}/relations`** — 无 `as_of` 取最新快照；响应：
+**`POST /api/v1/targets/{id}/relations/recompute`** — body `{window_bars, method, price_basis, as_of}`，`method` 为 `pearson|spearman`，`price_basis` 为 `okx_close|equity_close`，`as_of` 可省略（取最后一根 K 线时间）。首次提交返回 `202` 与 `{job_id, status, job_name, job_key}`，带 `Location: /api/v1/ops/job-runs/{id}`；相同参数再次提交返回 `200` 且 `status="skipped"`，不新增快照。`run_key` 只由口径身份（`target_id`、`as_of`、`window_bars`、`method`、`price_basis`）派生，`lag_max`/`stability_window`/`change_threshold` 来自配置并只写入 `params`，因此改配置后对同一 `as_of` 重算仍返回 `skipped`，不会撞上业务唯一键而失败。任务在 worker 中计算，产出 `relation_snapshot` + `relation_edge`。
+
+**`GET /api/v1/targets/{id}/relations`** — 无 `as_of` 取最新快照；无快照时返回 `200` 且 `status="undefined"`、`snapshot=null`、`edges=[]`，`reason` 说明原因（不返回 500）。响应：
 
 ```json
 {
-  "snapshot": {"id": 7, "as_of": "2026-11-06T00:00:00Z", "window_bars": 60, "method": "pearson", "price_basis": "okx_close", "sample_size": 60},
-  "edges": [{"counterparty_inst_id": "MSFT-USDT-SWAP", "coefficient": "0.8123456789", "best_lag": 0, "p_value": "0.0000001", "stability": "0.9000000000"}]
+  "status": "ok",
+  "reason": null,
+  "snapshot": {"id": 7, "target_id": 1, "as_of": "2026-11-06T00:00:00Z", "window_bars": 60, "method": "pearson", "price_basis": "okx_close", "lag_max": 5, "sample_size": 60, "run_key": "…", "computed_at": "2026-11-06T00:01:02Z", "params": {}},
+  "edges": [{"counterparty_inst_id": "MSFT-USDT-SWAP", "counterparty": {"symbol": "MSFT", "exchange": "XNAS", "asset_class": "us_equity"}, "coefficient": "0.8123456789", "best_lag": 0, "p_value": "0.0000001", "stability": "0.9000000000", "rank": 1}],
+  "significant_changes": [{"counterparty": "MSFT-USDT-SWAP", "kind": "changed", "previous": "0.5000000000", "current": "0.8123456789", "delta": "0.3123456789", "sign_flip": false, "significant": true}]
 }
 ```
 
-**`GET /api/v1/targets/{id}/relative-strength`** — `counterparty`、`lookback`，返回 `rs_ratio`、`rs_momentum`。
+`status="undefined"` 表示样本不足或候选序列缺失，此时 `edges` 为空、`reason` 非空（例如 `MISSING_SOURCE: …`）。`significant_changes` 只含达到阈值（默认 `0.2`）或发生符号翻转的条目。
+
+**`GET /api/v1/targets/{id}/relations/history`** — `limit`（默认 20），按 `as_of` 倒序返回快照序列，含每个快照的显著变化标记。
+
+**`GET /api/v1/targets/{id}/relative-strength`** — `counterparty`（合约 `inst_id`，必填，不存在返回 `404 INSTRUMENT_NOT_FOUND`）、`lookback`（默认 60，范围 2–500）、`price_basis`。返回 `defined`、`reason`、`rs_ratio`、`rs_momentum`、`momentum_reason`、`target_return`、`counterparty_return`、`excess_return`、`trend`，以及供绘图的 `series[{ts, rs_ratio}]`。窗口不足时 `defined=false`、`reason` 非空，不返回空壳数值。
 
 ### 3.4 opportunities 与聚类
 

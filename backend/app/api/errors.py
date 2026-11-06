@@ -47,6 +47,35 @@ def envelope(
     }
 
 
+_SCALARS = (str, int, float, bool)
+
+
+def _safe_validation_errors(error: RequestValidationError) -> list[dict[str, Any]]:
+    """校验详情必须可 JSON 序列化：自定义校验器 `raise ValueError` 会带异常对象进 `ctx`。"""
+
+    safe: list[dict[str, Any]] = []
+    for item in error.errors():
+        entry: dict[str, Any] = {}
+        for key, value in item.items():
+            if key == "ctx" and isinstance(value, dict):
+                entry[key] = {
+                    ctx_key: ctx_value
+                    if ctx_value is None or isinstance(ctx_value, _SCALARS)
+                    else str(ctx_value)
+                    for ctx_key, ctx_value in value.items()
+                }
+            elif (
+                key == "input"
+                and value is not None
+                and not isinstance(value, (*_SCALARS, list, dict))
+            ):
+                entry[key] = str(value)
+            else:
+                entry[key] = value
+        safe.append(entry)
+    return safe
+
+
 def install_error_handlers(app: FastAPI) -> None:
     """把三类异常统一成同一信封（业务错误、参数校验、HTTP 状态）。"""
 
@@ -67,7 +96,7 @@ def install_error_handlers(app: FastAPI) -> None:
                 request,
                 code="VALIDATION_ERROR",
                 message="request validation failed",
-                details={"errors": error.errors()},
+                details={"errors": _safe_validation_errors(error)},
             ),
         )
 

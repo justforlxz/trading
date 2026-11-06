@@ -169,6 +169,21 @@ K 线锚定规则（实测，见 `docs/risk/external-dependencies.md`）：
 
 `id`、`as_of`（截面时刻，唯一键的一部分）、`run_id`（可空，产生该截面的扫描批次，仅用于溯源，不参与唯一性）、`instrument_id`、`ret_1d`、`ret_5d`、`ret_20d`、`vol_20d`、`atr_14`、`volume_z`、`high_20d`、`low_20d`、`extras JSONB`。唯一键：`UNIQUE (as_of, instrument_id)`。
 
+### 3.1 实施口径（S4）
+
+上述四表由 `0003_research_schema` 迁移建立，计算口径与文档描述的对应关系如下。
+
+- **`relation_edge.coefficient`**：`best_lag` 处的皮尔逊或斯皮尔曼相关系数，落在 `NUMERIC(12,10)`；`best_lag` 为正表示对手方领先目标若干根 K 线（`source` 方向由该符号决定）。样本数不足、任一侧为常数序列或无法对齐时该边不写入。
+- **`relation_edge.p_value`**：`|r|=1` 时为 `0`，否则按 Student-t 分布（自由度 `sample_size-2`）计算的双侧 p 值，`NUMERIC(12,10)`；`sample_size<3` 为 `NULL`。
+- **`relation_edge.stability`**：全样本相关系数符号与滚动窗口（默认 20 根）相关系数符号的一致率，范围 `[0,1]`；不存在有效滚动窗口时为 `NULL`，不用 `0` 冒充。
+- **`relation_snapshot.run_key` 的口径**：只由口径身份（`target_id`、`as_of`、`window_bars`、`method`、`price_basis`）哈希得到，与业务唯一键 `(target_id, as_of, window_bars, method, price_basis)` 表达同一组语义；`lag_max`/`stability_window`/`change_threshold` 只写进 `params`，不进键。两者一致才不会出现「`run_key` 命中新值、业务唯一键命中旧行」的双约束冲突。因此改配置后对同一 `as_of` 重算得到 `skipped`，显著变化阈值本来就在读取时按当前配置计算，无需重算快照。
+- **候选集排除目标自身**：按 `instrument_id` 与 `symbol`（`uly` 首段）双重排除。`instrument_id` 允许为空（建目标时行情尚未同步），只按 id 排除会让目标以候选身份重新进入，产生 `r=1.0` 的自环边。
+- **`relative_strength_snapshot.run_key` 的口径**：`target_id`、`counterparty_id`、`as_of`、`lookback_bars`、`price_basis`、`momentum_bars` 的哈希；缺少口径或动量窗口会让 `okx_close` 与 `equity_close` 撞同一键并被静默丢弃。
+- **`relation_snapshot.params`**：记录本次计算的 `lag_max`、`stability_window`、`change_threshold`、候选口径（`CORRELATION_ASSET_CLASSES`）以及被跳过的候选数与原因，便于解释为什么某些股票没有出现在边里。
+- **`relation_snapshot` 的落库时机**：只有目标序列可用时才写快照；目标行情缺失（例如 `equity_close` 无真实行情）时任务以 `partial` 结束并写 `MISSING_SOURCE`，不写空壳快照。快照存在但没有任何候选边时，`params["reason"]` 记录原因，读取接口返回 `status="undefined"`。
+- **`relative_strength_snapshot` 的落库口径**：`rs_ratio` 为窗口起点归一化为 1 的比值序列末值，`rs_momentum` 为当前 `rs_ratio` 相对 `momentum_bars` 前的相对变化（默认 `lookback/5`，至少 1 根）。读取接口计算成功后按 `run_key` 幂等写入（`ON CONFLICT DO NOTHING`），因此同一组参数重复查询不产生新行；`defined=false` 时只返回原因，不落库。
+
+
 ## 4. opportunity schema
 
 ### opportunity_run（扫描批次）

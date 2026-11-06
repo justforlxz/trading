@@ -34,6 +34,8 @@ from app.market.core.bars import bar_seconds, parse_bars
 from app.market.models import Candle, Instrument
 from app.ops.quality import detect_price_jumps, is_stale, record_issue, resolve_issues
 from app.ports.market_data import CandleRow, EquitySource
+from app.research import relations as relation_service
+from app.research import targets as target_service
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +46,7 @@ SYNC_EQUITY = "sync_equity"
 SYNC_SESSIONS = "sync_sessions"
 QUALITY_SCAN = "quality_scan"
 PURGE_ROLLING = "purge_rolling_candles"
+RECOMPUTE_RELATIONS = "recompute_relations"
 
 
 def build_okx_client() -> OkxClient:
@@ -459,6 +462,48 @@ async def purge_rolling_candles(ctx: dict[str, Any], run_id: int | None = None) 
     return await _execute(run_id, PURGE_ROLLING, body)
 
 
+async def recompute_relations(
+    ctx: dict[str, Any],
+    run_id: int | None = None,
+    *,
+    target_id: int,
+    window_bars: int,
+    method: str = "pearson",
+    price_basis: str = "okx_close",
+    as_of: datetime | None = None,
+) -> dict[str, Any]:
+    """关系重算：读行情 → 纯函数计算 → 按 `run_key` 幂等落库。"""
+
+    settings = get_settings()
+
+    async def body(session: AsyncSession) -> dict[str, Any]:
+        target = await target_service.get_target(session, target_id)
+        if target is None:
+            raise ValueError(f"unknown target_id: {target_id}")
+        outcome = await relation_service.compute_snapshot(
+            session,
+            target=target,
+            window_bars=window_bars,
+            method=method,
+            price_basis=price_basis,
+            as_of=as_of,
+            lag_max=settings.relation_lag_max,
+            stability_window=settings.relation_stability_window,
+            change_threshold=settings.relation_change_threshold,
+            bar=settings.research_bar,
+        )
+        snapshot = outcome.snapshot
+        return {
+            "status": outcome.job_status,
+            "reason": outcome.reason,
+            "run_key": None if snapshot is None else snapshot.run_key,
+            "snapshot_id": None if snapshot is None else snapshot.id,
+            "edges": outcome.edge_count,
+        }
+
+    return await _execute(run_id, RECOMPUTE_RELATIONS, body)
+
+
 TASK_FUNCTIONS = [
     sync_instruments,
     ingest_candles,
@@ -467,6 +512,7 @@ TASK_FUNCTIONS = [
     sync_sessions,
     quality_scan,
     purge_rolling_candles,
+    recompute_relations,
 ]
 
 __all__ = [
@@ -474,11 +520,13 @@ __all__ = [
     "INGEST_CANDLES",
     "PURGE_ROLLING",
     "QUALITY_SCAN",
+    "RECOMPUTE_RELATIONS",
     "SYNC_EQUITY",
     "SYNC_INSTRUMENTS",
     "SYNC_SESSIONS",
     "TASK_FUNCTIONS",
     "build_okx_client",
+    "recompute_relations",
     "run_ingest_candles",
     "run_quality_scan",
     "run_sync_equity",

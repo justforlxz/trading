@@ -1,7 +1,7 @@
 """`/api/v1` 路由装配。
 
-S4 挂载 market、ops 与 research（目标股票/关系分析）；其余资源
-（opportunities/strategies/backtests）按 `docs/plan/p1.md` 在后续阶段加入，
+挂载 market、ops、research（目标股票/关系分析）与 opportunity（全市场扫描）。
+strategies/backtests 按 `docs/plan/p1.md` 在后续阶段加入，
 语义以 `docs/architecture/api-contract.md` 为准。
 """
 
@@ -9,11 +9,15 @@ from fastapi import APIRouter
 
 from app import __version__
 from app.api.v1 import market, ops, research
+from app.opportunity import api as opportunity_api
 
 router = APIRouter(prefix="/api/v1", tags=["ops"])
 router.include_router(market.router)
 router.include_router(ops.router)
 router.include_router(research.router)
+router.include_router(opportunity_api.router)
+router.include_router(opportunity_api.cluster_router)
+router.include_router(opportunity_api.market_router)
 
 
 @router.get("")

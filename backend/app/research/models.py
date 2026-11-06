@@ -26,6 +26,7 @@ from app.db.base import Base
 
 SCHEMA = "research"
 RATIO = Numeric(12, 10)
+PRICE = Numeric(20, 10)
 
 
 class TargetSymbol(Base):
@@ -134,8 +135,39 @@ class RelativeStrengthSnapshot(Base):
     run_key: Mapped[str] = mapped_column(Text, nullable=False)
 
 
+class MarketSnapshot(Base):
+    """全市场特征截面（P1-11）：每个 `as_of` 每只标的至多一行。
+
+    `run_id` 只用于溯源（哪个扫描批次产生），**不参与唯一键**：同一截面时刻
+    重跑只更新自身，不会因为批次不同而出现重复截面。
+    """
+
+    __tablename__ = "market_snapshot"
+    __table_args__: ClassVar[Any] = (
+        UniqueConstraint("as_of", "instrument_id", name="uq_market_snapshot_key"),
+        {"schema": SCHEMA},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    as_of: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    run_id: Mapped[int | None] = mapped_column(BigInteger)
+    instrument_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("market.instrument.id", ondelete="CASCADE"), nullable=False
+    )
+    ret_1d: Mapped[Decimal | None] = mapped_column(RATIO)
+    ret_5d: Mapped[Decimal | None] = mapped_column(RATIO)
+    ret_20d: Mapped[Decimal | None] = mapped_column(RATIO)
+    vol_20d: Mapped[Decimal | None] = mapped_column(RATIO)
+    atr_14: Mapped[Decimal | None] = mapped_column(PRICE)
+    volume_z: Mapped[Decimal | None] = mapped_column(RATIO)
+    high_20d: Mapped[Decimal | None] = mapped_column(PRICE)
+    low_20d: Mapped[Decimal | None] = mapped_column(PRICE)
+    extras: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+
+
 __all__ = [
     "SCHEMA",
+    "MarketSnapshot",
     "RelationEdge",
     "RelationSnapshot",
     "RelativeStrengthSnapshot",

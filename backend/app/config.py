@@ -73,6 +73,21 @@ class Settings(BaseSettings):
     relation_change_threshold: float = 0.2
     relative_strength_lookback: int = 60
 
+    # S5 全市场机会发现：特征窗口、聚类与机会判定阈值都从配置注入，不写死在函数里。
+    opportunity_bar: str = "1d"
+    opportunity_lookback_bars: int = 60
+    opportunity_min_overlap: int = 20
+    opportunity_cluster_threshold: float = 0.6
+    opportunity_min_cluster_size: int = 3
+    opportunity_min_correlation: float = 0.6
+    opportunity_spread_z: float = 1.5
+    opportunity_resonance_threshold: float = 0.6
+    opportunity_anomaly_window: int = 20
+    opportunity_anomaly_min_corr: float = 0.7
+    opportunity_anomaly_min_delta: float = 0.4
+    opportunity_max_pairs: int = 40
+    opportunity_scan_interval_seconds: int = 3600
+
 
 @lru_cache
 def get_settings() -> Settings:

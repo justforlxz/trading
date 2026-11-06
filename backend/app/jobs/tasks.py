@@ -32,6 +32,7 @@ from app.market import sessions as session_service
 from app.market import sync_status
 from app.market.core.bars import bar_seconds, parse_bars
 from app.market.models import Candle, Instrument
+from app.opportunity import scanner as opportunity_scanner
 from app.ops.quality import detect_price_jumps, is_stale, record_issue, resolve_issues
 from app.ports.market_data import CandleRow, EquitySource
 from app.research import relations as relation_service
@@ -47,6 +48,7 @@ SYNC_SESSIONS = "sync_sessions"
 QUALITY_SCAN = "quality_scan"
 PURGE_ROLLING = "purge_rolling_candles"
 RECOMPUTE_RELATIONS = "recompute_relations"
+SCAN_OPPORTUNITIES = "scan_opportunities"
 
 
 def build_okx_client() -> OkxClient:
@@ -504,6 +506,30 @@ async def recompute_relations(
     return await _execute(run_id, RECOMPUTE_RELATIONS, body)
 
 
+async def scan_opportunities(
+    ctx: dict[str, Any],
+    run_id: int | None = None,
+    *,
+    as_of: datetime | None = None,
+    universe: list[str] | None = None,
+    params: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """全市场扫描：特征截面 → 聚类 → 机会生成，按 `run_key` 幂等。"""
+
+    async def body(session: AsyncSession) -> dict[str, Any]:
+        outcome = await opportunity_scanner.scan(
+            session, as_of=as_of, universe=universe, params=params
+        )
+        return {
+            "status": outcome.status,
+            "run_id": outcome.run.id,
+            "run_key": outcome.run.run_key,
+            "counts": outcome.counts,
+        }
+
+    return await _execute(run_id, SCAN_OPPORTUNITIES, body)
+
+
 TASK_FUNCTIONS = [
     sync_instruments,
     ingest_candles,
@@ -513,6 +539,7 @@ TASK_FUNCTIONS = [
     quality_scan,
     purge_rolling_candles,
     recompute_relations,
+    scan_opportunities,
 ]
 
 __all__ = [
@@ -521,6 +548,7 @@ __all__ = [
     "PURGE_ROLLING",
     "QUALITY_SCAN",
     "RECOMPUTE_RELATIONS",
+    "SCAN_OPPORTUNITIES",
     "SYNC_EQUITY",
     "SYNC_INSTRUMENTS",
     "SYNC_SESSIONS",
@@ -531,4 +559,5 @@ __all__ = [
     "run_quality_scan",
     "run_sync_equity",
     "run_sync_instruments",
+    "scan_opportunities",
 ]

@@ -35,6 +35,11 @@ def build_schedule(settings: Settings | None = None) -> list[PeriodicTask]:
         PeriodicTask(
             tasks.SYNC_SESSIONS, tasks.SYNC_SESSIONS, current.sync_sessions_interval_seconds
         ),
+        PeriodicTask(
+            tasks.SCAN_OPPORTUNITIES,
+            tasks.SCAN_OPPORTUNITIES,
+            current.opportunity_scan_interval_seconds,
+        ),
         PeriodicTask(tasks.PURGE_ROLLING, tasks.PURGE_ROLLING, current.retention_interval_seconds),
     ]
 

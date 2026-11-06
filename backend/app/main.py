@@ -4,10 +4,12 @@
 """
 
 import logging
+from uuid import uuid4
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 
 from app import __version__
+from app.api.errors import REQUEST_ID_HEADER, install_error_handlers
 from app.api.v1 import router as api_v1_router
 from app.config import get_settings
 from app.ops.health import router as ops_router
@@ -29,6 +31,16 @@ def create_app() -> FastAPI:
         redoc_url=None,
         openapi_url="/openapi.json",
     )
+    install_error_handlers(app)
+
+    @app.middleware("http")
+    async def attach_request_id(request: Request, call_next):
+        request_id = request.headers.get(REQUEST_ID_HEADER) or uuid4().hex
+        request.state.request_id = request_id
+        response = await call_next(request)
+        response.headers[REQUEST_ID_HEADER] = request_id
+        return response
+
     app.include_router(ops_router)
     app.include_router(api_v1_router)
     logger.info("trading api initialized: env=%s version=%s", settings.app_env, __version__)

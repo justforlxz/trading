@@ -52,7 +52,7 @@ K 线锚定规则（实测，见 `docs/risk/external-dependencies.md`）：
 | `inst_id` | TEXT | 例 `AAPL-USDT-SWAP` |
 | `inst_family` / `uly` | TEXT | 例 `AAPL-USDT` |
 | `inst_category` | SMALLINT | OKX 原始值：1 加密、3 股票、4 商品、5 外汇、6 债券 |
-| `asset_class` | TEXT | 内部归类：`us_equity` / `foreign_equity` / `etf` / `index` / `private_company` / `commodity` / `crypto` |
+| `asset_class` | TEXT | 内部归类：`us_equity` / `foreign_equity` / `etf` / `index` / `private_company` / `commodity` / `crypto` / `unclassified` |
 | `exchange` | TEXT NULL | 映射到的真实交易所（`XNAS`/`XNYS`/`NYSE_ARCA` 等），无法映射则 NULL |
 | `ct_val` / `ct_val_ccy` | NUMERIC / TEXT | 合约面值，`AAPL` 为 `1 AAPL` |
 | `lot_sz` / `min_sz` / `tick_sz` | NUMERIC(24,10)/(20,10) | 下单与回测取整依据 |
@@ -94,11 +94,28 @@ K 线锚定规则（实测，见 `docs/risk/external-dependencies.md`）：
 | `source` | TEXT | `okx_rest` / `okx_history` |
 | `ingested_at` | TIMESTAMPTZ | |
 
-唯一键：`UNIQUE (instrument_id, bar, open_time)`。幂等：`ON CONFLICT DO UPDATE`，禁止删除重插。分区：`PARTITION BY RANGE (open_time)` 按月。
+唯一键：`UNIQUE (instrument_id, bar, open_time)`。幂等：`ON CONFLICT DO UPDATE`，禁止删除重插。
+
+**与初版设计的偏差（S3 实施记录）**：初版写「`PARTITION BY RANGE (open_time)` 按月」。但 `candle` 同时承载 1m 到 1d 六种周期，按 `open_time` 单键分区时同一分区内混有短周期与长周期数据，无法只清短周期；而保留策略要求 1m/5m/15m 滚动 90 天、1h 及以上全量。因此改为**不分区**，保留任务按 `bar` 行级批量 `DELETE`（见 §9 与 `docs/market-data.md`）。改变保留策略或数据量级需要重新评估分区方案。
 
 ### equity_candle（真实股票 K 线）
 
 字段同 `candle`，但 `equity_asset_id` 外键，另加 `session`（`PRE`/`REGULAR`/`POST`）与 `interval`（`1m`/`1d`）。唯一键：`UNIQUE (equity_asset_id, interval, ts)`。
+
+### basis_snapshot（合约与真实股价基差）
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | BIGSERIAL PK | |
+| `instrument_id` | BIGINT FK → `market.instrument.id` | 合约标的 |
+| `symbol` | TEXT | 冗余股票代码，便于按 symbol 查询 |
+| `ts` | TIMESTAMPTZ | 真实行情时间戳（`EquityQuote.ts`） |
+| `okx_price` / `equity_price` | NUMERIC(20,10) | 同一时刻的合约价与真实价 |
+| `basis_bps` | NUMERIC(12,4) | `(okx / equity - 1) * 10000`，基点 |
+| `source` | TEXT | 真实行情来源（`yahoo` / `none`） |
+| `created_at` | TIMESTAMPTZ | |
+
+唯一键：`UNIQUE (instrument_id, ts)`。幂等：`ON CONFLICT DO UPDATE`。基差绝对值超过 `basis_alert_bps`（默认 500bps）时另写一条 `data_quality_issue(kind=OUTLIER, dataset=market.basis)`。
 
 ### market_session（交易时段）
 
@@ -108,7 +125,7 @@ K 线锚定规则（实测，见 `docs/risk/external-dependencies.md`）：
 | `trading_date` | DATE | 交易所本地日 |
 | `pre_start` / `pre_end` / `regular_start` / `regular_end` / `post_start` / `post_end` | TIMESTAMPTZ | 当日时段边界 |
 | `is_half_day` / `is_holiday` | BOOLEAN | |
-| `calendar_source` / `calendar_version` | TEXT | 例 `exchange_calendars` + 版本号 |
+| `calendar_source` / `calendar_version` | TEXT | 本实现为内置规则 `builtin:us-equity-v1` + `v1`（`exchange_calendars` 只作测试 oracle，不进运行时） |
 
 唯一键：`UNIQUE (venue, trading_date)`。幂等：按日 upsert。
 
@@ -204,7 +221,7 @@ K 线锚定规则（实测，见 `docs/risk/external-dependencies.md`）：
 
 ### job_run（任务账本）
 
-`id`、`job_name`、`job_key`、`status`（`queued`/`running`/`ok`/`failed`/`skipped`）、`attempts`、`scheduled_at`、`started_at`、`finished_at`、`worker`、`error`、`payload_hash`、`result JSONB`。唯一键：`UNIQUE (job_name, job_key)`。
+`id`、`job_name`、`job_key`、`status`（`queued`/`running`/`ok`/`partial`/`failed`/`skipped`）、`attempts`、`scheduled_at`、`started_at`、`finished_at`、`worker`、`error`、`payload_hash`、`result JSONB`。唯一键：`UNIQUE (job_name, job_key)`。`partial` 表示任务已完成但有标的或周期采集失败，缺口已写 `data_quality_issue`。
 
 ### audit_log（审计）
 
@@ -232,7 +249,9 @@ K 线锚定规则（实测，见 `docs/risk/external-dependencies.md`）：
 | `4h` | 全量 | ~0.34M |
 | `1d` | 全量 | ~0.06M |
 
-合计约 3900 万行，单机 PostgreSQL 可承载（分区 + `(instrument_id, bar, open_time)` 索引）。保留任务按月删除过期分区，删除前必须确认对应 `data_source_sync` 已记录覆盖区间。
+合计约 3900 万行，单机 PostgreSQL 可承载（`(instrument_id, bar, open_time)` 唯一索引）。行数按 227 个股票类合约与约 248 天历史估算；当前实测标的池为 230 个股票类合约且会继续增长，容量评估需随之更新。
+
+保留任务（`app/market/retention.py`）按 `bar` 分组删除早于 cutoff 的行，每批 `batch_size`（默认 5000）提交一次，避免长事务与锁膨胀；`1h/4h/1d` 不参与清理。删除前必须确认对应 `data_source_sync` 已记录覆盖区间。
 
 ## 10. 命名与枚举
 

@@ -10,20 +10,48 @@ import contextlib
 import logging
 import signal
 import time
+from collections.abc import Awaitable, Callable
 
 from redis.asyncio import Redis
 
 from app.config import get_settings
+from app.jobs.queue import enqueue_task
+from app.jobs.schedule import SCHEDULE_KEY_PREFIX, PeriodicTask, build_schedule
 
 logger = logging.getLogger(__name__)
 
 HEARTBEAT_KEY = "trading:ops:scheduler:heartbeat"
 
 
-async def tick(redis: Redis, timeout_seconds: float) -> None:
-    """一次调度周期：写心跳（S3 起在此投递任务）。"""
+async def tick(
+    redis: Redis,
+    timeout_seconds: float,
+    *,
+    schedule: list[PeriodicTask] | None = None,
+    enqueue: Callable[[str], Awaitable[object]] | None = None,
+) -> None:
+    """一次调度周期：写心跳，并把到期的周期任务投递出去。
+
+    到期判定用 `SET NX EX`，间隔即租约；投递失败会释放租约，下个心跳重试。
+    """
 
     await redis.set(HEARTBEAT_KEY, int(time.time()), ex=int(timeout_seconds * 2))
+    tasks = schedule if schedule is not None else build_schedule()
+    dispatch = enqueue if enqueue is not None else _enqueue_default
+    for task in tasks:
+        key = f"{SCHEDULE_KEY_PREFIX}{task.name}"
+        acquired = await redis.set(key, "1", nx=True, ex=max(task.interval_seconds, 1))
+        if not acquired:
+            continue
+        try:
+            await dispatch(task.task_name)
+        except Exception:
+            logger.exception("failed to enqueue %s; releasing lease", task.task_name)
+            await redis.delete(key)
+
+
+async def _enqueue_default(task_name: str) -> object:
+    return await enqueue_task(task_name)
 
 
 async def run() -> None:

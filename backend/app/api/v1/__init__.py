@@ -1,15 +1,17 @@
-"""`/api/v1` 路由前缀占位。
+"""`/api/v1` 路由装配。
 
-S2 只挂载前缀与自述端点；业务资源（market/targets/opportunities/strategies/
-backtests/ops）按 `docs/plan/p1.md` 在 S3 起逐个加入，路由语义以
-`docs/architecture/api-contract.md` 为准。
+S3 挂载 market 与 ops；其余资源（targets/opportunities/strategies/backtests）
+按 `docs/plan/p1.md` 在后续阶段加入，语义以 `docs/architecture/api-contract.md` 为准。
 """
 
 from fastapi import APIRouter
 
 from app import __version__
+from app.api.v1 import market, ops
 
 router = APIRouter(prefix="/api/v1", tags=["ops"])
+router.include_router(market.router)
+router.include_router(ops.router)
 
 
 @router.get("")

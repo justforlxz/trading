@@ -1,132 +1,87 @@
 #!/usr/bin/env python3
-"""真实美股行情源探针（只读，无需 API key）。
-
-用途：S1 调研「美股真实行情」可得性，并给出 OKX 合约价与真实股票价的
-可比性证据。文档 docs/risk/external-dependencies.md 引用本脚本输出。
+"""真实美股行情探针：免 key、只用标准库，验证 Yahoo chart v8 是否可用。
 
 用法：
     python3 scripts/probes/equity_probe.py chart AAPL 1d 5d
-    python3 scripts/probes/equity_probe.py prepost AAPL
-    python3 scripts/probes/equity_probe.py v7-quote AAPL     # 预期失败，记录失败形态
-    python3 scripts/probes/equity_probe.py all
+    python3 scripts/probes/equity_probe.py chart SPY 1h 5d
 
-说明：
-- Yahoo Finance chart v8 是非官方公开端点，无需 key，但**没有 SLA**，
-  随时可能变更或封禁。本脚本只用于事实采集与回归对比，不作为运行时依赖的
-  唯一证据；是否采用见 docs/risk/external-dependencies.md 的决策项。
-- 任何非 200 都按失败原样打印，不重试、不伪造数据。
+输出交易日/数据点数量与首末收盘价，并标注来源与抓取时间。
+取不到数据时打印 `MISSING_SOURCE` 并以退出码 2 结束——**不会**用 OKX 指数
+价或任何合成值顶替真实行情（见 `docs/risk/external-dependencies.md` §2.9）。
 """
 
-from __future__ import annotations
-
+import argparse
 import json
 import sys
-import time
 import urllib.error
+import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-UA = "Mozilla/5.0 (X11; Linux x86_64) trading-probe/1.0"
-TIMEOUT = 20
-
-
-def utcnow() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) trading-equity-probe/0.1"
 
 
-def fetch(url: str) -> tuple[int, bytes]:
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
-    started = time.monotonic()
+def fetch_chart(symbol: str, interval: str, range_: str, timeout: float = 10.0) -> dict:
+    query = urllib.parse.urlencode(
+        {"range": range_, "interval": interval, "includePrePost": "false"}
+    )
+    request = urllib.request.Request(
+        f"{CHART_URL.format(symbol=symbol)}?{query}",
+        headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
+        return json.loads(response.read().decode("utf-8"))
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="真实美股行情探针（Yahoo chart v8）")
+    sub = parser.add_subparsers(dest="command", required=True)
+    chart = sub.add_parser("chart", help="抓取 K 线并打印覆盖情况")
+    chart.add_argument("symbol", help="股票代码，例如 AAPL")
+    chart.add_argument("interval", nargs="?", default="1d", help="K 线周期，默认 1d")
+    chart.add_argument("range_", metavar="RANGE", nargs="?", default="5d", help="时间范围，默认 5d")
+    args = parser.parse_args(argv)
+
+    fetched_at = datetime.now(tz=UTC).isoformat()
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
-            body = resp.read()
-            status = resp.status
-    except urllib.error.HTTPError as exc:
-        body = exc.read()
-        status = exc.code
-    elapsed = time.monotonic() - started
-    print(f"[{utcnow()}] GET {url} -> HTTP {status} in {elapsed:.2f}s, {len(body)} bytes")
-    return status, body
+        payload = fetch_chart(args.symbol, args.interval, args.range_)
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError) as error:
+        print(f"MISSING_SOURCE: yahoo chart v8 unavailable: {error}", file=sys.stderr)
+        return 2
 
+    result = (payload.get("chart") or {}).get("result") or []
+    if not result:
+        error = (payload.get("chart") or {}).get("error")
+        print(f"MISSING_SOURCE: empty chart result ({error})", file=sys.stderr)
+        return 2
 
-def cmd_chart(symbol: str, interval: str, rng: str) -> None:
-    url = (
-        f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
-        f"?interval={interval}&range={rng}"
+    entry = result[0]
+    timestamps = entry.get("timestamp") or []
+    quote = ((entry.get("indicators") or {}).get("quote") or [{}])[0]
+    closes = quote.get("close") or []
+    points = [
+        (int(ts), close) for ts, close in zip(timestamps, closes, strict=False) if close is not None
+    ]
+    if not points:
+        print("MISSING_SOURCE: chart has no usable closes", file=sys.stderr)
+        return 2
+
+    first_ts, first_close = points[0]
+    last_ts, last_close = points[-1]
+    meta = entry.get("meta") or {}
+    print(f"source=yahoo chart v8 symbol={args.symbol} interval={args.interval} range={args.range_}")
+    print(f"fetched_at={fetched_at}")
+    print(f"points={len(points)}")
+    print(
+        "first="
+        f"{datetime.fromtimestamp(first_ts, tz=UTC).isoformat()} close={first_close}"
     )
-    status, body = fetch(url)
-    if status != 200:
-        print(f"FAILED status={status} body={body[:400]!r}")
-        raise SystemExit(2)
-    payload = json.loads(body)
-    result = payload["chart"]["result"][0]
-    meta = result["meta"]
-    keep = {
-        k: meta.get(k)
-        for k in (
-            "symbol",
-            "currency",
-            "exchangeName",
-            "instrumentType",
-            "exchangeTimezoneName",
-            "gmtoffset",
-            "regularMarketPrice",
-            "regularMarketTime",
-            "hasPrePostMarketData",
-        )
-    }
-    print("meta: " + json.dumps(keep, ensure_ascii=False))
-    ts = result.get("timestamp") or []
-    print(f"points={len(ts)}")
-    if ts:
-        closes = result["indicators"]["quote"][0].get("close") or []
-        print(f"first_ts={ts[0]} last_ts={ts[-1]}")
-        print(f"first_close={closes[0]} last_close={closes[-1]}")
-
-
-def cmd_prepost(symbol: str) -> None:
-    url = (
-        f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
-        "?interval=1m&range=1d&includePrePost=true"
-    )
-    status, body = fetch(url)
-    if status != 200:
-        print(f"FAILED status={status} body={body[:400]!r}")
-        raise SystemExit(2)
-    result = json.loads(body)["chart"]["result"][0]
-    meta = result["meta"]
-    print("currentTradingPeriod: " + json.dumps(meta.get("currentTradingPeriod"), ensure_ascii=False))
-    print("hasPrePostMarketData: " + json.dumps(meta.get("hasPrePostMarketData")))
-    print(f"points={len(result.get('timestamp') or [])}")
-
-
-def cmd_v7_quote(symbol: str) -> None:
-    """Yahoo v7 quote 需要 crumb/cookie，本探针用于记录它的失败形态。"""
-    url = f"https://query1.finance.yahoo.com/v7/finance/quote?symbols={symbol}"
-    status, body = fetch(url)
-    print(f"status={status} body={body[:300]!r}")
-
-
-def main(argv: list[str]) -> int:
-    if not argv or argv[0] in ("-h", "--help"):
-        print(__doc__)
-        return 0
-    cmd, rest = argv[0], argv[1:]
-    if cmd == "chart":
-        cmd_chart(rest[0], rest[1] if len(rest) > 1 else "1d", rest[2] if len(rest) > 2 else "5d")
-    elif cmd == "prepost":
-        cmd_prepost(rest[0] if rest else "AAPL")
-    elif cmd == "v7-quote":
-        cmd_v7_quote(rest[0] if rest else "AAPL")
-    elif cmd == "all":
-        cmd_chart("AAPL", "1d", "5d")
-        cmd_prepost("AAPL")
-        cmd_v7_quote("AAPL")
-    else:
-        print(f"unknown command: {cmd}", file=sys.stderr)
-        return 1
+    print(f"last={datetime.fromtimestamp(last_ts, tz=UTC).isoformat()} close={last_close}")
+    if meta.get("regularMarketPrice") is not None:
+        print(f"regularMarketPrice={meta['regularMarketPrice']}")
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(sys.argv[1:]))
+    raise SystemExit(main())

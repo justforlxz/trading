@@ -28,6 +28,41 @@ class Settings(BaseSettings):
     scheduler_heartbeat_interval_seconds: float = 5.0
     scheduler_heartbeat_timeout_seconds: float = 30.0
 
+    # 公共行情接口（P1 只用公开 REST，不接私有/下单接口）。
+    okx_rest_base_url: str = "https://www.okx.com"
+    okx_http_timeout_seconds: float = 10.0
+    # 实测限流阈值：/market/candles 40 次/2s，/market/history-candles 20 次/2s。
+    okx_candles_rate_limit: int = 40
+    okx_history_rate_limit: int = 20
+    okx_rate_limit_window_seconds: float = 2.0
+    okx_max_retries: int = 4
+    okx_retry_backoff_seconds: float = 0.5
+
+    # 真实美股行情源：yahoo（免 key，无 SLA）或 none（显式缺失）。
+    equity_source: str = "yahoo"
+    equity_http_timeout_seconds: float = 10.0
+    equity_symbol_suffix: str = ""
+    equity_daily_lookback_days: int = 10
+    # 周期同步的真实行情标的（股票代码，逗号分隔）。P1 先控制在少量标的，
+    # 避免每 5 分钟对 175 个标的打满 Yahoo 的无 SLA 接口。
+    equity_sync_symbols: str = "AAPL,SPY,QQQ,NVDA,TSLA"
+
+    # 采集周期任务：秒为单位的调度间隔。
+    sync_instruments_interval_seconds: int = 3600
+    ingest_candles_interval_seconds: int = 60
+    sync_equity_interval_seconds: int = 300
+    quality_interval_seconds: int = 900
+    retention_interval_seconds: int = 86400
+
+    # 周期采集的 bar 与标的范围（P1 不扫全市场，靠 /market/backfill 补齐单标的）。
+    ingest_bars: str = "1m,5m,15m,1h,4h,1d"
+    candle_ingest_symbols: str = "AAPL,SPY,QQQ,NVDA,TSLA"
+
+    # 保留策略与质量阈值。
+    rolling_retention_days: int = 90
+    basis_alert_bps: int = 500
+    stale_after_seconds: int = 600
+
 
 @lru_cache
 def get_settings() -> Settings:

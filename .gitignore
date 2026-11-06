@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+build/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# 环境变量与密钥（.env.example 是唯一允许入库的样本）
+.env
+.env.local
+*.pem
+*.key
+
+# 工具与系统
+.DS_Store
+.idea/
+.vscode/

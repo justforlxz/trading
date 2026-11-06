@@ -7,7 +7,8 @@ from itertools import pairwise
 from sqlalchemy import select
 
 from app.api.v1 import market as market_api
-from app.jobs import tasks
+from app.jobs import runs, tasks
+from app.market import sync_status
 from app.market.candles import upsert_candles
 from app.market.equity import record_basis
 from app.market.instruments import count_instruments
@@ -167,3 +168,82 @@ async def test_basis_endpoint_returns_snapshot(session, client) -> None:
     assert len(items) == 1
     assert items[0]["source"] == "yahoo"
     assert items[0]["equity_price"] == "344.1700000000"
+
+
+async def test_failed_run_can_be_retried_with_same_payload(session, client, monkeypatch) -> None:
+    calls: list[object] = []
+
+    async def fake_dispatch(task_name: str, **kwargs: object) -> None:
+        calls.append(kwargs.get("run_id"))
+
+    monkeypatch.setattr(market_api, "dispatch", fake_dispatch)
+
+    first = await client.post("/api/v1/market/sync/instruments")
+    run_id = first.json()["job_id"]
+    await runs.finish_run(session, run_id, "failed", error="boom")
+
+    second = await client.post("/api/v1/market/sync/instruments")
+    assert second.status_code == 202
+    assert second.json()["job_id"] == run_id
+    assert len(calls) == 2
+
+
+async def test_partial_run_can_be_retried_with_same_payload(session, client, monkeypatch) -> None:
+    calls: list[object] = []
+
+    async def fake_dispatch(task_name: str, **kwargs: object) -> None:
+        calls.append(kwargs.get("run_id"))
+
+    monkeypatch.setattr(market_api, "dispatch", fake_dispatch)
+
+    first = await client.post("/api/v1/market/sync/instruments")
+    run_id = first.json()["job_id"]
+    await runs.finish_run(session, run_id, "partial", result={"status": "partial"})
+
+    second = await client.post("/api/v1/market/sync/instruments")
+    assert second.status_code == 202
+    assert len(calls) == 2
+
+
+async def test_sync_status_reports_ledger_and_stale(session, client) -> None:
+    now = datetime.now(tz=UTC)
+    await sync_status.record_sync(
+        session,
+        source=sync_status.SOURCE_OKX,
+        dataset=sync_status.DATASET_INSTRUMENTS,
+        scope="SWAP",
+        window_start=now,
+        window_end=now,
+        status="ok",
+        rows_written=543,
+    )
+    await session.commit()
+
+    body = (await client.get("/api/v1/market/sync-status")).json()
+    items = {(item["source"], item["dataset"], item["scope"]): item for item in body["items"]}
+    item = items[("okx", "market.instrument", "SWAP")]
+    assert item["status"] == "ok"
+    assert item["last_success_at"] is not None
+    assert item["stale"] is False
+    assert body["stale"] == 0
+
+
+async def test_quality_issues_supports_status_filter(session, client) -> None:
+    await record_issue(
+        session,
+        dataset="market.candle",
+        scope_id="AAPL-USDT-SWAP:1h",
+        kind="GAP",
+        window_start=datetime(2026, 11, 6, 1, 0, tzinfo=UTC),
+    )
+    await session.commit()
+
+    open_items = (await client.get("/api/v1/market/quality-issues?status=open")).json()["items"]
+    resolved_items = (await client.get("/api/v1/market/quality-issues?status=resolved")).json()[
+        "items"
+    ]
+    assert len(open_items) == 1
+    assert resolved_items == []
+
+    bad = await client.get("/api/v1/market/quality-issues?status=bogus")
+    assert bad.status_code == 400

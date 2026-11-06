@@ -14,11 +14,12 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.market import sync_status
 from app.market.core.bars import bar_seconds, normalize_bar
 from app.market.core.candles import find_gaps
 from app.market.core.coverage import coverage_by_day, summarize
 from app.market.models import Candle, Instrument
-from app.ops.quality import record_issue
+from app.ops.quality import record_issue, resolve_issues
 from app.ports.market_data import CandleRow, CandleSource
 
 DATASET = "market.candle"
@@ -148,6 +149,15 @@ async def record_gaps(
         )
     )
     gaps = find_gaps(actual, start, end, bar)
+    # 先关闭该窗口内已补齐的历史缺口，再登记仍然缺失的（幂等键不会误关新缺口）。
+    await resolve_issues(
+        session,
+        dataset=DATASET,
+        scope_id=f"{instrument.inst_id}:{bar}",
+        kind="GAP",
+        since=start,
+        until=end,
+    )
     for gap_start, gap_end in gaps:
         await record_issue(
             session,
@@ -218,12 +228,23 @@ async def ingest_recent(
 
     moment = now or datetime.now(tz=UTC)
     written: dict[str, int] = {}
+    bucket_start, bucket_end = sync_status.day_bucket(moment)
     for bar in bars:
         normalized = normalize_bar(bar)
         rows = await source.fetch_candles(instrument.inst_id, normalized, limit=limit)
         written[normalized] = await upsert_candles(session, instrument.id, rows)
         start, end = _gap_window(normalized, moment)
         await record_gaps(session, instrument=instrument, bar=normalized, start=start, end=end)
+        await sync_status.record_sync(
+            session,
+            source="okx",
+            dataset=DATASET,
+            scope=f"{instrument.inst_id}:{normalized}",
+            window_start=bucket_start,
+            window_end=bucket_end,
+            status="ok",
+            rows_written=written[normalized],
+        )
     await session.commit()
     return written
 
@@ -246,6 +267,17 @@ async def backfill(
     )
     written = await upsert_candles(session, instrument.id, rows)
     gaps = await record_gaps(session, instrument=instrument, bar=normalized, start=start, end=end)
+    await sync_status.record_sync(
+        session,
+        source="okx",
+        dataset=DATASET,
+        scope=f"{instrument.inst_id}:{normalized}",
+        window_start=start,
+        window_end=end,
+        status="partial" if gaps else "ok",
+        rows_written=written,
+        error=None if not gaps else f"{len(gaps)} gap(s) remain",
+    )
     await session.commit()
     return BackfillResult(
         inst_id=instrument.inst_id, bar=normalized, rows_written=written, gaps=gaps
@@ -315,18 +347,11 @@ async def list_candles(
     return rows[:limit], next_cursor
 
 
-def expected_window_end(start: datetime, end: datetime, bar: str) -> datetime:
-    """把 `[start, end)` 对齐到周期边界，供覆盖率与缺口计算共用。"""
-
-    return end if end > start else start + timedelta(seconds=bar_seconds(bar))
-
-
 __all__ = [
     "DATASET",
     "BackfillResult",
     "backfill",
     "coverage",
-    "expected_window_end",
     "ingest_recent",
     "latest_open_time",
     "list_candles",

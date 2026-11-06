@@ -104,13 +104,13 @@
 
 **`GET /api/v1/market/candles`** — `inst_id`（必填）、`bar`（枚举 `1m|5m|15m|1h|4h|1d`）、`start`、`end`、`limit`、`cursor`。返回按 `open_time` 升序，含 `confirm` 标记；未收盘 bar 返回但 `confirm=false`。
 
-**`POST /api/v1/market/backfill`** — body `{inst_id, bar, start, end}`，`202`。重复提交同一区间由 `data_source_sync` 唯一键吸收。
+**`POST /api/v1/market/backfill`** — body `{inst_id, bar, start, end}`，`202`。重复提交同一区间由 `ops.job_run` 幂等键吸收（`failed`/`partial` 允许同键重试），每次执行刷新 `data_source_sync` 账本。
 
 **`GET /api/v1/market/sessions`** — `from`、`to`（默认最近 30 天），返回 `market_session` 行；`venue` 固定 `XNYS`。
 
-**`GET /api/v1/market/sync-status`** — 按 `source`/`dataset`/`scope` 聚合的最新同步状态、`last_success_at`、`stale` 布尔。
+**`GET /api/v1/market/sync-status`** — 返回 `items[]`：按 `source`/`dataset`/`scope` 聚合的最新同步状态（`status`、`window_start/end`、`rows_written`、`last_error`、`last_success_at`、`age_seconds`）与 `stale` 布尔（按数据集采集间隔 ×3 判定），并附 `stale` 计数、标的数与未解决质量问题数。
 
-**`GET /api/v1/market/quality-issues`** — `status=open|resolved`、`kind`、`scope_id`。
+**`GET /api/v1/market/quality-issues`** — `status=open|resolved`（`open` 只返回 `resolved_at IS NULL`）、`kind`、`scope_id`；非法 `status` 返回 400。
 
 **`GET /api/v1/market/coverage`** — `inst_id`、`bar`、`from`、`to`，返回逐日覆盖与缺口列表。
 

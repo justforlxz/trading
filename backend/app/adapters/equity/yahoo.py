@@ -19,7 +19,7 @@ CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) trading-backend/0.1"
 
 
-# Yahoo 返回的是 float32 精度（如 344.1700134277344），落库前量化到 1e-6，
+# Yahoo 返回的是 float32 精度（如 344.1700134277344），落库前量化到 1e-4，
 # 去掉浮点尾数，同时不引入任何价格修正。
 PRICE_QUANT = Decimal("0.0001")
 

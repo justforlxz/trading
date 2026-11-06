@@ -12,7 +12,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.market.core.bars import ROLLING_BARS
-from app.market.models import Candle, Instrument
+from app.market.models import Candle
 
 DEFAULT_BATCH_SIZE = 5000
 
@@ -60,13 +60,4 @@ async def purge_rolling_candles(
     return RetentionResult(cutoff=cutoff, deleted_by_bar=deleted)
 
 
-async def purge_orphan_candles(session: AsyncSession) -> int:
-    """清理失去标的引用的行（标的被下架后的兜底；FK 已 CASCADE，此处只统计）。"""
-
-    statement = delete(Candle).where(Candle.instrument_id.not_in(select(Instrument.id)))
-    result = await session.execute(statement)
-    await session.commit()
-    return int(result.rowcount or 0)
-
-
-__all__ = ["RetentionResult", "purge_orphan_candles", "purge_rolling_candles"]
+__all__ = ["RetentionResult", "purge_rolling_candles"]

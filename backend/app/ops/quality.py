@@ -11,7 +11,7 @@ from decimal import Decimal
 from itertools import pairwise
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -104,13 +104,42 @@ async def resolve_issue(
         issue.resolved_at = datetime.now(tz=UTC)
 
 
+async def resolve_issues(
+    session: AsyncSession,
+    *,
+    dataset: str,
+    scope_id: str,
+    kind: str,
+    since: datetime | None = None,
+    until: datetime | None = None,
+) -> int:
+    """把该 scope/kind 下已不再成立的问题批量标记解决（保留历史行）。"""
+
+    statement = (
+        update(DataQualityIssue)
+        .where(
+            DataQualityIssue.dataset == dataset,
+            DataQualityIssue.scope_id == scope_id,
+            DataQualityIssue.kind == kind,
+            DataQualityIssue.resolved_at.is_(None),
+        )
+        .values(resolved_at=datetime.now(tz=UTC))
+    )
+    if since is not None:
+        statement = statement.where(DataQualityIssue.window_start >= since)
+    if until is not None:
+        statement = statement.where(DataQualityIssue.window_start < until)
+    result = await session.execute(statement)
+    return int(result.rowcount or 0)
+
+
 async def list_issues(
     session: AsyncSession,
     *,
     dataset: str | None = None,
     scope_id: str | None = None,
     kind: str | None = None,
-    unresolved_only: bool = False,
+    status: str | None = None,
     limit: int = 50,
     cursor: int | None = None,
 ) -> tuple[list[DataQualityIssue], int | None]:
@@ -123,8 +152,12 @@ async def list_issues(
         statement = statement.where(DataQualityIssue.scope_id == scope_id)
     if kind:
         statement = statement.where(DataQualityIssue.kind == kind)
-    if unresolved_only:
+    if status == "open":
         statement = statement.where(DataQualityIssue.resolved_at.is_(None))
+    elif status == "resolved":
+        statement = statement.where(DataQualityIssue.resolved_at.is_not(None))
+    elif status is not None:
+        raise ValueError(f"unknown issue status: {status}")
     if cursor is not None:
         statement = statement.where(DataQualityIssue.id > cursor)
     rows = list(await session.scalars(statement))
@@ -153,10 +186,19 @@ def detect_price_jumps(rows: Sequence[CandleRow], threshold_ratio: float = 0.2) 
     return outliers
 
 
-def is_stale(latest: datetime | None, now: datetime, bar_seconds: int) -> bool:
-    """最新一根 K 线是否已超过「周期 × 3」未更新（采集停摆判定）。"""
+def is_stale(
+    latest: datetime | None,
+    now: datetime,
+    bar_seconds: int,
+    *,
+    stale_after_seconds: int = 60,
+) -> bool:
+    """最新一根 K 线是否已超过「周期 × 3」未更新（采集停摆判定）。
+
+    `stale_after_seconds` 是全局下限（配置项），避免 1m 周期因单次抖动误报。
+    """
 
     if latest is None:
         return True
-    max_age = timedelta(seconds=max(bar_seconds * 3, 60))
+    max_age = timedelta(seconds=max(bar_seconds * 3, stale_after_seconds))
     return now - latest > max_age

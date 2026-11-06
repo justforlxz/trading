@@ -16,6 +16,7 @@ from app.ports.market_data import CandleRow
 CANDLES_PATH = "/api/v5/market/candles"
 HISTORY_PATH = "/api/v5/market/history-candles"
 MAX_LIMIT = 300
+HISTORY_MAX_LIMIT = 100
 
 
 def _decimal(value: Any) -> Decimal:
@@ -89,7 +90,8 @@ class OkxCandleSource:
         if end <= start:
             raise ValueError("end must be after start")
         okx_bar = to_okx_bar(bar)
-        page_limit = min(page_limit, MAX_LIMIT)
+        # history-candles 的 limit 上限是 100（与 candles 的 300 不同）。
+        page_limit = min(page_limit, HISTORY_MAX_LIMIT)
         step_ms = bar_seconds(bar) * 1000
         start_ms = int(start.timestamp() * 1000)
         cursor = int(end.timestamp() * 1000)

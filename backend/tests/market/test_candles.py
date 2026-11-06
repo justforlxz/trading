@@ -132,3 +132,26 @@ def test_find_gaps_merges_consecutive_missing_slots() -> None:
     assert find_gaps(actual, start, start + timedelta(hours=4), "1h") == [
         (start + timedelta(hours=1), start + timedelta(hours=3))
     ]
+
+
+async def test_gap_resolves_after_backfill_same_window(session) -> None:
+    """缺口补齐后同一窗口的 GAP 记录转为 resolved，不残留 open。"""
+
+    instrument = await insert_instrument(session)
+    start = datetime(2026, 11, 6, 0, 0, tzinfo=UTC)
+    rows = make_candle_rows(start=start, count=4)
+    await upsert_candles(session, instrument.id, [rows[0], rows[3]])
+
+    end = start + timedelta(hours=4)
+    gaps = await record_gaps(session, instrument=instrument, bar="1h", start=start, end=end)
+    assert gaps
+    await session.commit()
+    issue = await session.scalar(select(DataQualityIssue).where(DataQualityIssue.kind == "GAP"))
+    assert issue is not None
+    assert issue.resolved_at is None
+
+    await upsert_candles(session, instrument.id, rows[1:3])
+    assert await record_gaps(session, instrument=instrument, bar="1h", start=start, end=end) == []
+    await session.commit()
+    await session.refresh(issue)
+    assert issue.resolved_at is not None

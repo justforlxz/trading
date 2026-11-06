@@ -24,6 +24,13 @@ class BackfillRequest(BaseModel):
         except ValueError as error:
             raise ValueError(str(error)) from error
 
+    @field_validator("start", "end")
+    @classmethod
+    def _require_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("timestamp must be timezone-aware ISO-8601 (e.g. ...Z)")
+        return value
+
     @field_validator("end")
     @classmethod
     def _check_window(cls, value: datetime, info: ValidationInfo) -> datetime:

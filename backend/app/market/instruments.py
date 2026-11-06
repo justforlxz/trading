@@ -127,7 +127,8 @@ async def list_instruments(
     if inst_category is not None:
         statement = statement.where(Instrument.inst_category == inst_category)
     if query:
-        statement = statement.where(Instrument.inst_id.ilike(f"%{query}%"))
+        escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        statement = statement.where(Instrument.inst_id.ilike(f"%{escaped}%", escape="\\"))
     rows = list(await session.scalars(statement))
     next_cursor = rows[limit - 1].inst_id if len(rows) > limit else None
     return rows[:limit], next_cursor

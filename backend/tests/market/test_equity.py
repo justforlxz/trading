@@ -146,3 +146,31 @@ async def test_equity_asset_symbol_mapping(session, symbol: str) -> None:
 
     instruments = await session.scalar(select(func.count()).select_from(Instrument))
     assert instruments == 1
+
+
+async def test_missing_source_is_deduped_per_day(session) -> None:
+    """同一标的连续两轮不可用只保留一条 MISSING_SOURCE（自然日去重窗口）。"""
+
+    await insert_instrument(session, "AAPL-USDT-SWAP")
+    await sync_equity_candles(session, FakeEquitySource(unavailable=True))
+    await sync_equity_candles(session, FakeEquitySource(unavailable=True))
+
+    rows = list(
+        await session.scalars(
+            select(DataQualityIssue).where(DataQualityIssue.kind == "MISSING_SOURCE")
+        )
+    )
+    assert len(rows) == 1
+    assert rows[0].resolved_at is None
+
+
+async def test_missing_source_resolves_after_success(session) -> None:
+    await insert_instrument(session, "AAPL-USDT-SWAP")
+    await sync_equity_candles(session, FakeEquitySource(unavailable=True))
+    await sync_equity_candles(session, FakeEquitySource(make_equity_rows(5)))
+
+    issue = await session.scalar(
+        select(DataQualityIssue).where(DataQualityIssue.kind == "MISSING_SOURCE")
+    )
+    assert issue is not None
+    assert issue.resolved_at is not None

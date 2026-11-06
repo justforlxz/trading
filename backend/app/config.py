@@ -41,7 +41,6 @@ class Settings(BaseSettings):
     # 真实美股行情源：yahoo（免 key，无 SLA）或 none（显式缺失）。
     equity_source: str = "yahoo"
     equity_http_timeout_seconds: float = 10.0
-    equity_symbol_suffix: str = ""
     equity_daily_lookback_days: int = 10
     # 周期同步的真实行情标的（股票代码，逗号分隔）。P1 先控制在少量标的，
     # 避免每 5 分钟对 175 个标的打满 Yahoo 的无 SLA 接口。
@@ -53,6 +52,7 @@ class Settings(BaseSettings):
     sync_equity_interval_seconds: int = 300
     quality_interval_seconds: int = 900
     retention_interval_seconds: int = 86400
+    sync_sessions_interval_seconds: int = 86400
 
     # 周期采集的 bar 与标的范围（P1 不扫全市场，靠 /market/backfill 补齐单标的）。
     ingest_bars: str = "1m,5m,15m,1h,4h,1d"

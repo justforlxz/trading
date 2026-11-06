@@ -98,15 +98,3 @@ def out_of_order(actual: Sequence[datetime]) -> bool:
     """序列是否非严格升序。"""
 
     return any(later <= earlier for earlier, later in pairwise(actual))
-
-
-def merge_confirm(existing: bool, incoming: bool) -> bool:
-    """confirm 只能 false → true：已确认的 bar 不会被未完成 bar 覆盖。"""
-
-    return existing or incoming
-
-
-def truncate_to_now[T](rows: Iterable[T], now: datetime, key: Callable[[T], datetime]) -> list[T]:
-    """丢弃 open_time 落在未来的 bar（上游偶发越界数据）。"""
-
-    return [row for row in rows if key(row) <= now]

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.errors import ApiError
 from app.api.v1.deps import dispatch, session_dep
 from app.api.v1.market_schemas import BackfillRequest
+from app.config import get_settings
 from app.jobs import tasks
 from app.jobs.runs import create_run
 from app.market import candles as candle_service
@@ -18,6 +19,7 @@ from app.market import instruments as instrument_service
 from app.market import sessions as session_service
 from app.market.core.bars import normalize_bar
 from app.market.models import DataQualityIssue, EquityAsset, Instrument
+from app.market.sync_status import list_sync_status
 from app.ops.quality import list_issues
 
 router = APIRouter(prefix="/market", tags=["market"])
@@ -238,16 +240,22 @@ async def quality_issues(
     dataset: str | None = None,
     scope_id: str | None = None,
     kind: str | None = None,
-    unresolved_only: bool = False,
+    status_filter: Annotated[str | None, Query(alias="status")] = None,
     limit: int = Query(50, ge=1, le=200),
     cursor: int | None = None,
 ) -> dict[str, Any]:
+    if status_filter not in (None, "open", "resolved"):
+        raise ApiError(
+            "INVALID_STATUS",
+            f"status must be open or resolved, got {status_filter!r}",
+            status_code=400,
+        )
     rows, next_cursor = await list_issues(
         session,
         dataset=dataset,
         scope_id=scope_id,
         kind=kind,
-        unresolved_only=unresolved_only,
+        status=status_filter,
         limit=limit,
         cursor=cursor,
     )
@@ -335,6 +343,15 @@ async def basis(
 
 @router.get("/sync-status")
 async def sync_status(session: SessionDep) -> dict[str, Any]:
+    """按 source/dataset/scope 聚合最新采集状态，并按各自间隔判定 stale。"""
+
+    settings = get_settings()
+    thresholds = {
+        "market.instrument": settings.sync_instruments_interval_seconds * 3,
+        "market.candle": settings.ingest_candles_interval_seconds * 3,
+        "market.equity_candle": settings.sync_equity_interval_seconds * 3,
+    }
+    items = await list_sync_status(session, stale_after_seconds=thresholds)
     total = await instrument_service.count_instruments(session)
     unresolved = await session.scalar(
         select(func.count())
@@ -345,6 +362,8 @@ async def sync_status(session: SessionDep) -> dict[str, Any]:
         select(Instrument.asset_class, func.count()).group_by(Instrument.asset_class)
     )
     return {
+        "items": items,
+        "stale": sum(1 for item in items if item["stale"]),
         "instruments": total,
         "unresolved_issues": int(unresolved or 0),
         "by_asset_class": {name: int(count) for name, count in by_class},

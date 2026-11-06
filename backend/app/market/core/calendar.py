@@ -256,18 +256,3 @@ def session_phase(ts: datetime) -> str:
             if window.post_start <= utc < window.post_end:  # type: ignore[operator]
                 return "POST"
     return "CLOSED"
-
-
-def trading_days(start: date, end: date) -> list[date]:
-    """区间内的交易日（用于覆盖率分母）。"""
-
-    return [w.trading_date for w in iter_sessions(start, end) if w.is_session]
-
-
-def previous_trading_day(day: date) -> date:
-    """上一个交易日（回补窗口起点用）。"""
-
-    cursor = day - timedelta(days=1)
-    while not is_trading_day(cursor):
-        cursor -= timedelta(days=1)
-    return cursor

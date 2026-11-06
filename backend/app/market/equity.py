@@ -14,8 +14,9 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.equity.base import EquitySourceUnavailable, EquitySymbolNotFound
+from app.market import sync_status
 from app.market.models import BasisSnapshot, EquityAsset, EquityCandle, Instrument
-from app.ops.quality import record_issue
+from app.ops.quality import record_issue, resolve_issues
 from app.ports.market_data import EquityCandleRow, EquityQuote, EquitySource
 
 DATASET_CANDLE = "market.equity_candle"
@@ -126,20 +127,24 @@ async def sync_equity_candles(
 
     moment = now or datetime.now(tz=UTC)
     targets = assets if assets is not None else await ensure_equity_assets(session, source)
+    bucket_start, bucket_end = sync_status.day_bucket(moment)
     written = 0
     missing: list[str] = []
     for asset in targets:
         symbol = asset.source_symbol or asset.symbol
+        scope = f"{asset.symbol}:1d"
         try:
             rows = await source.fetch_daily(symbol, lookback_days=lookback_days)
         except (EquitySourceUnavailable, EquitySymbolNotFound) as error:
             missing.append(asset.symbol)
+            # 以自然日为去重窗口：同一天连续失败只保留一行，不会每轮翻倍。
             await record_issue(
                 session,
                 dataset=DATASET_CANDLE,
-                scope_id=f"{asset.symbol}:1d",
+                scope_id=scope,
                 kind="MISSING_SOURCE",
-                window_start=moment,
+                window_start=bucket_start,
+                window_end=bucket_end,
                 severity="warning",
                 detail={
                     "symbol": asset.symbol,
@@ -147,8 +152,29 @@ async def sync_equity_candles(
                     "reason": str(error),
                 },
             )
+            await sync_status.record_sync(
+                session,
+                source=source.name,
+                dataset=DATASET_CANDLE,
+                scope=scope,
+                window_start=bucket_start,
+                window_end=bucket_end,
+                status="failed",
+                error=str(error),
+            )
             continue
         written += await upsert_equity_candles(session, asset.id, rows)
+        await resolve_issues(session, dataset=DATASET_CANDLE, scope_id=scope, kind="MISSING_SOURCE")
+        await sync_status.record_sync(
+            session,
+            source=source.name,
+            dataset=DATASET_CANDLE,
+            scope=scope,
+            window_start=bucket_start,
+            window_end=bucket_end,
+            status="ok",
+            rows_written=len(rows),
+        )
     await session.commit()
     return EquitySyncResult(assets=len(targets), candles_written=written, missing=missing)
 

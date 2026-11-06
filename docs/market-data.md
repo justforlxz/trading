@@ -29,7 +29,7 @@ P1 只负责「把真实、可追溯的行情落进库，并能查询与判定�
 | 场景 | 行为 |
 | --- | --- |
 | Yahoo 请求失败/超时/限流 | 跳过该标的，写 `data_quality_issue(dataset=market.equity_candle, kind=MISSING_SOURCE)`，`job_run.status=partial` |
-| Yahoo 返回空结果 | 同上，不写任何 K 线 |
+| Yahoo 返回空结果 | 同上，不写任何 K 线；`MISSING_SOURCE` 以自然日为去重窗口，同一天多次失败只保留一行，恢复成功后自动 `resolved` |
 | OKX 限流（HTTP 429 或 HTTP 200 + `code=50011`） | 指数退避重试；耗尽后该标的本轮跳过，写 `GAP` 待补窗口，任务 `partial` |
 | 标的无真实行情映射（私营公司/指数/商品等） | 不建 `equity_asset`，自然不采集 |
 | 未知股票符号 | `asset_class=unclassified`，`exchange=NULL`，**不猜**交易所与类别 |
@@ -96,6 +96,11 @@ API 必返且非空**）、`raw`（OKX 原始条目，仅内部保留，不对�
 `last_success_at`、`coverage JSONB`。唯一键
 `(source, dataset, scope, window_start, window_end)`。
 
+写入规则：标的同步按「自然日 + scope=SWAP」，合约 K 线与真实行情按
+「自然日 + `inst_id:bar` / `symbol:1d`」，回补按请求的 `[start,end)`。
+`GET /market/sync-status` 取每个组合的最新一行，用数据集间隔 ×3 判定 `stale`，
+并提供 `last_success_at` / `age_seconds` 回答「采集延迟」。
+
 ### market.data_quality_issue（数据质量）
 
 `dataset`、`scope_id`、`kind`（`GAP`/`DUPLICATE`/`OUTLIER`/`STALE`/`UNCONFIRMED`/
@@ -144,8 +149,12 @@ API 必返且非空**）、`raw`（OKX 原始条目，仅内部保留，不对�
   `UpstreamUnavailable`；任务收敛 `partial`，并写 `GAP` 待补窗口（起点=最后一根
   之后，与后续缺口检测同口径，补齐后自然收敛）。
 - 调度：`sync_instruments` 每小时、`ingest_candles` 每分钟、`sync_equity` 每 5 分钟、
-  `quality_scan` 每 15 分钟、`purge_rolling_candles` 每天；用 Redis `SET NX EX`
-  租约保证多副本不重复投递。调度投递的函数名必须与 worker 注册名一致（有单测守护）。
+  `quality_scan` 每 15 分钟、`sync_sessions` 每天、`purge_rolling_candles` 每天；
+  用 Redis `SET NX EX` 租约保证多副本不重复投递。调度投递的函数名必须与 worker
+  注册名一致（有单测守护）。
+- 每个周期任务先写一行 `ops.job_run`（`scheduled_at` 参与 job_key，因此每轮唯一），
+  再把 `run_id` 传给 worker；采集成败、耗时与 partial 原因都可在 `/ops/job-runs`
+  与 `/market/sync-status` 查到。
 - 真实行情周期同步只覆盖 `equity_sync_symbols`（默认 AAPL/SPY/QQQ/NVDA/TSLA）：
   `equity_asset` 映射覆盖全部美股正股与 ETF，但 P1 不每 5 分钟对 175 个标的打满
   Yahoo 的无 SLA 接口。需要更多标的时改配置，不改代码。
@@ -157,6 +166,9 @@ API 必返且非空**）、`raw`（OKX 原始条目，仅内部保留，不对�
 - `GET /market/quality-issues`：可按 `dataset`/`scope_id`/`kind`/`unresolved_only` 过滤。
 - 质量扫描：`STALE`（最后一根超过 3 个周期）与 `OUTLIER`（相邻收盘跳变超过 20%）。
 - 缺口与问题登记都幂等：重复扫描不产生重复行。
+- 关闭链路：缺口补齐后同窗口的 `GAP` 自动置 `resolved`；`STALE` 在采集恢复后
+  自动关闭；`MISSING_SOURCE` 在数据源恢复后关闭。历史行保留，不物理删除。
+- `GET /market/quality-issues?status=open|resolved` 可按状态过滤。
 
 ## 8. 保留策略
 
@@ -182,9 +194,9 @@ API 必返且非空**）、`raw`（OKX 原始条目，仅内部保留，不对�
 5. **不做实时推送**：采集是轮询，端到端延迟取决于调度间隔（1m 周期约 1 分钟）。
 6. **Yahoo 数值精度**：上游返回 float32 尾数（如 `344.1700134277344`），落库前
    量化到 `1e-4`，不做价格修正。
-7. **周期任务不写 `ops.job_run`**：目前只有 API 手动触发会建任务记录（用于幂等与
-   `Location` 查询），scheduler 周期性投递的执行结果在 worker 日志里；补齐任务账本
-   属于 P2 可观测性工作。
+7. **手动重跑的幂等键**：`POST /sync/instruments` 不带 `Idempotency-Key` 时参数恒定，
+   成功后再次提交会返回 `skipped`；需要强制重跑请换一个 `Idempotency-Key`
+   （失败/部分失败的同键任务会自动重试，不需要换 Key）。
 
 ## 10. 验收命令
 

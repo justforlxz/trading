@@ -2,6 +2,7 @@
 
 唯一的幂等键是 `(job_name, job_key)`；同一组参数的重复请求不会再产生新行，
 而是返回已有任务（`created=False`），由调用方决定回 202 还是 200。
+`failed` / `partial` 的任务允许用同键重试：复用原行并重置为 `queued`。
 """
 
 from datetime import UTC, datetime
@@ -15,6 +16,7 @@ from app.jobs.keys import canonical_job_key, canonical_payload
 from app.ops.models import JobRun
 
 RUNNING_STATUSES = ("queued", "running")
+RETRYABLE_STATUSES = ("failed", "partial")
 
 
 async def create_run(
@@ -49,7 +51,17 @@ async def create_run(
     )
     if existing is None:  # pragma: no cover - 冲突必然有行
         raise RuntimeError("job run conflict without row")
-    return existing, False
+    if existing.status not in RETRYABLE_STATUSES:
+        return existing, False
+    # 失败/部分失败允许同参数重试：复用同一行，避免永久锁死。
+    existing.status = "queued"
+    existing.scheduled_at = datetime.now(tz=UTC)
+    existing.started_at = None
+    existing.finished_at = None
+    existing.error = None
+    existing.result = {}
+    await session.commit()
+    return existing, True
 
 
 async def mark_running(session: AsyncSession, run_id: int) -> None:
@@ -107,6 +119,7 @@ async def list_runs(
 
 
 __all__ = [
+    "RETRYABLE_STATUSES",
     "RUNNING_STATUSES",
     "create_run",
     "finish_run",

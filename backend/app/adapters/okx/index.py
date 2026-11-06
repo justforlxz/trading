@@ -34,9 +34,3 @@ class OkxSnapshotSource:
         if not data:
             return None
         return _parse_price(data[0], "last")
-
-    async def fetch_index_price(self, inst_id: str) -> tuple[Decimal, datetime] | None:
-        data = await self._client.get(INDEX_TICKERS_PATH, {"instId": inst_id}, limiter="ticker")
-        if not data:
-            return None
-        return _parse_price(data[0], "idxPx")

@@ -480,3 +480,134 @@ export async function getMarketSnapshot(asOf?: string): Promise<MarketSnapshot> 
   const suffix = asOf ? `?as_of=${encodeURIComponent(asOf)}` : "";
   return request<MarketSnapshot>(`/market/snapshot${suffix}`);
 }
+
+// ---- 策略（S6） -------------------------------------------------------------
+
+export type StrategyKind = "directional" | "relative_value";
+export type StrategyStatus =
+  | "draft"
+  | "pending_approval"
+  | "approved"
+  | "rejected"
+  | "archived";
+export type StrategySide = "long" | "short";
+export type StrategyApprovalDecision = "approved" | "rejected";
+
+export type StrategyLeg = {
+  id: number;
+  instrument_id: number;
+  inst_id: string;
+  symbol: string | null;
+  side: StrategySide;
+  weight: string;
+  rationale: string;
+  rank: number;
+};
+
+export type StrategyApproval = {
+  id: number;
+  decision: StrategyApprovalDecision;
+  content_hash: string;
+  reviewer: string;
+  note: string | null;
+  decided_at: string;
+};
+
+export type StrategyTransition = {
+  id: number;
+  from_status: StrategyStatus;
+  to_status: StrategyStatus;
+  at: string;
+  actor: string;
+  reason: string | null;
+  request_id: string | null;
+};
+
+export type StrategySource = {
+  type: "target" | "opportunity";
+  [key: string]: unknown;
+};
+
+export type StrategyExclusion = {
+  instrument_id: number;
+  inst_id: string;
+  reason: string;
+};
+
+export type Strategy = {
+  id: number;
+  strategy_key: string;
+  name: string;
+  kind: StrategyKind;
+  status: StrategyStatus;
+  target_id: number | null;
+  templates: string[];
+  params: Record<string, unknown>;
+  source: StrategySource | null;
+  exclusions: StrategyExclusion[];
+  content_hash: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  approved_at: string | null;
+  reviewer: string | null;
+  legs: StrategyLeg[];
+  approvals?: StrategyApproval[];
+  transitions?: StrategyTransition[];
+};
+
+export type StrategyList = {
+  items: Strategy[];
+  next_cursor: string | null;
+};
+
+export async function listStrategies(
+  params: {
+    status?: StrategyStatus;
+    kind?: StrategyKind;
+    limit?: number;
+    cursor?: string;
+  } = {},
+): Promise<StrategyList> {
+  const query = new URLSearchParams();
+  if (params.status) query.set("status", params.status);
+  if (params.kind) query.set("kind", params.kind);
+  if (params.limit !== undefined) query.set("limit", String(params.limit));
+  if (params.cursor) query.set("cursor", params.cursor);
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request<StrategyList>(`/strategies${suffix}`);
+}
+
+export async function getStrategy(strategyId: number): Promise<Strategy> {
+  return request<Strategy>(`/strategies/${strategyId}`);
+}
+
+export async function submitStrategy(strategyId: number): Promise<Strategy> {
+  return request<Strategy>(`/strategies/${strategyId}/submit`, { method: "POST" });
+}
+
+export async function approveStrategy(
+  strategyId: number,
+  reviewer: string,
+  note?: string,
+): Promise<Strategy> {
+  return request<Strategy>(`/strategies/${strategyId}/approve`, {
+    method: "POST",
+    body: JSON.stringify({ reviewer, note: note ?? null }),
+  });
+}
+
+export async function rejectStrategy(
+  strategyId: number,
+  reviewer: string,
+  note: string,
+): Promise<Strategy> {
+  return request<Strategy>(`/strategies/${strategyId}/reject`, {
+    method: "POST",
+    body: JSON.stringify({ reviewer, note }),
+  });
+}
+
+export async function archiveStrategy(strategyId: number): Promise<Strategy> {
+  return request<Strategy>(`/strategies/${strategyId}/archive`, { method: "POST" });
+}

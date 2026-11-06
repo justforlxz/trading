@@ -88,6 +88,14 @@ class Settings(BaseSettings):
     opportunity_max_pairs: int = 40
     opportunity_scan_interval_seconds: int = 3600
 
+    # S6 策略构建与审批：权重空间与腿数上限都从配置注入，构建器只做纯计算。
+    # 单标的权重上限 0.6 保证两腿各 0.5 的组合合法，且不会退化成单腿押注。
+    strategy_max_position_weight: float = 0.6
+    strategy_max_gross_exposure: float = 1.0
+    strategy_max_net_exposure: float = 1.0
+    strategy_min_legs: int = 2
+    strategy_max_legs: int = 6
+
 
 @lru_cache
 def get_settings() -> Settings:

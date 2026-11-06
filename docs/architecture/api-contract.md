@@ -163,6 +163,7 @@ target 记录字段：`id`、`symbol`、`exchange`、`display_name`、`note`、`
 | GET | `/api/v1/strategies` | `status`、`kind`、`limit`、`cursor` |
 | POST | `/api/v1/strategies` | body `{kind, name, target_id?, templates[], params{}}` → 创建 `draft`；同参数返回已有 `strategy_key` 对应记录（`200`） |
 | GET | `/api/v1/strategies/{id}` | 含 `legs[]`、当前 `status`、`content_hash` |
+| PATCH | `/api/v1/strategies/{id}` | body `{name?, params?, legs?}`；仅 `draft` / `rejected` 可编辑，编辑后重算 `content_hash` 且 `version + 1`；其余状态返回 `409 strategy_readonly` |
 | POST | `/api/v1/strategies/{id}/submit` | `draft → pending_approval` |
 | POST | `/api/v1/strategies/{id}/approve` | body `{reviewer, note?}`，`pending_approval → approved` |
 | POST | `/api/v1/strategies/{id}/reject` | body `{reviewer, note}`，`pending_approval → rejected` |
@@ -171,6 +172,8 @@ target 记录字段：`id`、`symbol`、`exchange`、`display_name`、`note`、`
 | GET | `/api/v1/strategies/{id}/transitions` | `strategy_transition` 审计链 |
 
 非法迁移返回 `409 strategy_illegal_transition`；`approved` 策略的任何内容字段修改返回 `409 strategy_readonly`（必须先 `archive` 再从模板新建，保证审批内容与回测内容一致）。
+
+策略域错误码：`404 TARGET_NOT_FOUND` / `OPPORTUNITY_NOT_FOUND` / `STRATEGY_NOT_FOUND`；`409 strategy_illegal_transition` / `strategy_readonly` / `strategy_key_conflict`；`422 strategy_unknown_template` / `strategy_unevidenced_leg` / `strategy_no_source_data` / `strategy_source_required` / `strategy_invalid_param` / `strategy_reserved_param` / `strategy_instrument_not_found` / `strategy_position_limit` / `strategy_gross_exposure_exceeded` / `strategy_net_exposure_exceeded` / `strategy_min_legs` / `strategy_max_legs` / `strategy_duplicate_leg` / `strategy_side_weight_mismatch`。全部使用统一错误信封。
 
 ### 3.6 backtests
 

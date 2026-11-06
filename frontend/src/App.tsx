@@ -4,7 +4,7 @@ import { AppShell } from "./components/layout/app-shell";
 import DashboardPage from "./pages/dashboard";
 import ResearchPage from "./pages/research/index";
 import SettingsPage from "./pages/settings";
-import StrategiesPage from "./pages/strategies";
+import StrategiesPage from "./pages/strategies/index";
 
 export default function App() {
   return (

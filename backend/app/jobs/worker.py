@@ -11,6 +11,7 @@ from arq.connections import RedisSettings
 
 from app.config import get_settings
 from app.jobs.keys import canonical_job_key
+from app.jobs.tasks import TASK_FUNCTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ async def ping(ctx: dict[str, Any], payload: dict[str, Any] | None = None) -> st
 class WorkerSettings:
     """arq 的 worker 配置对象（arq 按类属性读取）。"""
 
-    functions: ClassVar[list[Any]] = [ping]
+    functions: ClassVar[list[Any]] = [ping, *TASK_FUNCTIONS]
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)
     max_tries = 3
     job_timeout = 300

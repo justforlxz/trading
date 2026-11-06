@@ -14,6 +14,8 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.config import get_settings
 from app.db.base import Base
+from app.market import models as market_models  # noqa: F401 - 让 metadata 收集到表
+from app.ops import models as ops_models  # noqa: F401
 
 config = context.config
 

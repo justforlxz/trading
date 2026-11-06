@@ -16,14 +16,17 @@ dependencies = [
   "alembic>=1.14,<2.0",
   "arq>=0.26,<1.0",
   "redis>=5.0,<6.0",
+  # 外部 HTTP 只在 adapters 内使用（OKX 公共 REST + Yahoo chart v8）。
+  "httpx>=0.28,<1.0",
 ]
 
 [project.optional-dependencies]
 dev = [
   "pytest>=8.3,<9.0",
   "pytest-asyncio>=0.24,<1.0",
-  "httpx>=0.28,<1.0",
   "ruff>=0.8,<1.0",
+  # 测试 oracle：NYSE 日历的独立实现（只用于比对，不参与运行时）
+  "exchange_calendars>=4.13,<5.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -50,5 +53,6 @@ known-third-party = ["alembic"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "function"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 testpaths = ["tests"]

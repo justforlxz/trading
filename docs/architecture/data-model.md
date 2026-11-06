@@ -1,6 +1,6 @@
 # 数据模型（P1）
 
-单一 PostgreSQL 16 实例，按限界上下文分 schema：`market`、`research`、`strategy`、`backtest`、`ops`。跨 schema 只允许外键引用 `market.instrument` 与 `research.target_symbol`，其余禁止互相 JOIN 业务表。
+单一 PostgreSQL 16 实例，按限界上下文分 schema：`market`、`research`、`opportunity`、`strategy`、`backtest`、`ops`。跨 schema 只允许外键引用 `market.instrument` 与 `research.target_symbol`，其余禁止互相 JOIN 业务表。
 
 约定先行，表结构后列。
 

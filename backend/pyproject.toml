@@ -1,0 +1,54 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "trading-backend"
+version = "0.1.0"
+description = "trading backend — FastAPI 服务、arq 任务入口与数据库迁移"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115,<1.0",
+  "uvicorn[standard]>=0.32,<1.0",
+  "pydantic-settings>=2.6,<3.0",
+  "sqlalchemy[asyncio]>=2.0,<2.1",
+  "asyncpg>=0.30,<1.0",
+  "alembic>=1.14,<2.0",
+  "arq>=0.26,<1.0",
+  "redis>=5.0,<6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<9.0",
+  "pytest-asyncio>=0.24,<1.0",
+  "httpx>=0.28,<1.0",
+  "ruff>=0.8,<1.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = [".", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+# B008：FastAPI 的 Depends()/Query() 以默认值形式出现，属误报
+# RUF002/RUF003：本项目文档与注释使用中文全角标点，属预期
+ignore = ["B008", "RUF002", "RUF003"]
+
+[tool.ruff.lint.isort]
+# 仓库根的 alembic/ 迁移目录会遮蔽同名第三方包，显式声明归属
+known-third-party = ["alembic"]
+
+
+[tool.ruff.lint.per-file-ignores]
+"alembic/versions/*.py" = ["E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]

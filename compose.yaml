@@ -1,0 +1,11 @@
+# 仓库根 compose 入口：让 `docker compose up -d --build` / `docker compose down -v`
+# 在仓库根直接可用（S2 验收条件 1、5、6）。
+#
+# 真实定义在 infra/docker-compose.yml；被 include 时其内部相对路径（如 ../backend）
+# 仍相对该文件解析，因此两种用法等价：
+#   docker compose up -d --build
+#   docker compose -f infra/docker-compose.yml up -d --build
+name: trading
+
+include:
+  - path: infra/docker-compose.yml

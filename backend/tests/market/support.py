@@ -174,3 +174,17 @@ async def insert_instrument(
     await session.commit()
     await session.refresh(instrument)
     return instrument
+
+
+class FailingCandleSource:
+    """模拟限流耗尽的上游：所有取数都抛 UpstreamUnavailable。"""
+
+    async def fetch_candles(self, inst_id: str, bar: str, limit: int = 300):
+        from app.adapters.okx.rate_limit import UpstreamUnavailable
+
+        raise UpstreamUnavailable("simulated limit exhausted")
+
+    async def fetch_history(self, inst_id, bar, start, end, page_limit: int = 100):
+        from app.adapters.okx.rate_limit import UpstreamUnavailable
+
+        raise UpstreamUnavailable("simulated limit exhausted")

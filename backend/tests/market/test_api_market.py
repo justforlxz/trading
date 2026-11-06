@@ -247,3 +247,67 @@ async def test_quality_issues_supports_status_filter(session, client) -> None:
 
     bad = await client.get("/api/v1/market/quality-issues?status=bogus")
     assert bad.status_code == 400
+
+
+async def test_sync_status_marks_never_successful_scope_as_stale(session, client) -> None:
+    """当天第一次同步就失败：不能因为窗口是"明天"而算出负年龄/健康。"""
+
+    now = datetime.now(tz=UTC)
+    await sync_status.record_sync(
+        session,
+        source=sync_status.SOURCE_YAHOO,
+        dataset=sync_status.DATASET_EQUITY,
+        scope="AAPL:1d",
+        window_start=now.replace(hour=0, minute=0, second=0, microsecond=0),
+        window_end=now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1),
+        status="failed",
+        error="yahoo unavailable",
+    )
+    await session.commit()
+
+    body = (await client.get("/api/v1/market/sync-status")).json()
+    item = body["items"][0]
+    assert item["stale"] is True
+    assert item["age_seconds"] >= 0
+    assert body["stale"] == 1
+
+
+async def test_sync_status_partial_backfill_of_old_window_is_not_stale(session, client) -> None:
+    """历史窗口的一次性回补刚跑完，不应因为 window_end 久远而被判陈旧。"""
+
+    await sync_status.record_sync(
+        session,
+        source=sync_status.SOURCE_OKX,
+        dataset=sync_status.DATASET_CANDLE,
+        scope="AAPL-USDT-SWAP:1h",
+        window_start=datetime(2026, 3, 1, tzinfo=UTC),
+        window_end=datetime(2026, 3, 2, tzinfo=UTC),
+        status="partial",
+        error="1 gap(s) remain",
+    )
+    await session.commit()
+
+    body = (await client.get("/api/v1/market/sync-status")).json()
+    item = body["items"][0]
+    assert item["stale"] is False
+    assert item["age_seconds"] < 60
+
+
+async def test_default_run_helpers_write_the_ledger(session) -> None:
+    """tick 的默认实现走真实 DB：先建 queued 行，入队失败可落 failed。"""
+
+    from sqlalchemy import select
+
+    from app.jobs.scheduler import _fail_run_default, _start_run_default
+    from app.ops.models import JobRun
+
+    run_id = await _start_run_default("sync_instruments")
+    assert run_id is not None
+    run = await session.scalar(select(JobRun).where(JobRun.id == run_id))
+    assert run is not None
+    assert run.status == "queued"
+
+    await _fail_run_default(run_id, "redis down")
+    await session.refresh(run)
+    assert run.status == "failed"
+    assert run.error == "redis down"

@@ -105,9 +105,18 @@ async def list_sync_status(
     rows = list(await session.scalars(statement))
     items: list[dict[str, Any]] = []
     for row in rows:
-        reference = row.last_success_at or row.window_end
-        age_seconds = int((moment - reference).total_seconds())
+        # 年龄以「上次成功」为准；从未成功时退回「上次尝试」，避免用未来/历史窗口
+        # 当参照：day_bucket 的 window_end 是明天 00:00Z，用它会出现负年龄。
+        reference = row.last_success_at or row.updated_at
+        age_seconds = max(0, int((moment - reference).total_seconds()))
         threshold = thresholds.get(row.dataset)
+        if row.status == "failed":
+            # 本轮失败：即使刚尝试过，数据也不可信，直接计入 stale。
+            stale = True
+        elif threshold is None:
+            stale = True
+        else:
+            stale = age_seconds > threshold
         items.append(
             {
                 "source": row.source,
@@ -119,10 +128,11 @@ async def list_sync_status(
                 "last_success_at": (
                     None if row.last_success_at is None else row.last_success_at.isoformat()
                 ),
+                "updated_at": row.updated_at.isoformat(),
                 "rows_written": row.rows_written,
                 "last_error": row.last_error,
                 "age_seconds": age_seconds,
-                "stale": threshold is None or age_seconds > threshold,
+                "stale": stale,
             }
         )
     items.sort(key=lambda item: (item["source"], item["dataset"], item["scope"]))

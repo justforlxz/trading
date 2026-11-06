@@ -155,3 +155,25 @@ async def test_gap_resolves_after_backfill_same_window(session) -> None:
     await session.commit()
     await session.refresh(issue)
     assert issue.resolved_at is not None
+
+
+async def test_ingest_failure_writes_failed_ledger_and_gap(session) -> None:
+    """限流耗尽：任务 partial、缺口登记、账本落 failed（AC4 的账本侧证据）。"""
+
+    from app.jobs.tasks import run_ingest_candles
+    from app.market.models import DataSourceSync
+    from tests.market.support import FailingCandleSource
+
+    await insert_instrument(session, "AAPL-USDT-SWAP")
+    result = await run_ingest_candles(
+        session, FailingCandleSource(), inst_ids=["AAPL"], bars=["1h"]
+    )
+    assert result["status"] == "partial"
+    assert result["failed"]["AAPL-USDT-SWAP"]
+
+    ledger = list(await session.scalars(select(DataSourceSync)))
+    assert len(ledger) == 1
+    assert ledger[0].status == "failed"
+    assert ledger[0].last_success_at is None
+    issue = await session.scalar(select(DataQualityIssue).where(DataQualityIssue.kind == "GAP"))
+    assert issue is not None

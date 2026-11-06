@@ -163,7 +163,7 @@ API 必返且非空**）、`raw`（OKX 原始条目，仅内部保留，不对�
 
 - `GET /market/coverage?inst_id=&bar=&start=&end=`：按 UTC 自然日切桶，返回
   `expected` / `actual` / `missing` / `ratio`，缺口定位到具体 `window_start`。
-- `GET /market/quality-issues`：可按 `dataset`/`scope_id`/`kind`/`unresolved_only` 过滤。
+- `GET /market/quality-issues`：可按 `dataset`、`scope_id`、`kind`、`status=open|resolved` 过滤。
 - 质量扫描：`STALE`（最后一根超过 3 个周期）与 `OUTLIER`（相邻收盘跳变超过 20%）。
 - 缺口与问题登记都幂等：重复扫描不产生重复行。
 - 关闭链路：缺口补齐后同窗口的 `GAP` 自动置 `resolved`；`STALE` 在采集恢复后

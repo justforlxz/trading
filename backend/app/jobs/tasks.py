@@ -14,6 +14,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.equity.base import EquitySourceUnavailable, EquitySymbolNotFound
 from app.adapters.equity.registry import build_equity_source
 from app.adapters.okx.candles import OkxCandleSource
 from app.adapters.okx.client import OkxClient
@@ -101,9 +102,20 @@ async def run_ingest_candles(
             )
         except UpstreamUnavailable as error:
             failed[instrument.inst_id] = str(error)
+            bucket_start, bucket_end = sync_status.day_bucket(now or datetime.now(tz=UTC))
             for bar in selected_bars:
                 await candle_service.record_collection_gap(
                     session, instrument=instrument, bar=bar, now=now
+                )
+                await sync_status.record_sync(
+                    session,
+                    source=sync_status.SOURCE_OKX,
+                    dataset=candle_service.DATASET,
+                    scope=f"{instrument.inst_id}:{bar}",
+                    window_start=bucket_start,
+                    window_end=bucket_end,
+                    status="failed",
+                    error=str(error),
                 )
 
     status = "partial" if failed or missing_instruments else "ok"
@@ -248,7 +260,7 @@ async def run_sync_equity(session: AsyncSession, source: EquitySource) -> dict[s
             try:
                 quote = await source.fetch_quote(asset.source_symbol or asset.symbol)
                 snapshot = await okx.fetch_last_price(instrument.inst_id)
-            except UpstreamUnavailable:
+            except (UpstreamUnavailable, EquitySourceUnavailable, EquitySymbolNotFound):
                 continue
             if quote is None or snapshot is None:
                 continue

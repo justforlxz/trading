@@ -47,7 +47,9 @@ async def create_run(
         return run, True
 
     existing = await session.scalar(
-        select(JobRun).where(JobRun.job_name == job_name, JobRun.job_key == job_key)
+        select(JobRun)
+        .where(JobRun.job_name == job_name, JobRun.job_key == job_key)
+        .with_for_update()
     )
     if existing is None:  # pragma: no cover - 冲突必然有行
         raise RuntimeError("job run conflict without row")

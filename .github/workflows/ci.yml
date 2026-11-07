@@ -50,6 +50,8 @@ jobs:
         run: ruff format --check .
       - name: Test
         run: pytest -q
+      - name: Coverage
+        run: pytest -q --cov=app --cov-report=term-missing --cov-fail-under=70
 
   frontend:
     name: frontend (lint + build)

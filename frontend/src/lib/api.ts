@@ -765,3 +765,187 @@ export async function listBacktestTrades(
   const suffix = query.toString() ? `?${query.toString()}` : "";
   return request(`/backtests/${runId}/trades${suffix}`);
 }
+
+export type RiskSeverity = "tier1" | "tier2" | "tier3";
+
+export type RiskAction = "none" | "warn" | "reduce" | "close";
+
+export type RiskEventKind = "limit_breach" | "drawdown" | "funding" | "liquidity";
+
+export type RiskThresholds = {
+  max_order_notional: string;
+  max_leg_weight: string;
+  max_leverage: string;
+  max_gross_exposure: string;
+  max_net_exposure: string;
+  max_instrument_weight: string;
+  max_concentration: string;
+  drawdown_warn: string;
+  drawdown_reduce: string;
+  drawdown_close: string;
+  funding_rate_threshold: string;
+  min_depth_notional: string;
+};
+
+export type RiskPolicy = {
+  scope: "global" | "strategy";
+  strategy_id: number | null;
+  version: number;
+  thresholds: RiskThresholds;
+  updated_at: string;
+  updated_by: string;
+  note: string | null;
+};
+
+export type RiskBreach = {
+  code: string;
+  field: string;
+  observed: string;
+  threshold: string;
+};
+
+export type RiskDuplicateHolding = {
+  instrument_id: number;
+  side: string;
+  strategy_ids: number[];
+};
+
+export type RiskStatus = {
+  scope: "global" | "strategy";
+  strategy_id: number | null;
+  policy_version: number;
+  allowed: boolean;
+  reason: string | null;
+  limits: RiskThresholds;
+  capital: string | null;
+  gross_exposure: string | null;
+  net_exposure: string | null;
+  leverage: string | null;
+  concentration: string | null;
+  long_exposure: string | null;
+  short_exposure: string | null;
+  long_short_conflicts: number[];
+  duplicates: RiskDuplicateHolding[];
+  breaches: RiskBreach[];
+};
+
+export type RiskEventItem = {
+  id: number;
+  kind: RiskEventKind;
+  severity: RiskSeverity;
+  action: RiskAction;
+  strategy_id: number | null;
+  instrument_id: number | null;
+  policy_version: number;
+  observed_value: string | null;
+  threshold: string | null;
+  payload: Record<string, unknown>;
+  evaluation_key: string;
+  created_at: string;
+  resolved_at: string | null;
+};
+
+export type RiskEventPage = {
+  items: RiskEventItem[];
+  next_cursor: string | null;
+};
+
+export type RiskFundingItem = {
+  inst_id: string;
+  funding_rate: string;
+  next_funding_at: string | null;
+  best_bid: string;
+  best_ask: string;
+  bid_depth: string;
+  ask_depth: string;
+};
+
+export type RiskFundingBreach = {
+  kind: "funding" | "liquidity";
+  severity: RiskSeverity;
+  action: RiskAction;
+  inst_id: string;
+  observed_value: string;
+  threshold: string;
+};
+
+export type RiskFundingReport = {
+  items: RiskFundingItem[];
+  breaches: RiskFundingBreach[];
+  missing: string[];
+};
+
+export type UpdateRiskPolicyInput = {
+  expected_version: number;
+  updated_by: string;
+  note?: string | null;
+  strategy_id?: number | null;
+  thresholds: RiskThresholds;
+};
+
+export type RiskEvaluateInput = {
+  strategy_id: number;
+  as_of?: string | null;
+  evaluation_key?: string | null;
+};
+
+function riskQuery(params: Record<string, string | number | undefined | null>): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== "") {
+      query.set(key, String(value));
+    }
+  }
+  const suffix = query.toString();
+  return suffix ? `?${suffix}` : "";
+}
+
+export async function getRiskPolicy(strategyId?: number): Promise<RiskPolicy> {
+  return request<RiskPolicy>(`/risk/policy${riskQuery({ strategy_id: strategyId })}`);
+}
+
+export async function updateRiskPolicy(input: UpdateRiskPolicyInput): Promise<RiskPolicy> {
+  return request<RiskPolicy>("/risk/policy", {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getRiskStatus(strategyId?: number): Promise<RiskStatus> {
+  return request<RiskStatus>(`/risk/status${riskQuery({ strategy_id: strategyId })}`);
+}
+
+export async function listRiskEvents(
+  params: {
+    kind?: RiskEventKind;
+    severity?: RiskSeverity;
+    strategy_id?: number;
+    since?: string;
+    limit?: number;
+    cursor?: string;
+  } = {},
+): Promise<RiskEventPage> {
+  return request<RiskEventPage>(`/risk/events${riskQuery(params)}`);
+}
+
+export async function getRiskFunding(
+  params: { strategy_id?: number; inst_ids?: string } = {},
+): Promise<RiskFundingReport> {
+  return request<RiskFundingReport>(`/risk/funding${riskQuery(params)}`);
+}
+
+export type RiskEvaluateAccepted = {
+  run_id: number;
+  job_id: number;
+  status: string;
+  run_key: string;
+  created: boolean;
+  dispatched: boolean;
+};
+
+export async function evaluateRisk(input: RiskEvaluateInput): Promise<RiskEvaluateAccepted> {
+  return request<RiskEvaluateAccepted>("/risk/evaluate", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}

@@ -41,6 +41,7 @@ def build_schedule(settings: Settings | None = None) -> list[PeriodicTask]:
             current.opportunity_scan_interval_seconds,
         ),
         PeriodicTask(tasks.PURGE_ROLLING, tasks.PURGE_ROLLING, current.retention_interval_seconds),
+        PeriodicTask(tasks.RISK_SCAN, tasks.RISK_SCAN, current.risk_scan_interval_seconds),
     ]
 
 

@@ -19,7 +19,7 @@
 2. **可计算即可断言**：所有影响决策的计算（相关性、聚类、权重、成本、指标）是纯函数，输入输出确定，可单测与逐位复现。
 3. **不做内部微服务**：容器间只有「API 对外」与「DB/Redis 共享」两种通信，服务之间不互相 HTTP 调用，避免把模块边界问题降级成分布式一致性问题。
 4. **状态只在数据库**：进程无跨请求内存状态；任务幂等由唯一键与 `job_run` 保证，重启不丢语义。
-5. **P1 不预埋未来阶段**：风控、执行、AI 不建目录、不建表、不写逻辑，**也不预留空端口或空接口**；未来阶段真正开工时再按当时的 ADR 引入（见 §9）。
+5. **不预埋未来阶段**：P1 期间风控、执行、AI 不建目录、不建表、不写逻辑，**也不预留空端口或空接口**。P2 已按本阶段需求正式落地 `risk`（见 §3 与 §9）；`execution`/`ai` 仍属 P3/P4，真正开工时再按当时的 ADR 引入。
 
 ## 3. 模块边界
 
@@ -37,6 +37,7 @@
 | `opportunity` | 扫描编排、机会聚合与持久化、机会解释（reasons/evidence） | 生成具体策略参数 | `/api/v1/opportunities*` |
 | `strategy` | 模板组合、权重与敞口约束、状态机、审批记录 | 回测、下单 | `/api/v1/strategies*` |
 | `backtest` | 事件回放、成本模型、撮合近似、指标、报告数据 | 真实下单、资金划转 | `/api/v1/backtests*` |
+| `risk` | 策略级与全局组合风控、资金分配、回撤分级处置、资金费率与流动性监控、风险事件 | 下单、账户、模拟撮合、AI 决策 | `/api/v1/risk/*`、`risk.service.*` |
 | `jobs` | arq 任务定义、调度表达式、重试与幂等键 | 业务计算本身（调用上层模块） | worker/scheduler 入口 |
 | `ops` | `job_run`、审计日志、健康与就绪、覆盖度运维视图 | 业务指标口径 | `/api/v1/ops/*`、`/health` |
 | `api` | 路由、鉴权（P1 无）、错误信封、序列化 | 领域逻辑 | `/api/v1` |
@@ -58,12 +59,14 @@ graph TD
     OPP[opportunity]
     STR[strategy]
     BT[backtest]
+    RSK[risk]
     OPS[ops]
   end
   subgraph 领域核心（纯函数）
     ANLC[analysis.core]
     STRC[strategy.core]
     BTC[backtest.core]
+    RSKC[risk.core]
   end
   subgraph 外部适配
     OKX[adapters/okx]
@@ -73,19 +76,22 @@ graph TD
   RD[(Redis)]
 
   WEB -->|HTTP /api/v1| API
-  API --> MKT & ANL & OPP & STR & BT & OPS
-  JOBS --> MKT & OPP & STR & BT & OPS
+  API --> MKT & ANL & OPP & STR & BT & RSK & OPS
+  JOBS --> MKT & OPP & STR & BT & RSK & OPS
   OPP --> ANL
   STR --> STRC
   BT --> BTC & MKT
+  RSK --> RSKC
+  RSK -->|只读| STR & BT & MKT
   MKT --> OKX & EQ
+  RSK -->|公开行情| OKX
   ANL --> ANLC
-  MKT & OPP & STR & BT & OPS --> DB
+  MKT & OPP & STR & BT & RSK & OPS --> DB
   JOBS --> RD
   API -.只读查询.-> DB
 ```
 
-禁止的依赖（评审时直接拒绝）：`analysis → strategy`、`strategy → backtest`、`core → adapters`、任何模块 `→ api`、服务之间 `→ 对方的 service`（只能经 DB 或纯函数）。
+禁止的依赖（评审时直接拒绝）：`analysis → strategy`、`strategy → backtest`、`core → adapters`、任何模块 `→ api`、服务之间 `→ 对方的 service`（只能经 DB 或纯函数）。`risk` 只能单向**只读**引用 `strategy`/`market`/`backtest` 的数据，反向 import 一律拒绝；`risk` 不 import `execution`/`ai`（P2 不存在）。
 
 ## 5. 运行容器与启动顺序
 
@@ -158,4 +164,6 @@ sequenceDiagram
 
 ## 9. P1 边界
 
-不在本阶段：账户与密钥管理、下单与撤单、持仓同步、风控拦截、模拟撮合、AI 生成策略、告警推送。`risk`/`execution`/`ai` 目录在 P1 不存在，避免空壳抽象。
+P1 不在本阶段：账户与密钥管理、下单与撤单、持仓同步、风控拦截、模拟撮合、AI 生成策略、告警推送。`risk`/`execution`/`ai` 目录在 P1 不存在，避免空壳抽象。
+
+P2 已实现 `risk`：策略级与全局组合两级风控、自动资金分配、最大回撤分级处置、资金费率与流动性监控、风险事件落库与 `/api/v1/risk/*`。P2 仍不接触真实账户、不下单，`execution`/`ai` 继续不存在。

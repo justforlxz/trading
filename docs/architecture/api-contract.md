@@ -82,6 +82,8 @@
 | `backtest_metric` | `GET /backtests/{run_id}/metrics` |
 | `backtest_equity_point` | `GET /backtests/{run_id}/equity` |
 | `backtest_trade` | `GET /backtests/{run_id}/trades` |
+| `risk_policy` | `GET /risk/policy`、`PUT /risk/policy` |
+| `risk_event` | `GET /risk/events` |
 | `job_run` | `GET /ops/job-runs`、`GET /ops/job-runs/{id}` |
 | `audit_log` | `GET /ops/audit-log` |
 
@@ -226,7 +228,92 @@ walk-forward 要求训练段严格早于测试段且互不重叠，分段必须�
 **`GET .../trades`** — `backtest_trade` 列表，含成本拆解
 （`fees`/`funding`/`slippage`）与 `net_pnl`，按 `cursor` 分页。
 
-### 3.7 ops
+### 3.7 risk
+
+风控只读 `strategy`、`market`、`backtest` 数据，不写交易域，不接私有接口，不下单。
+所有判决由 `app.risk.core` 纯函数计算，服务层只做查询、编排与事件落库。
+**fail-closed**：K 线缺失、依赖不可用、计算异常一律返回拒绝放行，不抛 500。
+
+**`GET /api/v1/risk/policy`** — 查询参数 `strategy_id`（省略即全局）。返回当前最高版本阈值：
+`{scope, strategy_id, version, thresholds{...}, updated_at, updated_by, note}`。
+阈值以字符串返回（`NUMERIC` 精度，避免 float 误差）。不存在任何版本时按配置默认值自动创建 `version=1`（幂等）。
+
+**`PUT /api/v1/risk/policy`** — body：
+
+```json
+{
+  "expected_version": 1,
+  "updated_by": "risk-admin",
+  "note": "收紧集中度",
+  "strategy_id": 12,
+  "thresholds": {
+    "max_order_notional": "20000",
+    "max_leg_weight": "0.6",
+    "max_leverage": "1.0",
+    "max_gross_exposure": "1.0",
+    "max_net_exposure": "1.0",
+    "max_instrument_weight": "0.6",
+    "max_concentration": "0.5",
+    "drawdown_warn": "0.05",
+    "drawdown_reduce": "0.10",
+    "drawdown_close": "0.20",
+    "funding_rate_threshold": "0.0005",
+    "min_depth_notional": "20000"
+  }
+}
+```
+
+写入新版本行（`version = expected_version + 1`）并返回新策略。`expected_version` 与当前版本不符返回
+`409 risk_policy_stale`（`details` 含 `current_version`、`expected_version`）；阈值非法（非正、回撤未满足
+`0 < warn < reduce < close`、字段缺失）返回 `422 risk_invalid_threshold`。
+
+**`GET /api/v1/risk/status`** — 查询参数 `strategy_id`。只读、不落事件、不查 K 线。
+`strategy_id` 省略时按全部 `approved` 策略汇总全局组合。响应：
+
+```json
+{
+  "scope": "strategy",
+  "strategy_id": 12,
+  "policy_version": 2,
+  "allowed": false,
+  "reason": "limit_breach",
+  "limits": {"max_gross_exposure": "0.5", "...": "..."},
+  "capital": "100000",
+  "gross_exposure": "140000",
+  "net_exposure": "40000",
+  "leverage": "1.4",
+  "concentration": "0.9",
+  "long_exposure": "90000",
+  "short_exposure": "50000",
+  "long_short_conflicts": [7],
+  "duplicates": [{"instrument_id": 7, "side": "long", "strategy_ids": [12, 13]}],
+  "breaches": [{"code": "gross_exposure_exceeded", "field": "gross_exposure",
+                "observed": "1.4", "threshold": "0.5"}]
+}
+```
+
+`reason` 取值：`null`（放行）、`limit_breach`、`strategy_not_approved`、`risk_empty_portfolio`、
+`risk_evaluation_failed`。策略不存在返回 `404 not_found`。
+
+**`GET /api/v1/risk/events`** — `kind`（`limit_breach|drawdown|funding|liquidity`）、`severity`
+（`tier1|tier2|tier3`）、`strategy_id`、`since`（ISO-8601）、`limit`（默认 50，上限 200）、`cursor`。
+按 `id` 倒序返回 `{items[], next_cursor}`。事件项含 `kind`、`severity`、`action`、`strategy_id`、
+`instrument_id`、`policy_version`、`observed_value`、`threshold`、`payload`、`evaluation_key`、
+`created_at`、`resolved_at`。同一评估键下重复评估不会产生重复行。`cursor` 非整数返回 `400 invalid_request`。
+
+**`GET /api/v1/risk/funding`** — `strategy_id` 或 `inst_ids`（逗号分隔）。读取 OKX 公开
+`GET /api/v5/public/funding-rate` 与 `GET /api/v5/market/books`（免鉴权，不涉及账户）。
+返回 `{items[], breaches[], missing[]}`：`items` 为资金费率与盘口观测（数值字符串），`breaches` 为超阈值/深度不足
+信号（`kind=funding|liquidity`），`missing` 为缺失观测的 `inst_id`。任一标的缺失即 `503
+risk_market_data_unavailable`（fail-closed），`details.missing` 列出缺失标的；上游不可用返回 `503 dependency_unavailable`。
+
+**`POST /api/v1/risk/evaluate`** — body `{strategy_id, as_of?, evaluation_key?}`。按 `ops.job_run` 幂等键投递
+`risk_evaluate` 任务，`202` 返回 `{run_id, job_id, status, run_key, created, dispatched}`；
+同参数重复提交复用同一 `run_id` 并返回 `200`、`created=false`、`dispatched=false`。
+评估键缺省取 `as_of` 的日期（`YYYY-MM-DD`），决定事件的去重粒度。任务完成后超限与回撤各自落一条
+`risk_event`（`kind=limit_breach` / `drawdown`）。
+
+### 3.8 ops
 
 **`GET /api/v1/ops/job-runs`** — `job_name`、`status`、`from`、`to`，返回 `job_run` 列表。
 **`GET /api/v1/ops/job-runs/{id}`** — 单条，含 `attempts`、`error`、`result`。

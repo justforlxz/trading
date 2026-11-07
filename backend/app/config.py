@@ -117,6 +117,20 @@ class Settings(BaseSettings):
     risk_funding_book_depth: int = 20
     risk_scan_interval_seconds: int = 3600
 
+    # P3 交易执行：真实交易默认关闭，未显式开启时只能走 paper。
+    # 凭据只从环境变量 / 密钥文件读取，绝不写入代码或配置文件默认值。
+    real_trading_enabled: bool = False
+    okx_api_key: str = ""
+    okx_api_secret: str = ""
+    okx_api_passphrase: str = ""
+    # 实盘逐策略放行清单（逗号分隔 strategy.id）；空表示不放行任何策略。
+    execution_real_strategy_ids: str = ""
+    # paper 撮合节奏：逗号分隔的成交比例，每轮轮询消耗一段，用于模拟部分成交。
+    execution_paper_fill_chunks: str = "0.5,0.5"
+    # 标记价格与止损：取最近确认 K 线收盘价；浮亏占持仓均价比例达到阈值即平仓。
+    execution_quote_bar: str = "1d"
+    execution_stop_loss_ratio: float = 0.05
+
 
 @lru_cache
 def get_settings() -> Settings:

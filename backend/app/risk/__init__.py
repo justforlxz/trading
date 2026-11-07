@@ -8,5 +8,5 @@
 - ``app.risk.data`` 用独立 ``MetaData`` 只读声明 ``strategy`` / ``market`` /
   ``backtest`` 表，避免 ``strategy``/``backtest`` 反向依赖风控。
 
-本模块不接触真实账户，不 import ``execution``/``ai``，不做任何下单类调用。
+本模块不接触真实账户，不引用执行域 ``execution`` 与 ``ai``，不做任何下单类调用。
 """

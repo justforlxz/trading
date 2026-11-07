@@ -8,7 +8,7 @@ strategy（策略生成与审批）、backtest（历史回测与评估）与 ris
 from fastapi import APIRouter
 
 from app import __version__
-from app.api.v1 import backtest, market, ops, research, risk
+from app.api.v1 import backtest, execution, market, ops, research, risk
 from app.opportunity import api as opportunity_api
 from app.strategy import api as strategy_api
 
@@ -22,6 +22,7 @@ router.include_router(opportunity_api.market_router)
 router.include_router(strategy_api.router)
 router.include_router(backtest.router)
 router.include_router(risk.router)
+router.include_router(execution.router)
 
 
 @router.get("")

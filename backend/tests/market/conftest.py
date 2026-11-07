@@ -90,7 +90,17 @@ def database_url() -> str:
     url = _database_url()
     if not url:
         pytest.skip("未配置 TEST_DATABASE_URL / DATABASE_URL: 跳过数据库用例")
+    # 迁移在子进程/新循环里执行，会清掉当前事件循环；留下可用的循环，
+    # 保证其它测试目录排在后面时 async 用例依然能拿到 loop。
+    try:
+        previous = asyncio.get_event_loop_policy().get_event_loop()
+    except RuntimeError:
+        previous = None
     _prepare_database(url)
+    if previous is not None and not previous.is_closed():
+        asyncio.set_event_loop(previous)
+    else:
+        asyncio.set_event_loop(asyncio.new_event_loop())
     return url
 
 

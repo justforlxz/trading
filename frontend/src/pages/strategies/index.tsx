@@ -1,5 +1,6 @@
 import { Loader2, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { PageHeading } from "../../components/layout/page-parts";
 import { Button } from "../../components/ui/button";
@@ -58,6 +59,18 @@ function formatWeight(value: string): string {
   return weight.toFixed(4);
 }
 
+function isoDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function defaultBacktestWindow(): { start: string; end: string } {
+  const end = new Date();
+  const start = new Date(end.getTime() - 90 * 24 * 3600 * 1000);
+  return { start: isoDate(start), end: isoDate(end) };
+}
+
+const DEFAULT_BACKTEST_WINDOW = defaultBacktestWindow();
+
 function StatusBadge({ status }: { status: StrategyStatus }) {
   return (
     <span
@@ -72,6 +85,7 @@ function StatusBadge({ status }: { status: StrategyStatus }) {
 }
 
 export default function StrategiesPage() {
+  const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<StrategyStatus | null>(null);
   const [items, setItems] = useState<Strategy[]>([]);
   const [listLoading, setListLoading] = useState(true);
@@ -86,6 +100,16 @@ export default function StrategiesPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [reviewer, setReviewer] = useState("");
   const [note, setNote] = useState("");
+
+  const [btBar, setBtBar] = useState("1d");
+  const [btStart, setBtStart] = useState(DEFAULT_BACKTEST_WINDOW.start);
+  const [btEnd, setBtEnd] = useState(DEFAULT_BACKTEST_WINDOW.end);
+  const [btCapital, setBtCapital] = useState("100000");
+  const [btFee, setBtFee] = useState("5");
+  const [btSlip, setBtSlip] = useState("2");
+  const [btFunding, setBtFunding] = useState("1");
+  const [btBusy, setBtBusy] = useState(false);
+  const [btError, setBtError] = useState<string | null>(null);
 
   const [reloadToken, setReloadToken] = useState(0);
 
@@ -166,6 +190,40 @@ export default function StrategiesPage() {
   const canDecide = detail?.status === "pending_approval";
   const canArchive = detail?.status === "approved" || detail?.status === "rejected";
   const reviewerReady = reviewer.trim().length > 0;
+
+  async function startBacktest(strategyId: number): Promise<void> {
+    setBtBusy(true);
+    setBtError(null);
+    try {
+      const accepted = await api.createBacktest({
+        strategy_id: strategyId,
+        window: {
+          start: `${btStart}T00:00:00Z`,
+          end: `${btEnd}T00:00:00Z`,
+        },
+        bar: btBar,
+        initial_capital: btCapital,
+        cost_model: {
+          taker_fee_bps: btFee,
+          maker_fee_bps: "0",
+          slippage_bps: btSlip,
+          funding_bps_per_period: btFunding,
+        },
+      });
+      if (accepted.dispatched) {
+        const job = await api.waitForJob(accepted.job_id, { attempts: 120, intervalMs: 1500 });
+        if (job.status === "failed") {
+          setBtError(`回测任务失败：${job.error ?? "未知原因"}`);
+          return;
+        }
+      }
+      navigate(`/backtests/${accepted.run_id}`);
+    } catch (error) {
+      setBtError(describe(error));
+    } finally {
+      setBtBusy(false);
+    }
+  }
 
   return (
     <>
@@ -406,6 +464,113 @@ export default function StrategiesPage() {
                     </p>
                   )}
                 </div>
+
+                <section className="rounded-lg border border-border/60 p-3">
+                  <h3 className="mb-1 text-sm font-medium">历史回测</h3>
+                  <p className="mb-3 text-xs text-muted-foreground">
+                    只读历史行情，按买入持有跑完整个窗口；只在已批准策略上开放。
+                    资金费为常数假设，不是实测资金费。
+                  </p>
+                  {detail.status !== "approved" ? (
+                    <p className="text-sm text-muted-foreground">
+                      策略批准后才能提交回测。
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        <label className="text-sm">
+                          <span className="mb-1 block text-muted-foreground">周期</span>
+                          <select
+                            value={btBar}
+                            onChange={(event) => setBtBar(event.target.value)}
+                            className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <option value="1h">1h</option>
+                            <option value="4h">4h</option>
+                            <option value="1d">1d</option>
+                          </select>
+                        </label>
+                        <label className="text-sm">
+                          <span className="mb-1 block text-muted-foreground">开始日期</span>
+                          <input
+                            type="date"
+                            value={btStart}
+                            onChange={(event) => setBtStart(event.target.value)}
+                            className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          />
+                        </label>
+                        <label className="text-sm">
+                          <span className="mb-1 block text-muted-foreground">结束日期（不含）</span>
+                          <input
+                            type="date"
+                            value={btEnd}
+                            onChange={(event) => setBtEnd(event.target.value)}
+                            className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          />
+                        </label>
+                        <label className="text-sm">
+                          <span className="mb-1 block text-muted-foreground">初始资金</span>
+                          <input
+                            value={btCapital}
+                            onChange={(event) => setBtCapital(event.target.value)}
+                            className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          />
+                        </label>
+                        <label className="text-sm">
+                          <span className="mb-1 block text-muted-foreground">手续费 bps</span>
+                          <input
+                            value={btFee}
+                            onChange={(event) => setBtFee(event.target.value)}
+                            className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          />
+                        </label>
+                        <label className="text-sm">
+                          <span className="mb-1 block text-muted-foreground">滑点 bps</span>
+                          <input
+                            value={btSlip}
+                            onChange={(event) => setBtSlip(event.target.value)}
+                            className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          />
+                        </label>
+                        <label className="text-sm">
+                          <span className="mb-1 block text-muted-foreground">
+                            资金费 bps / 8h
+                          </span>
+                          <input
+                            value={btFunding}
+                            onChange={(event) => setBtFunding(event.target.value)}
+                            className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          />
+                        </label>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          size="sm"
+                          disabled={btBusy}
+                          onClick={() => {
+                            const id = detail.id;
+                            void startBacktest(id);
+                          }}
+                        >
+                          运行回测
+                        </Button>
+                        {btBusy && (
+                          <>
+                            <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">
+                              提交后等待后台任务结束…
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      {btError && (
+                        <p className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">
+                          {btError}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </section>
 
                 <section>
                   <h3 className="mb-2 text-sm font-medium">组合成员</h3>

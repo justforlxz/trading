@@ -611,3 +611,157 @@ export async function rejectStrategy(
 export async function archiveStrategy(strategyId: number): Promise<Strategy> {
   return request<Strategy>(`/strategies/${strategyId}/archive`, { method: "POST" });
 }
+
+// ---- 历史回测（S7） --------------------------------------------------------
+
+export type BacktestStatus = "queued" | "running" | "ok" | "failed";
+
+export type BacktestWindowInput = {
+  start: string;
+  end: string;
+  name?: string;
+  role?: "train" | "test" | "eval";
+};
+
+export type BacktestCostModel = {
+  taker_fee_bps: string;
+  maker_fee_bps: string;
+  slippage_bps: string;
+  funding_bps_per_period: string;
+  funding: boolean;
+  fee_role: "taker" | "maker";
+};
+
+export type BacktestThreshold = {
+  name: string;
+  op: ">=" | "<=" | ">" | "<" | "==";
+  value: string;
+};
+
+export type BacktestCriteriaResult = {
+  name: string;
+  op: string;
+  threshold: string;
+  actual: string;
+  passed: boolean;
+};
+
+export type BacktestCriteria = {
+  thresholds: BacktestThreshold[];
+  results: BacktestCriteriaResult[];
+  passed: boolean;
+  default: boolean;
+};
+
+export type BacktestRun = {
+  id: number;
+  run_key: string;
+  strategy_id: number;
+  strategy_version: number;
+  window: { start: string; end: string };
+  bar: string;
+  initial_capital: string;
+  cost_model: BacktestCostModel;
+  params: Record<string, unknown>;
+  criteria: BacktestCriteria | null;
+  funding_assumption: string | null;
+  status: BacktestStatus;
+  started_at: string | null;
+  finished_at: string | null;
+  error: string | null;
+};
+
+export type BacktestMetric = {
+  name: string;
+  value: string;
+  unit: string;
+};
+
+export type BacktestEquityPoint = {
+  ts: string;
+  equity: string;
+  cash: string;
+  exposure: string;
+  drawdown: string;
+};
+
+export type BacktestTrade = {
+  id: number;
+  instrument_id: number;
+  inst_id: string | null;
+  symbol: string | null;
+  side: StrategySide;
+  entry_ts: string;
+  exit_ts: string;
+  entry_px: string;
+  exit_px: string;
+  qty: string;
+  gross_pnl: string;
+  fees: string;
+  funding: string;
+  slippage: string;
+  net_pnl: string;
+  bars_held: number;
+  exit_reason: string;
+};
+
+export type CreateBacktestInput = {
+  strategy_id: number;
+  window: BacktestWindowInput;
+  windows?: BacktestWindowInput[];
+  bar: string;
+  initial_capital: string;
+  cost_model: Omit<BacktestCostModel, "funding" | "fee_role"> &
+    Partial<Pick<BacktestCostModel, "funding" | "fee_role">>;
+  criteria?: { thresholds: BacktestThreshold[] };
+  risk_free_rate?: string;
+  annualization_factor?: string;
+};
+
+export type BacktestAccepted = {
+  run_id: number;
+  job_id: number;
+  status: string;
+  run_key: string;
+  created: boolean;
+  dispatched: boolean;
+};
+
+export async function createBacktest(input: CreateBacktestInput): Promise<BacktestAccepted> {
+  return request<BacktestAccepted>("/backtests", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getBacktest(runId: number): Promise<BacktestRun> {
+  return request<BacktestRun>(`/backtests/${runId}`);
+}
+
+export async function getBacktestMetrics(
+  runId: number,
+): Promise<{ run_id: number; status: string; items: BacktestMetric[] }> {
+  return request(`/backtests/${runId}/metrics`);
+}
+
+export async function listBacktestEquity(
+  runId: number,
+  params: { limit?: number; cursor?: string } = {},
+): Promise<{ items: BacktestEquityPoint[]; next_cursor: string | null }> {
+  const query = new URLSearchParams();
+  if (params.limit !== undefined) query.set("limit", String(params.limit));
+  if (params.cursor) query.set("cursor", params.cursor);
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request(`/backtests/${runId}/equity${suffix}`);
+}
+
+export async function listBacktestTrades(
+  runId: number,
+  params: { limit?: number; cursor?: number } = {},
+): Promise<{ items: BacktestTrade[]; next_cursor: number | null }> {
+  const query = new URLSearchParams();
+  if (params.limit !== undefined) query.set("limit", String(params.limit));
+  if (params.cursor !== undefined) query.set("cursor", String(params.cursor));
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return request(`/backtests/${runId}/trades${suffix}`);
+}

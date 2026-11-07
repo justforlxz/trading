@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { AppShell } from "./components/layout/app-shell";
+import BacktestDetailPage from "./pages/backtests/detail";
 import DashboardPage from "./pages/dashboard";
 import ResearchPage from "./pages/research/index";
 import SettingsPage from "./pages/settings";
@@ -13,6 +14,7 @@ export default function App() {
         <Route index element={<DashboardPage />} />
         <Route path="research" element={<ResearchPage />} />
         <Route path="strategies" element={<StrategiesPage />} />
+        <Route path="backtests/:id" element={<BacktestDetailPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

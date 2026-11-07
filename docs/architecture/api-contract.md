@@ -177,24 +177,54 @@ target 记录字段：`id`、`symbol`、`exchange`、`display_name`、`note`、`
 
 ### 3.6 backtests
 
+回测只接受 `status=approved` 的策略，只读 `market.candle` 中 `confirm=true` 的 K 线；
+不写任何交易域数据，不接私有接口。资金费没有采集来源，只能按常数假设并显式标注。
+`params` 中固定写入 `data_source=okx_usdt_perp_candle`、`price_basis=okx_close`、
+`funding_assumption=constant`，供报告页与审计对齐口径。
+
 **`POST /api/v1/backtests`** — body：
 
 ```json
 {
   "strategy_id": 12,
   "window": {"start": "2026-04-01T00:00:00Z", "end": "2026-11-01T00:00:00Z"},
+  "windows": [
+    {"name": "w1", "start": "2026-04-01T00:00:00Z", "end": "2026-07-01T00:00:00Z",
+     "role": "train"},
+    {"name": "w2", "start": "2026-07-01T00:00:00Z", "end": "2026-11-01T00:00:00Z",
+     "role": "test"}
+  ],
   "bar": "1h",
   "initial_capital": "100000",
-  "cost_model": {"taker_fee_bps": "5", "maker_fee_bps": "2", "slippage_bps": "2", "funding": true}
+  "cost_model": {
+    "taker_fee_bps": "5", "maker_fee_bps": "2", "slippage_bps": "2",
+    "funding_bps_per_period": "1", "funding": true, "fee_role": "taker"
+  },
+  "criteria": {"thresholds": [{"name": "sharpe", "op": ">=", "value": "1"}]},
+  "annualization_factor": "252",
+  "risk_free_rate": "0",
+  "rebalance": "none"
 }
 ```
 
-`202` + `job_id`；`run_key` 由策略版本、窗口、bar、成本模型与参数哈希得到，同参数重复提交直接返回已有 `run_id`。
+`windows` 可省略：主窗口出整段汇总指标，每个分段再出 `指标@窗口名`；
+walk-forward 要求训练段严格早于测试段且互不重叠，分段必须落在主窗口内。
+`202` + `run_id` / `job_id`；`run_key` 由策略版本、窗口、bar、成本模型与参数哈希得到，
+同参数重复提交返回已有运行（`200`，`created=false`），不重复排队。
 
-**`GET /api/v1/backtests/{run_id}`** — 状态、`strategy_version`、`started_at`、`finished_at`、`error`。
+**错误码**：非 `approved` 策略 `409 strategy_not_approved`；窗口内某条腿没有
+`confirm=true` 的 K 线 `422 insufficient_data`（`details.gaps` 列明标的与窗口）；
+非法 bar / 空窗口 / 窗口过长 `422 backtest_invalid_bar` / `backtest_window_invalid` /
+`backtest_window_too_long`。
+
+**`GET /api/v1/backtests/{run_id}`** — 状态、`strategy_version`、`started_at`、
+`finished_at`、`error`，以及 `params.criteria`（阈值、逐条 `actual`/`passed`、
+整体 `passed`、是否 `default`）和 `funding_assumption`。
 **`GET .../metrics`** — `backtest_metric` 列表（`name`、`value`、`unit`）。
-**`GET .../equity`** — `backtest_equity_point` 序列（分页）。
-**`GET .../trades`** — `backtest_trade` 列表，含成本拆解（`fees`/`funding`/`slippage`）。
+**`GET .../equity`** — `backtest_equity_point` 序列（`ts`、`equity`、`cash`、
+`exposure`、`drawdown`，按 `cursor` 分页）。
+**`GET .../trades`** — `backtest_trade` 列表，含成本拆解
+（`fees`/`funding`/`slippage`）与 `net_pnl`，按 `cursor` 分页。
 
 ### 3.7 ops
 

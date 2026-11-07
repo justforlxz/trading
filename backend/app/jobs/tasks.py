@@ -50,6 +50,8 @@ PURGE_ROLLING = "purge_rolling_candles"
 RECOMPUTE_RELATIONS = "recompute_relations"
 SCAN_OPPORTUNITIES = "scan_opportunities"
 BACKTEST_RUN = "run_backtest"
+RISK_EVALUATE = "risk_evaluate"
+RISK_SCAN = "risk_scan"
 
 
 def build_okx_client() -> OkxClient:
@@ -547,6 +549,51 @@ async def run_backtest(
     return await _execute(run_id, BACKTEST_RUN, body)
 
 
+async def risk_evaluate(
+    ctx: dict[str, Any],
+    run_id: int | None = None,
+    *,
+    strategy_id: int,
+    as_of: datetime | str | None = None,
+    evaluation_key: str | None = None,
+) -> dict[str, Any]:
+    """对指定策略执行一次风控评估并把超限落成事件。"""
+
+    from app.risk import service as risk_service
+
+    moment = as_of
+    if isinstance(moment, str):
+        moment = datetime.fromisoformat(moment.replace("Z", "+00:00"))
+
+    async def body(session: AsyncSession) -> dict[str, Any]:
+        return await risk_service.evaluate(
+            session,
+            strategy_id=strategy_id,
+            as_of=moment,
+            evaluation_key=evaluation_key,
+        )
+
+    return await _execute(run_id, RISK_EVALUATE, body)
+
+
+async def risk_scan(ctx: dict[str, Any], run_id: int | None = None) -> dict[str, Any]:
+    """周期巡检：全部 approved 策略 + 资金费率/流动性观测。"""
+
+    from app.adapters.okx.risk import OkxRiskMarketSource
+    from app.risk import service as risk_service
+
+    client = build_okx_client()
+    try:
+
+        async def body(session: AsyncSession) -> dict[str, Any]:
+            source = OkxRiskMarketSource(client, book_depth=get_settings().risk_funding_book_depth)
+            return await risk_service.scan(session, source=source)
+
+        return await _execute(run_id, RISK_SCAN, body)
+    finally:
+        await client.aclose()
+
+
 TASK_FUNCTIONS = [
     sync_instruments,
     ingest_candles,
@@ -558,6 +605,8 @@ TASK_FUNCTIONS = [
     recompute_relations,
     scan_opportunities,
     run_backtest,
+    risk_evaluate,
+    risk_scan,
 ]
 
 __all__ = [
@@ -567,6 +616,8 @@ __all__ = [
     "PURGE_ROLLING",
     "QUALITY_SCAN",
     "RECOMPUTE_RELATIONS",
+    "RISK_EVALUATE",
+    "RISK_SCAN",
     "SCAN_OPPORTUNITIES",
     "SYNC_EQUITY",
     "SYNC_INSTRUMENTS",
@@ -574,6 +625,8 @@ __all__ = [
     "TASK_FUNCTIONS",
     "build_okx_client",
     "recompute_relations",
+    "risk_evaluate",
+    "risk_scan",
     "run_backtest",
     "run_ingest_candles",
     "run_quality_scan",

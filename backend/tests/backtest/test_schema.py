@@ -1,4 +1,8 @@
-"""迁移门禁：0006 是 head、四张表与四个唯一键齐备、升级可重复执行（AC1）。"""
+"""迁移门禁：backtest 四张表与四个唯一键齐备、升级可重复执行（AC1）。
+
+0007 落地后 0006 不再是 head，这里只断言 backtest 结构完整与升级幂等；
+当前 head 由 ``tests/risk/test_schema.py`` 断言。
+"""
 
 import os
 import subprocess
@@ -23,10 +27,7 @@ UNIQUE_KEYS = {
 }
 
 
-async def test_head_is_0006_and_schema_is_complete(session) -> None:
-    head = await session.scalar(text("SELECT version_num FROM alembic_version"))
-    assert head == "0006_backtest_schema"
-
+async def test_backtest_schema_is_complete(session) -> None:
     names = list(
         await session.scalars(
             text(
@@ -72,4 +73,4 @@ async def test_upgrade_head_is_idempotent(session, database_url: str) -> None:
     )
     assert result.returncode == 0, result.stderr
     head = await session.scalar(text("SELECT version_num FROM alembic_version"))
-    assert head == "0006_backtest_schema"
+    assert head is not None

@@ -99,6 +99,24 @@ class Settings(BaseSettings):
     # S7 历史回测：窗口上限从配置注入，公式里不写死；年化因子按 bar 推导。
     backtest_max_bars: int = 20000
 
+    # P2 风控：这里的值只用于初始化 v1 阈值策略，运行期以 risk.risk_policy 为准。
+    risk_default_capital: float = 100000.0
+    risk_max_order_notional: float = 20000.0
+    risk_max_leg_weight: float = 0.6
+    risk_max_leverage: float = 1.0
+    risk_max_gross_exposure: float = 1.0
+    risk_max_net_exposure: float = 1.0
+    risk_max_instrument_weight: float = 0.6
+    risk_max_concentration: float = 0.5
+    risk_drawdown_warn: float = 0.05
+    risk_drawdown_reduce: float = 0.10
+    risk_drawdown_close: float = 0.20
+    risk_funding_rate_threshold: float = 0.0005
+    risk_min_depth_notional: float = 20000.0
+    risk_market_data_lookback_days: int = 7
+    risk_funding_book_depth: int = 20
+    risk_scan_interval_seconds: int = 3600
+
 
 @lru_cache
 def get_settings() -> Settings:

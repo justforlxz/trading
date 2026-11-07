@@ -96,6 +96,9 @@ class Settings(BaseSettings):
     strategy_min_legs: int = 2
     strategy_max_legs: int = 6
 
+    # S7 历史回测：窗口上限从配置注入，公式里不写死；年化因子按 bar 推导。
+    backtest_max_bars: int = 20000
+
 
 @lru_cache
 def get_settings() -> Settings:

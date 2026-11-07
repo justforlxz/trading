@@ -49,6 +49,7 @@ QUALITY_SCAN = "quality_scan"
 PURGE_ROLLING = "purge_rolling_candles"
 RECOMPUTE_RELATIONS = "recompute_relations"
 SCAN_OPPORTUNITIES = "scan_opportunities"
+BACKTEST_RUN = "run_backtest"
 
 
 def build_okx_client() -> OkxClient:
@@ -530,6 +531,22 @@ async def scan_opportunities(
     return await _execute(run_id, SCAN_OPPORTUNITIES, body)
 
 
+async def run_backtest(
+    ctx: dict[str, Any],
+    run_id: int | None = None,
+    *,
+    backtest_id: int,
+) -> dict[str, Any]:
+    """执行一次已排队的回测；结果由 service 幂等落库。"""
+
+    from app.backtest import service as backtest_service
+
+    async def body(session: AsyncSession) -> dict[str, Any]:
+        return await backtest_service.execute(session, backtest_id)
+
+    return await _execute(run_id, BACKTEST_RUN, body)
+
+
 TASK_FUNCTIONS = [
     sync_instruments,
     ingest_candles,
@@ -540,10 +557,12 @@ TASK_FUNCTIONS = [
     purge_rolling_candles,
     recompute_relations,
     scan_opportunities,
+    run_backtest,
 ]
 
 __all__ = [
     "BACKFILL_CANDLES",
+    "BACKTEST_RUN",
     "INGEST_CANDLES",
     "PURGE_ROLLING",
     "QUALITY_SCAN",
@@ -555,6 +574,7 @@ __all__ = [
     "TASK_FUNCTIONS",
     "build_okx_client",
     "recompute_relations",
+    "run_backtest",
     "run_ingest_candles",
     "run_quality_scan",
     "run_sync_equity",

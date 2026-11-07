@@ -8,7 +8,7 @@ DEV_RUN = $(DEV_COMPOSE) run --rm --no-deps --build api-dev
 
 .DEFAULT_GOAL := help
 
-.PHONY: help up down logs test lint format migrate
+.PHONY: help up down logs test lint format migrate coverage
 
 help: ## 列出可用目标
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-8s\033[0m %s\n", $$1, $$2}'
@@ -36,3 +36,6 @@ format: ## 后端 ruff 自动格式化（改动直接写回工作区）
 
 migrate: ## 对运行中的数据库执行 alembic upgrade head（幂等）
 	$(COMPOSE) run --rm -e RUN_MIGRATIONS=0 api alembic upgrade head
+
+coverage: ## 后端覆盖率（容器内跑完整 pytest，阈值 70%，低于即失败）
+	$(DEV_RUN) pytest -q --cov=app --cov-report=term-missing --cov-fail-under=70

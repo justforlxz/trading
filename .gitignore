@@ -9,6 +9,12 @@ venv/
 *.egg-info/
 build/
 
+# 覆盖率产物（make coverage 在挂载目录内生成）
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
 # Node
 node_modules/
 dist/

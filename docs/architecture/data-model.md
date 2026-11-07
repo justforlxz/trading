@@ -242,14 +242,40 @@ K 线锚定规则（实测，见 `docs/risk/external-dependencies.md`）：
 
 `id`、`request_id`、`actor`、`action`、`resource`、`resource_id`、`before JSONB`、`after JSONB`、`at`、`idempotency_key`。唯一键：`UNIQUE (idempotency_key)`（部分索引，仅非空时生效）。
 
-## 8. 预留表（P1 不建，仅固定方向）
+## 8. risk schema（P2 已落地）
 
-以下实体属 P2/P3，P1 不创建迁移，列出是为了让外键方向一次定对：
+风控只读引用 `strategy.strategy` 与 `market.instrument`，不反向被业务模块引用。金额列用 `NUMERIC(24,10)`，比例列用 `NUMERIC(12,10)`，禁止 float。
 
-| 表 | 阶段 | 与 P1 的关系 |
+### risk_policy（阈值策略，版本化）
+
+`id`、`scope`（`global`/`strategy`）、`strategy_id`（`scope=strategy` 时非空，引用 `strategy.strategy.id`，级联删除）、`version`、阈值列：
+
+| 列 | 类型 | 含义 |
 | --- | --- | --- |
-| `risk.risk_policy` / `risk.risk_event` | P2 | 引用 `strategy.strategy` 与 `market.instrument` |
-| `execution.order` / `execution.fill` / `execution.position` | P3 | 引用 `strategy.strategy` 与 `market.instrument` |
+| `max_order_notional` | `NUMERIC(24,10)` | 单笔名义金额上限 |
+| `max_leg_weight` | `NUMERIC(12,10)` | 单腿权重上限 |
+| `max_leverage` | `NUMERIC(12,10)` | 杠杆上限 |
+| `max_gross_exposure` | `NUMERIC(12,10)` | 总敞口 / 资本上限 |
+| `max_net_exposure` | `NUMERIC(12,10)` | 净敞口 / 资本上限 |
+| `max_instrument_weight` | `NUMERIC(12,10)` | 单标的权重上限 |
+| `max_concentration` | `NUMERIC(12,10)` | 集中度上限 |
+| `drawdown_warn` / `drawdown_reduce` / `drawdown_close` | `NUMERIC(12,10)` | 回撤三级阈值 |
+| `funding_rate_threshold` | `NUMERIC(12,10)` | 资金费率绝对值阈值 |
+| `min_depth_notional` | `NUMERIC(24,10)` | 盘口最小深度 |
+
+另有 `note`、`updated_by`（记录调用来源与备注）、`created_at`、`updated_at`。
+
+唯一键：`UNIQUE (scope, strategy_id, version) NULLS NOT DISTINCT` —— `global` 作用域的 `strategy_id` 为 NULL，`NULLS NOT DISTINCT` 保证同一作用域同一版本只能存在一行。版本单调递增，更新阈值即插入新版本行，旧版本保留以便事件回溯。
+
+### risk_event（风险事件）
+
+`id`、`kind`（`limit_breach`/`drawdown`/`funding`/`liquidity`）、`severity`（`tier1`/`tier2`/`tier3`）、`action`（`none`/`warn`/`reduce`/`close`）、`strategy_id`（可空，引用 `strategy.strategy.id`，置空删除）、`instrument_id`（可空，引用 `market.instrument.id`，置空删除）、`policy_version`、`observed_value`、`threshold`、`payload JSONB`、`evaluation_key`、`created_at`、`resolved_at`。
+
+唯一键：`UNIQUE (kind, strategy_id, instrument_id, policy_version, evaluation_key) NULLS NOT DISTINCT` —— 同一评估键下重复评估不会产生重复事件行，API 只体现去重语义（不计数）。`created_at` 上建有索引，用于面板按时间倒序分页。
+
+### P3 预留
+
+`execution.order` / `execution.fill` / `execution.position` 仍属 P3，P2 不建表；方向仍是引用 `strategy.strategy` 与 `market.instrument`。
 
 ## 9. 存储量与保留
 

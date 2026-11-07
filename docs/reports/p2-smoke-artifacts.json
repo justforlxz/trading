@@ -1,0 +1,37 @@
+{
+  "generated_at": "2026-11-07T09:26:00Z",
+  "api_base": "http://localhost:8000/api/v1",
+  "evaluation_key": "2026-11-07",
+  "steps": [
+    {
+      "migration": "0007_risk_schema (head)",
+      "web_status": "200"
+    },
+    {
+      "seeded_strategy": 5,
+      "seeded_backtest": 5
+    },
+    {
+      "policy_version_initial": 1
+    },
+    {
+      "policy_version_tight": 2
+    },
+    {
+      "status_reason": "limit_breach",
+      "breach_codes": "concentration_exceeded,gross_exposure_exceeded,instrument_weight_exceeded,leg_weight_exceeded,leverage_exceeded,order_notional_exceeded"
+    },
+    {
+      "evaluate_run": 1436,
+      "limit_breach_events": 10
+    },
+    {
+      "drawdown_events": 1,
+      "drawdown_action": "reduce",
+      "drawdown_severity": "tier2"
+    },
+    {
+      "policy_version_restored": 3
+    }
+  ]
+}

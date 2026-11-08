@@ -949,3 +949,42 @@ export async function evaluateRisk(input: RiskEvaluateInput): Promise<RiskEvalua
     body: JSON.stringify(input),
   });
 }
+
+export type AiCitation = {
+  type: string;
+  source: string;
+  [key: string]: unknown;
+};
+
+export type AiModelView = {
+  provider: string;
+  model: string;
+};
+
+export type AiQueryResponse = {
+  answer: string;
+  intent: string | null;
+  citations: AiCitation[];
+  model: AiModelView;
+  degraded: boolean;
+  missing?: string[];
+  /** 所有 `/ai/*` 200 响应固定为 true。 */
+  read_only?: boolean;
+  /** false 表示后端拒答（未许可/未识别），此时没有引用、也没有域数据。 */
+  answerable?: boolean;
+  /** 拒答原因, 取值同后端 `Decision.refusal`。 */
+  reason?: string;
+};
+
+export type AiQueryInput = {
+  question: string;
+  limit?: number;
+};
+
+/** 只读问答: 写意图由后端拒绝并返回 403 ai_write_forbidden。 */
+export async function askAssistant(input: AiQueryInput): Promise<AiQueryResponse> {
+  return request<AiQueryResponse>("/ai/query", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}

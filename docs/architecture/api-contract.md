@@ -390,13 +390,119 @@ risk_market_data_unavailable`（fail-closed），`details.missing` 列出缺失�
 阈值时产生 `reduce_only` 平仓单并写 `risk_event(kind=stop_trigger, action=close)`，不经过策略审批；
 已有未完成止损单时不重复下单。
 
+### 3.10 ai（P4 只读分析助手）
+
+`ai` 是**只读编排层**：读取 §3.2 / §3.3 / §3.5 / §3.6 / §3.7 / §3.9 已算好的结果，组织
+`citations`，再调用可选的语言模型改写文案。它不重算指标、不写交易域、不改变策略或风控状态，
+也不持久化对话历史。所有端点均为 `POST`，错误沿用 §1.1 信封。
+
+通用响应字段：`summary` 或 `answer`（解释文本）、`citations[]`、`model{provider, model}`、
+`degraded`（bool）、`missing[]`（数据不足时的缺失项）、`read_only: true`（固定）与
+`answerable: bool`。`citations[]` 每项至少`{type, source}`，其余字段是**本次请求实际读到的值**，
+与 `source` 指向的 GET 接口逐项一致；`source` 形如 `GET /api/v1/market/coverage`。数据不足时返回
+`200`，文本以「数据不足」开头并在 `missing` 列出缺失项，不编造数值。
+
+`explain/*` 与 `suggest/strategy` 是显式端点，恒 `answerable=true`；`/ai/query` 可以返回
+`answerable=false`：此时 `citations=[]`、文本是固定拒答文案、另带 `reason`，响应中不含任何域数据
+（字段取值见下文 `/ai/query`）。
+
+**`POST /api/v1/ai/explain/market`** — body `{as_of?, bar?, scope?}`。`as_of` 缺省为当前时间，
+`bar` 缺省取研究配置，`scope` 为逗号分隔的 `inst_id`（缺省取启用目标股票）。
+返回市场时段与 K 线覆盖解释；citations 含 `market_session`（与 `GET /market/sessions` 一致）、
+`market_coverage`（与 `GET /market/coverage` 的 `summary` 一致）、`target_universe`。
+
+**`POST /api/v1/ai/explain/relations`** — body `{target_id, window_bars?, method?, price_basis?}`。
+返回关系快照解释；citations 含 `relation_snapshot`（`snapshot_id`、`as_of`、`window_bars`、`method`、
+`price_basis`、`sample_size`）与 `relation_edge`（目标 `target_id`、对手盘 `instrument_id`、
+`coefficient`、`best_lag`、`rank`），均与 `GET /targets/{id}/relations` 一致。
+传入的筛选条件与最新快照不符时返回「数据不足」并列出 `snapshot_matching_filters`。
+
+**`POST /api/v1/ai/explain/strategy`** — body `{strategy_id}`。citations 含 `strategy_id`、`version`、
+`status`，以及每条 leg 的 `instrument_id`、`inst_id`、`side`、`target_weight`、`rationale`、`rank`
+（与 `GET /strategies/{id}` 的 `weight` 同值）。
+
+**`POST /api/v1/ai/explain/backtest`** — body `{run_id}`。citations 含 `run_id` 与 `status`/`window`/
+`initial_capital`，以及 `GET /backtests/{id}/metrics` 的**全部指标**（`name`/`value`/`unit`，数值为同一
+Decimal 字符串，误差为 0）。亏损回测的解释不得出现「加仓 / 扩大仓位」类建议；模型输出若命中该
+词表，服务端回退为确定性摘要并置 `degraded=true`。
+
+**`POST /api/v1/ai/query`** — body `{question, limit?}`。返回
+`{answer, intent, answerable, read_only, reason?, citations[], model, degraded, missing[]}`。
+处理顺序固定为「动作安全检查 → 正向读取许可 → 域端口调用」，前两步未通过时**不访问任何域数据
+端口**（端口调用次数为 0），也不会产生任何业务域写入。
+
+1. **动作安全检查**：先按中英文标点（`，。；、,.!?！？` 与换行）切句，逐句判定；任一句是祈使/
+   处置句即整体不作答。祈使句只用**句首锚点**：处置/祈使前缀（把/将/给/替/让/请/帮/麻烦/给我/
+   替我/让我/你/马上/直接/先/立刻），或句首动作词根（买/卖/平/清/撤/加/减/开/关/调/改/设/移/
+   拉/换/补/建/转/拆/锁/砍）。命中后查受控对象类别（闭集，`matched_object_class`）：`trade`
+   （订单/挂单/委托/成交）、`position`（仓位/持仓/多单/空单/敞口）、`strategy`（策略/腿/权重/
+   参数）、`risk`（风控/止损/止盈/阈值/杠杆/保证金/预算/资金）、`execution`（实盘/模式/授权）、
+   `capital`（全仓/满仓/梭哈/加仓/减仓/清仓）、`quantity`（`\d+\s*(股|手|张|倍|成|%)`）。命中任一
+   返回 `403 ai_write_forbidden`，`error.details.refusal = {code, message, matched_object_class}`；
+   未命中返回 `200 answerable=false`、`reason="imperative_unclassified"`。
+   动作检查先于一切分类：带问号、或带「对象 + 的 + 属性」结构的句子，只要同时出现变更形态
+   （成/为/到/掉/空/满/半/倍/%/下来/上去/起来/一下/了/至/干净/净）仍判祈使；属性结构不能
+   单独作为只读依据，`把策略 1 的腿删掉一条` 与 `策略的腿删掉一条可以吗` 都归入拒绝。
+   句首变更谓词（修改/调整/设置/更改/更新/改掉/换掉/替换/删除/新增/减少/提高/下调…）优先于属性模板：
+   命中即按写请求拒绝，不再进入「对象 + 的 + 属性」许可；句首读动词（强调/假设/解释/说明/分析/列出/查看…）本身不是许可：动作检查必须先完成变更判定（CHANGE_SHAPES ∪ 谓词 + 目标），读动词只在没有任何变更信号时才按疑问处理，动作检查内不得出现位于变更判定之前的提前 return。疑问框架（是否/多大/多少/哪个/情况）只否定「疑问延续」形式的变更，不因尾段出现谓词就误伤只读。
+   属性读取许可按模板发放：「对象 + 的 + 属性名词」之后只允许紧跟属性谓词或疑问尾（是多少/是什么/
+   有哪些/情况/记录/状态/如何/吗/呢 等）；中间出现任何其它成分（减少/合并/作废/下线/停用…）
+   既拿不到许可，也会被动作检查判为写请求，`策略 1 的腿减少一条` 同样不产生数据回答。
+   尾段必须是**完整谓词**：剥掉「是多少/有多少条/是两条」等谓词与量词后必须为空；尾段出现
+   任何变更形态（`是两条改成一条`、`有多少减到一半`、`有几条删掉一条`）即按祈使拒绝，
+   前缀命中不构成许可。
+   属性尾段必须是**完整谓词**：剥掉「是多少/有多少条/是两条」这类谓词与量词后必须为空，
+   尾段出现任何变更形态即按祈使拒绝，前缀命中不构成许可（`策略 1 的腿是两条改成一条` 不产生数据回答）。
+   尾段必须是**完整谓词**：剥掉「是多少/有多少条/是两条」等谓词与量词后必须为空，尾段出现
+   任何变更形态（`是两条改成一条`、`有多少减到一半`、`有几条删掉一条`）即按祈使拒绝；
+   前缀命中不构成许可。
+2. **正向读取许可**：只有疑问句进入许可判定，同样只用句首/句末锚点：句首（什么/啥/哪/谁/为什么/
+   怎么/如何/是否/请问/解释/解读/说明/介绍/分析/对比/多少/几/区别）或句末（吗/呢/是多少/是什么/
+   多少钱/有什么区别/的区别/是什么意思/怎么样/怎么办/问号）。命中后还必须命中 `READ_PATTERNS` 之一
+   （关系、回测/回撤/夏普/收益、策略/权重/腿、风控/敞口/集中度、持仓/盈亏/多单/空单/成本/均价/
+   浮盈/浮亏、行情/市场/时段/覆盖）才放行。定义式问法（什么是/是什么/是什么意思/的含义/的定义/
+   的区别）改由**静态术语表**（`app/ai/core/glossary.py`）作答，`citations` 形如
+   `{"type":"glossary","source":"glossary#多单","term":"多单","definition":"..."}`；术语未收录返回
+   `200 answerable=false`、`reason="concept_unknown"`；没有任何许可返回 `reason="unlicensed"`。
+3. **无法判断**：既不疑问也不祈使的输入返回 `reason="unrouted"`。
+
+`answerable=false` 时 `citations=[]`、`answer` 为固定拒答文案、`reason` 取
+`write_forbidden | imperative_unclassified | unrouted | unlicensed | concept_unknown`，响应中
+**不含任何域数据**。`general` 不再是可作答意图。问题为空或超长（>2000）返回
+`422 ai_invalid_request`。
+
+**`POST /api/v1/ai/suggest/strategy`** — body `{opportunity_id?, target_id?, params?}`，两者至少一个。
+返回**策略草案**：`{draft_only: true, persisted: false, strategy{kind, templates, params},
+legs[], warnings[], citations[], model, degraded}`。草案**不落库**、不提交审批，也不改变既有策略、
+leg 或审批计数；`target_id` 路径按关系快照的最强正/负相关生成多空两条腿，`opportunity_id` 路径生成
+单边草案并给出单边警告。两个 id 都缺返回 `422 ai_invalid_request`；实体不存在返回 404。
+
+**降级与开关**：`AI_ENABLED=false`、`AI_PROVIDER=none`，或 `openai` 缺 `model`/`base_url`/`api_key`
+时，全部 `/ai/*` 返回 `503 ai_not_configured`，且不发起任何外部请求。`AI_PROVIDER=rule_based` 时
+由确定性事实摘要回答，响应必带 `degraded=true` 且 `model={provider:"rule_based", model:"rules-v1"}`。
+上游模型失败时，`AI_FALLBACK_ENABLED=true` 降级为规则式摘要（`degraded=true`），否则返回
+`502 ai_upstream_error`。其余错误码：`403 ai_write_forbidden`、`422 ai_invalid_request`、
+`404 ai_target_not_found` / `ai_strategy_not_found` / `ai_backtest_not_found` /
+`ai_opportunity_not_found` / `ai_instrument_not_found`。任何情况都不得以 500 暴露内部错误。
+
+**审计**：每次调用（含被拒的写意图与上游失败）写一条 `ops.audit_log`：`actor="ai"`，
+`action` 为 `ai.explain.market|ai.explain.relations|ai.explain.strategy|ai.explain.backtest|ai.query|
+ai.suggest.strategy`，`resource`/`resource_id` 指向被解释实体，`after` 记
+`{model, latency_ms, tokens?, outcome}`（`outcome` 取 `ok`/`forbidden`/`refused`/`not_found`/`error`（`refused` 专用于 200 `answerable=false` 拒答））。
+同一 `X-Request-ID` 的重复调用不重复记账（`idempotency_key` 唯一索引兜底）；配置不可用（503）
+不写审计。
+
 ## 4. 内部边界
 
 - 服务进程之间**没有 HTTP 契约**。`api`、`worker`、`scheduler` 共享同一个 Python 包与同一套 `services`，通过 PostgreSQL 与 Redis 队列协作。
 - `scheduler` 只能调用 `jobs` 的投递函数（写队列 + `job_run`），不得直接执行重计算。
 - `worker` 任务的输入输出是 Python 对象，落库后对外表现为上表资源；不存在"内部 REST 接口"。
 - 跨模块调用只允许：`opportunity → analysis`（纯函数）、`strategy.core`、`backtest.core`、`backtest → market`（读 K 线服务）。禁止横向调用其他模块的 service。
-- 外部适配器只在 `adapters/` 内出现；`api` 层不得直接 import `httpx` 调外部接口。
+- `ai` 只允许**只读**编排 `market` / `research` / `opportunity` / `strategy` / `risk` / `backtest` / `execution` 的查询函数（GET 语义），且必须经只读端口 `app.ports.ai_reads` 取数；不得调用执行域写接口、不得改变策略/风控状态；上述模块不得反向 import `ai`。
+- `app.ai` 的 import 白名单：`app.ai.*`、`app.ports.ai_reads`、`app.config`、`app.db.session`（外加标准库与 `httpx`/`sqlalchemy`）。任何业务域模块（`market`/`research`/`opportunity`/`strategy`/`backtest`/`risk`/`execution`/`ops`）都不允许出现，`tests/ai/test_import_boundary.py` 用 AST 兜底。
+- 域只读适配器归 `app/adapters/domain`：`reads.py` 实现 `DomainAiReads`（把域 service 结果整理成成型 dict，域异常一律转 `AiReadsError`），`registry.py` 提供 `build_ai_reads(session)`，由 `app/api/v1/ai.py`（组合根）装配后传给 `app.ai.service`。
+- 只读路径不得为满足查询而写库：日历只读 `list_sessions`（不 `sync_sessions`），风控缺省阈值用未落库的临时对象（`risk.service.resolve_policy_readonly`）。审计 `ops.audit_log` 是 `app.ai` 唯一允许的写入。
+- 外部适配器只在 `adapters/` 内出现；`api` 层不得直接 import `httpx` 调外部接口。语言模型调用封装在 `app/ai/adapter.py`，由 `ai` 服务调用。
 
 ## 5. 兼容与版本
 

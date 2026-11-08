@@ -1,0 +1,695 @@
+{
+  "cases": [
+    {
+      "text": "帮我买点BTC",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "给我卖 100 股",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "撤掉所有挂单",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "把杠杆拉到5倍",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "把止损上移",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "清掉仓位",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "给策略1加大资金",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "全仓梭哈",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "直接满仓",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "一把梭",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "什么是多单",
+      "expect": [
+        "answered"
+      ],
+      "intent": "concept",
+      "class": "concept"
+    },
+    {
+      "text": "什么是空单",
+      "expect": [
+        "answered"
+      ],
+      "intent": "concept",
+      "class": "concept"
+    },
+    {
+      "text": "解释一下多单",
+      "expect": [
+        "answered"
+      ],
+      "intent": "positions",
+      "class": "concept"
+    },
+    {
+      "text": "我现在有多单吗",
+      "expect": [
+        "answered"
+      ],
+      "intent": "positions",
+      "class": "read"
+    },
+    {
+      "text": "建仓成本是多少",
+      "expect": [
+        "answered"
+      ],
+      "intent": "positions",
+      "class": "read"
+    },
+    {
+      "text": "换仓成本高吗",
+      "expect": [
+        "answered"
+      ],
+      "intent": "positions",
+      "class": "read"
+    },
+    {
+      "text": "做多和做空的区别",
+      "expect": [
+        "answered"
+      ],
+      "intent": "concept",
+      "class": "concept"
+    },
+    {
+      "text": "把策略\n改成做空",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "approve strategy 1",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "modify leg weight of strategy 1",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "止损改到 95，为什么",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 删除，解释后果",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "帮我下单买入 AAPL 100 股",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "开实盘",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "帮我清仓",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "解释一下当前行情",
+      "expect": [
+        "answered"
+      ],
+      "intent": "market",
+      "class": "read"
+    },
+    {
+      "text": "解释回测 1 的表现",
+      "expect": [
+        "answered"
+      ],
+      "intent": "backtest",
+      "class": "read",
+      "seed": "backtest"
+    },
+    {
+      "text": "当前风控敞口是多少",
+      "expect": [
+        "answered"
+      ],
+      "intent": "risk",
+      "class": "read"
+    },
+    {
+      "text": "持仓盈亏怎么样",
+      "expect": [
+        "answered"
+      ],
+      "intent": "positions",
+      "class": "read"
+    },
+    {
+      "text": "现在风控是否允许增加敞口？",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "read"
+    },
+    {
+      "text": "策略的调整历史",
+      "expect": [
+        "answered"
+      ],
+      "class": "read",
+      "intent": "strategy"
+    },
+    {
+      "text": "请问今天天气如何",
+      "expect": [
+        "unlicensed"
+      ],
+      "class": "ambiguous"
+    },
+    {
+      "text": "什么是波动率",
+      "expect": [
+        "unlicensed"
+      ],
+      "class": "ambiguous"
+    },
+    {
+      "text": "把策略1改成做空？",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "把风控敞口调低？",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "把仓位清掉好吗",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "能帮我把策略 1 改成做空吗",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 改成做空怎么样",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "解释一下然后把策略1改成做空",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "把杠杆调到3倍可以吗",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "清仓呢？",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "给我卖100股好吗",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "把实盘打开行不行",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "如何把仓位清掉",
+      "expect": [
+        "unlicensed"
+      ],
+      "class": "ambiguous"
+    },
+    {
+      "text": "策略 1 转成空头好吗",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 切换为空头可以吗",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "仓位清干净好吗",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 转成空头",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 切换成空头",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "仓位清干净",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 砍掉一半",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "杠杆拉满",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "资金预算削成一半",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "把这个策略的腿去掉一条",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "把策略 1 的腿删掉一条",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 的腿去掉一条",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "把策略的腿删掉好吗",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略的腿删掉一条可以吗",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "把策略 1 的腿改成一条好吗",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "把策略 1 的持仓改成空头",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "把策略 1 的仓位清掉",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "把持仓的成本改成 50",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "把风控的阈值调低",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "把订单的价格改成 100",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 的腿减少一条",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 的腿减一条",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 的腿合并",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 的腿作废",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 的腿下线",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 的腿停用",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 的腿减少一条可以吗",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 的腿作废好吗",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 的腿下线行吗",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 的腿合并可以吗",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 的腿是两条改成一条",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 的腿有多少改成一条",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 的腿有几条删掉一条",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 的腿有两条改成一条",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 的仓位是 30% 调到 50%",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 的仓位有多少减到一半",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 的持仓有多少卖掉一半",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "策略 1 的权重有多少改成 0.3",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "修改策略 1 的权重",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "调整策略 1 的权重",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "设置策略 1 的权重",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "更改策略 1 的权重",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "换掉这个策略的腿",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "立即停止实盘",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "解锁实盘",
+      "expect": [
+        "forbidden"
+      ],
+      "class": "write"
+    },
+    {
+      "text": "订单成交了吗",
+      "expect": [
+        "answered"
+      ],
+      "intent": "positions"
+    },
+    {
+      "text": "策略 1 的仓位有多大",
+      "expect": [
+        "answered"
+      ],
+      "intent": "positions"
+    },
+    {
+      "text": "止损设置在哪个价位",
+      "expect": [
+        "answered"
+      ],
+      "intent": "risk"
+    },
+    {
+      "text": "策略的腿和仓位情况",
+      "expect": [
+        "answered"
+      ],
+      "intent": "strategy"
+    },
+    {
+      "text": "策略 1 的仓位变化了多少",
+      "expect": [
+        "answered"
+      ],
+      "intent": "positions"
+    },
+    {
+      "text": "策略 1 的收益上涨了多少",
+      "expect": [
+        "answered"
+      ],
+      "intent": "backtest"
+    },
+    {
+      "text": "强调一下策略的主要风险",
+      "expect": [
+        "answered"
+      ]
+    },
+    {
+      "text": "假设策略不成立会怎样",
+      "expect": [
+        "answered"
+      ],
+      "intent": "strategy"
+    }
+  ]
+}

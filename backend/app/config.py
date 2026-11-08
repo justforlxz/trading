@@ -131,6 +131,21 @@ class Settings(BaseSettings):
     execution_quote_bar: str = "1d"
     execution_stop_loss_ratio: float = 0.05
 
+    # P4 只读分析助手：外部模型是可选依赖，默认关闭；规则式兜底不发出任何外部请求。
+    # provider 取 none / rule_based / openai；openai 需同时配齐 model、base_url 与 api_key。
+    ai_enabled: bool = False
+    ai_provider: str = "none"
+    ai_model: str = ""
+    ai_base_url: str = ""
+    ai_api_key: str = ""
+    ai_timeout_seconds: float = 20.0
+    ai_max_tokens: int = 800
+    ai_temperature: float = 0.2
+    # 上游模型失败时是否降级为规则式答案；关闭后失败直接 502 ai_upstream_error。
+    ai_fallback_enabled: bool = True
+    # 单次解释最多附带的引用条数（逐条引用仍来自本次实际读取的数据）。
+    ai_max_citations: int = 20
+
 
 @lru_cache
 def get_settings() -> Settings:

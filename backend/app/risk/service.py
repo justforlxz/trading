@@ -134,9 +134,17 @@ def _policy_view(policy: RiskPolicy) -> dict[str, Any]:
     }
 
 
-def policy_view(policy: RiskPolicy) -> dict[str, Any]:
-    """阈值策略的响应视图（阈值以字符串返回，避免 float 误差）。"""
-    return _policy_view(policy)
+def policy_view(policy: RiskPolicy, *, source: str = "stored") -> dict[str, Any]:
+    """阈值策略的响应视图（阈值以字符串返回，避免 float 误差）。
+
+    `source="defaults"` 表示这是一份**未落库**的缺省阈值, 因此没有版本号。
+    """
+
+    view = _policy_view(policy)
+    view["policy_source"] = source
+    if source == "defaults":
+        view["version"] = None
+    return view
 
 
 def _limits_from(values: dict[str, Decimal]) -> Limits:
@@ -205,6 +213,34 @@ async def resolve_policy(session: AsyncSession, *, strategy_id: int | None = Non
         if scoped is not None:
             return scoped
     return await get_or_create_policy(session)
+
+
+async def resolve_policy_readonly(
+    session: AsyncSession, *, strategy_id: int | None = None
+) -> tuple[RiskPolicy, str]:
+    """只读取生效阈值, 任何情况下都不落库。
+
+    返回 `(policy, source)`: `source="stored"` 表示读到既有记录, `source="defaults"`
+    表示用配置默认值构造了一份**未落库**的临时对象 (版本号为 None)。
+    只读问答 (如 `/ai/query` 问风控) 必须用它, 不能为满足查询而写 `risk.risk_policy`。
+    """
+
+    if strategy_id is not None:
+        scoped = await get_policy(session, scope="strategy", strategy_id=strategy_id)
+        if scoped is not None:
+            return scoped, "stored"
+    existing = await get_policy(session)
+    if existing is not None:
+        return existing, "stored"
+    defaults = RiskPolicy(
+        scope="global",
+        strategy_id=None,
+        version=None,
+        updated_by="system:defaults",
+        note="默认阈值 (未落库)",
+        **thresholds_from_settings(get_settings()),
+    )
+    return defaults, "defaults"
 
 
 async def update_policy(
@@ -594,10 +630,10 @@ async def evaluate(
 async def status(session: AsyncSession, *, strategy_id: int | None = None) -> dict[str, Any]:
     """只读状态查询：当前是否允许增加敞口、命中哪些限额。
 
-    不写事件、不查 K 线，用于面板快速展示。
+    不写事件、不查 K 线、也不为缺省阈值落库, 用于面板与助手快速展示。
     """
     settings = get_settings()
-    policy = await resolve_policy(session, strategy_id=strategy_id)
+    policy, policy_source = await resolve_policy_readonly(session, strategy_id=strategy_id)
     thresholds = policy_thresholds(policy)
     limit_values = _limits_from(thresholds)
     default_capital = _decimal(settings.risk_default_capital)
@@ -677,6 +713,7 @@ async def status(session: AsyncSession, *, strategy_id: int | None = None) -> di
             "scope": scope,
             "strategy_id": strategy_id,
             "policy_version": policy.version,
+            "policy_source": policy_source,
             "allowed": False,
             "reason": "risk_evaluation_failed",
             "limits": {field: _text(thresholds[field]) for field in THRESHOLD_FIELDS},
@@ -699,6 +736,7 @@ async def status(session: AsyncSession, *, strategy_id: int | None = None) -> di
         "scope": scope,
         "strategy_id": strategy_id,
         "policy_version": policy.version,
+        "policy_source": policy_source,
         "allowed": allowed,
         "reason": reason,
         "limits": {field: _text(thresholds[field]) for field in THRESHOLD_FIELDS},
@@ -900,6 +938,7 @@ __all__ = [
     "policy_view",
     "record_event",
     "resolve_policy",
+    "resolve_policy_readonly",
     "scan",
     "serialize_event",
     "status",

@@ -3,20 +3,21 @@
 自托管的自动化量化交易系统：分析美股之间的动态相关性、市场共振、趋势与相对强弱，构建多空组合策略，在 OKX 美股 USDT 本位永续合约上执行。
 
 > 交付按阶段推进：P1 行情/关系/机会/策略/回测，P2 风控已落地；P3 交易执行已交付 order 生命周期、
-> 策略级虚拟持仓、对账、恢复、自动止损与 paper 交易，真实资金下单默认关闭。
-> 逐条证据见 `docs/reports/p1-acceptance.md`、`p2-acceptance.md`、`p3-acceptance.md`。
+> 策略级虚拟持仓、对账、恢复、自动止损与 paper 交易，真实资金下单默认关闭；P4 只读分析助手已交付
+> 解释、只读问答与策略草案建议，外部模型默认关闭。
+> 逐条证据见 `docs/reports/p1-acceptance.md`、`p2-acceptance.md`、`p3-acceptance.md`、`p4-acceptance.md`。
 
 ## 当前阶段
 
-**P3 交易执行 · S10 订单生命周期与 paper 交易（已完成；真实交易默认关闭）**
+**P4 分析助手 · S11 只读解释与只读问答（已完成；外部模型默认关闭）**
 
 | 项 | 状态 |
 | --- | --- |
 | 技术栈 | Python 3.12 + FastAPI / SQLAlchemy async + Alembic；React 18 + Vite + TS + Tailwind + shadcn/ui；PostgreSQL 16 + Redis 7；arq（worker + scheduler） |
 | 运行时形态 | Docker Compose 六服务：`postgres`、`redis`、`api`、`worker`、`scheduler`、`web` |
-| 已可运行 | `/health`、`/ready`、`/api/v1`（market / targets / opportunities / strategies / backtests / risk / **execution**）、前端四路由与双主题、`alembic upgrade head`、arq 任务链路、CI |
-| 阶段范围 | 行情采集、关系分析、机会发现、策略与回测、风控、订单生命周期与策略级虚拟持仓、对账、故障恢复、自动止损、paper 交易 |
-| 明确不做 | 真实资金下单（`REAL_TRADING_ENABLED` 默认 `false`，需逐策略书面授权）、AI 参与交易决策（P4） |
+| 已可运行 | `/health`、`/ready`、`/api/v1`（market / targets / opportunities / strategies / backtests / risk / execution / **ai**）、前端五路由与双主题、`alembic upgrade head`、arq 任务链路、CI |
+| 阶段范围 | P1–P3 能力，以及市场/关系/策略/回测解释、只读自然语言问答、策略草案建议、调用审计 |
+| 明确不做 | 真实资金下单（`REAL_TRADING_ENABLED` 默认 `false`，需逐策略书面授权）、AI 参与交易决策或写操作 |
 | 待决策 | 3 项，见 `docs/risk/external-dependencies.md` §5 |
 
 ## 快速开始

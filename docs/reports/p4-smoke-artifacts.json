@@ -1,0 +1,203 @@
+{
+  "generated_at": "2026-11-09T09:58:23Z",
+  "api_base": "http://localhost:8000/api/v1",
+  "run_tag": "20261109T095814-691475",
+  "ai_provider": "rule_based",
+  "real_trading_enabled": false,
+  "steps": [
+    {
+      "migration": "0008_execution_schema (head)",
+      "provider": "rule_based"
+    },
+    {
+      "seeded_target": 22,
+      "seeded_strategy": 36,
+      "seeded_run": 36
+    },
+    {
+      "market_coverage": {
+        "type": "market_coverage",
+        "source": "GET /api/v1/market/coverage",
+        "instrument_id": "P4SMKA-USDT-SWAP",
+        "bar": "1d",
+        "expected": 30,
+        "actual": 30,
+        "missing": 0,
+        "ratio": 1.0
+      }
+    },
+    {
+      "relation_snapshot": {
+        "type": "relation_snapshot",
+        "source": "GET /api/v1/targets/22/relations",
+        "snapshot_id": 18,
+        "target_id": 22,
+        "as_of": "2026-11-09T09:58:18.032304+00:00",
+        "window_bars": 200,
+        "method": "pearson",
+        "price_basis": "close",
+        "sample_size": 180
+      }
+    },
+    {
+      "backtest_metrics": [
+        {
+          "name": "annualized_return",
+          "value": "-0.4022330000"
+        },
+        {
+          "name": "cost_ratio",
+          "value": "0.0012100000"
+        },
+        {
+          "name": "max_drawdown",
+          "value": "0.3812000000"
+        },
+        {
+          "name": "profit_loss_ratio",
+          "value": "0.8123000000"
+        },
+        {
+          "name": "sharpe",
+          "value": "-1.8181257148"
+        },
+        {
+          "name": "sortino",
+          "value": "-2.1133000000"
+        },
+        {
+          "name": "total_return",
+          "value": "-0.3236520556"
+        },
+        {
+          "name": "trade_count",
+          "value": "24.0000000000"
+        },
+        {
+          "name": "turnover",
+          "value": "1.4321000000"
+        },
+        {
+          "name": "win_rate",
+          "value": "0.3750000000"
+        }
+      ]
+    },
+    {
+      "query_corpus_read": {
+        "cases": 23,
+        "answered": 20
+      }
+    },
+    {
+      "query_corpus_write": {
+        "cases": 74
+      }
+    },
+    {
+      "audit_rows": [
+        "p4-smoke-20261109T095814-691475-backtest|ai.explain.backtest|backtest|ok",
+        "p4-smoke-20261109T095814-691475-market|ai.explain.market|market|ok",
+        "p4-smoke-20261109T095814-691475-q10|ai.query|query|ok",
+        "p4-smoke-20261109T095814-691475-q11|ai.query|query|ok",
+        "p4-smoke-20261109T095814-691475-q12|ai.query|query|ok",
+        "p4-smoke-20261109T095814-691475-q13|ai.query|query|ok",
+        "p4-smoke-20261109T095814-691475-q14|ai.query|query|ok",
+        "p4-smoke-20261109T095814-691475-q15|ai.query|query|ok",
+        "p4-smoke-20261109T095814-691475-q16|ai.query|query|ok",
+        "p4-smoke-20261109T095814-691475-q25|ai.query|query|ok",
+        "p4-smoke-20261109T095814-691475-q26|ai.query|query|ok",
+        "p4-smoke-20261109T095814-691475-q27|ai.query|query|ok",
+        "p4-smoke-20261109T095814-691475-q28|ai.query|query|ok",
+        "p4-smoke-20261109T095814-691475-q30|ai.query|query|ok",
+        "p4-smoke-20261109T095814-691475-q31|ai.query|query|refused",
+        "p4-smoke-20261109T095814-691475-q32|ai.query|query|refused",
+        "p4-smoke-20261109T095814-691475-q43|ai.query|query|refused",
+        "p4-smoke-20261109T095814-691475-q89|ai.query|query|ok",
+        "p4-smoke-20261109T095814-691475-q90|ai.query|query|ok",
+        "p4-smoke-20261109T095814-691475-q91|ai.query|query|ok",
+        "p4-smoke-20261109T095814-691475-q92|ai.query|query|ok",
+        "p4-smoke-20261109T095814-691475-q93|ai.query|query|ok",
+        "p4-smoke-20261109T095814-691475-q94|ai.query|query|ok",
+        "p4-smoke-20261109T095814-691475-q95|ai.query|query|ok",
+        "p4-smoke-20261109T095814-691475-q96|ai.query|query|ok",
+        "p4-smoke-20261109T095814-691475-relations|ai.explain.relations|target|ok",
+        "p4-smoke-20261109T095814-691475-strategy|ai.explain.strategy|strategy|ok",
+        "p4-smoke-20261109T095814-691475-w0|ai.query|query|refused",
+        "p4-smoke-20261109T095814-691475-w1|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w17|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w18|ai.query|query|refused",
+        "p4-smoke-20261109T095814-691475-w19|ai.query|query|refused",
+        "p4-smoke-20261109T095814-691475-w2|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w20|ai.query|query|refused",
+        "p4-smoke-20261109T095814-691475-w21|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w22|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w23|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w24|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w29|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w3|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w33|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w34|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w35|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w36|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w37|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w38|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w39|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w4|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w40|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w41|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w42|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w44|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w45|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w46|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w47|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w48|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w49|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w5|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w50|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w51|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w52|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w53|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w54|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w55|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w56|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w57|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w58|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w59|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w6|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w60|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w61|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w62|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w63|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w64|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w65|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w66|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w67|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w68|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w69|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w7|ai.query|query|refused",
+        "p4-smoke-20261109T095814-691475-w70|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w71|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w72|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w73|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w74|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w75|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w76|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w77|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w78|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w79|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w8|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w80|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w81|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w82|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w83|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w84|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w85|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w86|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w87|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w88|ai.query|query|forbidden",
+        "p4-smoke-20261109T095814-691475-w9|ai.query|query|refused"
+      ]
+    }
+  ]
+}

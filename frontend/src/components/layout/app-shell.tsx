@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { LayoutDashboard, Layers, Network, Settings2, ShieldAlert } from "lucide-react";
+import { LayoutDashboard, Layers, Network, Settings2, ShieldAlert, Sparkles } from "lucide-react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { cn } from "../../lib/utils";
@@ -17,6 +17,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/research", label: "研究", icon: Network },
   { to: "/strategies", label: "策略", icon: Layers },
   { to: "/risk", label: "风控", icon: ShieldAlert },
+  { to: "/assistant", label: "助手", icon: Sparkles },
   { to: "/settings", label: "设置", icon: Settings2 },
 ];
 
@@ -60,7 +61,7 @@ export function AppShell() {
         </nav>
 
         <div className="border-t px-6 py-4 text-xs text-muted-foreground">
-          P1 交易前准备 · v0.1.0
+          P1–P4 · v0.1.0
         </div>
       </aside>
 

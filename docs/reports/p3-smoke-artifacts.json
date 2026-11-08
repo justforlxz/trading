@@ -1,0 +1,30 @@
+{
+  "generated_at": "2026-11-07T22:36:21Z",
+  "api_base": "http://localhost:8000/api/v1",
+  "evaluation_key": "2026-11-07",
+  "real_trading_enabled": false,
+  "steps": [
+    {
+      "migration": "0008_execution_schema (head)"
+    },
+    {
+      "seeded_strategy": 16
+    },
+    {
+      "evaluate_job": 2477
+    },
+    {
+      "order_partial": 31
+    },
+    {
+      "position_quantity": 1.2
+    },
+    {
+      "reconcile_checked": 1
+    },
+    {
+      "reattached": 1,
+      "rehydrated": 3
+    }
+  ]
+}

@@ -273,11 +273,55 @@ K 线锚定规则（实测，见 `docs/risk/external-dependencies.md`）：
 
 唯一键：`UNIQUE (kind, strategy_id, instrument_id, policy_version, evaluation_key) NULLS NOT DISTINCT` —— 同一评估键下重复评估不会产生重复事件行，API 只体现去重语义（不计数）。`created_at` 上建有索引，用于面板按时间倒序分页。
 
-### P3 预留
+## 9. execution schema（P3 交易执行）
 
-`execution.order` / `execution.fill` / `execution.position` 仍属 P3，P2 不建表；方向仍是引用 `strategy.strategy` 与 `market.instrument`。
+订单、成交、策略级虚拟持仓与对账差异。跨 schema 外键仍只允许 `strategy.strategy.id` 与
+`market.instrument.id`；`risk.risk_event.id` 只作为止损单的可选回溯引用。
+所有金额列使用 `NUMERIC(24,10)`。
 
-## 9. 存储量与保留
+### order（订单）
+
+`id`、`client_order_id`（OKX `clOrdId`，唯一）、`exchange_order_id`（可空）、`mode`（`paper`/`real`）、
+`strategy_id`（可空，引用 `strategy.strategy.id`，置空删除）、`instrument_id`（引用 `market.instrument.id`，级联删除）、
+`inst_id`（冗余存储，交易所调用需要）、`side`（`buy`/`sell`）、`position_side`（`long`/`short`）、
+`order_type`（`market`/`limit`）、`quantity`、`price`（可空）、`reduce_only`、`intent`（`entry`/`exit`/`stop`）、
+`state`、`filled_quantity`、`average_price`（可空）、`fee`、`reject_reason`（可空）、
+`risk_event_id`（可空，引用 `risk.risk_event.id`，置空删除）、`created_at`、`updated_at`、
+`submitted_at`（可空）、`closed_at`（可空）。
+
+唯一键：`UNIQUE (client_order_id)` —— 幂等下单的唯一闸门：同 `clOrdId` 重复提交返回同一订单，不再触达交易所。
+状态枚举：`pending → submitted → partial → filled`，以及终态 `canceled` / `rejected`；合法迁移由
+`app/execution/core/orders.ALLOWED_TRANSITIONS` 唯一定义，数据库 `CHECK` 只兜底取值范围。
+约束：`quantity > 0`、`0 <= filled_quantity <= quantity`。
+
+### fill（成交）
+
+`id`、`order_id`（引用 `execution."order".id`，级联删除）、`fill_id`（交易所成交 id 或本地成交 id）、
+`strategy_id`（可空）、`instrument_id`、`inst_id`、`side`、`position_side`、`quantity`、`price`、`fee`、
+`realized_pnl`（本笔记账的已实现盈亏增量）、`filled_at`。
+
+唯一键：`UNIQUE (order_id, fill_id)` —— 重复轮询不会重复计仓（恢复流程依赖这一点）。`filled_at` 建索引。
+
+### position（策略级虚拟持仓）
+
+`id`、`strategy_id`（引用 `strategy.strategy.id`，级联删除）、`instrument_id`、`inst_id`、
+`position_side`（`long`/`short`）、`quantity`（非负）、`average_price`、`realized_pnl`、`updated_at`。
+
+唯一键：`UNIQUE (strategy_id, instrument_id, position_side)` —— 策略 × 标的 × 方向。
+`quantity = 0` 的行保留而不删除，用于保留历史已实现盈亏；持仓查询过滤 `quantity > 0`。
+
+### reconcile_diff（对账差异）
+
+`id`、`kind`（`position_mismatch`/`order_missing_exchange`/`order_missing_local`）、`strategy_id`（可空）、
+`instrument_id`（可空）、`inst_id`、`position_side`（不按方向比时为空串）、`reference`（订单 `client_order_id`，
+持仓差异为空串）、`local_value`、`exchange_value`、`detail JSONB`、`status`（`open`/`resolved`）、`detected_at`、
+`resolved_at`、`resolved_by`、`note`、`resolve_attempts`。
+
+唯一约束：部分唯一索引 `UNIQUE (kind, inst_id, position_side, reference) WHERE status = 'open'` ——
+同一差异只保留一条未结记录，重复对账不叠加；结案后同一差异再次出现会产生新的 open 行，历史结案记录保留。
+对账**只记录差异，不改本地数据**；存在 open 差异时真实下单被拒绝（`execution_reconcile_pending`）。
+
+## 10. 存储量与保留
 
 按 227 个股票类合约、上市日起约 248 天估算：
 
@@ -294,7 +338,7 @@ K 线锚定规则（实测，见 `docs/risk/external-dependencies.md`）：
 
 保留任务（`app/market/retention.py`）按 `bar` 分组删除早于 cutoff 的行，每批 `batch_size`（默认 5000）提交一次，避免长事务与锁膨胀；`1h/4h/1d` 不参与清理。删除前必须确认对应 `data_source_sync` 已记录覆盖区间。
 
-## 10. 命名与枚举
+## 11. 命名与枚举
 
 - 表名小写复数、无前缀（schema 已表达上下文）；字段 `snake_case`。
 - 时间字段后缀：`_at` 表示时刻，`_time` 表示 K 线/时段边界，`_date` 表示本地业务日。

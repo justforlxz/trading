@@ -84,6 +84,10 @@
 | `backtest_trade` | `GET /backtests/{run_id}/trades` |
 | `risk_policy` | `GET /risk/policy`、`PUT /risk/policy` |
 | `risk_event` | `GET /risk/events` |
+| `execution.order` | `POST /execution/orders`（真实）、`POST /execution/paper/orders`（模拟）、`GET /execution/orders`、`GET /execution/orders/{id}`、`POST /execution/orders/{id}/sync`、`POST /execution/orders/{id}/cancel` |
+| `execution.fill` | 嵌套于订单响应的 `fills[]` |
+| `execution.position` | `GET /execution/positions`、`GET /execution/account` |
+| `execution.reconcile_diff` | `POST /execution/reconcile`、`GET /execution/reconcile/diffs`、`POST /execution/reconcile/diffs/{id}/resolve` |
 | `job_run` | `GET /ops/job-runs`、`GET /ops/job-runs/{id}` |
 | `audit_log` | `GET /ops/audit-log` |
 
@@ -318,6 +322,73 @@ risk_market_data_unavailable`（fail-closed），`details.missing` 列出缺失�
 **`GET /api/v1/ops/job-runs`** — `job_name`、`status`、`from`、`to`，返回 `job_run` 列表。
 **`GET /api/v1/ops/job-runs/{id}`** — 单条，含 `attempts`、`error`、`result`。
 **`GET /api/v1/ops/audit-log`** — `resource`、`resource_id`、`from`、`to`。
+
+### 3.9 execution
+
+执行域只读 `strategy` / `risk` / `market` 数据，统一下单入口是
+`app.execution.service.submit_order`；paper 与 real 共用同一套订单生命周期与状态机，
+只有交易源（`PrivateTradingSource`）不同。数值一律字符串，错误沿用 §1.1 信封。
+
+**`GET /api/v1/execution/mode`** — 返回
+`{mode, real_trading_enabled, credentials_configured, real_strategy_ids[], paper_fill_chunks[], stop_loss_ratio, reason}`。
+`mode` 为 `paper` 或 `real`；`REAL_TRADING_ENABLED` 缺省 `false` 时固定 `paper` 且 `reason=real_trading_disabled`。
+
+**`POST /api/v1/execution/orders`** — **真实**下单。`REAL_TRADING_ENABLED` 未显式打开时始终返回
+`403 real_trading_disabled`（门禁先于请求体校验执行，因此空请求体也返回 403）。
+开关打开后仍需：凭据齐全（`403 execution_credentials_missing`）、策略在
+`EXECUTION_REAL_STRATEGY_IDS` 中（`403 execution_strategy_not_authorized`）、无未处理对账差异
+（`403 execution_reconcile_pending`）。body：
+
+```json
+{
+  "strategy_id": 12,
+  "inst_id": "BTC-USDT-SWAP",
+  "side": "buy",
+  "position_side": "long",
+  "quantity": "0.01",
+  "order_type": "market",
+  "price": null,
+  "reduce_only": false,
+  "intent": "entry",
+  "client_order_id": "t-0001"
+}
+```
+
+`201` 返回订单视图与 `Location: /api/v1/execution/orders/{id}`；同 `client_order_id` 重复提交返回 `200`
+与同一订单，且不再次触达交易所。若 `client_order_id` 相同但请求载荷（策略/标的/方向/数量/价格/意图）
+不同，返回 `409 execution_idempotency_conflict`，绝不静默返回旧单；并发同 key 由数据库唯一约束兜底，
+冲突后回查既有单并按幂等语义返回。其余错误：`409 execution_strategy_not_approved`、
+`409 execution_risk_rejected`（details 带 `reason` / `breaches`）、
+`409 execution_position_inconsistent`（`reduce_only` 平仓数量超过该策略持仓，details 带
+`requested` / `available`，在落库与触达交易所之前拒绝）、`502 execution_upstream_rejected`、
+`503 execution_upstream_unavailable`（状态未知，留给恢复流程判定）。
+
+**`POST /api/v1/execution/paper/orders`** — 模拟下单，任何模式下可用，绝不构造交易所客户端。
+请求与响应同上。paper 撮合按 `EXECUTION_PAPER_FILL_CHUNKS`（默认 `0.5,0.5`）分段成交，
+因此市价单首次返回 `state=partial`，再调用一次 `POST /execution/orders/{id}/sync` 后变 `filled`。
+
+**`GET /api/v1/execution/orders`** — 查询参数 `strategy_id`、`state`、`mode`、`limit`（≤200）、`cursor`；
+返回 `{items[], next_cursor}`。
+**`GET /api/v1/execution/orders/{id}`** — 订单视图 + `fills[]`。
+**`POST /api/v1/execution/orders/{id}/sync`** — 拉取交易所订单与成交并推进状态机（幂等，重复同步不重复计仓）。
+**`POST /api/v1/execution/orders/{id}/cancel`** — 撤单；终态订单幂等返回当前视图。
+
+**`GET /api/v1/execution/positions`** — `strategy_id` 可选。返回
+`{items[], totals{realized_pnl, unrealized_pnl, total_pnl, gross_notional, net_notional, positions}}`；
+`item` 含 `strategy_id`、`instrument_id`、`inst_id`、`position_side`、`quantity`、`average_price`、
+`realized_pnl`、`mark_price`、`unrealized_pnl`、`unrealized_ratio`、`notional`。
+**`GET /api/v1/execution/account`** — `{mode, totals{...}, open_diffs}`。
+
+**`POST /api/v1/execution/reconcile`** — 本地虚拟持仓与未完成订单对交易所事实比对，返回
+`{checked_positions, checked_orders, diffs, open_diffs}`；只记录差异，不改本地数据。
+**`GET /api/v1/execution/reconcile/diffs`** — `status=open|resolved`、`limit`、`cursor`。
+**`POST /api/v1/execution/reconcile/diffs/{id}/resolve`** — body `{resolved_by, note?}`；结案后不再阻断下单。
+
+**`POST /api/v1/execution/recovery`** — 恢复未完成订单：paper 先按持久化成交重建撮合状态；交易所仍有该单则
+接管并补记成交，查无此单则 `pending → rejected`、其余 `→ canceled`，绝不重发；随后执行一次对账。
+**`POST /api/v1/execution/stops/evaluate`** — body `{threshold_ratio?, persist?}`。单腿浮亏占持仓均价比例达到
+阈值时产生 `reduce_only` 平仓单并写 `risk_event(kind=stop_trigger, action=close)`，不经过策略审批；
+已有未完成止损单时不重复下单。
 
 ## 4. 内部边界
 

@@ -9,6 +9,7 @@ from fastapi import APIRouter
 
 from app import __version__
 from app.api.v1 import backtest, execution, market, ops, research, risk
+from app.mcp import api as mcp_api
 from app.opportunity import api as opportunity_api
 from app.strategy import api as strategy_api
 
@@ -23,6 +24,7 @@ router.include_router(strategy_api.router)
 router.include_router(backtest.router)
 router.include_router(risk.router)
 router.include_router(execution.router)
+router.include_router(mcp_api.router)
 
 
 @router.get("")

@@ -6,9 +6,9 @@ from sqlalchemy import text
 
 @pytest.mark.asyncio
 async def test_migration_head_is_current(session) -> None:
-    # head 随阶段推进：P3 新增 0008_execution_schema，风控表仍在同一迁移链上。
+    # head 随阶段推进：P4 新增 0009_mcp_schema，风控表仍在同一迁移链上。
     row = (await session.execute(text("SELECT version_num FROM alembic_version"))).scalar_one()
-    assert row == "0008_execution_schema"
+    assert row == "0009_mcp_schema"
 
 
 @pytest.mark.asyncio

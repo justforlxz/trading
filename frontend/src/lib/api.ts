@@ -949,3 +949,41 @@ export async function evaluateRisk(input: RiskEvaluateInput): Promise<RiskEvalua
     body: JSON.stringify(input),
   });
 }
+
+// ---- MCP 客户端（P4） -------------------------------------------------------
+
+export type McpScope = "read" | "operate";
+
+export type McpClient = {
+  id: number;
+  name: string;
+  scopes: McpScope[];
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  revoked: boolean;
+};
+
+/** 创建响应里的 token 只出现这一次，后端不再保存明文。 */
+export type McpClientCreated = {
+  client: McpClient;
+  token: string;
+};
+
+export async function listMcpClients(): Promise<{ items: McpClient[] }> {
+  return request<{ items: McpClient[] }>("/mcp/clients");
+}
+
+export async function createMcpClient(input: {
+  name: string;
+  scopes: McpScope[];
+}): Promise<McpClientCreated> {
+  return request<McpClientCreated>("/mcp/clients", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function revokeMcpClient(clientId: number): Promise<McpClient> {
+  return request<McpClient>(`/mcp/clients/${clientId}`, { method: "DELETE" });
+}

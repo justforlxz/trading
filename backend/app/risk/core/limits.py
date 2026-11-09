@@ -77,23 +77,16 @@ def evaluate_limits(
         breaches.append(Breach("risk_empty_portfolio", "legs", ZERO, Decimal("1")))
         return _denied(breaches)
 
+    # 权重/名义允许带符号: 符号表达多空方向, 限额按绝对值校验。
     for leg in legs:
         if leg.side not in SIDES:
             breaches.append(Breach("risk_invalid_side", f"side:{leg.instrument_id}", ZERO, ZERO))
-        if leg.weight < ZERO:
-            breaches.append(
-                Breach("risk_invalid_weight", f"weight:{leg.instrument_id}", leg.weight, ZERO)
-            )
-        if leg.notional < ZERO:
-            breaches.append(
-                Breach("risk_invalid_weight", f"notional:{leg.instrument_id}", leg.notional, ZERO)
-            )
     if breaches:
         return _denied(breaches)
 
-    gross = sum((leg.notional for leg in legs), ZERO)
+    gross = sum((abs(leg.notional) for leg in legs), ZERO)
     signed = sum(
-        (leg.notional if leg.side == "long" else -leg.notional for leg in legs),
+        (abs(leg.notional) if leg.side == "long" else -abs(leg.notional) for leg in legs),
         ZERO,
     )
     net = abs(signed)
@@ -103,24 +96,24 @@ def evaluate_limits(
 
     per_instrument: dict[int, Decimal] = defaultdict(lambda: ZERO)
     for leg in legs:
-        per_instrument[leg.instrument_id] += leg.weight
+        per_instrument[leg.instrument_id] += abs(leg.weight)
 
     for leg in legs:
-        if _exceeds(leg.notional, limits.max_order_notional):
+        if _exceeds(abs(leg.notional), limits.max_order_notional):
             breaches.append(
                 Breach(
                     "order_notional_exceeded",
                     f"notional:{leg.instrument_id}",
-                    leg.notional,
+                    abs(leg.notional),
                     limits.max_order_notional,
                 )
             )
-        if _exceeds(leg.weight, limits.max_leg_weight):
+        if _exceeds(abs(leg.weight), limits.max_leg_weight):
             breaches.append(
                 Breach(
                     "leg_weight_exceeded",
                     f"weight:{leg.instrument_id}",
-                    leg.weight,
+                    abs(leg.weight),
                     limits.max_leg_weight,
                 )
             )

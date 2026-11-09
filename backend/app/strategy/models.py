@@ -57,6 +57,9 @@ class Strategy(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # 运行暂停标记（MCP `pause_strategy` / `resume_strategy` 写入）；`status` 仍是
+    # 五值状态机，暂停只影响「是否允许新的执行动作」，不改变策略状态。
+    paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class StrategyLeg(Base):

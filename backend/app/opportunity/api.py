@@ -1,6 +1,7 @@
 """`/api/v1/opportunities/*` 与 `/api/v1/market/snapshot`（P1-13）。
 
 决策计算全部在 `app.analysis.core`；本模块只做参数校验、查询编排与响应组装。
+只读查询与序列化在 `app.opportunity.query`，与 MCP 共用同一份实现。
 扫描本身是后台任务：`POST /opportunities/scan` 走 `jobs.create_run` + `dispatch`，
 进程内不做重活。
 
@@ -10,56 +11,41 @@
 
 from __future__ import annotations
 
-import base64
-import binascii
-from datetime import UTC, datetime
-from decimal import Decimal
+from datetime import datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Response, status
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.analysis.core.opportunities import assert_explainable, market_breadth
 from app.api.errors import ApiError
 from app.api.v1.deps import dispatch, session_dep
 from app.config import get_settings
 from app.jobs import tasks
 from app.jobs.runs import create_run
-from app.market.core.calendar import session_phase
 from app.market.models import Instrument
-from app.opportunity.models import (
-    AssetCluster,
-    ClusterMember,
-    Opportunity,
-    OpportunityRun,
+from app.opportunity.models import AssetCluster, ClusterMember, OpportunityRun
+from app.opportunity.query import (
+    DEFAULT_LIMIT,
+    MAX_LIMIT,
+    InvalidCursor,
+    get_opportunity_view,
+    iso_text,
+    list_opportunities_view,
+    market_snapshot_view,
+    opportunity_payload,
+    run_payload,
+    symbol_text,
 )
+from app.opportunity.query import dec_text as _dec
 from app.opportunity.scanner import merge_params, params_from_settings
 from app.opportunity.schemas import OpportunityDirection, OpportunityKind, ScanRequest
-from app.research.models import MarketSnapshot
 
 router = APIRouter(prefix="/opportunities", tags=["opportunity"])
 cluster_router = APIRouter(prefix="/clusters", tags=["opportunity"])
 market_router = APIRouter(prefix="/market", tags=["market"])
 
 SessionDep = Annotated[AsyncSession, Depends(session_dep)]
-
-MAX_LIMIT = 200
-DEFAULT_LIMIT = 50
-
-
-def _dec(value: Any | None) -> str | None:
-    """Decimal 一律以字符串返回，避免前端 JSON 解析丢精度。"""
-
-    return None if value is None else str(value)
-
-
-def _iso(value: datetime | None) -> str | None:
-    return None if value is None else value.isoformat()
-
-
-def _symbol(inst_id: str, uly: str | None) -> str:
-    return (uly or inst_id.split("-")[0]).upper()
 
 
 def _parse_as_of(value: str) -> datetime:
@@ -76,63 +62,6 @@ def _parse_as_of(value: str) -> datetime:
     return parsed
 
 
-def _encode_cursor(score: Decimal, row_id: int) -> str:
-    raw = f"{score}:{row_id}".encode()
-    return base64.urlsafe_b64encode(raw).decode()
-
-
-def _decode_cursor(value: str) -> tuple[Decimal, int]:
-    try:
-        decoded = base64.urlsafe_b64decode(value.encode()).decode()
-        score_text, id_text = decoded.split(":", 1)
-        return Decimal(score_text), int(id_text)
-    except (ValueError, UnicodeDecodeError, binascii.Error) as error:
-        raise ApiError(
-            "INVALID_CURSOR", "cursor is not a valid scan cursor", status_code=422
-        ) from error
-
-
-def opportunity_payload(row: Opportunity, instrument: Instrument | None) -> dict[str, Any]:
-    """单条机会；`reasons` 与 `evidence` 原样透出，绝不返回裸分数。
-
-    构造时再校验一次可解释性：即使库里被人为写入残缺记录，响应也不会
-    悄悄变成一条只有分数的「黑箱」机会。
-    """
-
-    assert_explainable(row.reasons or [], row.evidence or {})
-    return {
-        "id": row.id,
-        "run_id": row.run_id,
-        "kind": row.kind,
-        "direction": row.direction,
-        "score": _dec(row.score),
-        "horizon": row.horizon,
-        "reasons": row.reasons,
-        "evidence": row.evidence,
-        "primary_instrument_id": row.primary_instrument_id,
-        "primary_inst_id": None if instrument is None else instrument.inst_id,
-        "primary_symbol": None
-        if instrument is None
-        else _symbol(instrument.inst_id, instrument.uly),
-        "created_at": _iso(row.created_at),
-    }
-
-
-def run_payload(row: OpportunityRun) -> dict[str, Any]:
-    return {
-        "id": row.id,
-        "run_key": row.run_key,
-        "as_of": _iso(row.as_of),
-        "universe_size": row.universe_size,
-        "status": row.status,
-        "started_at": _iso(row.started_at),
-        "finished_at": _iso(row.finished_at),
-        "error": row.error,
-        "params": row.params,
-        "counts": row.counts,
-    }
-
-
 @router.post("/scan", status_code=status.HTTP_202_ACCEPTED)
 async def trigger_scan(
     payload: ScanRequest,
@@ -147,7 +76,7 @@ async def trigger_scan(
         session,
         job_name=tasks.SCAN_OPPORTUNITIES,
         payload={
-            "as_of": _iso(payload.as_of),
+            "as_of": iso_text(payload.as_of),
             "universe": sorted(payload.universe) if payload.universe else None,
             "params": effective,
         },
@@ -217,65 +146,29 @@ async def list_opportunities(
 ) -> dict[str, Any]:
     """按分数倒序返回机会；默认取最新批次，每条都带 `reasons` 与 `evidence`。"""
 
-    if run_id is None:
-        run_id = await session.scalar(
-            select(func.max(OpportunityRun.id)).where(OpportunityRun.status.in_(["ok", "partial"]))
+    try:
+        return await list_opportunities_view(
+            session,
+            run_id=run_id,
+            kind=None if kind is None else kind.value,
+            direction=None if direction is None else direction.value,
+            min_score=min_score,
+            limit=limit,
+            cursor=cursor,
         )
-        if run_id is None:
-            return {"items": [], "next_cursor": None, "run_id": None}
-
-    stmt = (
-        select(Opportunity, Instrument)
-        .join(Instrument, Instrument.id == Opportunity.primary_instrument_id)
-        .where(Opportunity.run_id == run_id)
-        .order_by(Opportunity.score.desc(), Opportunity.id.desc())
-    )
-    if kind is not None:
-        stmt = stmt.where(Opportunity.kind == kind)
-    if direction is not None:
-        stmt = stmt.where(Opportunity.direction == direction)
-    if min_score is not None:
-        stmt = stmt.where(Opportunity.score >= Decimal(str(min_score)))
-    if cursor is not None:
-        last_score, last_id = _decode_cursor(cursor)
-        stmt = stmt.where(
-            or_(
-                Opportunity.score < last_score,
-                and_(Opportunity.score == last_score, Opportunity.id < last_id),
-            )
-        )
-    rows = (await session.execute(stmt.limit(limit + 1))).all()
-    visible = rows[:limit]
-    next_cursor = (
-        _encode_cursor(visible[-1][0].score, visible[-1][0].id)
-        if len(rows) > limit and visible
-        else None
-    )
-    return {
-        "run_id": run_id,
-        "items": [opportunity_payload(row, instrument) for row, instrument in visible],
-        "next_cursor": next_cursor,
-    }
+    except InvalidCursor as error:
+        raise ApiError("INVALID_CURSOR", str(error), status_code=422) from error
 
 
 @router.get("/{opportunity_id}")
 async def get_opportunity(opportunity_id: int, session: SessionDep) -> dict[str, Any]:
-    row = (
-        await session.execute(
-            select(Opportunity, Instrument)
-            .join(Instrument, Instrument.id == Opportunity.primary_instrument_id)
-            .where(Opportunity.id == opportunity_id)
-        )
-    ).first()
-    if row is None:
+    payload = await get_opportunity_view(session, opportunity_id)
+    if payload is None:
         raise ApiError(
             "OPPORTUNITY_NOT_FOUND",
             f"unknown opportunity_id: {opportunity_id}",
             status_code=404,
         )
-    opportunity, instrument = row
-    payload = opportunity_payload(opportunity, instrument)
-    payload["members"] = opportunity.evidence.get("members", []) if opportunity.evidence else []
     return payload
 
 
@@ -288,7 +181,10 @@ async def list_clusters(
 
     if run_id is None:
         run_id = await session.scalar(
-            select(func.max(OpportunityRun.id)).where(OpportunityRun.status.in_(["ok", "partial"]))
+            select(OpportunityRun.id)
+            .where(OpportunityRun.status.in_(["ok", "partial"]))
+            .order_by(OpportunityRun.id.desc())
+            .limit(1)
         )
         if run_id is None:
             return {"run_id": None, "items": []}
@@ -315,7 +211,7 @@ async def list_clusters(
             {
                 "instrument_id": member.instrument_id,
                 "inst_id": instrument.inst_id,
-                "symbol": _symbol(instrument.inst_id, instrument.uly),
+                "symbol": symbol_text(instrument.inst_id, instrument.uly),
                 "distance": _dec(member.distance),
                 "weight": _dec(member.weight),
             }
@@ -339,60 +235,11 @@ async def list_clusters(
 
 
 @market_router.get("/snapshot")
-async def market_snapshot(
-    session: SessionDep,
-    as_of: str | None = None,
-) -> dict[str, Any]:
+async def market_snapshot(session: SessionDep, as_of: str | None = None) -> dict[str, Any]:
     """全市场特征截面（驾驶舱数据源）；`as_of` 缺省取最新一次扫描的截面。"""
 
-    moment = (
-        _parse_as_of(as_of)
-        if as_of
-        else await session.scalar(select(func.max(MarketSnapshot.as_of)))
-    )
-    if moment is None:
-        return {
-            "as_of": None,
-            "items": [],
-            "count": 0,
-            "breadth": None,
-            "session": session_phase(datetime.now(UTC)),
-        }
-    rows = (
-        await session.execute(
-            select(MarketSnapshot, Instrument)
-            .join(Instrument, Instrument.id == MarketSnapshot.instrument_id)
-            .where(MarketSnapshot.as_of == moment)
-            .order_by(Instrument.inst_id)
-        )
-    ).all()
-    items = [
-        {
-            "instrument_id": snapshot.instrument_id,
-            "inst_id": instrument.inst_id,
-            "symbol": _symbol(instrument.inst_id, instrument.uly),
-            "asset_class": instrument.asset_class,
-            "ret_1d": _dec(snapshot.ret_1d),
-            "ret_5d": _dec(snapshot.ret_5d),
-            "ret_20d": _dec(snapshot.ret_20d),
-            "vol_20d": _dec(snapshot.vol_20d),
-            "atr_14": _dec(snapshot.atr_14),
-            "volume_z": _dec(snapshot.volume_z),
-            "high_20d": _dec(snapshot.high_20d),
-            "low_20d": _dec(snapshot.low_20d),
-            "extras": snapshot.extras,
-        }
-        for snapshot, instrument in rows
-    ]
-    returns = [float(snapshot.ret_1d) for snapshot, _ in rows if snapshot.ret_1d is not None]
-    return {
-        "as_of": _iso(moment),
-        "count": len(items),
-        "breadth": market_breadth(returns),
-        # 美股时段由市场日历纯函数给出，前端只负责展示，不自己算时区与窗口。
-        "session": session_phase(datetime.now(UTC)),
-        "items": items,
-    }
+    moment = _parse_as_of(as_of) if as_of else None
+    return await market_snapshot_view(session, as_of=moment)
 
 
 __all__ = [

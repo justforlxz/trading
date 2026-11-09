@@ -1,0 +1,63 @@
+{
+  "generated_at": "2026-11-09T17:38:27Z",
+  "phases": [
+    {
+      "phase": "baseline",
+      "chaos_candles": 9,
+      "candles_total": 35403,
+      "orders": 4,
+      "strategies": 4
+    },
+    {
+      "phase": "redis_down",
+      "health_http": 200,
+      "read_http": "200",
+      "dispatch_http": "200",
+      "replay_status": "skipped",
+      "fresh_job_status": "partial",
+      "candles_before": 9,
+      "candles_after": 9
+    },
+    {
+      "phase": "postgres_down",
+      "health_http": "200",
+      "ready_http": "000",
+      "read_http": "000",
+      "recovery_seconds": 1
+    },
+    {
+      "phase": "upstream_429",
+      "job": 1495,
+      "job_status": "failed",
+      "job_error": "upstream unavailable after 5 attempts: okx rate limited: /api/v5/market/history-candles",
+      "replay_status": "partial",
+      "candles_before": 9,
+      "candles_during": 9,
+      "candles_after": 9
+    },
+    {
+      "phase": "worker_restart",
+      "restart_seconds": 9,
+      "resumed_job": 1493,
+      "duplicate_candles": 0,
+      "replayed_job": 1498,
+      "jobs_before": 241,
+      "jobs_after": 241,
+      "stuck_running": 4,
+      "stuck_queued": 3
+    },
+    {
+      "phase": "final",
+      "execution_mode": "paper",
+      "real_trading_enabled": "false",
+      "real_orders": 0
+    }
+  ],
+  "known_debt": [
+    "redis 停摆时投递失败留下的 queued 任务行（job 1485）会永久锁死同参数幂等键：重放返回 200/skipped，任务不再执行",
+    "postgres 停摆时就绪探针 20s 无响应（客户端超时），未在超时内返回 503 错误体；建议给连接池设置 connect_timeout",
+    "postgres 停摆时读接口 20s 无响应（客户端超时），未返回错误响应体",
+    "worker 被杀时正在执行的任务会留在 ops.job_run status=running（当前 4 行），没有启动时的回收器",
+    "投递失败会留下 status=queued 的任务行（当前 3 行），同参数幂等键被锁死直到人工处理"
+  ]
+}

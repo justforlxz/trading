@@ -131,7 +131,7 @@ if [[ ${SKIP_MIGRATION_CHECK:-0} != "1" ]]; then
   ); then
     fail "读取 alembic current 失败（需要 docker 与运行中的 compose 栈）"
   fi
-  [[ $migration == *"0007_risk_schema"* ]] || fail "迁移版本不是 0007_risk_schema：$migration"
+  [[ $migration == *"(head)"* ]] || fail "迁移版本不在 head：$migration"
 fi
 step_end "$web_code" "API health=ok；迁移=$migration"
 ARTIFACT_ENTRIES+=("$(jq -n --arg m "$migration" --arg w "$web_code" '{migration:$m, web_status:$w}')")
@@ -362,7 +362,12 @@ breach_codes=$(jq -r '[.breaches[].code] | unique | join(",")' <<<"$HTTP_BODY")
 [[ $breach_codes == *"gross_exposure_exceeded"* ]] || fail "未命中总敞口限额：$breach_codes"
 [[ $breach_codes == *"concentration_exceeded"* ]] || fail "未命中集中度限额：$breach_codes"
 status_reason=$(jq -r '.reason' <<<"$HTTP_BODY")
-[[ $status_reason == "limit_breach" ]] || fail "拒绝原因不是 limit_breach：${status_reason}"
+# 回撤与限额同时命中时，status 以回撤为对外原因（回撤处置优先级更高），
+# 因此这里接受两者，限额命中已由上面的 breaches 断言覆盖。
+case $status_reason in
+  limit_breach | drawdown) ;;
+  *) fail "拒绝原因既不是 limit_breach 也不是 drawdown：${status_reason}" ;;
+esac
 step_end 200 "allowed=false，reason=${status_reason}，命中：${breach_codes}"
 ARTIFACT_ENTRIES+=("$(jq -n --arg r "$status_reason" --arg c "$breach_codes" '{status_reason:$r, breach_codes:$c}')")
 

@@ -2,21 +2,22 @@
 
 自托管的自动化量化交易系统：分析美股之间的动态相关性、市场共振、趋势与相对强弱，构建多空组合策略，在 OKX 美股 USDT 本位永续合约上执行。
 
-> 交付按阶段推进：P1 行情/关系/机会/策略/回测，P2 风控已落地；P3 交易执行已交付 order 生命周期、
-> 策略级虚拟持仓、对账、恢复、自动止损与 paper 交易，真实资金下单默认关闭。
-> 逐条证据见 `docs/reports/p1-acceptance.md`、`p2-acceptance.md`、`p3-acceptance.md`。
+> **1.0 已交付**：P1 行情/关系/机会/策略/回测、P2 风控、P3 交易执行（order 生命周期、策略级虚拟持仓、
+> 对账、恢复、自动止损、paper 交易）、P4 以 MCP 服务对外暴露能力（ADR-0007，不含内置 LLM）。
+> 真实资金下单默认关闭，1.0 全程只跑 paper。逐条证据见 `docs/reports/release-1.0.md`。
 
 ## 当前阶段
 
-**P3 交易执行 · S10 订单生命周期与 paper 交易（已完成；真实交易默认关闭）**
+**1.0 · S12 集成验收与发布（已完成；真实交易默认关闭，K8s 形态未交付）**
 
 | 项 | 状态 |
 | --- | --- |
 | 技术栈 | Python 3.12 + FastAPI / SQLAlchemy async + Alembic；React 18 + Vite + TS + Tailwind + shadcn/ui；PostgreSQL 16 + Redis 7；arq（worker + scheduler） |
 | 运行时形态 | Docker Compose 六服务：`postgres`、`redis`、`api`、`worker`、`scheduler`、`web` |
-| 已可运行 | `/health`、`/ready`、`/api/v1`（market / targets / opportunities / strategies / backtests / risk / **execution**）、前端四路由与双主题、`alembic upgrade head`、arq 任务链路、CI |
-| 阶段范围 | 行情采集、关系分析、机会发现、策略与回测、风控、订单生命周期与策略级虚拟持仓、对账、故障恢复、自动止损、paper 交易 |
-| 明确不做 | 真实资金下单（`REAL_TRADING_ENABLED` 默认 `false`，需逐策略书面授权）、AI 参与交易决策（P4） |
+| 已可运行 | `/health`、`/ready`、`/api/v1`（market / targets / opportunities / strategies / backtests / risk / execution / mcp-clients）、MCP `POST /mcp`、前端四路由与双主题、`alembic upgrade head`（`0009_mcp_schema`）、arq 任务链路、CI |
+| 阶段范围 | 行情采集、关系分析、机会发现、策略与回测、风控、订单生命周期与策略级虚拟持仓、对账、故障恢复、自动止损、paper 交易、MCP 只读查询 + 受控操作 |
+| 明确不做 | 真实资金下单（`REAL_TRADING_ENABLED` 默认 `false`，需逐策略书面授权）、内置 LLM / 自然语言助手（P4 改由 MCP 对外暴露能力） |
+| 未交付 | Kubernetes 部署形态（工程债，见 `docs/reports/release-1.0.md`） |
 | 待决策 | 3 项，见 `docs/risk/external-dependencies.md` §5 |
 
 ## 快速开始
@@ -81,12 +82,38 @@ actionlint .github/workflows/ci.yml
 | 文档 | 内容 |
 | --- | --- |
 | `AGENTS.md` | 工程规范：目录、分层、命名、提交信息、测试门禁、禁止事项 |
+| `docs/runbook.md` | **运维手册**：部署、配置、备份恢复、升级回滚、故障排查、日志位置 |
+| `docs/mcp.md` | MCP 服务：协议、鉴权与作用域、工具清单、审计 |
+| `docs/market-data.md` | 行情来源、时段与数据口径 |
 | `docs/architecture/overview.md` | 模块边界、依赖方向、运行容器与启动顺序、故障域 |
-| `docs/architecture/data-model.md` | 实体、关键字段、唯一约束与幂等键、时间与精度约定 |
-| `docs/architecture/api-contract.md` | 对外 REST 契约草案、错误与分页约定、实体↔资源映射 |
+| `docs/architecture/data-model.md` | 实体、关键字段、唯一约束与幂等键、时间与精度约定（schema 含 market / research / opportunity / strategy / backtest / risk / execution / ops / mcp） |
+| `docs/architecture/api-contract.md` | 对外 REST 契约（§3.1–3.10）、MCP 契约、错误与分页约定 |
 | `docs/plan/p1.md` | P1 任务拆解（依赖 / 交付物 / 验收命令 / 判据）与 S3–S8 映射 |
+| `docs/plan/p2-p4.md` | P2–P4 与 S12 集成验收的任务拆解（§3 的 AI 计划表已作废，见 ADR-0007） |
 | `docs/risk/external-dependencies.md` | OKX 与美股行情源实测证据、结论、风险与待决策项 |
-| `docs/architecture/adr/` | 架构决策记录 0001–0006 |
+| `docs/architecture/adr/` | 架构决策记录 0001–0007（0007 = P4 用 MCP 取代内置 AI） |
+| `docs/reports/release-1.0.md` | **1.0 发布说明**：P1–P4 能力表、门禁与实测覆盖率、已知限制与工程债 |
+| `docs/reports/p1-acceptance.md` · `p2-acceptance.md` · `p3-acceptance.md` | 各阶段验收报告 |
+| `docs/reports/chaos-report.md` | 故障注入验收：Redis/PG 停机、上游 429、worker 重启 |
+| `docs/reports/perf-baseline.md` | 性能基线：全池回补、全市场扫描、关键 GET p95、容量判断与告警阈值 |
+| `docs/reports/security-audit.md` | 安全审计：密钥扫描、MCP 鉴权与越权、实盘门禁、文档一致性 |
+| `docs/reports/*-artifacts.json` | 各验收脚本产出的原始数据（`full-smoke`、`chaos`、`p1/p2/p3-smoke`） |
+
+## 验收脚本
+
+```bash
+bash scripts/e2e/full_smoke.sh        # S12-01 全链路一键验收（步骤 0–9，需干净库：先 down -v && make up）
+bash scripts/e2e/chaos.sh             # S12-02 四类故障注入（Redis/PG 停机、上游 429、worker 重启）
+bash scripts/e2e/security_audit.sh    # S12-04 安全审计探针（只读；非 paper 姿态直接中止）
+bash scripts/e2e/p1_smoke.sh          # P1 单阶段回归
+bash scripts/e2e/p2_smoke.sh          # P2 单阶段回归
+bash scripts/e2e/p3_smoke.sh          # P3 单阶段回归（paper 交易，不碰真实资金）
+```
+
+脚本都以 `exit 0` 表示通过、非零表示失败并打印失败步骤（`security_audit.sh` 是逐项断言，任一不符即非零，
+且在非 `paper` + `REAL_TRADING_ENABLED=false` 的部署上开跑前就中止，不会碰真实下单端点）。
+`full_smoke.sh` / `chaos.sh` 的产物默认写 `$HOME/.cache/s12/`，避免跑一次验收就改动工作区；
+需要刷新仓库内 `docs/reports/*-artifacts.json` 时显式传 `ARTIFACT=docs/reports/<名字>.json`。
 
 ## 探针脚本
 

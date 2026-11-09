@@ -191,7 +191,7 @@ if [[ ${SKIP_MIGRATION_CHECK:-0} != "1" ]]; then
   ); then
     fail "读取 alembic current 失败（需要 docker 与运行中的 compose 栈）"
   fi
-  [[ $migration == *"0006"* ]] || fail "迁移版本不是 0006：$migration"
+  [[ $migration == *"(head)"* ]] || fail "迁移版本不在 head：$migration"
 fi
 step_end "$web_code" "API health=ok；迁移=$migration"
 ARTIFACT_ENTRIES+=("$(jq -n --arg m "$migration" --arg w "$web_code" '{migration:$m, web_status:$w}')")

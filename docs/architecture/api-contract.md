@@ -390,6 +390,40 @@ risk_market_data_unavailable`（fail-closed），`details.missing` 列出缺失�
 阈值时产生 `reduce_only` 平仓单并写 `risk_event(kind=stop_trigger, action=close)`，不经过策略审批；
 已有未完成止损单时不重复下单。
 
+### 3.10 MCP
+
+把 P1–P3 的只读能力与受控操作以 **Model Context Protocol**（JSON-RPC 2.0 over HTTP）暴露给外部 Agent。
+服务本身**不含 LLM**、不做自然语言理解、不参与交易决策（决策依据：ADR-0007）。完整说明见 `docs/mcp.md`。
+
+**`POST /mcp`** — Streamable HTTP，支持 JSON 与 SSE 两种响应形态（`Accept: text/event-stream` 返回
+`event: message` 帧）；`trading-mcp`（`python -m app.mcp.stdio`）只是把 stdio 转发到该端点。
+
+| 项 | 契约 |
+| --- | --- |
+| 鉴权 | `Authorization: Bearer <token>`；服务端只存 `sha256(token)`，明文仅在创建时返回一次 |
+| 鉴权失败 | **HTTP 401** + §1.1 统一错误信封（不是 JSON-RPC error），`code=mcp_unauthorized`（缺令牌 / 未知 / 已吊销同码） |
+| 方法 | `initialize`、`ping`、`tools/list`、`tools/call`、`resources/list`、`resources/read`；未知方法 `-32601`，参数错误 `-32602`，非法 JSON `-32700`（HTTP 400） |
+| 批量 / 通知 | 数组一次返回响应数组；全为 notification 时 HTTP 202 空体，只留审计不执行业务 |
+| scope 不足 | **HTTP 403** + JSON-RPC error `-32003`，`data.code=mcp_forbidden`；只写一条 `mcp.mcp_call_log` 审计行，不产生任何业务写入 |
+| 工具失败 | HTTP 200，`result.isError=true`，`content[0].text` 为 `{"error":{code,message,details}}` |
+| 审计 | 每次调用写 `mcp.mcp_call_log`（client_id、method、tool、scope 判定、结果、时间） |
+
+工具集（`backend/app/mcp/tools.py`，共 26 个）：
+
+- **只读 18 个**（scope `read`）：`market_status`、`list_instruments`、`get_candles`、`data_coverage`、
+  `list_targets`、`get_target`、`get_relations`、`get_relative_strength`、`list_opportunities`、
+  `get_opportunity`、`list_strategies`、`get_strategy`、`get_backtest`、`risk_status`、`list_risk_events`、
+  `list_positions`、`list_orders`、`virtual_positions`。返回值与对应 REST GET 语义一致。
+- **受控操作 8 个**（scope `operate`）：`trigger_scan`、`create_strategy_draft`、`update_strategy_draft`、
+  `submit_strategy_for_approval`、`run_backtest`、`pause_strategy`、`resume_strategy`、
+  `execute_strategy_action`。全部复用既有 REST 的同一套服务与门禁：策略仍需人工审批、回测仍需已审批策略、
+  真实下单仍受 `REAL_TRADING_ENABLED` 与策略授权约束，MCP 不提供绕过风控与审批的通道。
+
+**`POST /api/v1/mcp/clients`** — body `{name, scopes[]}`，`scopes ⊆ {"read","operate"}`；
+返回 `201 {client:{id,name,scopes,created_at,revoked_at}, token}`，`token` 只在此响应出现一次。
+**`GET /api/v1/mcp/clients`** — `{items:[...]}`，不回显 token。
+**`DELETE /api/v1/mcp/clients/{id}`** — 吊销，返回 200 与 `revoked:true`；吊销后同一 token 立即 401。
+
 ## 4. 内部边界
 
 - 服务进程之间**没有 HTTP 契约**。`api`、`worker`、`scheduler` 共享同一个 Python 包与同一套 `services`，通过 PostgreSQL 与 Redis 队列协作。

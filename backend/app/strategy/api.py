@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from decimal import Decimal
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Header, Query, Request, Response
@@ -13,7 +11,6 @@ from app.api.errors import ApiError
 from app.api.v1.deps import session_dep
 from app.strategy import service
 from app.strategy.core.constraints import ConstraintViolation
-from app.strategy.models import Strategy, StrategyApproval, StrategyLeg, StrategyTransition
 from app.strategy.schemas import (
     ApproveRequest,
     CreateStrategyRequest,
@@ -21,6 +18,12 @@ from app.strategy.schemas import (
     RejectRequest,
     StrategyKind,
     StrategyStatus,
+)
+from app.strategy.service import (
+    approval_payload,
+    strategy_detail,
+    strategy_payload,
+    transition_payload,
 )
 
 router = APIRouter(prefix="/strategies", tags=["strategy"])
@@ -31,112 +34,8 @@ DEFAULT_LIMIT = 50
 ActorHeader = Annotated[str | None, Header(alias="X-Actor")]
 
 
-def _dec(value: Any) -> str | None:
-    if value is None:
-        return None
-    if isinstance(value, Decimal):
-        return str(value)
-    return str(value)
-
-
-def _iso(value: datetime | None) -> str | None:
-    if value is None:
-        return None
-    return value.isoformat().replace("+00:00", "Z")
-
-
-def _symbol(inst_id: str, uly: str | None) -> str:
-    return (uly or inst_id.split("-")[0]).upper()
-
-
 def _fail(exc: ConstraintViolation) -> None:
     raise ApiError(exc.code, exc.message, status_code=exc.status_code, details=exc.details) from exc
-
-
-def _leg_payload(row: StrategyLeg, inst_id: str, uly: str | None) -> dict[str, Any]:
-    return {
-        "id": row.id,
-        "instrument_id": row.instrument_id,
-        "inst_id": inst_id,
-        "symbol": _symbol(inst_id, uly),
-        "side": row.side,
-        "weight": _dec(row.target_weight),
-        "rationale": row.rationale,
-        "rank": row.rank,
-    }
-
-
-def _approval_payload(row: StrategyApproval) -> dict[str, Any]:
-    return {
-        "id": row.id,
-        "decision": row.decision,
-        "content_hash": row.content_hash,
-        "reviewer": row.reviewer,
-        "note": row.note,
-        "decided_at": _iso(row.decided_at),
-    }
-
-
-def _transition_payload(row: StrategyTransition) -> dict[str, Any]:
-    return {
-        "id": row.id,
-        "from_status": row.from_status,
-        "to_status": row.to_status,
-        "at": _iso(row.at),
-        "actor": row.actor,
-        "reason": row.reason,
-        "request_id": row.request_id,
-    }
-
-
-def _strategy_payload(
-    row: Strategy,
-    *,
-    legs: list[tuple[StrategyLeg, str, str | None]] | None = None,
-    approvals: list[StrategyApproval] | None = None,
-    transitions: list[StrategyTransition] | None = None,
-    reviewer: str | None = None,
-) -> dict[str, Any]:
-    params = dict(row.params or {})
-    payload: dict[str, Any] = {
-        "id": row.id,
-        "strategy_key": row.strategy_key,
-        "name": row.name,
-        "kind": row.kind,
-        "status": row.status,
-        "target_id": row.target_id,
-        "templates": list(row.templates or []),
-        "params": params,
-        "source": params.get("source"),
-        "exclusions": params.get("exclusions", []),
-        "content_hash": row.content_hash,
-        "version": row.version,
-        "created_at": _iso(row.created_at),
-        "updated_at": _iso(row.updated_at),
-        "approved_at": _iso(row.approved_at),
-        "reviewer": reviewer,
-        "legs": [_leg_payload(leg, inst_id, uly) for leg, inst_id, uly in (legs or [])],
-    }
-    if approvals is not None:
-        payload["approvals"] = [_approval_payload(item) for item in approvals]
-    if transitions is not None:
-        payload["transitions"] = [_transition_payload(item) for item in transitions]
-    return payload
-
-
-async def _detail(session: AsyncSession, strategy_id: int) -> dict[str, Any]:
-    row = await service.get_strategy(session, strategy_id)
-    legs = await service.load_legs(session, strategy_id)
-    approvals = await service.load_approvals(session, strategy_id)
-    transitions = await service.load_transitions(session, strategy_id)
-    reviewer = approvals[0].reviewer if approvals else None
-    return _strategy_payload(
-        row,
-        legs=legs,
-        approvals=approvals,
-        transitions=transitions,
-        reviewer=reviewer,
-    )
 
 
 def _request_id(request: Request) -> str | None:
@@ -168,7 +67,7 @@ async def list_strategies(
     legs_by_strategy = await service.load_legs_many(session, [row.id for row in rows])
     return {
         "items": [
-            _strategy_payload(
+            strategy_payload(
                 row,
                 legs=legs_by_strategy.get(row.id, []),
                 reviewer=reviewers.get(row.id),
@@ -195,13 +94,13 @@ async def create_strategy(
     if not created:
         response.status_code = 200
     legs = await service.load_legs(session, row.id)
-    return _strategy_payload(row, legs=legs)
+    return strategy_payload(row, legs=legs)
 
 
 @router.get("/{strategy_id}")
 async def get_strategy(strategy_id: int, session: SessionDep) -> dict[str, Any]:
     try:
-        return await _detail(session, strategy_id)
+        return await strategy_detail(session, strategy_id)
     except ConstraintViolation as exc:
         _fail(exc)
 
@@ -212,7 +111,7 @@ async def patch_strategy(
 ) -> dict[str, Any]:
     try:
         await service.patch_strategy(session, strategy_id, payload)
-        return await _detail(session, strategy_id)
+        return await strategy_detail(session, strategy_id)
     except ConstraintViolation as exc:
         _fail(exc)
 
@@ -232,7 +131,7 @@ async def submit_strategy(
             actor=x_actor or "user",
             request_id=_request_id(request),
         )
-        return await _detail(session, strategy_id)
+        return await strategy_detail(session, strategy_id)
     except ConstraintViolation as exc:
         _fail(exc)
 
@@ -254,7 +153,7 @@ async def approve_strategy(
             reason=payload.note,
             request_id=_request_id(request),
         )
-        return await _detail(session, strategy_id)
+        return await strategy_detail(session, strategy_id)
     except ConstraintViolation as exc:
         _fail(exc)
 
@@ -276,7 +175,7 @@ async def reject_strategy(
             reason=payload.note,
             request_id=_request_id(request),
         )
-        return await _detail(session, strategy_id)
+        return await strategy_detail(session, strategy_id)
     except ConstraintViolation as exc:
         _fail(exc)
 
@@ -296,7 +195,7 @@ async def archive_strategy(
             actor=x_actor or "user",
             request_id=_request_id(request),
         )
-        return await _detail(session, strategy_id)
+        return await strategy_detail(session, strategy_id)
     except ConstraintViolation as exc:
         _fail(exc)
 
@@ -308,7 +207,7 @@ async def list_approvals(strategy_id: int, session: SessionDep) -> dict[str, Any
     except ConstraintViolation as exc:
         _fail(exc)
     rows = await service.load_approvals(session, strategy_id)
-    return {"items": [_approval_payload(row) for row in rows]}
+    return {"items": [approval_payload(row) for row in rows]}
 
 
 @router.get("/{strategy_id}/transitions")
@@ -318,7 +217,7 @@ async def list_transitions(strategy_id: int, session: SessionDep) -> dict[str, A
     except ConstraintViolation as exc:
         _fail(exc)
     rows = await service.load_transitions(session, strategy_id)
-    return {"items": [_transition_payload(row) for row in rows]}
+    return {"items": [transition_payload(row) for row in rows]}
 
 
 __all__ = ["router"]

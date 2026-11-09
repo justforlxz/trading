@@ -17,6 +17,7 @@ from app.config import get_settings
 from app.db.base import Base
 from app.execution import models as execution_models  # noqa: F401
 from app.market import models as market_models  # noqa: F401 - 让 metadata 收集到表
+from app.mcp import models as mcp_models  # noqa: F401
 from app.opportunity import models as opportunity_models  # noqa: F401
 from app.ops import models as ops_models  # noqa: F401
 from app.research import models as research_models  # noqa: F401

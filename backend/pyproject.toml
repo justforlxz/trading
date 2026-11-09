@@ -36,6 +36,10 @@ dev = [
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
 
+[project.scripts]
+# stdio 包装器：外部 Agent 用它把 JSON-RPC 转发到 HTTP `/mcp`。
+trading-mcp = "app.mcp.stdio:main"
+
 [tool.ruff]
 target-version = "py312"
 line-length = 100

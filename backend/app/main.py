@@ -12,6 +12,7 @@ from app import __version__
 from app.api.errors import REQUEST_ID_HEADER, install_error_handlers
 from app.api.v1 import router as api_v1_router
 from app.config import get_settings
+from app.mcp.server import router as mcp_router
 from app.ops.health import router as ops_router
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,8 @@ def create_app() -> FastAPI:
 
     app.include_router(ops_router)
     app.include_router(api_v1_router)
+    # MCP 的 Streamable HTTP 端点独立挂载在 `/mcp`（不属于 `/api/v1` 的业务契约）。
+    app.include_router(mcp_router)
     logger.info("trading api initialized: env=%s version=%s", settings.app_env, __version__)
     return app
 

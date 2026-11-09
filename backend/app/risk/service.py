@@ -151,6 +151,23 @@ def _limits_from(values: dict[str, Decimal]) -> Limits:
     )
 
 
+def _drawdown_breach(verdict: Any, thresholds: dict[str, Decimal]) -> dict[str, str]:
+    """把回撤判决转成与限额 breach 同构的可解释条目。"""
+
+    severity = getattr(verdict, "severity", None) or "tier1"
+    threshold = {
+        "tier3": thresholds["drawdown_close"],
+        "tier2": thresholds["drawdown_reduce"],
+        "tier1": thresholds["drawdown_warn"],
+    }[severity]
+    return {
+        "code": "drawdown_exceeded",
+        "field": "drawdown",
+        "observed": _text(verdict.drawdown),
+        "threshold": _text(threshold),
+    }
+
+
 # ---------------------------------------------------------------------------
 # 阈值策略
 # ---------------------------------------------------------------------------
@@ -540,6 +557,8 @@ async def evaluate(
         }
         for breach in verdict.breaches
     ]
+    if drawdown_verdict.breached:
+        result["breaches"].append(_drawdown_breach(drawdown_verdict, thresholds))
     result["allowed"] = not verdict.breaches and not drawdown_verdict.breached
     if not result["allowed"]:
         result["reason"] = "limit_breach" if verdict.breaches else "drawdown"
@@ -591,6 +610,30 @@ async def evaluate(
     return result
 
 
+def _breach_field(breach: Any) -> str | None:
+    """limits 返回 Breach 对象, 回撤 breach 是 dict; 统一取 field。"""
+
+    return breach.get("field") if isinstance(breach, dict) else breach.field
+
+
+def _breach_payload(breach: Any) -> dict[str, Any]:
+    """把两种 breach 形式统一成可 JSON 化的 dict。"""
+
+    if isinstance(breach, dict):
+        return {
+            "code": breach.get("code"),
+            "field": breach.get("field"),
+            "observed": breach.get("observed"),
+            "threshold": breach.get("threshold"),
+        }
+    return {
+        "code": breach.code,
+        "field": breach.field,
+        "observed": _text(breach.observed),
+        "threshold": _text(breach.threshold),
+    }
+
+
 async def status(session: AsyncSession, *, strategy_id: int | None = None) -> dict[str, Any]:
     """只读状态查询：当前是否允许增加敞口、命中哪些限额。
 
@@ -617,6 +660,9 @@ async def status(session: AsyncSession, *, strategy_id: int | None = None) -> di
         capital = baseline.initial_capital if baseline else default_capital
         if capital <= ZERO:
             capital = default_capital
+        equity_points = (
+            tuple(await data.load_equity_series(session, baseline.id)) if baseline else ()
+        )
         positions = [
             portfolio.Position(
                 strategy_id=strategy_id,
@@ -632,6 +678,7 @@ async def status(session: AsyncSession, *, strategy_id: int | None = None) -> di
         elif not legs:
             allowed, reason = False, "risk_empty_portfolio"
     else:
+        equity_points = ()
         total_capital = ZERO
         for approved_id in await data.list_approved_strategies(session):
             legs = await data.load_legs(session, approved_id)
@@ -670,6 +717,19 @@ async def status(session: AsyncSession, *, strategy_id: int | None = None) -> di
                 capital=capital,
             )
             breaches = verdict.breaches or breaches
+            if equity_points:
+                peak, _ = drawdown.drawdown_series(tuple(point.equity for point in equity_points))
+                dd_verdict = drawdown.evaluate_drawdown(
+                    equity=equity_points[-1].equity,
+                    peak=peak,
+                    thresholds=DrawdownThresholds(
+                        warn=thresholds["drawdown_warn"],
+                        reduce=thresholds["drawdown_reduce"],
+                        close=thresholds["drawdown_close"],
+                    ),
+                )
+                if dd_verdict.breached:
+                    breaches = [*list(breaches), _drawdown_breach(dd_verdict, thresholds)]
     except RiskError:
         raise
     except Exception:  # 计算失败一律拒绝放行
@@ -693,7 +753,12 @@ async def status(session: AsyncSession, *, strategy_id: int | None = None) -> di
         }
 
     if reason is None and breaches:
-        allowed, reason = False, "limit_breach"
+        allowed, reason = (
+            False,
+            "drawdown"
+            if any(_breach_field(row) == "drawdown" for row in breaches)
+            else "limit_breach",
+        )
 
     return {
         "scope": scope,
@@ -718,15 +783,7 @@ async def status(session: AsyncSession, *, strategy_id: int | None = None) -> di
             }
             for item in portfolio_risk.duplicates
         ],
-        "breaches": [
-            {
-                "code": breach.code,
-                "field": breach.field,
-                "observed": _text(breach.observed),
-                "threshold": _text(breach.threshold),
-            }
-            for breach in breaches
-        ],
+        "breaches": [_breach_payload(breach) for breach in breaches],
     }
 
 

@@ -157,17 +157,37 @@ def test_non_positive_capital_rejected() -> None:
     assert _codes(verdict) == {"risk_insufficient_capital"}
 
 
-def test_invalid_side_and_negative_weight_rejected() -> None:
+def test_invalid_side_rejected() -> None:
     verdict = evaluate_limits(
         legs=(
             LegIntent(instrument_id=1, side="flat", weight=Decimal("0.1"), notional=Decimal("1")),
-            LegIntent(instrument_id=2, side="long", weight=Decimal("-0.1"), notional=Decimal("-1")),
         ),
         limits=_limits(),
         capital=CAPITAL,
     )
     assert verdict.ok is False
-    assert {"risk_invalid_side", "risk_invalid_weight"} <= _codes(verdict)
+    assert _codes(verdict) == {"risk_invalid_side"}
+
+
+def test_signed_weights_are_valid_for_relative_value() -> None:
+    """空头腿用负权重表达方向: 限额按绝对值校验, 净敞口按 side 抵消。"""
+
+    verdict = evaluate_limits(
+        legs=(
+            _long("0.3"),
+            LegIntent(
+                instrument_id=2,
+                side="short",
+                weight=Decimal("-0.3"),
+                notional=Decimal("-30000"),
+            ),
+        ),
+        limits=_limits(),
+        capital=CAPITAL,
+    )
+    assert verdict.ok is True, verdict.breaches
+    assert verdict.gross_exposure == Decimal("60000")
+    assert verdict.net_exposure == Decimal("0")
 
 
 def test_deterministic_for_same_input() -> None:

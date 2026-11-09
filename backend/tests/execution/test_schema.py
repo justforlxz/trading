@@ -12,8 +12,9 @@ EXPECTED_TABLES = {"order", "fill", "position", "reconcile_diff"}
 
 
 async def test_revision_is_execution_schema(session) -> None:
+    # head 随阶段推进：P4 新增 0009_mcp_schema，execution 表仍在同一迁移链上。
     version = await session.scalar(text("SELECT version_num FROM alembic_version"))
-    assert version == "0008_execution_schema"
+    assert version == "0009_mcp_schema"
 
 
 async def test_tables_and_checks(session) -> None:

@@ -216,7 +216,7 @@ def _gate_check(*, mode: str, strategy_id: int | None, open_diffs: int) -> str:
     return decision.mode
 
 
-async def _risk_gate(session: AsyncSession, strategy_id: int) -> None:
+async def risk_gate(session: AsyncSession, strategy_id: int) -> None:
     """入场单必须先拿到风控放行结论；任何异常都按拒绝处理（fail-closed）。"""
 
     try:
@@ -398,7 +398,7 @@ async def submit_order(
     mode = _gate_check(mode=requested_mode, strategy_id=strategy_id, open_diffs=open_diffs)
 
     if intent == "entry" and not reduce_only:
-        await _risk_gate(session, strategy_id)
+        await risk_gate(session, strategy_id)
 
     if reduce_only:
         available = await available_close_quantity(
@@ -850,6 +850,7 @@ __all__ = [
     "position_valuations",
     "positions_view",
     "resolve_mode",
+    "risk_gate",
     "serialize_fill",
     "serialize_order",
     "serialize_valuation",

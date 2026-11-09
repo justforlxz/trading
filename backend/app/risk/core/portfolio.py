@@ -58,14 +58,16 @@ def evaluate_portfolio(positions: tuple[Position, ...], *, capital: Decimal) -> 
     holders: dict[tuple[int, str], set[int]] = defaultdict(set)
 
     for position in positions:
-        gross += position.notional
-        weights[position.instrument_id] += position.weight
+        # 带符号权重/名义: 方向由 side 表达, 敞口与集中度按绝对值聚合。
+        notional = abs(position.notional)
+        gross += notional
+        weights[position.instrument_id] += abs(position.weight)
         sides[position.instrument_id].add(position.side)
         holders[(position.instrument_id, position.side)].add(position.strategy_id)
         if position.side == "short":
-            short_total += position.notional
+            short_total += notional
         else:
-            long_total += position.notional
+            long_total += notional
 
     concentration = max(weights.values(), default=ZERO)
     conflicts = tuple(sorted(iid for iid, values in sides.items() if len(values) > 1))

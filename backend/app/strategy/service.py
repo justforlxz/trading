@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import delete, select
@@ -483,14 +484,137 @@ async def transition(
     return strategy
 
 
+# ---------------------------------------------------------------------------
+# 只读响应视图
+#
+# Web API 与 MCP 共用同一份组装逻辑：同一策略在两个入口必须逐字段一致，
+# 复制一份序列化代码迟早会漂移。这里只做格式化，不读也不写数据库。
+# ---------------------------------------------------------------------------
+
+
+def _dec(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, Decimal):
+        return str(value)
+    return str(value)
+
+
+def _iso(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    return value.isoformat().replace("+00:00", "Z")
+
+
+def _symbol(inst_id: str, uly: str | None) -> str:
+    return (uly or inst_id.split("-")[0]).upper()
+
+
+def leg_payload(row: StrategyLeg, inst_id: str, uly: str | None) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "instrument_id": row.instrument_id,
+        "inst_id": inst_id,
+        "symbol": _symbol(inst_id, uly),
+        "side": row.side,
+        "weight": _dec(row.target_weight),
+        "rationale": row.rationale,
+        "rank": row.rank,
+    }
+
+
+def approval_payload(row: StrategyApproval) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "decision": row.decision,
+        "content_hash": row.content_hash,
+        "reviewer": row.reviewer,
+        "note": row.note,
+        "decided_at": _iso(row.decided_at),
+    }
+
+
+def transition_payload(row: StrategyTransition) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "from_status": row.from_status,
+        "to_status": row.to_status,
+        "at": _iso(row.at),
+        "actor": row.actor,
+        "reason": row.reason,
+        "request_id": row.request_id,
+    }
+
+
+def strategy_payload(
+    row: Strategy,
+    *,
+    legs: list[tuple[StrategyLeg, str, str | None]] | None = None,
+    approvals: list[StrategyApproval] | None = None,
+    transitions: list[StrategyTransition] | None = None,
+    reviewer: str | None = None,
+) -> dict[str, Any]:
+    params = dict(row.params or {})
+    payload: dict[str, Any] = {
+        "id": row.id,
+        "strategy_key": row.strategy_key,
+        "name": row.name,
+        "kind": row.kind,
+        "status": row.status,
+        "target_id": row.target_id,
+        "templates": list(row.templates or []),
+        "params": params,
+        "source": params.get("source"),
+        "exclusions": params.get("exclusions", []),
+        "content_hash": row.content_hash,
+        "version": row.version,
+        "created_at": _iso(row.created_at),
+        "updated_at": _iso(row.updated_at),
+        "approved_at": _iso(row.approved_at),
+        "reviewer": reviewer,
+        "legs": [leg_payload(leg, inst_id, uly) for leg, inst_id, uly in (legs or [])],
+    }
+    if approvals is not None:
+        payload["approvals"] = [approval_payload(item) for item in approvals]
+    if transitions is not None:
+        payload["transitions"] = [transition_payload(item) for item in transitions]
+    return payload
+
+
+async def strategy_detail(session: AsyncSession, strategy_id: int) -> dict[str, Any]:
+    """单条策略的完整视图：Web `GET /strategies/{id}` 与 MCP `get_strategy` 共用。"""
+
+    row = await get_strategy(session, strategy_id)
+    # 写操作刚在同一会话里提交过时，`updated_at` 这类 server-side onupdate 列
+    # 处于过期状态；在这里（await 上下文）刷新，避免读属性时触发同步 IO。
+    await session.refresh(row)
+    legs = await load_legs(session, strategy_id)
+    approvals = await load_approvals(session, strategy_id)
+    transitions = await load_transitions(session, strategy_id)
+    reviewer = approvals[0].reviewer if approvals else None
+    return strategy_payload(
+        row,
+        legs=legs,
+        approvals=approvals,
+        transitions=transitions,
+        reviewer=reviewer,
+    )
+
+
 __all__ = [
+    "approval_payload",
     "create_strategy",
     "get_strategy",
     "latest_reviewers",
+    "leg_payload",
     "list_strategies",
     "load_approvals",
     "load_legs",
+    "load_legs_many",
     "load_transitions",
     "patch_strategy",
+    "strategy_detail",
+    "strategy_payload",
     "transition",
+    "transition_payload",
 ]

@@ -22,8 +22,6 @@ from app.api.schemas import (
     ExecutionModeRequest,
     ExecutionStateResponse,
     FillListResponse,
-    IndicatorCatalogResponse,
-    IndicatorSeriesResponse,
     JournalListResponse,
     Order,
     OrderCreateRequest,
@@ -40,7 +38,7 @@ from app.api.schemas import (
     StrategyInstanceListResponse,
     StrategyInstanceUpdateRequest,
 )
-from app.api.schemas.common import Bar, DataSource
+from app.api.schemas.common import DataSource
 
 __all__ = ["contract_router"]
 
@@ -51,26 +49,6 @@ def _stub(node: str) -> HTTPException:
     """契约桩统一响应：501 明确表示「形状已定、实现未到」。"""
 
     return HTTPException(status_code=501, detail=f"contract stub; implemented by {node}")
-
-
-# ---------------------------------------------------------------- indicators
-
-indicators_router = APIRouter(tags=["indicators"])
-
-
-@indicators_router.get("/indicators", response_model=IndicatorCatalogResponse)
-def list_indicators() -> IndicatorCatalogResponse:
-    raise _stub("T2.1")
-
-
-@indicators_router.get("/indicators/series", response_model=IndicatorSeriesResponse)
-def get_indicator_series(
-    inst_id: str = Query(...),
-    bar: Bar = Query(...),
-    names: str = Query(..., description="逗号分隔的指标名 (如 rsi,sma)"),
-    limit: int = Query(200, ge=1, le=1000),
-) -> IndicatorSeriesResponse:
-    raise _stub("T2.2")
 
 
 # ---------------------------------------------------------------- strategy
@@ -228,7 +206,6 @@ def get_overview() -> OverviewResponse:
 
 
 for _router in (
-    indicators_router,
     strategy_router,
     backtest_router,
     trades_router,

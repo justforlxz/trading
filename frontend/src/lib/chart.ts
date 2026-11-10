@@ -1,8 +1,8 @@
 /**
- * K 线图的几何计算。
+ * 分时折线图的几何计算。
  *
- * 只做「把契约里的十进制字符串摆到 SVG 坐标上」这一件呈现工作：
- * 不计算任何业务指标，也不补造缺失的 K 线。
+ * 只做「把收盘价摆到 SVG 坐标上」这一件呈现工作：不计算任何指标，
+ * 也不补造缺失的点。
  */
 
 import type { components } from "../api/types";
@@ -10,58 +10,59 @@ import type { components } from "../api/types";
 export type Candle = components["schemas"]["Candle"];
 
 export const CHART_WIDTH = 800;
-export const CHART_HEIGHT = 320;
+/**
+ * 画布高宽比约 1:5.7（宽 800、高 140）。
+ *
+ * 折线按 `w-full` 铺满卡片宽度、高度由 viewBox 同比放大，画布越「扁」渲染高度越小：
+ * 1280 像素宽视口下画布被放大到约 911×160 像素，1440 像素宽视口下约 1046×183 像素，
+ * 详情页的四张指标卡片与折线因此都能落在 900 像素高的首屏内。
+ */
+export const CHART_HEIGHT = 140;
 
 const PLOT_LEFT = 64;
 const PLOT_RIGHT = CHART_WIDTH - 16;
 const PLOT_TOP = 12;
-const PLOT_BOTTOM = CHART_HEIGHT - 30;
+const PLOT_BOTTOM = CHART_HEIGHT - 28;
 const PRICE_PADDING_RATIO = 0.08;
-const PRICE_TICK_COUNT = 5;
+const PRICE_TICK_COUNT = 4;
 const TIME_TICK_LIMIT = 6;
-const BODY_WIDTH_RATIO = 0.6;
-const BODY_MIN_WIDTH = 2;
-const BODY_MAX_WIDTH = 22;
-const DOJI_HEIGHT = 1;
 
-export type CandleBox = {
-  centerX: number;
-  bodyX: number;
-  bodyWidth: number;
-  bodyTop: number;
-  bodyHeight: number;
-  openY: number;
-  closeY: number;
-  wickTop: number;
-  wickBottom: number;
-  rising: boolean;
-  openTime: string;
+/** 折线上的一个点：时间取自 K 线，价格取自收盘价，原样保留字符串。 */
+export type ClosePoint = {
+  time: string;
+  price: string;
 };
 
 export type PriceTick = { y: number; label: string };
 
 export type TimeTick = { x: number; label: string };
 
-export type CandleChartGeometry = {
+export type LineChartGeometry = {
   plotLeft: number;
   plotRight: number;
   plotTop: number;
   plotBottom: number;
-  boxes: CandleBox[];
+  points: Array<{ x: number; y: number; time: string }>;
+  /** SVG 折线路径；价格无法解析的点不参与连线。 */
+  line: string;
   priceTicks: PriceTick[];
   timeTicks: TimeTick[];
 };
 
-function emptyGeometry(): CandleChartGeometry {
-  return {
-    plotLeft: PLOT_LEFT,
-    plotRight: PLOT_RIGHT,
-    plotTop: PLOT_TOP,
-    plotBottom: PLOT_BOTTOM,
-    boxes: [],
-    priceTicks: [],
-    timeTicks: [],
-  };
+/** 只取收盘价，其余价格字段不进入界面。 */
+export function closePoints(candles: Candle[]): ClosePoint[] {
+  return candles.map((candle) => ({ time: candle.open_time, price: candle.close }));
+}
+
+function parsePrice(value: string): number | null {
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function roundCoordinate(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 /** 相邻价格刻度之间的位数，只用于刻度文案。 */
@@ -70,8 +71,8 @@ function tickDigits(step: number): number {
   return Math.min(8, Math.max(0, Math.ceil(-Math.log10(step))));
 }
 
-/** K 线时间戳按契约以 UTC 表示，标签同样以 UTC 呈现，避免本地时区造成的歧义。 */
-export function formatCandleTime(iso: string): string {
+/** 时间戳按契约以 UTC 表示，标签同样以 UTC 呈现，避免本地时区造成的歧义。 */
+export function formatChartTime(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
   const pad = (value: number) => String(value).padStart(2, "0");
@@ -80,19 +81,29 @@ export function formatCandleTime(iso: string): string {
   )}:${pad(date.getUTCMinutes())}`;
 }
 
-export function buildCandleChart(candles: Candle[]): CandleChartGeometry {
-  const isPrice = (value: string) => value.trim() !== "" && Number.isFinite(Number(value));
-  const valid = candles.filter((candle) =>
-    [candle.open, candle.high, candle.low, candle.close].every(isPrice),
-  );
-  if (valid.length === 0) return emptyGeometry();
+function emptyGeometry(): LineChartGeometry {
+  return {
+    plotLeft: PLOT_LEFT,
+    plotRight: PLOT_RIGHT,
+    plotTop: PLOT_TOP,
+    plotBottom: PLOT_BOTTOM,
+    points: [],
+    line: "",
+    priceTicks: [],
+    timeTicks: [],
+  };
+}
 
-  const lows = valid.map((candle) => Number(candle.low));
-  const highs = valid.map((candle) => Number(candle.high));
-  const rawLow = Math.min(...lows);
-  const rawHigh = Math.max(...highs);
+export function buildLineChart(closePrices: ClosePoint[]): LineChartGeometry {
+  const priced = closePrices
+    .map((point) => ({ time: point.time, price: parsePrice(point.price) }))
+    .filter((point): point is { time: string; price: number } => point.price !== null);
+  if (priced.length === 0) return emptyGeometry();
+
+  const rawLow = Math.min(...priced.map((point) => point.price));
+  const rawHigh = Math.max(...priced.map((point) => point.price));
   const span = rawHigh - rawLow;
-  // 单根或全平盘 K 线没有跨度，用相对值撑开，保证除数恒大于 0。
+  // 单点或全平盘没有跨度，用相对值撑开，保证除数恒大于 0。
   const padding = span > 0 ? span * PRICE_PADDING_RATIO : Math.max(Math.abs(rawHigh) * 0.01, 0.01);
   const priceLow = rawLow - padding;
   const priceHigh = rawHigh + padding;
@@ -100,31 +111,16 @@ export function buildCandleChart(candles: Candle[]): CandleChartGeometry {
   const plotHeight = PLOT_BOTTOM - PLOT_TOP;
   const yFor = (price: number) => PLOT_TOP + ((priceHigh - price) / priceSpan) * plotHeight;
 
-  const slotWidth = (PLOT_RIGHT - PLOT_LEFT) / valid.length;
-  const bodyWidth = Math.min(
-    BODY_MAX_WIDTH,
-    Math.max(BODY_MIN_WIDTH, slotWidth * BODY_WIDTH_RATIO),
-  );
+  const slotWidth = (PLOT_RIGHT - PLOT_LEFT) / priced.length;
+  const points = priced.map((point, index) => ({
+    x: PLOT_LEFT + slotWidth * (index + 0.5),
+    y: yFor(point.price),
+    time: point.time,
+  }));
 
-  const boxes = valid.map((candle, index) => {
-    const centerX = PLOT_LEFT + slotWidth * (index + 0.5);
-    const openY = yFor(Number(candle.open));
-    const closeY = yFor(Number(candle.close));
-    const bodyTop = Math.min(openY, closeY);
-    return {
-      centerX,
-      bodyX: centerX - bodyWidth / 2,
-      bodyWidth,
-      bodyTop,
-      bodyHeight: Math.max(Math.abs(openY - closeY), DOJI_HEIGHT),
-      openY,
-      closeY,
-      wickTop: yFor(Number(candle.high)),
-      wickBottom: yFor(Number(candle.low)),
-      rising: Number(candle.close) >= Number(candle.open),
-      openTime: candle.open_time,
-    };
-  });
+  const line = points
+    .map((point, index) => `${index === 0 ? "M" : "L"}${roundCoordinate(point.x)} ${roundCoordinate(point.y)}`)
+    .join(" ");
 
   const priceStep = priceSpan / (PRICE_TICK_COUNT - 1);
   const digits = tickDigits(priceStep);
@@ -133,13 +129,13 @@ export function buildCandleChart(candles: Candle[]): CandleChartGeometry {
     label: (priceHigh - priceStep * index).toFixed(digits),
   }));
 
-  const tickCount = Math.min(valid.length, TIME_TICK_LIMIT);
+  const tickCount = Math.min(points.length, TIME_TICK_LIMIT);
   const timeTicks =
     tickCount === 1
-      ? [{ x: boxes[0].centerX, label: formatCandleTime(boxes[0].openTime) }]
+      ? [{ x: points[0].x, label: formatChartTime(points[0].time) }]
       : Array.from({ length: tickCount }, (_, index) => {
-          const target = Math.round(((valid.length - 1) * index) / (tickCount - 1));
-          return { x: boxes[target].centerX, label: formatCandleTime(boxes[target].openTime) };
+          const target = Math.round(((points.length - 1) * index) / (tickCount - 1));
+          return { x: points[target].x, label: formatChartTime(points[target].time) };
         });
 
   return {
@@ -147,7 +143,8 @@ export function buildCandleChart(candles: Candle[]): CandleChartGeometry {
     plotRight: PLOT_RIGHT,
     plotTop: PLOT_TOP,
     plotBottom: PLOT_BOTTOM,
-    boxes,
+    points,
+    line,
     priceTicks,
     timeTicks,
   };

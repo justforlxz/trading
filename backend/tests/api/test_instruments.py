@@ -6,8 +6,8 @@ import re
 
 from fastapi.testclient import TestClient
 
-from tests.api.conftest import seed_instruments
-from tests.factories.instruments import make_ref
+from tests.api.conftest import seed_daily, seed_instruments
+from tests.factories.instruments import make_ref, make_swap_ref
 
 DECIMAL = re.compile(r"^-?\d{1,20}(\.\d{1,12})?$")
 UTC_ZULU = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
@@ -59,6 +59,48 @@ def test_search_rejects_blank_query(market_data: TestClient) -> None:
 
     assert response.status_code == 422
     assert response.json()["detail"]
+
+
+def test_detail_picks_the_other_form_not_the_other_quote(client: TestClient) -> None:
+    """同一产品两条现货加一条永续：任一现货的对手腿都是永续，不是另一条现货。"""
+
+    seed_instruments(
+        make_ref(),
+        make_ref(inst_id="XAAPL-USDC", base_ccy="XAAPL", quote_ccy="USDC"),
+        make_swap_ref(),
+    )
+    seed_daily("XAAPL-USDT", ["100", "110", "121"])
+    seed_daily("XAAPL-USDC", ["100", "110", "120"])
+    seed_daily("AAPL-USDT-SWAP", ["50", "55", "60.5"])
+
+    usdc_spot = client.get("/api/instruments/XAAPL-USDC").json()
+    assert [sibling["inst_id"] for sibling in usdc_spot["siblings"]] == ["AAPL-USDT-SWAP"]
+    assert usdc_spot["siblings"][0]["inst_type"] == "SWAP"
+
+    usdt_spot = client.get("/api/instruments/XAAPL-USDT").json()
+    assert [sibling["inst_id"] for sibling in usdt_spot["siblings"]] == ["AAPL-USDT-SWAP"]
+
+    swap = client.get("/api/instruments/AAPL-USDT-SWAP").json()
+    assert [sibling["inst_id"] for sibling in swap["siblings"]] == ["XAAPL-USDT"]
+
+
+def test_detail_from_the_swap_side_reports_the_spot_leg(market_data: TestClient) -> None:
+    """从永续一侧看详情，对手腿必须是现货——反过来写死的实现过不了这一条。"""
+
+    response = market_data.get("/api/instruments/AAPL-USDT-SWAP")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["instrument"]["inst_type"] == "SWAP"
+    assert body["siblings"] == [
+        {
+            "inst_id": "XAAPL-USDT",
+            "inst_type": "SPOT",
+            "last_price": "121",
+            # 60.5 / 121 - 1 = -50%
+            "price_spread_pct": "-50",
+        }
+    ]
 
 
 def test_detail_reports_metadata_and_sibling_quote(market_data: TestClient) -> None:

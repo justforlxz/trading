@@ -81,6 +81,16 @@ class InstrumentPair:
     spot: Instrument | None
     swap: Instrument | None
 
+    def counterpart(self, row: Instrument) -> Instrument | None:
+        """同一产品的另一种形态；`row` 本身是其中一种形态时返回另一侧，缺则 `None`。
+
+        一个产品在库里可能有多行现货（不同报价，例如 `XAAPL-USDT` 与 `XAAPL-USDC`），
+        因此配对按形态选、不按 `symbol` 选：现货行的对手腿永远是永续，永续行的对手
+        腿永远是现货。挑「另一条现货」会把两种形态说成同一个东西。
+        """
+
+        return self.swap if row.inst_type == SPOT else self.spot
+
 
 def build_instrument(ref: InstrumentRef) -> Instrument:
     """把上游标的快照翻译成落库模型（纯映射，不碰数据库）。"""

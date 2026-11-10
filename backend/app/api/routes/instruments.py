@@ -111,7 +111,7 @@ def _siblings(row: Instrument) -> list[SiblingQuote]:
     """同 product_key 的另一条腿；任一侧没有日线就不给价差。"""
 
     pair = get_instrument_pair(row.product_key)
-    other = pair.swap if row.inst_type == "SPOT" else pair.spot
+    other = pair.counterpart(row)
     if other is None:
         return []
 

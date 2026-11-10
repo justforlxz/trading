@@ -1,9 +1,13 @@
 """数据库层：同步 SQLAlchemy 引擎 + SQLite（WAL）。
 
-门面只发布建库入口 `init_db`；引擎、会话与声明基类是 db 的内部实现，
-跨包不得直连 `app.db.engine` / `app.db.base`（导入形态由架构测试强制）。
+门面发布三样东西：建库入口 `init_db`、声明基类 `Base`、工作单元 `session_scope`，
+以及 SQLite 缺失的列类型 `DecimalText` / `UtcDateTime`。引擎实例与 `Session`
+工厂仍是内部实现，跨包只能经本门面使用（导入形态由架构测试强制）。
 """
 
+from app.db.base import Base
+from app.db.engine import session_scope
 from app.db.init import init_db
+from app.db.types import DecimalText, UtcDateTime
 
-__all__ = ["init_db"]
+__all__ = ["Base", "DecimalText", "UtcDateTime", "init_db", "session_scope"]

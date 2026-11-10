@@ -50,7 +50,11 @@ def get_engine() -> Engine:
 
 @contextmanager
 def session_scope() -> Iterator[Session]:
-    """一次工作单元的会话：正常提交，异常回滚，最后关闭。"""
+    """一次工作单元的会话：正常提交，异常回滚，最后关闭。
 
-    with Session(get_engine()) as session, session.begin():
+    提交后不让实例过期：域服务会把查到的行作为只读对象交给上层，出作用域后
+    再读属性不应该触发 `DetachedInstanceError`。
+    """
+
+    with Session(get_engine(), expire_on_commit=False) as session, session.begin():
         yield session

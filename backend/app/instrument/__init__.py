@@ -1,4 +1,15 @@
-"""交易标的：合约元数据、价格精度与交易状态（后续节点实现）。"""
+"""交易标的：统一模型、上游分类映射与同步。
 
-# 空壳阶段没有对外符号；后续节点落地时在此发布（门面唯一出口）。
-__all__: list[str] = []
+门面即出口：跨包只允许 `from app.instrument import ...`。
+"""
+
+from app.instrument.model import Instrument, InstrumentPair
+from app.instrument.service import get_instrument_pair, list_instruments, sync_instruments
+
+__all__ = [
+    "Instrument",
+    "InstrumentPair",
+    "get_instrument_pair",
+    "list_instruments",
+    "sync_instruments",
+]

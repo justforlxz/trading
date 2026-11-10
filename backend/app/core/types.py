@@ -117,6 +117,10 @@ class InstrumentRef:
     instrument 域完成。三个精度字段（`tick_size`/`lot_size`/`min_size`）可能为
     None：尚未开盘的标的（`state` 为 `preopen`）上游并不下发，此时保留标的本身、
     把精度标为「未知」，而不是伪造数值或丢弃整条记录。
+
+    永续专属字段只在 `inst_type` 为 `SWAP` 时有值：`ct_val_ccy` 是合约标的币种
+    （现货侧对应 `base_ccy`），`settle_ccy` 是结算币种，其余是合约乘数与杠杆规则。
+    同一产品的现货与永续靠这些字段对齐，不靠拆 `instId` 字符串。
     """
 
     inst_id: str
@@ -129,6 +133,12 @@ class InstrumentRef:
     lot_size: Decimal | None = None
     min_size: Decimal | None = None
     list_time: datetime | None = None
+    ct_val_ccy: str = ""
+    settle_ccy: str = ""
+    ct_val: Decimal | None = None
+    ct_mult: Decimal | None = None
+    ct_type: str = ""
+    max_lever: Decimal | None = None
 
 
 @dataclass(frozen=True, slots=True)

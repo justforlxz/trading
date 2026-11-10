@@ -36,6 +36,12 @@ def _parse_instrument(row: Any) -> InstrumentRef:
             lot_size=_decimal_or_none(row.get("lotSz")),
             min_size=_decimal_or_none(row.get("minSz")),
             list_time=utc_from_millis(row["listTime"]) if row.get("listTime") else None,
+            ct_val_ccy=str(row.get("ctValCcy") or ""),
+            settle_ccy=str(row.get("settleCcy") or ""),
+            ct_val=_decimal_or_none(row.get("ctVal")),
+            ct_mult=_decimal_or_none(row.get("ctMult")),
+            ct_type=str(row.get("ctType") or ""),
+            max_lever=_decimal_or_none(row.get("lever")),
         )
     except KeyError as exc:
         raise ExchangeError(f"标的元数据缺少字段:{exc}") from exc

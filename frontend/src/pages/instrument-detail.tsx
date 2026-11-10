@@ -184,7 +184,7 @@ export default function InstrumentDetailPage() {
     <>
       <Link
         to="/watchlist"
-        className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+        className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
       >
         ← 返回自选
       </Link>
@@ -207,7 +207,7 @@ export default function InstrumentDetailPage() {
         </p>
       ) : null}
 
-      <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="关键指标">
+      <section className="mb-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="关键指标">
         {INDICATOR_CARDS.map((card) => {
           const series = indicators?.series.find((item) => item.name === card.name);
           const readings = readingsOf(series);

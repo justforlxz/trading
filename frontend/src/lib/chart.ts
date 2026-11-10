@@ -10,7 +10,14 @@ import type { components } from "../api/types";
 export type Candle = components["schemas"]["Candle"];
 
 export const CHART_WIDTH = 800;
-export const CHART_HEIGHT = 260;
+/**
+ * 画布高宽比约 1:5.7（宽 800、高 140）。
+ *
+ * 折线按 `w-full` 铺满卡片宽度、高度由 viewBox 同比放大，画布越「扁」渲染高度越小：
+ * 1280 像素宽视口下画布被放大到约 911×160 像素，1440 像素宽视口下约 1046×183 像素，
+ * 详情页的四张指标卡片与折线因此都能落在 900 像素高的首屏内。
+ */
+export const CHART_HEIGHT = 140;
 
 const PLOT_LEFT = 64;
 const PLOT_RIGHT = CHART_WIDTH - 16;

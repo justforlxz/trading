@@ -1,0 +1,41 @@
+{
+  "items": [
+    {
+      "emitted_actions": [
+        "BUY",
+        "SELL",
+        "HOLD"
+      ],
+      "name": "MA Cross",
+      "params": [
+        {
+          "default": 20,
+          "kind": "int",
+          "maximum": 200,
+          "minimum": 2,
+          "name": "fast",
+          "title": "快线周期"
+        },
+        {
+          "default": 60,
+          "kind": "int",
+          "maximum": 500,
+          "minimum": 3,
+          "name": "slow",
+          "title": "慢线周期"
+        }
+      ],
+      "required_bars": [
+        "1h",
+        "4h",
+        "1d"
+      ],
+      "required_indicators": [
+        "sma"
+      ],
+      "strategy_id": "ma_cross",
+      "summary": "快慢均线交叉产生多空信号。",
+      "version": "1.0.0"
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "backtest": {
+    "default_bar": "1h",
+    "default_initial_capital": "10000",
+    "funding_enabled": true
+  },
+  "costs": {
+    "maker_fee_bps": "2",
+    "slippage_bps": "3",
+    "spread_bps": "2",
+    "taker_fee_bps": "5"
+  },
+  "data": {
+    "proxy_configured": false,
+    "proxy_enabled": false
+  },
+  "exchange": {
+    "api_configured": false,
+    "demo_trading": true
+  },
+  "execution": {
+    "auto_trading_enabled": false,
+    "emergency_stop": false,
+    "mode": "paper"
+  },
+  "risk": {
+    "liquidation_buffer_pct": "10",
+    "max_daily_loss": "300",
+    "max_leverage": "3",
+    "max_order_notional": "1000",
+    "max_position_notional": "3000",
+    "max_positions": 5,
+    "max_total_notional": "10000",
+    "stop_loss_mandatory": true
+  },
+  "updated_at": "2026-11-10T06:10:00Z"
+}

@@ -1,0 +1,14 @@
+{
+  "combos": [
+    {
+      "params": {
+        "fast": 10,
+        "slow": 40
+      }
+    }
+  ],
+  "created_at": "2026-11-10T01:30:00Z",
+  "data_source": "okx",
+  "status": "succeeded",
+  "sweep_id": "sw_0001"
+}

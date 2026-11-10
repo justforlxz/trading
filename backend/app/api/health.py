@@ -3,7 +3,7 @@
 from typing import Literal
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app import __version__
 from app.config import get_settings
@@ -17,6 +17,10 @@ class HealthResponse(BaseModel):
     status: Literal["ok"]
     version: str
     env: str
+
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"status": "ok", "version": "0.2.0", "env": "dev"}]}
+    )
 
 
 @router.get("/health", response_model=HealthResponse)

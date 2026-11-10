@@ -1,0 +1,64 @@
+{
+  "account": {
+    "available": "8160.00",
+    "currency": "USDT",
+    "equity": "10240.55",
+    "mode": "paper",
+    "today_pnl": "-12.30",
+    "unrealized_pnl": "28.64"
+  },
+  "active_strategies": [
+    {
+      "instance_id": "si_0001",
+      "latest_signal_at": "2026-11-10T07:00:00Z",
+      "name": "AAPL 均线趋势",
+      "status": "enabled",
+      "strategy_id": "ma_cross"
+    }
+  ],
+  "exposure": {
+    "gross_exposure": "1997.15",
+    "margin_used_pct": "19.5",
+    "net_exposure": "1997.15"
+  },
+  "generated_at": "2026-11-10T08:00:00Z",
+  "positions": [
+    {
+      "avg_entry_price": "228.10",
+      "inst_id": "XAAPL-USDT",
+      "inst_type": "SPOT",
+      "leverage": "1",
+      "mark_price": "231.42",
+      "mode": "paper",
+      "notional": "1997.15",
+      "opened_at": "2026-11-09T14:00:00Z",
+      "product_key": "AAPL",
+      "qty": "8.63",
+      "side": "long",
+      "strategy_instance_id": "si_0001",
+      "unrealized_pnl": "28.64"
+    }
+  ],
+  "recent_signals": [
+    {
+      "action": "BUY",
+      "bar": "1h",
+      "generated_at": "2026-11-10T07:00:00Z",
+      "inst_id": "XAAPL-USDT",
+      "inst_type": "SPOT",
+      "price": "231.42",
+      "reason": "MA20 上穿 MA60",
+      "signal_id": "sig_0001",
+      "strategy_instance_id": "si_0001",
+      "target_weight": "0.25"
+    }
+  ],
+  "watchlist_highlights": [
+    {
+      "change_pct_24h": "1.86",
+      "inst_id": "XAAPL-USDT",
+      "last_price": "231.42",
+      "product_key": "AAPL"
+    }
+  ]
+}

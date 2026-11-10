@@ -1,0 +1,20 @@
+{
+  "items": [
+    {
+      "avg_entry_price": "228.10",
+      "inst_id": "XAAPL-USDT",
+      "inst_type": "SPOT",
+      "leverage": "1",
+      "mark_price": "231.42",
+      "mode": "paper",
+      "notional": "1997.15",
+      "opened_at": "2026-11-09T14:00:00Z",
+      "product_key": "AAPL",
+      "qty": "8.63",
+      "side": "long",
+      "strategy_instance_id": "si_0001",
+      "unrealized_pnl": "28.64"
+    }
+  ],
+  "mode": "paper"
+}

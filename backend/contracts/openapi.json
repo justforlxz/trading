@@ -1,0 +1,5454 @@
+{
+  "components": {
+    "schemas": {
+      "AccountSummary": {
+        "properties": {
+          "available": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Available",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "equity": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Equity",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "manual",
+              "paper",
+              "live"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "today_pnl": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Today Pnl",
+            "type": "string"
+          },
+          "unrealized_pnl": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Unrealized Pnl",
+            "type": "string"
+          }
+        },
+        "required": [
+          "equity",
+          "available",
+          "currency",
+          "unrealized_pnl",
+          "today_pnl",
+          "mode"
+        ],
+        "title": "AccountSummary",
+        "type": "object"
+      },
+      "BacktestCosts": {
+        "properties": {
+          "maker_fee_bps": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Maker Fee Bps",
+            "type": "string"
+          },
+          "slippage_bps": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Slippage Bps",
+            "type": "string"
+          },
+          "spread_bps": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Spread Bps",
+            "type": "string"
+          },
+          "taker_fee_bps": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Taker Fee Bps",
+            "type": "string"
+          }
+        },
+        "required": [
+          "maker_fee_bps",
+          "taker_fee_bps",
+          "slippage_bps",
+          "spread_bps"
+        ],
+        "title": "BacktestCosts",
+        "type": "object"
+      },
+      "BacktestDetailResponse": {
+        "examples": [
+          {
+            "equity_curve": [
+              {
+                "equity": "10000",
+                "time": "2026-08-01T00:00:00Z"
+              },
+              {
+                "equity": "11240.55",
+                "time": "2026-11-01T00:00:00Z"
+              }
+            ],
+            "request": {
+              "bar": "1h",
+              "costs": {
+                "maker_fee_bps": "2",
+                "slippage_bps": "3",
+                "spread_bps": "2",
+                "taker_fee_bps": "5"
+              },
+              "data_source": "okx",
+              "end_date": "2026-11-01",
+              "execution_model": "next_open",
+              "funding_enabled": true,
+              "initial_capital": "10000",
+              "max_position_pct": "0.25",
+              "position_size": "2000",
+              "quote_currency": "USDT",
+              "start_date": "2026-08-01",
+              "strategy_instance_id": "si_0001",
+              "targets": {
+                "inst_ids": [
+                  "XAAPL-USDT"
+                ],
+                "mode": "single"
+              }
+            },
+            "run": {
+              "bar": "1h",
+              "created_at": "2026-11-10T01:20:00Z",
+              "data_source": "okx",
+              "end_date": "2026-11-01",
+              "finished_at": "2026-11-10T01:21:30Z",
+              "is_proxy": false,
+              "metrics": {
+                "annualized_return_pct": "48.21",
+                "avg_holding_hours": "18.4",
+                "final_capital": "11240.55",
+                "funding_coverage_pct": "100",
+                "funding_missing_count": 0,
+                "funding_total": "-12.84",
+                "initial_capital": "10000",
+                "max_drawdown_pct": "-6.12",
+                "max_single_loss": "-158.20",
+                "max_single_win": "312.40",
+                "payoff_ratio": "1.72",
+                "profit_factor": "1.95",
+                "sharpe": "1.31",
+                "total_return_pct": "12.4055",
+                "trade_count": 37,
+                "win_rate": "0.54"
+              },
+              "run_id": "bt_0001",
+              "start_date": "2026-08-01",
+              "status": "succeeded",
+              "strategy_instance_id": "si_0001",
+              "symbol_count": 1
+            },
+            "trades": [
+              {
+                "entry_price": "228.10",
+                "entry_time": "2026-08-04T14:00:00Z",
+                "exit_price": "232.44",
+                "exit_time": "2026-08-05T06:00:00Z",
+                "fee": "1.98",
+                "funding": "0",
+                "inst_id": "XAAPL-USDT",
+                "inst_type": "SPOT",
+                "pnl": "35.24",
+                "qty": "8.63",
+                "reason": "MA20 下穿 MA60",
+                "side": "buy",
+                "trade_id": "tr_0001"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "equity_curve": {
+            "items": {
+              "$ref": "#/components/schemas/EquityPoint"
+            },
+            "title": "Equity Curve",
+            "type": "array"
+          },
+          "request": {
+            "$ref": "#/components/schemas/BacktestRequest"
+          },
+          "run": {
+            "$ref": "#/components/schemas/BacktestRunSummary"
+          },
+          "trades": {
+            "items": {
+              "$ref": "#/components/schemas/BacktestTrade"
+            },
+            "title": "Trades",
+            "type": "array"
+          }
+        },
+        "required": [
+          "run",
+          "request",
+          "trades",
+          "equity_curve"
+        ],
+        "title": "BacktestDetailResponse",
+        "type": "object"
+      },
+      "BacktestMetrics": {
+        "properties": {
+          "annualized_return_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annualized Return Pct"
+          },
+          "avg_holding_hours": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Avg Holding Hours",
+            "type": "string"
+          },
+          "final_capital": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Final Capital",
+            "type": "string"
+          },
+          "funding_coverage_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Funding Coverage Pct"
+          },
+          "funding_missing_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Funding Missing Count"
+          },
+          "funding_total": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Funding Total"
+          },
+          "initial_capital": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Initial Capital",
+            "type": "string"
+          },
+          "max_drawdown_pct": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Max Drawdown Pct",
+            "type": "string"
+          },
+          "max_single_loss": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Max Single Loss",
+            "type": "string"
+          },
+          "max_single_win": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Max Single Win",
+            "type": "string"
+          },
+          "payoff_ratio": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Payoff Ratio",
+            "type": "string"
+          },
+          "profit_factor": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Profit Factor",
+            "type": "string"
+          },
+          "sharpe": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Sharpe",
+            "type": "string"
+          },
+          "total_return_pct": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Total Return Pct",
+            "type": "string"
+          },
+          "trade_count": {
+            "title": "Trade Count",
+            "type": "integer"
+          },
+          "win_rate": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Win Rate",
+            "type": "string"
+          }
+        },
+        "required": [
+          "initial_capital",
+          "final_capital",
+          "total_return_pct",
+          "max_drawdown_pct",
+          "win_rate",
+          "payoff_ratio",
+          "profit_factor",
+          "sharpe",
+          "trade_count",
+          "avg_holding_hours",
+          "max_single_win",
+          "max_single_loss"
+        ],
+        "title": "BacktestMetrics",
+        "type": "object"
+      },
+      "BacktestRankingResponse": {
+        "examples": [
+          {
+            "data_source": "okx",
+            "items": [
+              {
+                "inst_id": "XAAPL-USDT",
+                "inst_type": "SPOT",
+                "max_drawdown_pct": "-6.12",
+                "profit_factor": "1.95",
+                "sharpe": "1.31",
+                "total_return_pct": "12.4055",
+                "trade_count": 37
+              }
+            ],
+            "metric": "total_return_pct"
+          }
+        ],
+        "properties": {
+          "data_source": {
+            "enum": [
+              "okx",
+              "us_equity_proxy"
+            ],
+            "title": "Data Source",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BacktestRankingRow"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "metric": {
+            "enum": [
+              "total_return_pct",
+              "max_drawdown_pct",
+              "sharpe",
+              "profit_factor"
+            ],
+            "title": "Metric",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data_source",
+          "metric",
+          "items"
+        ],
+        "title": "BacktestRankingResponse",
+        "type": "object"
+      },
+      "BacktestRankingRow": {
+        "properties": {
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "inst_type": {
+            "enum": [
+              "SPOT",
+              "SWAP"
+            ],
+            "title": "Inst Type",
+            "type": "string"
+          },
+          "max_drawdown_pct": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Max Drawdown Pct",
+            "type": "string"
+          },
+          "profit_factor": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Profit Factor",
+            "type": "string"
+          },
+          "sharpe": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Sharpe",
+            "type": "string"
+          },
+          "total_return_pct": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Total Return Pct",
+            "type": "string"
+          },
+          "trade_count": {
+            "title": "Trade Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "inst_id",
+          "inst_type",
+          "total_return_pct",
+          "max_drawdown_pct",
+          "sharpe",
+          "profit_factor",
+          "trade_count"
+        ],
+        "title": "BacktestRankingRow",
+        "type": "object"
+      },
+      "BacktestRequest": {
+        "description": "一次回测的全部可复现输入。结果必须能按这份配置重放。",
+        "properties": {
+          "bar": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Bar",
+            "type": "string"
+          },
+          "costs": {
+            "$ref": "#/components/schemas/BacktestCosts"
+          },
+          "data_source": {
+            "enum": [
+              "okx",
+              "us_equity_proxy"
+            ],
+            "title": "Data Source",
+            "type": "string"
+          },
+          "end_date": {
+            "format": "date",
+            "title": "End Date",
+            "type": "string"
+          },
+          "execution_model": {
+            "enum": [
+              "next_open",
+              "next_close"
+            ],
+            "title": "Execution Model",
+            "type": "string"
+          },
+          "funding_enabled": {
+            "default": true,
+            "title": "Funding Enabled",
+            "type": "boolean"
+          },
+          "initial_capital": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Initial Capital",
+            "type": "string"
+          },
+          "max_position_pct": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Max Position Pct",
+            "type": "string"
+          },
+          "position_size": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Position Size",
+            "type": "string"
+          },
+          "quote_currency": {
+            "title": "Quote Currency",
+            "type": "string"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          },
+          "strategy_instance_id": {
+            "title": "Strategy Instance Id",
+            "type": "string"
+          },
+          "targets": {
+            "$ref": "#/components/schemas/BacktestTargets"
+          }
+        },
+        "required": [
+          "strategy_instance_id",
+          "targets",
+          "bar",
+          "start_date",
+          "end_date",
+          "initial_capital",
+          "quote_currency",
+          "position_size",
+          "max_position_pct",
+          "costs",
+          "execution_model",
+          "data_source"
+        ],
+        "title": "BacktestRequest",
+        "type": "object"
+      },
+      "BacktestRunListResponse": {
+        "examples": [
+          {
+            "data_source": "okx",
+            "items": [
+              {
+                "bar": "1h",
+                "created_at": "2026-11-10T01:20:00Z",
+                "data_source": "okx",
+                "end_date": "2026-11-01",
+                "finished_at": "2026-11-10T01:21:30Z",
+                "is_proxy": false,
+                "metrics": {
+                  "annualized_return_pct": "48.21",
+                  "avg_holding_hours": "18.4",
+                  "final_capital": "11240.55",
+                  "funding_coverage_pct": "100",
+                  "funding_missing_count": 0,
+                  "funding_total": "-12.84",
+                  "initial_capital": "10000",
+                  "max_drawdown_pct": "-6.12",
+                  "max_single_loss": "-158.20",
+                  "max_single_win": "312.40",
+                  "payoff_ratio": "1.72",
+                  "profit_factor": "1.95",
+                  "sharpe": "1.31",
+                  "total_return_pct": "12.4055",
+                  "trade_count": 37,
+                  "win_rate": "0.54"
+                },
+                "run_id": "bt_0001",
+                "start_date": "2026-08-01",
+                "status": "succeeded",
+                "strategy_instance_id": "si_0001",
+                "symbol_count": 1
+              }
+            ],
+            "total": 1
+          }
+        ],
+        "properties": {
+          "data_source": {
+            "enum": [
+              "okx",
+              "us_equity_proxy"
+            ],
+            "title": "Data Source",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BacktestRunSummary"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "data_source",
+          "items",
+          "total"
+        ],
+        "title": "BacktestRunListResponse",
+        "type": "object"
+      },
+      "BacktestRunSummary": {
+        "examples": [
+          {
+            "bar": "1h",
+            "created_at": "2026-11-10T01:20:00Z",
+            "data_source": "okx",
+            "end_date": "2026-11-01",
+            "finished_at": "2026-11-10T01:21:30Z",
+            "is_proxy": false,
+            "metrics": {
+              "annualized_return_pct": "48.21",
+              "avg_holding_hours": "18.4",
+              "final_capital": "11240.55",
+              "funding_coverage_pct": "100",
+              "funding_missing_count": 0,
+              "funding_total": "-12.84",
+              "initial_capital": "10000",
+              "max_drawdown_pct": "-6.12",
+              "max_single_loss": "-158.20",
+              "max_single_win": "312.40",
+              "payoff_ratio": "1.72",
+              "profit_factor": "1.95",
+              "sharpe": "1.31",
+              "total_return_pct": "12.4055",
+              "trade_count": 37,
+              "win_rate": "0.54"
+            },
+            "run_id": "bt_0001",
+            "start_date": "2026-08-01",
+            "status": "succeeded",
+            "strategy_instance_id": "si_0001",
+            "symbol_count": 1
+          }
+        ],
+        "properties": {
+          "bar": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Bar",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "data_source": {
+            "enum": [
+              "okx",
+              "us_equity_proxy"
+            ],
+            "title": "Data Source",
+            "type": "string"
+          },
+          "end_date": {
+            "format": "date",
+            "title": "End Date",
+            "type": "string"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "is_proxy": {
+            "title": "Is Proxy",
+            "type": "boolean"
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BacktestMetrics"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "strategy_instance_id": {
+            "title": "Strategy Instance Id",
+            "type": "string"
+          },
+          "symbol_count": {
+            "title": "Symbol Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "run_id",
+          "status",
+          "strategy_instance_id",
+          "data_source",
+          "is_proxy",
+          "bar",
+          "start_date",
+          "end_date",
+          "symbol_count",
+          "created_at"
+        ],
+        "title": "BacktestRunSummary",
+        "type": "object"
+      },
+      "BacktestSettings": {
+        "properties": {
+          "default_bar": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Default Bar",
+            "type": "string"
+          },
+          "default_initial_capital": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Default Initial Capital",
+            "type": "string"
+          },
+          "funding_enabled": {
+            "title": "Funding Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "funding_enabled",
+          "default_initial_capital",
+          "default_bar"
+        ],
+        "title": "BacktestSettings",
+        "type": "object"
+      },
+      "BacktestSweepCombo": {
+        "properties": {
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BacktestMetrics"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "params": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "title": "Params",
+            "type": "object"
+          }
+        },
+        "required": [
+          "params"
+        ],
+        "title": "BacktestSweepCombo",
+        "type": "object"
+      },
+      "BacktestSweepRequest": {
+        "description": "参数组合扫描：网格 + 训练/验证/样本外切分，防止把最优历史参数当结论。",
+        "properties": {
+          "param_grid": {
+            "additionalProperties": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "boolean"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Param Grid",
+            "type": "object"
+          },
+          "request": {
+            "$ref": "#/components/schemas/BacktestRequest"
+          },
+          "splits": {
+            "items": {
+              "$ref": "#/components/schemas/TimeSplit"
+            },
+            "title": "Splits",
+            "type": "array"
+          }
+        },
+        "required": [
+          "request",
+          "param_grid",
+          "splits"
+        ],
+        "title": "BacktestSweepRequest",
+        "type": "object"
+      },
+      "BacktestSweepResponse": {
+        "examples": [
+          {
+            "combos": [
+              {
+                "params": {
+                  "fast": 10,
+                  "slow": 40
+                }
+              }
+            ],
+            "created_at": "2026-11-10T01:30:00Z",
+            "data_source": "okx",
+            "status": "succeeded",
+            "sweep_id": "sw_0001"
+          }
+        ],
+        "properties": {
+          "combos": {
+            "items": {
+              "$ref": "#/components/schemas/BacktestSweepCombo"
+            },
+            "title": "Combos",
+            "type": "array"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "data_source": {
+            "enum": [
+              "okx",
+              "us_equity_proxy"
+            ],
+            "title": "Data Source",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "sweep_id": {
+            "title": "Sweep Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sweep_id",
+          "status",
+          "data_source",
+          "created_at",
+          "combos"
+        ],
+        "title": "BacktestSweepResponse",
+        "type": "object"
+      },
+      "BacktestTargets": {
+        "description": "标的范围：单标的 / 手选多个 / 自选分组 / Watchlist 全部 / 全市场。",
+        "properties": {
+          "group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group"
+          },
+          "inst_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Inst Ids",
+            "type": "array"
+          },
+          "mode": {
+            "enum": [
+              "single",
+              "list",
+              "watchlist",
+              "group",
+              "all"
+            ],
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "BacktestTargets",
+        "type": "object"
+      },
+      "BacktestTrade": {
+        "properties": {
+          "entry_price": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Entry Price",
+            "type": "string"
+          },
+          "entry_time": {
+            "title": "Entry Time",
+            "type": "string"
+          },
+          "exit_price": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Exit Price",
+            "type": "string"
+          },
+          "exit_time": {
+            "title": "Exit Time",
+            "type": "string"
+          },
+          "fee": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Fee",
+            "type": "string"
+          },
+          "funding": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Funding",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "inst_type": {
+            "enum": [
+              "SPOT",
+              "SWAP"
+            ],
+            "title": "Inst Type",
+            "type": "string"
+          },
+          "pnl": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Pnl",
+            "type": "string"
+          },
+          "qty": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Qty",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "side": {
+            "enum": [
+              "buy",
+              "sell"
+            ],
+            "title": "Side",
+            "type": "string"
+          },
+          "trade_id": {
+            "title": "Trade Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trade_id",
+          "inst_id",
+          "inst_type",
+          "side",
+          "qty",
+          "entry_time",
+          "entry_price",
+          "exit_time",
+          "exit_price",
+          "fee",
+          "funding",
+          "pnl",
+          "reason"
+        ],
+        "title": "BacktestTrade",
+        "type": "object"
+      },
+      "Candle": {
+        "description": "一根 K 线。`is_closed=false` 表示未完成，`data_source` 区分真实/代理。",
+        "properties": {
+          "close": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Close",
+            "type": "string"
+          },
+          "data_source": {
+            "enum": [
+              "okx",
+              "us_equity_proxy"
+            ],
+            "title": "Data Source",
+            "type": "string"
+          },
+          "high": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "High",
+            "type": "string"
+          },
+          "is_closed": {
+            "title": "Is Closed",
+            "type": "boolean"
+          },
+          "low": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Low",
+            "type": "string"
+          },
+          "open": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Open",
+            "type": "string"
+          },
+          "open_time": {
+            "title": "Open Time",
+            "type": "string"
+          },
+          "volume": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Volume",
+            "type": "string"
+          }
+        },
+        "required": [
+          "open_time",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "is_closed",
+          "data_source"
+        ],
+        "title": "Candle",
+        "type": "object"
+      },
+      "CandleSeriesResponse": {
+        "description": "K 线窗口。数据不足时 `available_from` 如实反映真实起点，禁止补造。",
+        "examples": [
+          {
+            "available_from": "2026-11-10T05:00:00Z",
+            "available_to": "2026-11-10T07:00:00Z",
+            "bar": "1h",
+            "candles": [
+              {
+                "close": "231.42",
+                "data_source": "okx",
+                "high": "232.10",
+                "is_closed": true,
+                "low": "229.44",
+                "open": "229.80",
+                "open_time": "2026-11-10T07:00:00Z",
+                "volume": "1520.335"
+              }
+            ],
+            "data_source": "okx",
+            "has_gap": false,
+            "inst_id": "XAAPL-USDT"
+          }
+        ],
+        "properties": {
+          "available_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available From"
+          },
+          "available_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available To"
+          },
+          "bar": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Bar",
+            "type": "string"
+          },
+          "candles": {
+            "items": {
+              "$ref": "#/components/schemas/Candle"
+            },
+            "title": "Candles",
+            "type": "array"
+          },
+          "data_source": {
+            "enum": [
+              "okx",
+              "us_equity_proxy"
+            ],
+            "title": "Data Source",
+            "type": "string"
+          },
+          "has_gap": {
+            "default": false,
+            "title": "Has Gap",
+            "type": "boolean"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "inst_id",
+          "bar",
+          "data_source",
+          "candles"
+        ],
+        "title": "CandleSeriesResponse",
+        "type": "object"
+      },
+      "CostSettings": {
+        "properties": {
+          "maker_fee_bps": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Maker Fee Bps",
+            "type": "string"
+          },
+          "slippage_bps": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Slippage Bps",
+            "type": "string"
+          },
+          "spread_bps": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Spread Bps",
+            "type": "string"
+          },
+          "taker_fee_bps": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Taker Fee Bps",
+            "type": "string"
+          }
+        },
+        "required": [
+          "maker_fee_bps",
+          "taker_fee_bps",
+          "slippage_bps",
+          "spread_bps"
+        ],
+        "title": "CostSettings",
+        "type": "object"
+      },
+      "DataSettings": {
+        "properties": {
+          "proxy_configured": {
+            "title": "Proxy Configured",
+            "type": "boolean"
+          },
+          "proxy_enabled": {
+            "title": "Proxy Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "proxy_enabled",
+          "proxy_configured"
+        ],
+        "title": "DataSettings",
+        "type": "object"
+      },
+      "EquityPoint": {
+        "properties": {
+          "equity": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Equity",
+            "type": "string"
+          },
+          "time": {
+            "title": "Time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "time",
+          "equity"
+        ],
+        "title": "EquityPoint",
+        "type": "object"
+      },
+      "ExchangeSettings": {
+        "properties": {
+          "api_configured": {
+            "title": "Api Configured",
+            "type": "boolean"
+          },
+          "demo_trading": {
+            "title": "Demo Trading",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "demo_trading",
+          "api_configured"
+        ],
+        "title": "ExchangeSettings",
+        "type": "object"
+      },
+      "ExecutionModeRequest": {
+        "properties": {
+          "acknowledge_risk": {
+            "default": false,
+            "title": "Acknowledge Risk",
+            "type": "boolean"
+          },
+          "mode": {
+            "enum": [
+              "manual",
+              "paper",
+              "live"
+            ],
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "ExecutionModeRequest",
+        "type": "object"
+      },
+      "ExecutionSettings": {
+        "properties": {
+          "auto_trading_enabled": {
+            "title": "Auto Trading Enabled",
+            "type": "boolean"
+          },
+          "emergency_stop": {
+            "title": "Emergency Stop",
+            "type": "boolean"
+          },
+          "mode": {
+            "enum": [
+              "manual",
+              "paper",
+              "live"
+            ],
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "auto_trading_enabled",
+          "emergency_stop"
+        ],
+        "title": "ExecutionSettings",
+        "type": "object"
+      },
+      "ExecutionStateResponse": {
+        "examples": [
+          {
+            "auto_trading_enabled": false,
+            "emergency_stop": false,
+            "mode": "paper"
+          }
+        ],
+        "properties": {
+          "auto_trading_enabled": {
+            "title": "Auto Trading Enabled",
+            "type": "boolean"
+          },
+          "emergency_stop": {
+            "title": "Emergency Stop",
+            "type": "boolean"
+          },
+          "live_acknowledged_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Live Acknowledged At"
+          },
+          "mode": {
+            "enum": [
+              "manual",
+              "paper",
+              "live"
+            ],
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "auto_trading_enabled",
+          "emergency_stop"
+        ],
+        "title": "ExecutionStateResponse",
+        "type": "object"
+      },
+      "ExposureSummary": {
+        "properties": {
+          "gross_exposure": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Gross Exposure",
+            "type": "string"
+          },
+          "margin_used_pct": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Margin Used Pct",
+            "type": "string"
+          },
+          "net_exposure": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Net Exposure",
+            "type": "string"
+          }
+        },
+        "required": [
+          "gross_exposure",
+          "net_exposure",
+          "margin_used_pct"
+        ],
+        "title": "ExposureSummary",
+        "type": "object"
+      },
+      "Fill": {
+        "properties": {
+          "fee": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Fee",
+            "type": "string"
+          },
+          "fee_currency": {
+            "title": "Fee Currency",
+            "type": "string"
+          },
+          "fill_id": {
+            "title": "Fill Id",
+            "type": "string"
+          },
+          "filled_at": {
+            "title": "Filled At",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "order_id": {
+            "title": "Order Id",
+            "type": "string"
+          },
+          "price": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Price",
+            "type": "string"
+          },
+          "qty": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Qty",
+            "type": "string"
+          },
+          "side": {
+            "enum": [
+              "buy",
+              "sell"
+            ],
+            "title": "Side",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fill_id",
+          "order_id",
+          "inst_id",
+          "side",
+          "price",
+          "qty",
+          "fee",
+          "fee_currency",
+          "filled_at"
+        ],
+        "title": "Fill",
+        "type": "object"
+      },
+      "FillListResponse": {
+        "examples": [
+          {
+            "items": [
+              {
+                "fee": "0.98",
+                "fee_currency": "USDT",
+                "fill_id": "fill_0001",
+                "filled_at": "2026-11-09T14:00:02Z",
+                "inst_id": "XAAPL-USDT",
+                "order_id": "ord_0001",
+                "price": "228.10",
+                "qty": "8.63",
+                "side": "buy"
+              }
+            ],
+            "total": 1
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Fill"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "FillListResponse",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HealthResponse": {
+        "description": "稳定的探针响应结构，前端与运维脚本按字段读取。",
+        "examples": [
+          {
+            "env": "dev",
+            "status": "ok",
+            "version": "0.2.0"
+          }
+        ],
+        "properties": {
+          "env": {
+            "title": "Env",
+            "type": "string"
+          },
+          "status": {
+            "const": "ok",
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "version",
+          "env"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      },
+      "IndicatorCatalogResponse": {
+        "examples": [
+          {
+            "items": [
+              {
+                "min_bars": 15,
+                "name": "rsi",
+                "outputs": [
+                  "rsi"
+                ],
+                "params": [
+                  {
+                    "default": 14,
+                    "kind": "int",
+                    "maximum": 200,
+                    "minimum": 2,
+                    "name": "period",
+                    "title": "周期"
+                  }
+                ],
+                "summary": "相对强弱指标: 衡量近期涨跌幅度之比。",
+                "title": "RSI"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/IndicatorDefinition"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "IndicatorCatalogResponse",
+        "type": "object"
+      },
+      "IndicatorDefinition": {
+        "description": "单个指标的元数据：参数、输出字段、最小数据长度。",
+        "properties": {
+          "min_bars": {
+            "title": "Min Bars",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "outputs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Outputs",
+            "type": "array"
+          },
+          "params": {
+            "items": {
+              "$ref": "#/components/schemas/ParamSpec"
+            },
+            "title": "Params",
+            "type": "array"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "title",
+          "summary",
+          "params",
+          "outputs",
+          "min_bars"
+        ],
+        "title": "IndicatorDefinition",
+        "type": "object"
+      },
+      "IndicatorPoint": {
+        "properties": {
+          "time": {
+            "title": "Time",
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Values",
+            "type": "object"
+          }
+        },
+        "required": [
+          "time",
+          "values"
+        ],
+        "title": "IndicatorPoint",
+        "type": "object"
+      },
+      "IndicatorSeries": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "title": "Params",
+            "type": "object"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/IndicatorPoint"
+            },
+            "title": "Points",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "params",
+          "points"
+        ],
+        "title": "IndicatorSeries",
+        "type": "object"
+      },
+      "IndicatorSeriesResponse": {
+        "examples": [
+          {
+            "bar": "1h",
+            "inst_id": "XAAPL-USDT",
+            "inst_type": "SPOT",
+            "series": [
+              {
+                "name": "rsi",
+                "params": {
+                  "period": 14
+                },
+                "points": [
+                  {
+                    "time": "2026-11-10T07:00:00Z",
+                    "values": {
+                      "rsi": "58.21"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "bar": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Bar",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "inst_type": {
+            "enum": [
+              "SPOT",
+              "SWAP"
+            ],
+            "title": "Inst Type",
+            "type": "string"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/IndicatorSeries"
+            },
+            "title": "Series",
+            "type": "array"
+          }
+        },
+        "required": [
+          "inst_id",
+          "inst_type",
+          "bar",
+          "series"
+        ],
+        "title": "IndicatorSeriesResponse",
+        "type": "object"
+      },
+      "InstrumentDetailResponse": {
+        "examples": [
+          {
+            "instrument": {
+              "asset_type": "tokenized_equity",
+              "base_currency": "XAAPL",
+              "inst_id": "XAAPL-USDT",
+              "inst_type": "SPOT",
+              "listing_time": "2026-07-01T00:00:00Z",
+              "lot_size": "0.001",
+              "min_order_size": "0.001",
+              "product_key": "AAPL",
+              "quote_currency": "USDT",
+              "tick_size": "0.01",
+              "trading_status": "live"
+            },
+            "latest_signal": {
+              "action": "BUY",
+              "bar": "1h",
+              "generated_at": "2026-11-10T07:00:00Z",
+              "inst_id": "XAAPL-USDT",
+              "inst_type": "SPOT",
+              "price": "231.42",
+              "reason": "MA20 上穿 MA60",
+              "signal_id": "sig_0001",
+              "strategy_instance_id": "si_0001",
+              "target_weight": "0.25"
+            },
+            "siblings": [
+              {
+                "inst_id": "AAPL-USDT-SWAP",
+                "inst_type": "SWAP",
+                "last_price": "231.55",
+                "price_spread_pct": "0.06"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "instrument": {
+            "$ref": "#/components/schemas/InstrumentInfo"
+          },
+          "latest_signal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Signal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "siblings": {
+            "items": {
+              "$ref": "#/components/schemas/SiblingQuote"
+            },
+            "title": "Siblings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "instrument",
+          "siblings"
+        ],
+        "title": "InstrumentDetailResponse",
+        "type": "object"
+      },
+      "InstrumentInfo": {
+        "description": "标的静态元数据。SWAP 专属字段对 SPOT 为 null。",
+        "properties": {
+          "asset_type": {
+            "enum": [
+              "tokenized_equity",
+              "crypto"
+            ],
+            "title": "Asset Type",
+            "type": "string"
+          },
+          "base_currency": {
+            "title": "Base Currency",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "inst_type": {
+            "enum": [
+              "SPOT",
+              "SWAP"
+            ],
+            "title": "Inst Type",
+            "type": "string"
+          },
+          "listing_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Listing Time"
+          },
+          "lot_size": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Size"
+          },
+          "max_leverage": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Leverage"
+          },
+          "min_order_size": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Order Size"
+          },
+          "product_key": {
+            "title": "Product Key",
+            "type": "string"
+          },
+          "quote_currency": {
+            "title": "Quote Currency",
+            "type": "string"
+          },
+          "tick_size": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tick Size"
+          },
+          "trading_status": {
+            "default": "unknown",
+            "enum": [
+              "live",
+              "preopen",
+              "suspended",
+              "unknown"
+            ],
+            "title": "Trading Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "inst_id",
+          "inst_type",
+          "product_key",
+          "asset_type",
+          "base_currency",
+          "quote_currency"
+        ],
+        "title": "InstrumentInfo",
+        "type": "object"
+      },
+      "InstrumentRef": {
+        "description": "标的的最小可引用形状（列表、搜索结果用）。",
+        "properties": {
+          "asset_type": {
+            "enum": [
+              "tokenized_equity",
+              "crypto"
+            ],
+            "title": "Asset Type",
+            "type": "string"
+          },
+          "base_currency": {
+            "title": "Base Currency",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "inst_type": {
+            "enum": [
+              "SPOT",
+              "SWAP"
+            ],
+            "title": "Inst Type",
+            "type": "string"
+          },
+          "product_key": {
+            "title": "Product Key",
+            "type": "string"
+          },
+          "quote_currency": {
+            "title": "Quote Currency",
+            "type": "string"
+          }
+        },
+        "required": [
+          "inst_id",
+          "inst_type",
+          "product_key",
+          "asset_type",
+          "base_currency",
+          "quote_currency"
+        ],
+        "title": "InstrumentRef",
+        "type": "object"
+      },
+      "InstrumentSearchResponse": {
+        "examples": [
+          {
+            "items": [
+              {
+                "asset_type": "tokenized_equity",
+                "base_currency": "XAAPL",
+                "inst_id": "XAAPL-USDT",
+                "inst_type": "SPOT",
+                "product_key": "AAPL",
+                "quote_currency": "USDT"
+              },
+              {
+                "asset_type": "tokenized_equity",
+                "base_currency": "AAPL",
+                "inst_id": "AAPL-USDT-SWAP",
+                "inst_type": "SWAP",
+                "product_key": "AAPL",
+                "quote_currency": "USDT"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InstrumentRef"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "InstrumentSearchResponse",
+        "type": "object"
+      },
+      "JournalEntry": {
+        "properties": {
+          "category": {
+            "enum": [
+              "signal",
+              "order",
+              "fill",
+              "mode_change",
+              "risk_block",
+              "settings"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "entry_id": {
+            "title": "Entry Id",
+            "type": "string"
+          },
+          "inst_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inst Id"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entry_id",
+          "category",
+          "message",
+          "created_at"
+        ],
+        "title": "JournalEntry",
+        "type": "object"
+      },
+      "JournalListResponse": {
+        "examples": [
+          {
+            "items": [
+              {
+                "category": "mode_change",
+                "created_at": "2026-11-10T06:10:00Z",
+                "entry_id": "jrn_0001",
+                "message": "执行模式 paper -> live, 已二次确认风险"
+              }
+            ],
+            "total": 1
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/JournalEntry"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "JournalListResponse",
+        "type": "object"
+      },
+      "Order": {
+        "examples": [
+          {
+            "avg_fill_price": "228.10",
+            "client_order_id": "cli_9f2a",
+            "created_at": "2026-11-09T13:59:40Z",
+            "filled_qty": "8.63",
+            "inst_id": "XAAPL-USDT",
+            "inst_type": "SPOT",
+            "mode": "paper",
+            "order_id": "ord_0001",
+            "order_type": "limit",
+            "price": "228.10",
+            "qty": "8.63",
+            "reduce_only": false,
+            "side": "buy",
+            "status": "filled",
+            "strategy_instance_id": "si_0001",
+            "updated_at": "2026-11-09T14:00:02Z"
+          }
+        ],
+        "properties": {
+          "avg_fill_price": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Fill Price"
+          },
+          "client_order_id": {
+            "title": "Client Order Id",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "filled_qty": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Filled Qty",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "inst_type": {
+            "enum": [
+              "SPOT",
+              "SWAP"
+            ],
+            "title": "Inst Type",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "manual",
+              "paper",
+              "live"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "order_id": {
+            "title": "Order Id",
+            "type": "string"
+          },
+          "order_type": {
+            "enum": [
+              "market",
+              "limit"
+            ],
+            "title": "Order Type",
+            "type": "string"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "qty": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Qty",
+            "type": "string"
+          },
+          "reduce_only": {
+            "title": "Reduce Only",
+            "type": "boolean"
+          },
+          "side": {
+            "enum": [
+              "buy",
+              "sell"
+            ],
+            "title": "Side",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "open",
+              "partially_filled",
+              "filled",
+              "cancelled",
+              "rejected"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "strategy_instance_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategy Instance Id"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "order_id",
+          "client_order_id",
+          "inst_id",
+          "inst_type",
+          "side",
+          "order_type",
+          "qty",
+          "filled_qty",
+          "status",
+          "reduce_only",
+          "mode",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Order",
+        "type": "object"
+      },
+      "OrderCreateRequest": {
+        "description": "手动确认下单。`client_order_id` 留空时由服务端生成，用于幂等。",
+        "properties": {
+          "acknowledge_risk": {
+            "default": false,
+            "title": "Acknowledge Risk",
+            "type": "boolean"
+          },
+          "client_order_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Order Id"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "order_type": {
+            "enum": [
+              "market",
+              "limit"
+            ],
+            "title": "Order Type",
+            "type": "string"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "qty": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Qty",
+            "type": "string"
+          },
+          "reduce_only": {
+            "default": false,
+            "title": "Reduce Only",
+            "type": "boolean"
+          },
+          "side": {
+            "enum": [
+              "buy",
+              "sell"
+            ],
+            "title": "Side",
+            "type": "string"
+          }
+        },
+        "required": [
+          "inst_id",
+          "side",
+          "order_type",
+          "qty"
+        ],
+        "title": "OrderCreateRequest",
+        "type": "object"
+      },
+      "OrderListResponse": {
+        "examples": [
+          {
+            "items": [
+              {
+                "avg_fill_price": "228.10",
+                "client_order_id": "cli_9f2a",
+                "created_at": "2026-11-09T13:59:40Z",
+                "filled_qty": "8.63",
+                "inst_id": "XAAPL-USDT",
+                "inst_type": "SPOT",
+                "mode": "paper",
+                "order_id": "ord_0001",
+                "order_type": "limit",
+                "price": "228.10",
+                "qty": "8.63",
+                "reduce_only": false,
+                "side": "buy",
+                "status": "filled",
+                "strategy_instance_id": "si_0001",
+                "updated_at": "2026-11-09T14:00:02Z"
+              }
+            ],
+            "total": 1
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Order"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "OrderListResponse",
+        "type": "object"
+      },
+      "OverviewResponse": {
+        "examples": [
+          {
+            "account": {
+              "available": "8160.00",
+              "currency": "USDT",
+              "equity": "10240.55",
+              "mode": "paper",
+              "today_pnl": "-12.30",
+              "unrealized_pnl": "28.64"
+            },
+            "active_strategies": [
+              {
+                "instance_id": "si_0001",
+                "latest_signal_at": "2026-11-10T07:00:00Z",
+                "name": "AAPL 均线趋势",
+                "status": "enabled",
+                "strategy_id": "ma_cross"
+              }
+            ],
+            "exposure": {
+              "gross_exposure": "1997.15",
+              "margin_used_pct": "19.5",
+              "net_exposure": "1997.15"
+            },
+            "generated_at": "2026-11-10T08:00:00Z",
+            "positions": [
+              {
+                "avg_entry_price": "228.10",
+                "inst_id": "XAAPL-USDT",
+                "inst_type": "SPOT",
+                "leverage": "1",
+                "mark_price": "231.42",
+                "mode": "paper",
+                "notional": "1997.15",
+                "opened_at": "2026-11-09T14:00:00Z",
+                "product_key": "AAPL",
+                "qty": "8.63",
+                "side": "long",
+                "strategy_instance_id": "si_0001",
+                "unrealized_pnl": "28.64"
+              }
+            ],
+            "recent_signals": [
+              {
+                "action": "BUY",
+                "bar": "1h",
+                "generated_at": "2026-11-10T07:00:00Z",
+                "inst_id": "XAAPL-USDT",
+                "inst_type": "SPOT",
+                "price": "231.42",
+                "reason": "MA20 上穿 MA60",
+                "signal_id": "sig_0001",
+                "strategy_instance_id": "si_0001",
+                "target_weight": "0.25"
+              }
+            ],
+            "watchlist_highlights": [
+              {
+                "change_pct_24h": "1.86",
+                "inst_id": "XAAPL-USDT",
+                "last_price": "231.42",
+                "product_key": "AAPL"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "account": {
+            "$ref": "#/components/schemas/AccountSummary"
+          },
+          "active_strategies": {
+            "items": {
+              "$ref": "#/components/schemas/StrategyBrief"
+            },
+            "title": "Active Strategies",
+            "type": "array"
+          },
+          "exposure": {
+            "$ref": "#/components/schemas/ExposureSummary"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/Position"
+            },
+            "title": "Positions",
+            "type": "array"
+          },
+          "recent_signals": {
+            "items": {
+              "$ref": "#/components/schemas/Signal"
+            },
+            "title": "Recent Signals",
+            "type": "array"
+          },
+          "watchlist_highlights": {
+            "items": {
+              "$ref": "#/components/schemas/WatchlistBrief"
+            },
+            "title": "Watchlist Highlights",
+            "type": "array"
+          }
+        },
+        "required": [
+          "account",
+          "exposure",
+          "positions",
+          "watchlist_highlights",
+          "active_strategies",
+          "recent_signals",
+          "generated_at"
+        ],
+        "title": "OverviewResponse",
+        "type": "object"
+      },
+      "ParamSpec": {
+        "description": "指标或策略的可配置参数定义。",
+        "properties": {
+          "default": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "boolean"
+              }
+            ],
+            "title": "Default"
+          },
+          "kind": {
+            "enum": [
+              "int",
+              "float",
+              "bool",
+              "string"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "maximum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum"
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "title",
+          "kind",
+          "default"
+        ],
+        "title": "ParamSpec",
+        "type": "object"
+      },
+      "Position": {
+        "properties": {
+          "avg_entry_price": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Avg Entry Price",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "inst_type": {
+            "enum": [
+              "SPOT",
+              "SWAP"
+            ],
+            "title": "Inst Type",
+            "type": "string"
+          },
+          "leverage": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Leverage",
+            "type": "string"
+          },
+          "liquidation_price": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Liquidation Price"
+          },
+          "mark_price": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Mark Price",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "manual",
+              "paper",
+              "live"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "notional": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Notional",
+            "type": "string"
+          },
+          "opened_at": {
+            "title": "Opened At",
+            "type": "string"
+          },
+          "product_key": {
+            "title": "Product Key",
+            "type": "string"
+          },
+          "qty": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Qty",
+            "type": "string"
+          },
+          "side": {
+            "enum": [
+              "long",
+              "short"
+            ],
+            "title": "Side",
+            "type": "string"
+          },
+          "strategy_instance_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategy Instance Id"
+          },
+          "unrealized_pnl": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Unrealized Pnl",
+            "type": "string"
+          }
+        },
+        "required": [
+          "inst_id",
+          "inst_type",
+          "product_key",
+          "side",
+          "qty",
+          "avg_entry_price",
+          "mark_price",
+          "notional",
+          "unrealized_pnl",
+          "leverage",
+          "mode",
+          "opened_at"
+        ],
+        "title": "Position",
+        "type": "object"
+      },
+      "PositionListResponse": {
+        "examples": [
+          {
+            "items": [
+              {
+                "avg_entry_price": "228.10",
+                "inst_id": "XAAPL-USDT",
+                "inst_type": "SPOT",
+                "leverage": "1",
+                "mark_price": "231.42",
+                "mode": "paper",
+                "notional": "1997.15",
+                "opened_at": "2026-11-09T14:00:00Z",
+                "product_key": "AAPL",
+                "qty": "8.63",
+                "side": "long",
+                "strategy_instance_id": "si_0001",
+                "unrealized_pnl": "28.64"
+              }
+            ],
+            "mode": "paper"
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Position"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "mode": {
+            "enum": [
+              "manual",
+              "paper",
+              "live"
+            ],
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "items"
+        ],
+        "title": "PositionListResponse",
+        "type": "object"
+      },
+      "PriceAlert": {
+        "examples": [
+          {
+            "direction": "above",
+            "enabled": true,
+            "inst_id": "XAAPL-USDT",
+            "price": "235.00"
+          }
+        ],
+        "properties": {
+          "direction": {
+            "enum": [
+              "above",
+              "below"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "price": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Price",
+            "type": "string"
+          },
+          "triggered_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triggered At"
+          }
+        },
+        "required": [
+          "inst_id",
+          "direction",
+          "price",
+          "enabled"
+        ],
+        "title": "PriceAlert",
+        "type": "object"
+      },
+      "PriceAlertRequest": {
+        "properties": {
+          "direction": {
+            "enum": [
+              "above",
+              "below"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "price": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Price",
+            "type": "string"
+          }
+        },
+        "required": [
+          "direction",
+          "price"
+        ],
+        "title": "PriceAlertRequest",
+        "type": "object"
+      },
+      "RelatedInstrument": {
+        "properties": {
+          "asset_type": {
+            "enum": [
+              "tokenized_equity",
+              "crypto"
+            ],
+            "title": "Asset Type",
+            "type": "string"
+          },
+          "correlation": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Correlation",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "product_key": {
+            "title": "Product Key",
+            "type": "string"
+          },
+          "window_days": {
+            "title": "Window Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "inst_id",
+          "product_key",
+          "asset_type",
+          "correlation",
+          "window_days"
+        ],
+        "title": "RelatedInstrument",
+        "type": "object"
+      },
+      "RelatedInstrumentsResponse": {
+        "examples": [
+          {
+            "inst_id": "XAAPL-USDT",
+            "items": [
+              {
+                "asset_type": "tokenized_equity",
+                "correlation": "0.87",
+                "inst_id": "XQQQ-USDT",
+                "product_key": "QQQ",
+                "window_days": 30
+              }
+            ],
+            "window_days": 30
+          }
+        ],
+        "properties": {
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RelatedInstrument"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "window_days": {
+            "title": "Window Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "inst_id",
+          "window_days",
+          "items"
+        ],
+        "title": "RelatedInstrumentsResponse",
+        "type": "object"
+      },
+      "RiskSettings": {
+        "description": "风控限额。`max_leverage` 的硬上限（10）不因配置抬高（decisions.md L1）。",
+        "properties": {
+          "liquidation_buffer_pct": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Liquidation Buffer Pct",
+            "type": "string"
+          },
+          "max_daily_loss": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Max Daily Loss",
+            "type": "string"
+          },
+          "max_leverage": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Max Leverage",
+            "type": "string"
+          },
+          "max_order_notional": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Max Order Notional",
+            "type": "string"
+          },
+          "max_position_notional": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Max Position Notional",
+            "type": "string"
+          },
+          "max_positions": {
+            "title": "Max Positions",
+            "type": "integer"
+          },
+          "max_total_notional": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Max Total Notional",
+            "type": "string"
+          },
+          "stop_loss_mandatory": {
+            "title": "Stop Loss Mandatory",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "max_order_notional",
+          "max_position_notional",
+          "max_total_notional",
+          "max_positions",
+          "max_leverage",
+          "max_daily_loss",
+          "liquidation_buffer_pct",
+          "stop_loss_mandatory"
+        ],
+        "title": "RiskSettings",
+        "type": "object"
+      },
+      "SettingsResponse": {
+        "examples": [
+          {
+            "backtest": {
+              "default_bar": "1h",
+              "default_initial_capital": "10000",
+              "funding_enabled": true
+            },
+            "costs": {
+              "maker_fee_bps": "2",
+              "slippage_bps": "3",
+              "spread_bps": "2",
+              "taker_fee_bps": "5"
+            },
+            "data": {
+              "proxy_configured": false,
+              "proxy_enabled": false
+            },
+            "exchange": {
+              "api_configured": false,
+              "demo_trading": true
+            },
+            "execution": {
+              "auto_trading_enabled": false,
+              "emergency_stop": false,
+              "mode": "paper"
+            },
+            "risk": {
+              "liquidation_buffer_pct": "10",
+              "max_daily_loss": "300",
+              "max_leverage": "3",
+              "max_order_notional": "1000",
+              "max_position_notional": "3000",
+              "max_positions": 5,
+              "max_total_notional": "10000",
+              "stop_loss_mandatory": true
+            },
+            "updated_at": "2026-11-10T06:10:00Z"
+          }
+        ],
+        "properties": {
+          "backtest": {
+            "$ref": "#/components/schemas/BacktestSettings"
+          },
+          "costs": {
+            "$ref": "#/components/schemas/CostSettings"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DataSettings"
+          },
+          "exchange": {
+            "$ref": "#/components/schemas/ExchangeSettings"
+          },
+          "execution": {
+            "$ref": "#/components/schemas/ExecutionSettings"
+          },
+          "risk": {
+            "$ref": "#/components/schemas/RiskSettings"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "execution",
+          "risk",
+          "costs",
+          "backtest",
+          "exchange",
+          "data",
+          "updated_at"
+        ],
+        "title": "SettingsResponse",
+        "type": "object"
+      },
+      "SettingsUpdateRequest": {
+        "description": "分组级部分更新；交易所凭据不在可写范围。",
+        "properties": {
+          "backtest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BacktestSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "costs": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CostSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DataSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "execution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExecutionSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "risk": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiskSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "SettingsUpdateRequest",
+        "type": "object"
+      },
+      "SiblingQuote": {
+        "description": "同一 `product_key` 的另一形态报价。两形态不等价，界面必须同时展示价差。",
+        "properties": {
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "inst_type": {
+            "enum": [
+              "SPOT",
+              "SWAP"
+            ],
+            "title": "Inst Type",
+            "type": "string"
+          },
+          "last_price": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Last Price",
+            "type": "string"
+          },
+          "price_spread_pct": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Price Spread Pct",
+            "type": "string"
+          }
+        },
+        "required": [
+          "inst_id",
+          "inst_type",
+          "last_price",
+          "price_spread_pct"
+        ],
+        "title": "SiblingQuote",
+        "type": "object"
+      },
+      "Signal": {
+        "additionalProperties": false,
+        "description": "策略输出的标准化交易信号，策略本身不产生订单。",
+        "properties": {
+          "action": {
+            "enum": [
+              "BUY",
+              "SELL",
+              "HOLD"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "bar": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Bar",
+            "type": "string"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "inst_type": {
+            "enum": [
+              "SPOT",
+              "SWAP"
+            ],
+            "title": "Inst Type",
+            "type": "string"
+          },
+          "price": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Price",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "signal_id": {
+            "title": "Signal Id",
+            "type": "string"
+          },
+          "strategy_instance_id": {
+            "title": "Strategy Instance Id",
+            "type": "string"
+          },
+          "target_weight": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Weight"
+          }
+        },
+        "required": [
+          "signal_id",
+          "strategy_instance_id",
+          "inst_id",
+          "inst_type",
+          "action",
+          "bar",
+          "price",
+          "reason",
+          "generated_at"
+        ],
+        "title": "Signal",
+        "type": "object"
+      },
+      "SignalListResponse": {
+        "examples": [
+          {
+            "items": [
+              {
+                "action": "BUY",
+                "bar": "1h",
+                "generated_at": "2026-11-10T07:00:00Z",
+                "inst_id": "XAAPL-USDT",
+                "inst_type": "SPOT",
+                "price": "231.42",
+                "reason": "MA20 上穿 MA60",
+                "signal_id": "sig_0001",
+                "strategy_instance_id": "si_0001",
+                "target_weight": "0.25"
+              }
+            ],
+            "total": 1
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Signal"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "SignalListResponse",
+        "type": "object"
+      },
+      "StrategyBrief": {
+        "properties": {
+          "instance_id": {
+            "title": "Instance Id",
+            "type": "string"
+          },
+          "latest_signal_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Signal At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "enabled",
+              "disabled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "strategy_id": {
+            "title": "Strategy Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instance_id",
+          "name",
+          "strategy_id",
+          "status"
+        ],
+        "title": "StrategyBrief",
+        "type": "object"
+      },
+      "StrategyCatalogResponse": {
+        "examples": [
+          {
+            "items": [
+              {
+                "emitted_actions": [
+                  "BUY",
+                  "SELL",
+                  "HOLD"
+                ],
+                "name": "MA Cross",
+                "params": [
+                  {
+                    "default": 20,
+                    "kind": "int",
+                    "maximum": 200,
+                    "minimum": 2,
+                    "name": "fast",
+                    "title": "快线周期"
+                  },
+                  {
+                    "default": 60,
+                    "kind": "int",
+                    "maximum": 500,
+                    "minimum": 3,
+                    "name": "slow",
+                    "title": "慢线周期"
+                  }
+                ],
+                "required_bars": [
+                  "1h",
+                  "4h",
+                  "1d"
+                ],
+                "required_indicators": [
+                  "sma"
+                ],
+                "strategy_id": "ma_cross",
+                "summary": "快慢均线交叉产生多空信号。",
+                "version": "1.0.0"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StrategyDefinition"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "StrategyCatalogResponse",
+        "type": "object"
+      },
+      "StrategyDefinition": {
+        "description": "策略模板：一个模板可派生多个独立配置的实例。",
+        "properties": {
+          "emitted_actions": {
+            "items": {
+              "enum": [
+                "BUY",
+                "SELL",
+                "HOLD"
+              ],
+              "type": "string"
+            },
+            "title": "Emitted Actions",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "params": {
+            "items": {
+              "$ref": "#/components/schemas/ParamSpec"
+            },
+            "title": "Params",
+            "type": "array"
+          },
+          "required_bars": {
+            "items": {
+              "enum": [
+                "1m",
+                "5m",
+                "15m",
+                "1h",
+                "4h",
+                "1d"
+              ],
+              "type": "string"
+            },
+            "title": "Required Bars",
+            "type": "array"
+          },
+          "required_indicators": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Required Indicators",
+            "type": "array"
+          },
+          "strategy_id": {
+            "title": "Strategy Id",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "strategy_id",
+          "name",
+          "version",
+          "summary",
+          "params",
+          "required_indicators",
+          "required_bars",
+          "emitted_actions"
+        ],
+        "title": "StrategyDefinition",
+        "type": "object"
+      },
+      "StrategyInstance": {
+        "examples": [
+          {
+            "bar": "1h",
+            "created_at": "2026-11-08T02:15:00Z",
+            "execution_mode": "paper",
+            "inst_ids": [
+              "XAAPL-USDT"
+            ],
+            "instance_id": "si_0001",
+            "latest_signal_at": "2026-11-10T07:00:00Z",
+            "name": "AAPL 均线趋势",
+            "params": {
+              "fast": 20,
+              "slow": 60
+            },
+            "status": "enabled",
+            "strategy_id": "ma_cross",
+            "strategy_version": "1.0.0",
+            "updated_at": "2026-11-10T07:00:00Z"
+          }
+        ],
+        "properties": {
+          "bar": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Bar",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "execution_mode": {
+            "enum": [
+              "manual",
+              "paper",
+              "live"
+            ],
+            "title": "Execution Mode",
+            "type": "string"
+          },
+          "inst_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Inst Ids",
+            "type": "array"
+          },
+          "instance_id": {
+            "title": "Instance Id",
+            "type": "string"
+          },
+          "latest_signal_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Signal At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "title": "Params",
+            "type": "object"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "enabled",
+              "disabled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "strategy_id": {
+            "title": "Strategy Id",
+            "type": "string"
+          },
+          "strategy_version": {
+            "title": "Strategy Version",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instance_id",
+          "strategy_id",
+          "strategy_version",
+          "name",
+          "bar",
+          "params",
+          "inst_ids",
+          "status",
+          "execution_mode",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "StrategyInstance",
+        "type": "object"
+      },
+      "StrategyInstanceCreateRequest": {
+        "properties": {
+          "bar": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Bar",
+            "type": "string"
+          },
+          "inst_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Inst Ids",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "title": "Params",
+            "type": "object"
+          },
+          "strategy_id": {
+            "title": "Strategy Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "strategy_id",
+          "name",
+          "bar",
+          "inst_ids"
+        ],
+        "title": "StrategyInstanceCreateRequest",
+        "type": "object"
+      },
+      "StrategyInstanceListResponse": {
+        "examples": [
+          {
+            "items": [
+              {
+                "bar": "1h",
+                "created_at": "2026-11-08T02:15:00Z",
+                "execution_mode": "paper",
+                "inst_ids": [
+                  "XAAPL-USDT"
+                ],
+                "instance_id": "si_0001",
+                "latest_signal_at": "2026-11-10T07:00:00Z",
+                "name": "AAPL 均线趋势",
+                "params": {
+                  "fast": 20,
+                  "slow": 60
+                },
+                "status": "enabled",
+                "strategy_id": "ma_cross",
+                "strategy_version": "1.0.0",
+                "updated_at": "2026-11-10T07:00:00Z"
+              }
+            ],
+            "total": 1
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StrategyInstance"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "StrategyInstanceListResponse",
+        "type": "object"
+      },
+      "StrategyInstanceUpdateRequest": {
+        "description": "PATCH 语义：只落显式提交的字段。",
+        "properties": {
+          "inst_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inst Ids"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "params": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "boolean"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Params"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "draft",
+                  "enabled",
+                  "disabled"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "title": "StrategyInstanceUpdateRequest",
+        "type": "object"
+      },
+      "TimeSplit": {
+        "properties": {
+          "end_date": {
+            "format": "date",
+            "title": "End Date",
+            "type": "string"
+          },
+          "name": {
+            "enum": [
+              "train",
+              "validation",
+              "test"
+            ],
+            "title": "Name",
+            "type": "string"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "start_date",
+          "end_date"
+        ],
+        "title": "TimeSplit",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "WatchlistAddRequest": {
+        "properties": {
+          "group": {
+            "default": "默认",
+            "title": "Group",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "inst_id"
+        ],
+        "title": "WatchlistAddRequest",
+        "type": "object"
+      },
+      "WatchlistBrief": {
+        "properties": {
+          "change_pct_24h": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Change Pct 24H",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "last_price": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Last Price",
+            "type": "string"
+          },
+          "product_key": {
+            "title": "Product Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "inst_id",
+          "product_key",
+          "last_price",
+          "change_pct_24h"
+        ],
+        "title": "WatchlistBrief",
+        "type": "object"
+      },
+      "WatchlistItem": {
+        "description": "自选列表一行：行情快照 + 关联运行态。",
+        "examples": [
+          {
+            "change_pct_24h": "1.86",
+            "group": "美股",
+            "instrument": {
+              "asset_type": "tokenized_equity",
+              "base_currency": "XAAPL",
+              "inst_id": "XAAPL-USDT",
+              "inst_type": "SPOT",
+              "listing_time": "2026-07-01T00:00:00Z",
+              "lot_size": "0.001",
+              "min_order_size": "0.001",
+              "product_key": "AAPL",
+              "quote_currency": "USDT",
+              "tick_size": "0.01",
+              "trading_status": "live"
+            },
+            "last_price": "231.42",
+            "latest_signal": {
+              "action": "BUY",
+              "bar": "1h",
+              "generated_at": "2026-11-10T07:00:00Z",
+              "inst_id": "XAAPL-USDT",
+              "inst_type": "SPOT",
+              "price": "231.42",
+              "reason": "MA20 上穿 MA60",
+              "signal_id": "sig_0001",
+              "strategy_instance_id": "si_0001",
+              "target_weight": "0.25"
+            },
+            "linked_strategy_instance_ids": [
+              "si_0001"
+            ],
+            "volume_24h_quote": "4821334.55"
+          }
+        ],
+        "properties": {
+          "alert": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PriceAlert"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "change_pct_24h": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Change Pct 24H",
+            "type": "string"
+          },
+          "group": {
+            "title": "Group",
+            "type": "string"
+          },
+          "instrument": {
+            "$ref": "#/components/schemas/InstrumentInfo"
+          },
+          "last_price": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Last Price",
+            "type": "string"
+          },
+          "latest_signal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Signal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "linked_strategy_instance_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Linked Strategy Instance Ids",
+            "type": "array"
+          },
+          "volume_24h_quote": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Volume 24H Quote",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instrument",
+          "group",
+          "last_price",
+          "change_pct_24h",
+          "volume_24h_quote"
+        ],
+        "title": "WatchlistItem",
+        "type": "object"
+      },
+      "WatchlistResponse": {
+        "examples": [
+          {
+            "groups": [
+              "美股",
+              "加密"
+            ],
+            "items": [
+              {
+                "change_pct_24h": "1.86",
+                "group": "美股",
+                "instrument": {
+                  "asset_type": "tokenized_equity",
+                  "base_currency": "XAAPL",
+                  "inst_id": "XAAPL-USDT",
+                  "inst_type": "SPOT",
+                  "listing_time": "2026-07-01T00:00:00Z",
+                  "lot_size": "0.001",
+                  "min_order_size": "0.001",
+                  "product_key": "AAPL",
+                  "quote_currency": "USDT",
+                  "tick_size": "0.01",
+                  "trading_status": "live"
+                },
+                "last_price": "231.42",
+                "latest_signal": {
+                  "action": "BUY",
+                  "bar": "1h",
+                  "generated_at": "2026-11-10T07:00:00Z",
+                  "inst_id": "XAAPL-USDT",
+                  "inst_type": "SPOT",
+                  "price": "231.42",
+                  "reason": "MA20 上穿 MA60",
+                  "signal_id": "sig_0001",
+                  "strategy_instance_id": "si_0001",
+                  "target_weight": "0.25"
+                },
+                "linked_strategy_instance_ids": [
+                  "si_0001"
+                ],
+                "volume_24h_quote": "4821334.55"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "groups": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WatchlistItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "groups"
+        ],
+        "title": "WatchlistResponse",
+        "type": "object"
+      },
+      "WatchlistUpdateRequest": {
+        "properties": {
+          "group": {
+            "title": "Group",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group"
+        ],
+        "title": "WatchlistUpdateRequest",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "个人量化工作台 — v2 单进程骨架",
+    "title": "trading",
+    "version": "0.2.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/backtest-sweeps": {
+      "post": {
+        "operationId": "create_backtest_sweep_api_backtest_sweeps_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BacktestSweepRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestSweepResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Backtest Sweep",
+        "tags": [
+          "backtest"
+        ]
+      }
+    },
+    "/api/backtests": {
+      "get": {
+        "operationId": "list_backtests_api_backtests_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "data_source",
+            "required": true,
+            "schema": {
+              "enum": [
+                "okx",
+                "us_equity_proxy"
+              ],
+              "title": "Data Source",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestRunListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Backtests",
+        "tags": [
+          "backtest"
+        ]
+      },
+      "post": {
+        "operationId": "create_backtest_api_backtests_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BacktestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestRunSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Backtest",
+        "tags": [
+          "backtest"
+        ]
+      }
+    },
+    "/api/backtests/ranking": {
+      "get": {
+        "operationId": "get_backtest_ranking_api_backtests_ranking_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "data_source",
+            "required": true,
+            "schema": {
+              "enum": [
+                "okx",
+                "us_equity_proxy"
+              ],
+              "title": "Data Source",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "metric",
+            "required": false,
+            "schema": {
+              "default": "total_return_pct",
+              "enum": [
+                "total_return_pct",
+                "max_drawdown_pct",
+                "sharpe",
+                "profit_factor"
+              ],
+              "title": "Metric",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestRankingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Backtest Ranking",
+        "tags": [
+          "backtest"
+        ]
+      }
+    },
+    "/api/backtests/{run_id}": {
+      "delete": {
+        "operationId": "delete_backtest_api_backtests__run_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Backtest",
+        "tags": [
+          "backtest"
+        ]
+      },
+      "get": {
+        "operationId": "get_backtest_api_backtests__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Backtest",
+        "tags": [
+          "backtest"
+        ]
+      }
+    },
+    "/api/execution": {
+      "get": {
+        "operationId": "get_execution_state_api_execution_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionStateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Execution State",
+        "tags": [
+          "trades"
+        ]
+      }
+    },
+    "/api/execution/mode": {
+      "put": {
+        "operationId": "set_execution_mode_api_execution_mode_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecutionModeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionStateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Execution Mode",
+        "tags": [
+          "trades"
+        ]
+      }
+    },
+    "/api/health": {
+      "get": {
+        "description": "存活探针：进程能应答即返回 ok。",
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/indicators": {
+      "get": {
+        "operationId": "list_indicators_api_indicators_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndicatorCatalogResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Indicators",
+        "tags": [
+          "indicators"
+        ]
+      }
+    },
+    "/api/indicators/series": {
+      "get": {
+        "operationId": "get_indicator_series_api_indicators_series_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "inst_id",
+            "required": true,
+            "schema": {
+              "title": "Inst Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "bar",
+            "required": true,
+            "schema": {
+              "enum": [
+                "1m",
+                "5m",
+                "15m",
+                "1h",
+                "4h",
+                "1d"
+              ],
+              "title": "Bar",
+              "type": "string"
+            }
+          },
+          {
+            "description": "逗号分隔的指标名 (如 rsi,sma)",
+            "in": "query",
+            "name": "names",
+            "required": true,
+            "schema": {
+              "description": "逗号分隔的指标名 (如 rsi,sma)",
+              "title": "Names",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndicatorSeriesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Indicator Series",
+        "tags": [
+          "indicators"
+        ]
+      }
+    },
+    "/api/instruments/search": {
+      "get": {
+        "operationId": "search_instruments_api_instruments_search_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "inst_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "SPOT",
+                    "SWAP"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Inst Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstrumentSearchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Instruments",
+        "tags": [
+          "watchlist"
+        ]
+      }
+    },
+    "/api/instruments/{inst_id}": {
+      "get": {
+        "operationId": "get_instrument_api_instruments__inst_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "inst_id",
+            "required": true,
+            "schema": {
+              "title": "Inst Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstrumentDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Instrument",
+        "tags": [
+          "watchlist"
+        ]
+      }
+    },
+    "/api/instruments/{inst_id}/candles": {
+      "get": {
+        "operationId": "get_instrument_candles_api_instruments__inst_id__candles_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "inst_id",
+            "required": true,
+            "schema": {
+              "title": "Inst Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "bar",
+            "required": true,
+            "schema": {
+              "enum": [
+                "1m",
+                "5m",
+                "15m",
+                "1h",
+                "4h",
+                "1d"
+              ],
+              "title": "Bar",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandleSeriesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Instrument Candles",
+        "tags": [
+          "watchlist"
+        ]
+      }
+    },
+    "/api/journal": {
+      "get": {
+        "operationId": "list_journal_api_journal_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JournalListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Journal",
+        "tags": [
+          "trades"
+        ]
+      }
+    },
+    "/api/overview": {
+      "get": {
+        "operationId": "get_overview_api_overview_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Overview",
+        "tags": [
+          "overview"
+        ]
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "operationId": "get_settings_document_api_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Settings Document",
+        "tags": [
+          "settings"
+        ]
+      },
+      "put": {
+        "operationId": "update_settings_document_api_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Settings Document",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/signals": {
+      "get": {
+        "operationId": "list_signals_api_signals_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignalListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Signals",
+        "tags": [
+          "trades"
+        ]
+      }
+    },
+    "/api/strategies": {
+      "get": {
+        "operationId": "list_strategies_api_strategies_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyCatalogResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Strategies",
+        "tags": [
+          "strategy"
+        ]
+      }
+    },
+    "/api/strategy-instances": {
+      "get": {
+        "operationId": "list_strategy_instances_api_strategy_instances_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyInstanceListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Strategy Instances",
+        "tags": [
+          "strategy"
+        ]
+      },
+      "post": {
+        "operationId": "create_strategy_instance_api_strategy_instances_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StrategyInstanceCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyInstance"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Strategy Instance",
+        "tags": [
+          "strategy"
+        ]
+      }
+    },
+    "/api/strategy-instances/{instance_id}": {
+      "delete": {
+        "operationId": "delete_strategy_instance_api_strategy_instances__instance_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instance_id",
+            "required": true,
+            "schema": {
+              "title": "Instance Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Strategy Instance",
+        "tags": [
+          "strategy"
+        ]
+      },
+      "get": {
+        "operationId": "get_strategy_instance_api_strategy_instances__instance_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instance_id",
+            "required": true,
+            "schema": {
+              "title": "Instance Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyInstance"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Strategy Instance",
+        "tags": [
+          "strategy"
+        ]
+      },
+      "patch": {
+        "operationId": "update_strategy_instance_api_strategy_instances__instance_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instance_id",
+            "required": true,
+            "schema": {
+              "title": "Instance Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StrategyInstanceUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyInstance"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Strategy Instance",
+        "tags": [
+          "strategy"
+        ]
+      }
+    },
+    "/api/trades/fills": {
+      "get": {
+        "operationId": "list_fills_api_trades_fills_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FillListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Fills",
+        "tags": [
+          "trades"
+        ]
+      }
+    },
+    "/api/trades/orders": {
+      "get": {
+        "operationId": "list_orders_api_trades_orders_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Orders",
+        "tags": [
+          "trades"
+        ]
+      },
+      "post": {
+        "operationId": "create_order_api_trades_orders_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Order",
+        "tags": [
+          "trades"
+        ]
+      }
+    },
+    "/api/trades/orders/{order_id}": {
+      "delete": {
+        "operationId": "cancel_order_api_trades_orders__order_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "title": "Order Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Order",
+        "tags": [
+          "trades"
+        ]
+      }
+    },
+    "/api/trades/positions": {
+      "get": {
+        "operationId": "list_positions_api_trades_positions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PositionListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Positions",
+        "tags": [
+          "trades"
+        ]
+      }
+    },
+    "/api/watchlist": {
+      "get": {
+        "operationId": "list_watchlist_api_watchlist_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Watchlist",
+        "tags": [
+          "watchlist"
+        ]
+      },
+      "post": {
+        "operationId": "add_watchlist_item_api_watchlist_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistAddRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Watchlist Item",
+        "tags": [
+          "watchlist"
+        ]
+      }
+    },
+    "/api/watchlist/{inst_id}": {
+      "delete": {
+        "operationId": "delete_watchlist_item_api_watchlist__inst_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "inst_id",
+            "required": true,
+            "schema": {
+              "title": "Inst Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Watchlist Item",
+        "tags": [
+          "watchlist"
+        ]
+      },
+      "patch": {
+        "operationId": "update_watchlist_item_api_watchlist__inst_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "inst_id",
+            "required": true,
+            "schema": {
+              "title": "Inst Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Watchlist Item",
+        "tags": [
+          "watchlist"
+        ]
+      }
+    },
+    "/api/watchlist/{inst_id}/alert": {
+      "delete": {
+        "operationId": "delete_price_alert_api_watchlist__inst_id__alert_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "inst_id",
+            "required": true,
+            "schema": {
+              "title": "Inst Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Price Alert",
+        "tags": [
+          "watchlist"
+        ]
+      },
+      "put": {
+        "operationId": "put_price_alert_api_watchlist__inst_id__alert_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "inst_id",
+            "required": true,
+            "schema": {
+              "title": "Inst Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriceAlertRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceAlert"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Price Alert",
+        "tags": [
+          "watchlist"
+        ]
+      }
+    },
+    "/api/watchlist/{inst_id}/related": {
+      "get": {
+        "operationId": "get_related_instruments_api_watchlist__inst_id__related_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "inst_id",
+            "required": true,
+            "schema": {
+              "title": "Inst Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "window_days",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "maximum": 180,
+              "minimum": 5,
+              "title": "Window Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelatedInstrumentsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Related Instruments",
+        "tags": [
+          "watchlist"
+        ]
+      }
+    }
+  }
+}

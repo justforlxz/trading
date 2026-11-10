@@ -1,18 +1,19 @@
 import { describe, expect, it } from "vitest";
 
-import { buildCandleChart, CHART_HEIGHT, CHART_WIDTH, formatCandleTime, type Candle } from "./chart";
+import {
+  buildLineChart,
+  CHART_HEIGHT,
+  CHART_WIDTH,
+  closePoints,
+  formatChartTime,
+  type Candle,
+} from "./chart";
 
-function candle(
-  open: string,
-  high: string,
-  low: string,
-  close: string,
-  open_time = "2026-11-10T07:00:00Z",
-): Candle {
+function candle(close: string, open_time = "2026-11-10T07:00:00Z"): Candle {
   return {
-    open,
-    high,
-    low,
+    open: close,
+    high: close,
+    low: close,
     close,
     open_time,
     volume: "1520.335",
@@ -21,87 +22,96 @@ function candle(
   };
 }
 
-describe("buildCandleChart", () => {
-  it("没有任何 K 线时不产生任何图形", () => {
-    const geometry = buildCandleChart([]);
-    expect(geometry.boxes).toEqual([]);
+describe("closePoints", () => {
+  it("只取收盘价与时间，其余价格字段不进入折线数据", () => {
+    expect(closePoints([candle("231.42", "2026-11-10T07:00:00Z")])).toEqual([
+      { time: "2026-11-10T07:00:00Z", price: "231.42" },
+    ]);
+  });
+});
+
+describe("buildLineChart", () => {
+  it("没有任何收盘价时不产生任何图形", () => {
+    const geometry = buildLineChart([]);
+    expect(geometry.points).toEqual([]);
+    expect(geometry.line).toBe("");
     expect(geometry.priceTicks).toEqual([]);
     expect(geometry.timeTicks).toEqual([]);
   });
 
-  it("单根 K 线居中，影线与实体都落在绘图区内", () => {
-    const geometry = buildCandleChart([candle("229.80", "232.10", "229.44", "231.42")]);
+  it("单点居中，路径只有一个起点", () => {
+    const geometry = buildLineChart([{ time: "2026-11-10T07:00:00Z", price: "231.42" }]);
 
-    expect(geometry.boxes).toHaveLength(1);
-    const [box] = geometry.boxes;
-    expect(box.centerX).toBeCloseTo((geometry.plotLeft + geometry.plotRight) / 2);
-    expect(box.rising).toBe(true);
-    expect(box.openY).toBeGreaterThan(box.closeY);
-    expect(box.wickTop).toBeGreaterThanOrEqual(geometry.plotTop);
-    expect(box.wickBottom).toBeLessThanOrEqual(geometry.plotBottom);
-    expect(box.bodyTop).toBeGreaterThanOrEqual(box.wickTop);
-    expect(box.bodyTop + box.bodyHeight).toBeLessThanOrEqual(box.wickBottom);
-    expect(geometry.priceTicks).toHaveLength(5);
+    expect(geometry.points).toHaveLength(1);
+    const [point] = geometry.points;
+    expect(point.x).toBeCloseTo((geometry.plotLeft + geometry.plotRight) / 2);
+    expect(point.y).toBeGreaterThanOrEqual(geometry.plotTop);
+    expect(point.y).toBeLessThanOrEqual(geometry.plotBottom);
+    expect(geometry.line).toMatch(/^M[\d.]+ [\d.]+$/);
+    expect(geometry.priceTicks).toHaveLength(4);
+    expect(geometry.timeTicks).toHaveLength(1);
   });
 
-  it("价格越高 y 越小：两根连续上涨的 K 线，后一根收盘更高", () => {
-    const geometry = buildCandleChart([
-      candle("100.00", "101.00", "99.00", "101.00", "2026-11-10T06:00:00Z"),
-      candle("101.00", "103.00", "100.50", "102.00", "2026-11-10T07:00:00Z"),
+  it("收盘价越高 y 越小：三个连续上涨的点，折线逐点向上", () => {
+    const geometry = buildLineChart([
+      { time: "2026-11-10T06:00:00Z", price: "100" },
+      { time: "2026-11-10T07:00:00Z", price: "101" },
+      { time: "2026-11-10T08:00:00Z", price: "102" },
     ]);
 
-    expect(geometry.boxes[0].closeY).toBeLessThan(geometry.boxes[0].openY);
-    expect(geometry.boxes[1].closeY).toBeLessThan(geometry.boxes[1].openY);
-    expect(geometry.boxes[1].closeY).toBeLessThan(geometry.boxes[0].closeY);
+    expect(geometry.points[1].y).toBeLessThan(geometry.points[0].y);
+    expect(geometry.points[2].y).toBeLessThan(geometry.points[1].y);
+    expect(geometry.line.startsWith("M")).toBe(true);
+    expect(geometry.line.split("L")).toHaveLength(3);
   });
 
-  it("全平盘 K 线不产生 NaN，实体保留最小可见高度", () => {
-    const geometry = buildCandleChart([
-      candle("100.00", "100.00", "100.00", "100.00", "2026-11-10T06:00:00Z"),
-      candle("100.00", "100.00", "100.00", "100.00", "2026-11-10T07:00:00Z"),
+  it("全平盘不产生 NaN 坐标，价格刻度文案不重复", () => {
+    const geometry = buildLineChart([
+      { time: "2026-11-10T06:00:00Z", price: "100" },
+      { time: "2026-11-10T07:00:00Z", price: "100" },
+      { time: "2026-11-10T08:00:00Z", price: "100" },
     ]);
 
-    const yCoordinates = geometry.boxes.flatMap((box) => [
-      box.bodyTop,
-      box.bodyHeight,
-      box.openY,
-      box.closeY,
-      box.wickTop,
-      box.wickBottom,
-    ]);
-    const xCoordinates = geometry.boxes.flatMap((box) => [box.centerX, box.bodyX, box.bodyWidth]);
-    expect([...xCoordinates, ...yCoordinates].every((value) => Number.isFinite(value))).toBe(true);
-    expect(yCoordinates.every((value) => value >= 0 && value <= CHART_HEIGHT)).toBe(true);
-    expect(xCoordinates.every((value) => value >= 0 && value <= CHART_WIDTH)).toBe(true);
-    expect(geometry.boxes[0].bodyHeight).toBeGreaterThanOrEqual(1);
+    const yCoordinates = geometry.points.map((point) => point.y);
+    expect(yCoordinates.every((value) => Number.isFinite(value))).toBe(true);
+    expect(
+      yCoordinates.every((value) => value >= 0 && value <= CHART_HEIGHT),
+    ).toBe(true);
+    expect(
+      geometry.points.every((point) => Number.isFinite(point.x) && point.x >= 0),
+    ).toBe(true);
+    expect(geometry.points.every((point) => point.x <= CHART_WIDTH)).toBe(true);
+
     const labels = geometry.priceTicks.map((tick) => tick.label);
     expect(new Set(labels).size).toBe(labels.length);
   });
 
-  it("时间刻度最多 6 个且覆盖首尾 K 线", () => {
-    const candles = Array.from({ length: 7 }, (_, index) =>
-      candle("100", "101", "99", "100.5", `2026-11-10T0${index}:00:00Z`),
-    );
-    const geometry = buildCandleChart(candles);
+  it("时间刻度最多 6 个且覆盖首尾", () => {
+    const points = Array.from({ length: 9 }, (_, index) => ({
+      time: `2026-11-10T0${index}:00:00Z`,
+      price: String(100 + index),
+    }));
+    const geometry = buildLineChart(points);
 
     expect(geometry.timeTicks).toHaveLength(6);
     expect(geometry.timeTicks[0].label).toBe("11-10 00:00");
-    expect(geometry.timeTicks[5].label).toBe("11-10 06:00");
-    expect(geometry.timeTicks[0].x).toBeCloseTo(geometry.boxes[0].centerX);
-    expect(geometry.timeTicks[5].x).toBeCloseTo(geometry.boxes[6].centerX);
+    expect(geometry.timeTicks[5].label).toBe("11-10 08:00");
+    expect(geometry.timeTicks[0].x).toBeCloseTo(geometry.points[0].x);
+    expect(geometry.timeTicks[5].x).toBeCloseTo(geometry.points[8].x);
   });
 
-  it("价格无法解析的 K 线被丢弃，不会画出 NaN 坐标", () => {
-    expect(buildCandleChart([candle("", "231", "229", "231")]).boxes).toEqual([]);
+  it("价格无法解析的点被丢弃，不会画出 NaN 坐标", () => {
+    expect(buildLineChart([{ time: "2026-11-10T07:00:00Z", price: "" }]).points).toEqual([]);
+    expect(buildLineChart([{ time: "2026-11-10T07:00:00Z", price: "abc" }]).points).toEqual([]);
   });
 });
 
-describe("formatCandleTime", () => {
+describe("formatChartTime", () => {
   it("按 UTC 呈现月-日 时:分", () => {
-    expect(formatCandleTime("2026-11-10T07:00:00Z")).toBe("11-10 07:00");
+    expect(formatChartTime("2026-11-10T07:00:00Z")).toBe("11-10 07:00");
   });
 
   it("无法解析时原样返回", () => {
-    expect(formatCandleTime("not-a-time")).toBe("not-a-time");
+    expect(formatChartTime("not-a-time")).toBe("not-a-time");
   });
 });

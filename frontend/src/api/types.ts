@@ -131,7 +131,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Indicators */
+        /**
+         * List Indicators
+         * @description 指标目录：每条声明都来自注册表，形状与 `schemas/indicators.py` 一一对应。
+         */
         get: operations["list_indicators_api_indicators_get"];
         put?: never;
         post?: never;
@@ -148,7 +151,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Indicator Series */
+        /**
+         * Get Indicator Series
+         * @description 按标的与周期算一组指标；参数缺省用注册表默认值，缺数据时序列为空。
+         */
         get: operations["get_indicator_series_api_indicators_series_get"];
         put?: never;
         post?: never;
@@ -2751,6 +2757,8 @@ export interface operations {
                 /** @description 逗号分隔的指标名 (如 rsi,sma) */
                 names: string;
                 limit?: number;
+                /** @description 可选参数通道, JSON 对象形如 {"rsi":{"period":14},"sma":{"period":20}} */
+                params?: string | null;
             };
             header?: never;
             path?: never;

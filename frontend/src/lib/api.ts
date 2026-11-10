@@ -30,6 +30,9 @@ export type WatchlistItem = components["schemas"]["WatchlistItem"];
 export type InstrumentDetailResponse = components["schemas"]["InstrumentDetailResponse"];
 export type CandleSeriesResponse = components["schemas"]["CandleSeriesResponse"];
 export type CandleBar = CandleSeriesResponse["bar"];
+export type IndicatorSeries = components["schemas"]["IndicatorSeries"];
+export type IndicatorSeriesResponse = components["schemas"]["IndicatorSeriesResponse"];
+export type IndicatorParamValue = IndicatorSeries["params"][string];
 
 async function request<T>(path: string): Promise<T> {
   const response = await fetch(`${BASE}${path}`, {
@@ -63,4 +66,19 @@ export function fetchCandles(
   return request<CandleSeriesResponse>(
     `/instruments/${encodeURIComponent(instId)}/candles?${query.toString()}`,
   );
+}
+
+export function fetchIndicatorSeries(
+  instId: string,
+  bar: CandleBar,
+  names: string[],
+  params?: Record<string, Record<string, IndicatorParamValue>>,
+): Promise<IndicatorSeriesResponse> {
+  const query = new URLSearchParams({
+    inst_id: instId,
+    bar,
+    names: names.join(","),
+  });
+  if (params && Object.keys(params).length > 0) query.set("params", JSON.stringify(params));
+  return request<IndicatorSeriesResponse>(`/indicators/series?${query.toString()}`);
 }

@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from app.api.contract import contract_router
 from app.api.health import router as health_router
+from app.api.routes.indicators import indicators_router
 from app.api.routes.instruments import instruments_router
 from app.api.routes.watchlist import watchlist_router
 
@@ -18,4 +19,5 @@ def include_routers(app: FastAPI) -> None:
     app.include_router(health_router, prefix="/api")
     app.include_router(watchlist_router, prefix="/api")
     app.include_router(instruments_router, prefix="/api")
+    app.include_router(indicators_router, prefix="/api")
     app.include_router(contract_router, prefix="/api")

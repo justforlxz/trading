@@ -4431,6 +4431,7 @@
     },
     "/api/indicators": {
       "get": {
+        "description": "指标目录：每条声明都来自注册表，形状与 `schemas/indicators.py` 一一对应。",
         "operationId": "list_indicators_api_indicators_get",
         "responses": {
           "200": {
@@ -4452,6 +4453,7 @@
     },
     "/api/indicators/series": {
       "get": {
+        "description": "按标的与周期算一组指标；参数缺省用注册表默认值，缺数据时序列为空。",
         "operationId": "get_indicator_series_api_indicators_series_get",
         "parameters": [
           {
@@ -4501,6 +4503,24 @@
               "minimum": 1,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "description": "可选参数通道, JSON 对象形如 {\"rsi\":{\"period\":14},\"sma\":{\"period\":20}}",
+            "in": "query",
+            "name": "params",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "可选参数通道, JSON 对象形如 {\"rsi\":{\"period\":14},\"sma\":{\"period\":20}}",
+              "title": "Params"
             }
           }
         ],

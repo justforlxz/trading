@@ -15,6 +15,9 @@ from app.api import contract_router, health_router
 from app.config import get_settings
 from app.db import init_db
 
+# 导入即注册 `candles` 表：建表只认已经定义过的元数据，装配根负责把域模型拉进来。
+from app.market import Candle  # noqa: F401
+
 logger = logging.getLogger(__name__)
 
 

@@ -1,7 +1,11 @@
-"""市场域：K 线对齐、缺口检测与相关性计算。
+"""市场域：历史 K 线的下载/落库/完整性，以及相关性计算。
 
-本节点只提供纯函数，采集与落库在后续节点接入。跨包调用一律走本门面，
-不允许 `from app.market.candles import ...` 之类的子模块直连。
+本域对外只发布两件事：
+- 纯函数（对齐、缺口、重复、相关系数）—— 输入输出可直接断言；
+- 编排入口（同步、读取、完整性报告、两标的相关性）—— 负责 IO 与事务边界。
+
+跨包调用一律走本门面，不允许 `from app.market.candles import ...` 之类的子模块直连。
+注意 `correlation(...)` 是「两个标的」的编排入口，纯数学模块仍是 `app.market.correlation`。
 """
 
 from app.market.candles import (
@@ -20,18 +24,28 @@ from app.market.correlation import (
     rolling_sign_agreement,
     spearman,
 )
+from app.market.model import Candle
+from app.market.service import correlation, integrity
+from app.market.sync import data_range, load_candles, sync_candles, upsert_candles
 
 __all__ = [
     "MIN_SAMPLES",
+    "Candle",
     "correlate",
+    "correlation",
+    "data_range",
     "duplicate_open_times",
     "expected_open_times",
     "find_gaps",
     "floor_open_time",
+    "integrity",
     "lagged_correlation",
+    "load_candles",
     "out_of_order",
     "p_value",
     "pearson",
     "rolling_sign_agreement",
     "spearman",
+    "sync_candles",
+    "upsert_candles",
 ]

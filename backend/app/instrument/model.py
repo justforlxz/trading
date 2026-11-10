@@ -22,7 +22,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core import InstrumentRef, ValidationError
 from app.db import Base, DecimalText, UtcDateTime
 
-__all__ = ["Instrument", "InstrumentPair"]
+__all__ = ["Instrument", "InstrumentPair", "unstorable_reason"]
 
 EXCHANGE = "okx"
 
@@ -93,11 +93,16 @@ class InstrumentPair:
 
 
 def build_instrument(ref: InstrumentRef) -> Instrument:
-    """把上游标的快照翻译成落库模型（纯映射，不碰数据库）。"""
+    """把上游标的快照翻译成落库模型（纯映射，不碰数据库）。
 
-    inst_type = ref.inst_type.strip().upper()
-    if inst_type not in INST_TYPES:
-        raise ValidationError(f"标的 {ref.inst_id} 的 instType 不支持:{ref.inst_type!r}")
+    上游还没下发币种的行无法确定产品键与报价币种，落库只能存半行：这里如实报错，
+    由 `sync_instruments` 逐条跳过并记录原因，不让单行影响同批其余标的。
+    """
+
+    inst_type = _inst_type(ref)
+    reason = unstorable_reason(ref)
+    if reason is not None:
+        raise ValidationError(f"标的 {ref.inst_id} {reason}")
 
     product_key = _product_key(ref, inst_type)
     return Instrument(
@@ -126,18 +131,52 @@ def _asset_type(inst_category: str) -> str:
     return _ASSET_TYPES.get(inst_category.strip(), UNKNOWN_ASSET_TYPE)
 
 
+def unstorable_reason(ref: InstrumentRef) -> str | None:
+    """这行还缺什么才能落库；字段齐全时返回 `None`。
+
+    上游对还没开盘的标的（`state == "preopen"`）不下发币种：`baseCcy` 与 `quoteCcy`
+    都是空串。这类行既说不清属于哪个产品，也说不清报价币种，落库只能存半行，因此
+    由同步流程逐条跳过并记录原因，不让一行空币种把整批标的一起回滚。
+
+    判定只看字段是否为空，不看 `state`：实测既有 `state == "live"` 而币种为空的行，
+    也有 `state == "preopen"` 却已下发币种的行。
+    """
+
+    inst_type = _inst_type(ref)
+    missing = [name for name, value in _currency_fields(ref, inst_type) if not value.strip()]
+    if not missing:
+        return None
+    return f"上游未下发币种字段 {'/'.join(missing)}"
+
+
+def _currency_fields(ref: InstrumentRef, inst_type: str) -> tuple[tuple[str, str], ...]:
+    """这行依赖哪些币种字段：永续看合约标的币种与结算币种，现货看 base 与报价。"""
+
+    if inst_type == SWAP:
+        return (("ctValCcy", ref.ct_val_ccy), ("settleCcy", ref.settle_ccy))
+    return (("baseCcy", ref.base_ccy), ("quoteCcy", ref.quote_ccy))
+
+
+def _inst_type(ref: InstrumentRef) -> str:
+    inst_type = ref.inst_type.strip().upper()
+    if inst_type not in INST_TYPES:
+        raise ValidationError(f"标的 {ref.inst_id} 的 instType 不支持:{ref.inst_type!r}")
+    return inst_type
+
+
 def _product_key(ref: InstrumentRef, inst_type: str) -> str:
     """同一产品的配对键。
 
     只有代币化股票（`instCategory == 3`）的现货带 `X` 标记，因此也只有这一类
     现货需要去掉它；加密资产的 `XRP`、`XLM` 去掉 X 会变成另一个不存在的东西。
+    币种为空的行到不了这里：`unstorable_reason` 已经先一步把它们判为不可入库。
     """
 
     if inst_type == SWAP:
-        return _require(ref.ct_val_ccy, ref.inst_id, "ctValCcy")
+        return ref.ct_val_ccy.strip()
+    base_ccy = ref.base_ccy.strip()
     if ref.inst_category.strip() != TOKENIZED_EQUITY_CATEGORY:
-        return _require(ref.base_ccy, ref.inst_id, "baseCcy")
-    base_ccy = _require(ref.base_ccy, ref.inst_id, "baseCcy")
+        return base_ccy
     if len(base_ccy) < 2 or not base_ccy.startswith("X"):
         raise ValidationError(f"代币化股票现货 {ref.inst_id} 的 baseCcy 缺少 X 标记:{base_ccy!r}")
     return base_ccy[1:]
@@ -145,8 +184,8 @@ def _product_key(ref: InstrumentRef, inst_type: str) -> str:
 
 def _quote_currency(ref: InstrumentRef, inst_type: str) -> str:
     if inst_type == SWAP:
-        return _require(ref.settle_ccy, ref.inst_id, "settleCcy")
-    return _require(ref.quote_ccy, ref.inst_id, "quoteCcy")
+        return ref.settle_ccy.strip()
+    return ref.quote_ccy.strip()
 
 
 def _trading_status(ref: InstrumentRef) -> str:

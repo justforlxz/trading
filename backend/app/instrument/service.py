@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -20,9 +21,12 @@ from app.instrument.model import (
     Instrument,
     InstrumentPair,
     build_instrument,
+    unstorable_reason,
 )
 
 __all__ = [
+    "SyncReport",
+    "SyncSkip",
     "get_instrument_pair",
     "list_instruments",
     "list_tradable",
@@ -36,18 +40,52 @@ DEFAULT_QUOTE_CURRENCY = "USDT"
 LIVE_STATUS = "live"
 
 
-def sync_instruments(refs: Sequence[InstrumentRef]) -> int:
-    """按 `symbol`（交易所 instId）写入或更新，返回处理的条数。
+@dataclass(frozen=True, slots=True)
+class SyncSkip:
+    """一条没有入库的标的，以及为什么。"""
+
+    inst_id: str
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class SyncReport:
+    """一次同步的结果：入库条数与逐条跳过记录，两者之和等于输入行数。"""
+
+    inserted: int
+    skipped: tuple[SyncSkip, ...]
+
+    @property
+    def total(self) -> int:
+        return self.inserted + len(self.skipped)
+
+
+def sync_instruments(refs: Sequence[InstrumentRef]) -> SyncReport:
+    """按 `symbol`（交易所 instId）写入或更新，返回入库与跳过的明细。
+
+    单行不合法只跳过这一行并记下原因，不影响同批其余标的：真实现货快照里有上游
+    还没下发币种的 preopen 行，一行空币种都不许把整批 1216 条 `live` 标的一起回滚。
 
     以 `symbol` 为主键 upsert：同一份快照重复同步只会更新字段，不会新增行，
     因此可以安全地反复执行。
     """
 
-    instruments = [build_instrument(ref) for ref in refs]
+    instruments: list[Instrument] = []
+    skipped: list[SyncSkip] = []
+    for ref in refs:
+        try:
+            reason = unstorable_reason(ref)
+            if reason is not None:
+                skipped.append(SyncSkip(ref.inst_id, reason))
+                continue
+            instruments.append(build_instrument(ref))
+        except ValidationError as exc:
+            skipped.append(SyncSkip(ref.inst_id, str(exc)))
+
     with session_scope() as session:
         for instrument in instruments:
             session.merge(instrument)
-    return len(instruments)
+    return SyncReport(inserted=len(instruments), skipped=tuple(skipped))
 
 
 def list_instruments() -> list[Instrument]:

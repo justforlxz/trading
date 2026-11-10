@@ -6,6 +6,7 @@
 from app.instrument.model import Instrument, InstrumentPair
 from app.instrument.rules import TradingRules, trading_rules
 from app.instrument.service import (
+    SyncReport,
     get_instrument_pair,
     list_instruments,
     list_tradable,
@@ -16,6 +17,7 @@ from app.instrument.service import (
 __all__ = [
     "Instrument",
     "InstrumentPair",
+    "SyncReport",
     "TradingRules",
     "get_instrument_pair",
     "list_instruments",

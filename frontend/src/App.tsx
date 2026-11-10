@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import { AppShell } from "./components/layout/app-shell";
 import BacktestsPage from "./pages/backtests";
+import InstrumentDetailPage from "./pages/instrument-detail";
 import OverviewPage from "./pages/overview";
 import SettingsPage from "./pages/settings";
 import StrategiesPage from "./pages/strategies";
@@ -14,6 +15,7 @@ export default function App() {
       <Route element={<AppShell />}>
         <Route index element={<OverviewPage />} />
         <Route path="watchlist" element={<WatchlistPage />} />
+        <Route path="watchlist/:instId" element={<InstrumentDetailPage />} />
         <Route path="strategies" element={<StrategiesPage />} />
         <Route path="backtests" element={<BacktestsPage />} />
         <Route path="trades" element={<TradesPage />} />

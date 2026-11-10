@@ -22,7 +22,7 @@ export function PageHeading({
 
 /**
  * 尚未实现的区域。只说明「按计划会有什么」，不展示任何业务数值，
- * 避免用占位假数据伪装功能已完成（项目开发原则）。
+ * 避免用编造的业务数值伪装功能已完成（项目开发原则）。
  */
 export function PendingPanel({
   stage,

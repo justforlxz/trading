@@ -1,0 +1,32 @@
+{
+ "meta": {
+  "kind": "test_fixture_recorded_response",
+  "purpose": "测试夹具：真实 OKX 响应的录制样本，仅用于固定 fake server 的行形状；不是实时行情。",
+  "captured_at": "2026-11-10T08:02:32Z",
+  "source": "https://www.okx.com/api/v5/market/ticker?instId=XAAPL-USDT"
+ },
+ "response": {
+  "code": "0",
+  "data": [
+   {
+    "instType": "SPOT",
+    "instId": "XAAPL-USDT",
+    "last": "351.07",
+    "lastSz": "0.19585",
+    "askPx": "351.05",
+    "askSz": "1.42623",
+    "bidPx": "351.01",
+    "bidSz": "0.02176",
+    "open24h": "344.5",
+    "high24h": "352.49",
+    "low24h": "343.45",
+    "volCcy24h": "354431.1053227",
+    "vol24h": "1018.3503",
+    "ts": "1794297751078",
+    "sodUtc0": "350.96",
+    "sodUtc8": "351.43"
+   }
+  ],
+  "msg": ""
+ }
+}

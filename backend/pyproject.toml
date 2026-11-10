@@ -4,41 +4,27 @@ build-backend = "hatchling.build"
 
 [project]
 name = "trading-backend"
-version = "0.1.0"
-description = "trading backend — FastAPI 服务、arq 任务入口与数据库迁移"
+version = "0.2.0"
+description = "trading backend — 单进程 FastAPI + 同步 SQLAlchemy + SQLite"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115,<1.0",
   "uvicorn[standard]>=0.32,<1.0",
   "pydantic-settings>=2.6,<3.0",
-  "sqlalchemy[asyncio]>=2.0,<2.1",
-  "asyncpg>=0.30,<1.0",
+  "sqlalchemy>=2.0,<2.1",
   "alembic>=1.14,<2.0",
-  "arq>=0.26,<1.0",
-  "redis>=5.0,<6.0",
-  # 外部 HTTP 只在 adapters 内使用（OKX 公共 REST + Yahoo chart v8）。
+  # 外部 HTTP 只在交易所适配层使用（OKX 公共 REST）。
   "httpx>=0.28,<1.0",
 ]
 
 [project.optional-dependencies]
 dev = [
   "pytest>=8.3,<9.0",
-  "pytest-asyncio>=0.24,<1.0",
   "ruff>=0.8,<1.0",
-  # 测试 oracle：NYSE 日历的独立实现（只用于比对，不参与运行时）
-  "exchange_calendars>=4.13,<5.0",
-  # 测试 oracle：相关/显著性对拍（只用于比对，运行时实现是 stdlib 纯函数）
-  "scipy>=1.14,<2.0",
-  # 覆盖率门禁（make coverage / CI backend job）
-  "pytest-cov>=5.0,<7.0",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
-
-[project.scripts]
-# stdio 包装器：外部 Agent 用它把 JSON-RPC 转发到 HTTP `/mcp`。
-trading-mcp = "app.mcp.stdio:main"
 
 [tool.ruff]
 target-version = "py312"
@@ -51,34 +37,5 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 # RUF002/RUF003：本项目文档与注释使用中文全角标点，属预期
 ignore = ["B008", "RUF002", "RUF003"]
 
-[tool.ruff.lint.isort]
-# 仓库根的 alembic/ 迁移目录会遮蔽同名第三方包，显式声明归属
-known-third-party = ["alembic"]
-
-
-[tool.ruff.lint.per-file-ignores]
-"alembic/versions/*.py" = ["E501"]
-
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "session"
-asyncio_default_test_loop_scope = "session"
 testpaths = ["tests"]
-
-[tool.coverage.run]
-# 只统计业务代码；迁移脚本与测试自身不计入分母。
-source = ["app"]
-branch = false
-omit = [
-  "alembic/*",
-  "tests/*",
-]
-
-[tool.coverage.report]
-precision = 1
-show_missing = true
-exclude_lines = [
-  "pragma: no cover",
-  "if TYPE_CHECKING:",
-  "raise NotImplementedError",
-]

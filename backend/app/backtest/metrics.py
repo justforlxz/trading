@@ -1,14 +1,14 @@
 """回测指标（纯函数，固定点 Decimal）。
 
-10 个指标名与 `docs/architecture/data-model.md` §6 的 `backtest_metric.name`
-一一对应。所有年化口径都由调用方传入 `annualization_factor` / `risk_free_rate`，
-公式里不写死 252 或 0，改参数必然改变结果。
+10 个指标名与回测报告一一对应。所有年化口径都由调用方传入
+`annualization_factor` / `risk_free_rate`，公式里不写死 252 或 0，
+改参数必然改变结果。
 
 约定：
 
 - `max_drawdown` 为正数幅度（0.1 表示从峰值回撤 10%）。
 - `turnover` = 累计成交名义金额 / 初始资金（建仓与平仓两侧都计，买入持有约 2.0）。
-- `cost_ratio` = (手续费 + 资金费 + 滑点) / 初始资金。
+- `cost_ratio` = (手续费 + 滑点) / 初始资金。
 - 年化/夏普/索提诺在样本不足时返回 0（不伪造、不抛错）。
 """
 
@@ -17,7 +17,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from decimal import Decimal
 
-from app.market.core.bars import bar_seconds
+from app.shared.timeframe import bar_seconds
 
 MONEY_QUANT = Decimal("0.0000000001")
 ONE = Decimal(1)
@@ -95,7 +95,6 @@ def compute_metrics(
     net_pnls: Sequence[Decimal],
     traded_notional: Decimal,
     total_fees: Decimal,
-    total_funding: Decimal,
     total_slippage: Decimal,
     annualization_factor: Decimal,
     risk_free_rate: Decimal,
@@ -145,7 +144,7 @@ def compute_metrics(
     average_loss = _mean(losses)
     profit_loss_ratio = _div(average_win, abs(average_loss)) if losses else ZERO
 
-    costs = abs(Decimal(total_fees)) + abs(Decimal(total_funding)) + abs(Decimal(total_slippage))
+    costs = abs(Decimal(total_fees)) + abs(Decimal(total_slippage))
     return {
         "total_return": quantize_money(total_return),
         "annualized_return": quantize_money(annualized),

@@ -1,6 +1,7 @@
 """trading 后端包。
 
-分层与依赖方向见 `docs/architecture/overview.md` §3–§4：本文件不导出任何业务符号。
+v2 是单进程同步栈（FastAPI + SQLAlchemy + SQLite）：本文件不导出任何业务符号，
+只声明版本号，避免导入包时产生副作用。
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

@@ -1,127 +1,72 @@
 # trading
 
-自托管的自动化量化交易系统：分析美股之间的动态相关性、市场共振、趋势与相对强弱，构建多空组合策略，在 OKX 美股 USDT 本位永续合约上执行。
+自托管的自动化交易系统：以标的之间的关系为主线发现机会、构建多空组合，并通过独立的风控与执行系统在 OKX 上交易美股相关合约。
 
-> **1.0 已交付**：P1 行情/关系/机会/策略/回测、P2 风控、P3 交易执行（order 生命周期、策略级虚拟持仓、
-> 对账、恢复、自动止损、paper 交易）、P4 以 MCP 服务对外暴露能力（ADR-0007，不含内置 LLM）。
-> 真实资金下单默认关闭，1.0 全程只跑 paper。逐条证据见 `docs/reports/release-1.0.md`。
+**当前状态：v2 骨架。** v1 实现已整体移除（`v1-final` tag 可回溯），仓库只有能启动的空壳：单进程 FastAPI + 同步 SQLAlchemy + SQLite。业务逻辑随后续节点逐个接入。
 
-## 当前阶段
+## 技术栈
 
-**1.0 · S12 集成验收与发布（已完成；真实交易默认关闭，K8s 形态未交付）**
-
-| 项 | 状态 |
+| 层 | 选型 |
 | --- | --- |
-| 技术栈 | Python 3.12 + FastAPI / SQLAlchemy async + Alembic；React 18 + Vite + TS + Tailwind + shadcn/ui；PostgreSQL 16 + Redis 7；arq（worker + scheduler） |
-| 运行时形态 | Docker Compose 六服务：`postgres`、`redis`、`api`、`worker`、`scheduler`、`web` |
-| 已可运行 | `/health`、`/ready`、`/api/v1`（market / targets / opportunities / strategies / backtests / risk / execution / mcp-clients）、MCP `POST /mcp`、前端四路由与双主题、`alembic upgrade head`（`0009_mcp_schema`）、arq 任务链路、CI |
-| 阶段范围 | 行情采集、关系分析、机会发现、策略与回测、风控、订单生命周期与策略级虚拟持仓、对账、故障恢复、自动止损、paper 交易、MCP 只读查询 + 受控操作 |
-| 明确不做 | 真实资金下单（`REAL_TRADING_ENABLED` 默认 `false`，需逐策略书面授权）、内置 LLM / 自然语言助手（P4 改由 MCP 对外暴露能力） |
-| 未交付 | Kubernetes 部署形态（工程债，见 `docs/reports/release-1.0.md`） |
-| 待决策 | 3 项，见 `docs/risk/external-dependencies.md` §5 |
+| 后端 | Python 3.12+、FastAPI、同步 SQLAlchemy |
+| 存储 | SQLite 单文件库（WAL 模式），无独立数据库进程 |
+| 任务 | 进程内定时任务，不使用消息队列 |
+| 前端 | TypeScript、React、Vite、Tailwind CSS、shadcn/ui 风格基础件 |
+
+单进程部署：一个 `uvicorn` 进程同时提供 HTTP API 与静态前端产物，没有第二套运行时。
 
 ## 快速开始
 
 ```bash
-cp .env.example .env          # 环境变量清单；默认值可直接跑，密钥不入库
-make up                       # 构建并启动六个服务，等待健康检查通过
-curl -fsS localhost:8000/health   # {"status":"ok","version":"0.1.0"}
-curl -fsS -o /dev/null -w '%{http_code}\n' localhost:5173   # 200
-make logs
-make down
+cp .env.example .env      # 环境变量清单；默认值可直接跑
+make install              # 建 .venv、安装后端（可编辑）与前端依赖
+make test                 # 后端 pytest + 前端构建
 ```
 
-也可直接使用 Compose（与 `make up` 等价）：
+只跑后端：
 
 ```bash
-docker compose up -d --build --wait
-docker compose ps --format json
+cd backend && ../.venv/bin/python -m uvicorn app.main:app --reload
+curl -s localhost:8000/api/health
 ```
 
-**可复现性判据**：`docker compose down -v && make up` 从零重建后，上述两个探活命令仍成立。
-
-### 容器与端口
-
-| 服务 | 作用 | 端口 |
-| --- | --- | --- |
-| `postgres` | 唯一持久化真相（schema 分域） | 仅内网 |
-| `redis` | 任务队列与短期缓存 | 仅内网 |
-| `api` | 同步请求；启动时幂等执行 `alembic upgrade head` | 8000 |
-| `worker` | 执行 arq 任务，不对外暴露端口 | — |
-| `scheduler` | 按 cron 与市场时段投递任务（同一镜像、独立进程） | — |
-| `web` | 静态资源、SPA 路由回退、`/api` 反代 | 5173 |
-
-### 存活探针
+只跑前端（开发服务器把 `/api` 反代到 `localhost:8000`）：
 
 ```bash
-# scheduler：Redis 心跳新鲜度（退出码 0 = 存活）
-docker compose exec -T scheduler python -m app.jobs.probe scheduler
-
-# worker：确认 arq 进程存在（退出码 0 = 存活）
-docker compose exec -T worker python -m app.jobs.probe worker
-
-# 就绪：数据库可连通才返回 200
-curl -fsS localhost:8000/ready
+pnpm --dir frontend dev
 ```
 
-上述两条探针同时是 Compose 的 `healthcheck`，因此 `docker compose ps` 里的 `running` 与 `healthy` 是同一判据。
+## 目录
 
-### 本地校验矩阵
+```
+backend/
+  app/
+    main.py         应用装配：lifespan 建表 → 挂载路由
+    config.py       环境变量解析（pydantic-settings）
+    db/             同步引擎、会话、声明基类、建表入口
+    api/            HTTP 协议层（无领域逻辑）
+    shared/         跨域共享的纯函数（bar 周期等）
+    market/         行情：K 线对齐、缺口、相关性
+    backtest/       回测：成本模型、绩效指标
+    indicators/ instrument/ watchlist/ strategy/ risk/ execution/ journal/ exchange/ jobs/
+                    各域骨架，随对应阶段落地
+  tests/            pytest（tests/api/ 起按接口分目录）
+frontend/
+  src/pages/        概览 / 自选 / 策略 / 回测 / 交易 / 设置
+  src/components/   ui（基础件）与 layout（外壳）
+  src/lib/          API 客户端、主题与纯展示工具
+```
+
+## 数据
+
+库文件固定在 `backend/data/trading.db`，随首次启动由 `init_db()` 创建（`create_all`，幂等），并设置 `journal_mode=WAL`。该目录不进版本库。
+
+## 门禁
 
 ```bash
-cd backend && ruff check . && ruff format --check . && pytest -q
-cd frontend && pnpm install --frozen-lockfile && pnpm lint && pnpm build
-docker compose config --quiet
-actionlint .github/workflows/ci.yml
+make lint     # ruff check + ruff format --check + eslint
+make test     # pytest + tsc --noEmit && vite build
+make verify-live   # 起真实 uvicorn 进程并请求 /api/health
 ```
 
-`make test` / `make lint` / `make format` 的后端部分走 `api-dev` 镜像（`dev` profile，装齐 dev extras 并挂载工作区源码，跑的是当前工作树），因此不依赖本机 Python；前端部分在宿主机用 `pnpm` 执行，需要本机装有 pnpm。`make migrate` 对运行中的数据库执行迁移（会自动拉起依赖服务）。
-
-## 文档索引
-
-| 文档 | 内容 |
-| --- | --- |
-| `AGENTS.md` | 工程规范：目录、分层、命名、提交信息、测试门禁、禁止事项 |
-| `docs/runbook.md` | **运维手册**：部署、配置、备份恢复、升级回滚、故障排查、日志位置 |
-| `docs/mcp.md` | MCP 服务：协议、鉴权与作用域、工具清单、审计 |
-| `docs/market-data.md` | 行情来源、时段与数据口径 |
-| `docs/architecture/overview.md` | 模块边界、依赖方向、运行容器与启动顺序、故障域 |
-| `docs/architecture/data-model.md` | 实体、关键字段、唯一约束与幂等键、时间与精度约定（schema 含 market / research / opportunity / strategy / backtest / risk / execution / ops / mcp） |
-| `docs/architecture/api-contract.md` | 对外 REST 契约（§3.1–3.10）、MCP 契约、错误与分页约定 |
-| `docs/plan/p1.md` | P1 任务拆解（依赖 / 交付物 / 验收命令 / 判据）与 S3–S8 映射 |
-| `docs/plan/p2-p4.md` | P2–P4 与 S12 集成验收的任务拆解（§3 的 AI 计划表已作废，见 ADR-0007） |
-| `docs/risk/external-dependencies.md` | OKX 与美股行情源实测证据、结论、风险与待决策项 |
-| `docs/architecture/adr/` | 架构决策记录 0001–0007（0007 = P4 用 MCP 取代内置 AI） |
-| `docs/reports/release-1.0.md` | **1.0 发布说明**：P1–P4 能力表、门禁与实测覆盖率、已知限制与工程债 |
-| `docs/reports/p1-acceptance.md` · `p2-acceptance.md` · `p3-acceptance.md` | 各阶段验收报告 |
-| `docs/reports/chaos-report.md` | 故障注入验收：Redis/PG 停机、上游 429、worker 重启 |
-| `docs/reports/perf-baseline.md` | 性能基线：全池回补、全市场扫描、关键 GET p95、容量判断与告警阈值 |
-| `docs/reports/security-audit.md` | 安全审计：密钥扫描、MCP 鉴权与越权、实盘门禁、文档一致性 |
-| `docs/reports/*-artifacts.json` | 各验收脚本产出的原始数据（`full-smoke`、`chaos`、`p1/p2/p3-smoke`） |
-
-## 验收脚本
-
-```bash
-bash scripts/e2e/full_smoke.sh        # S12-01 全链路一键验收（步骤 0–9，需干净库：先 down -v && make up）
-bash scripts/e2e/chaos.sh             # S12-02 四类故障注入（Redis/PG 停机、上游 429、worker 重启）
-bash scripts/e2e/security_audit.sh    # S12-04 安全审计探针（只读；非 paper 姿态直接中止）
-bash scripts/e2e/p1_smoke.sh          # P1 单阶段回归
-bash scripts/e2e/p2_smoke.sh          # P2 单阶段回归
-bash scripts/e2e/p3_smoke.sh          # P3 单阶段回归（paper 交易，不碰真实资金）
-```
-
-脚本都以 `exit 0` 表示通过、非零表示失败并打印失败步骤（`security_audit.sh` 是逐项断言，任一不符即非零，
-且在非 `paper` + `REAL_TRADING_ENABLED=false` 的部署上开跑前就中止，不会碰真实下单端点）。
-`full_smoke.sh` / `chaos.sh` 的产物默认写 `$HOME/.cache/s12/`，避免跑一次验收就改动工作区；
-需要刷新仓库内 `docs/reports/*-artifacts.json` 时显式传 `ARTIFACT=docs/reports/<名字>.json`。
-
-## 探针脚本
-
-调研结论都可复现，脚本只读、无副作用、仅用 Python 标准库：
-
-```bash
-python3 scripts/probes/okx_probe.py all        # 合约清单 / 行情 / 资金费率 / 历史深度
-python3 scripts/probes/equity_probe.py all     # 真实美股行情源可得性
-python3 scripts/probes/okx_probe.py --help
-python3 scripts/probes/equity_probe.py --help
-```
+工程约定见 `AGENTS.md`。

@@ -1,361 +1,100 @@
-"""合约 K 线：幂等写入、增量采集、历史回补、缺口登记与查询。
+"""K 线的纯函数：对齐、排序/去重、缺口定位、confirm 归并。
 
-关键约定：
-- 唯一键 `(instrument_id, bar, open_time)`，重复回补只更新值，不产生副本；
-- 已确认（confirm=true）的 bar 不会被后来的未完成 bar 覆盖（回补前先过滤）；
-- 采集失败（限流耗尽等）由任务层收敛为 `partial`，缺口写 `data_quality_issue`。
+不碰数据库、不发 HTTP，便于单测给出确定的输入/输出。
 """
 
-from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
-from typing import Any
+from collections.abc import Callable, Iterable, Sequence
+from datetime import UTC, datetime, timedelta, timezone
+from itertools import pairwise
 
-from sqlalchemy import func, select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.ext.asyncio import AsyncSession
+from app.shared.timeframe import bar_seconds, normalize_bar
 
-from app.market import sync_status
-from app.market.core.bars import bar_seconds, normalize_bar
-from app.market.core.candles import find_gaps
-from app.market.core.coverage import coverage_by_day, summarize
-from app.market.models import Candle, Instrument
-from app.ops.quality import record_issue, resolve_issues
-from app.ports.market_data import CandleRow, CandleSource
-
-DATASET = "market.candle"
-
-VALUE_FIELDS: tuple[str, ...] = (
-    "open",
-    "high",
-    "low",
-    "close",
-    "vol",
-    "vol_ccy",
-    "vol_ccy_quote",
-    "source",
-)
+# OKX 的 1D 以 UTC+8 为零点，内部仍用 UTC 存储，因此日线边界落在 16:00Z。
+UTC8 = timezone(timedelta(hours=8))
 
 
-@dataclass(frozen=True, slots=True)
-class BackfillResult:
-    """回补结果：写入行数 + 未补齐的窗口（空表示完整）。"""
-
-    inst_id: str
-    bar: str
-    rows_written: int
-    gaps: list[tuple[datetime, datetime]] = field(default_factory=list)
-
-    @property
-    def status(self) -> str:
-        return "partial" if self.gaps else "ok"
+def bar_delta(bar: str) -> timedelta:
+    return timedelta(seconds=bar_seconds(bar))
 
 
-def _values(
-    instrument_id: int, rows: list[CandleRow], ingested_at: datetime
-) -> list[dict[str, Any]]:
-    return [
-        {
-            "instrument_id": instrument_id,
-            "bar": row.bar,
-            "open_time": row.open_time,
-            "open": row.open,
-            "high": row.high,
-            "low": row.low,
-            "close": row.close,
-            "vol": row.vol,
-            "vol_ccy": row.vol_ccy,
-            "vol_ccy_quote": row.vol_ccy_quote,
-            "confirm": row.confirm,
-            "source": row.source,
-            "ingested_at": ingested_at,
-        }
-        for row in rows
-    ]
+def floor_open_time(ts: datetime, bar: str) -> datetime:
+    """把时间戳向下对齐到该周期的 open_time（UTC）。"""
+
+    if ts.tzinfo is None:
+        raise ValueError("ts must be timezone-aware")
+    canonical = normalize_bar(bar)
+    utc = ts.astimezone(UTC)
+    if canonical == "1d":
+        local = utc.astimezone(UTC8)
+        floored = local.replace(hour=0, minute=0, second=0, microsecond=0)
+        return floored.astimezone(UTC)
+    epoch = int(utc.timestamp())
+    step = bar_seconds(canonical)
+    return datetime.fromtimestamp(epoch - epoch % step, tz=UTC)
 
 
-async def _confirmed_open_times(
-    session: AsyncSession, instrument_id: int, bar: str, rows: list[CandleRow]
-) -> set[datetime]:
-    if not rows:
-        return set()
-    times = [row.open_time for row in rows]
-    statement = select(Candle.open_time).where(
-        Candle.instrument_id == instrument_id,
-        Candle.bar == bar,
-        Candle.open_time.in_(times),
-        Candle.confirm.is_(True),
-    )
-    return set(await session.scalars(statement))
+def expected_open_times(start: datetime, end: datetime, bar: str) -> list[datetime]:
+    """`[start, end)` 内应到的 open_time 序列（含缺口检测的分母）。"""
+
+    step = bar_delta(bar)
+    cursor = floor_open_time(start, bar)
+    if cursor < start:
+        cursor += step
+    result: list[datetime] = []
+    while cursor < end:
+        result.append(cursor)
+        cursor += step
+    return result
 
 
-async def upsert_candles(session: AsyncSession, instrument_id: int, rows: list[CandleRow]) -> int:
-    """幂等写入；已确认的 bar 不被未完成版本覆盖。返回提交的行数。"""
+def dedupe_sorted[T](rows: Iterable[T], key: Callable[[T], object]) -> list[T]:
+    """按 key 去重并升序；同一 open_time 保留最后一条（后到覆盖先到）。"""
 
-    if not rows:
-        return 0
-    confirmed = await _confirmed_open_times(session, instrument_id, rows[0].bar, rows)
-    usable = [row for row in rows if row.confirm or row.open_time not in confirmed]
-    if not usable:
-        return 0
-
-    payload = _values(instrument_id, usable, datetime.now(tz=UTC))
-    statement = pg_insert(Candle).values(payload)
-    statement = statement.on_conflict_do_update(
-        index_elements=[Candle.instrument_id, Candle.bar, Candle.open_time],
-        set_={
-            **{name: getattr(statement.excluded, name) for name in VALUE_FIELDS},
-            "confirm": Candle.confirm.is_(True) | statement.excluded.confirm,
-            "ingested_at": statement.excluded.ingested_at,
-        },
-    )
-    await session.execute(statement)
-    await session.commit()
-    return len(usable)
+    latest: dict[object, T] = {}
+    for row in rows:
+        latest[key(row)] = row
+    return [latest[k] for k in sorted(latest)]
 
 
-async def latest_open_time(session: AsyncSession, instrument_id: int, bar: str) -> datetime | None:
-    return await session.scalar(
-        select(func.max(Candle.open_time)).where(
-            Candle.instrument_id == instrument_id, Candle.bar == bar
-        )
-    )
-
-
-def _gap_window(bar: str, now: datetime) -> tuple[datetime, datetime]:
-    """缺口检测窗口：日线看 30 天，日内看 3 天（足够覆盖停摆排查）。"""
-
-    days = 30 if bar == "1d" else 3
-    return now - timedelta(days=days), now
-
-
-async def record_gaps(
-    session: AsyncSession,
-    *,
-    instrument: Instrument,
-    bar: str,
+def find_gaps(
+    actual: Sequence[datetime],
     start: datetime,
     end: datetime,
+    bar: str,
 ) -> list[tuple[datetime, datetime]]:
-    """对比「应到」与「实到」，把缺口登记为 GAP 问题（幂等）。"""
+    """返回缺口窗口 `[window_start, window_end)`，按时间升序合并连续缺失。"""
 
-    actual = set(
-        await session.scalars(
-            select(Candle.open_time).where(
-                Candle.instrument_id == instrument.id,
-                Candle.bar == bar,
-                Candle.open_time >= start,
-                Candle.open_time < end,
-            )
-        )
-    )
-    gaps = find_gaps(actual, start, end, bar)
-    # 先关闭该窗口内已补齐的历史缺口，再登记仍然缺失的（幂等键不会误关新缺口）。
-    await resolve_issues(
-        session,
-        dataset=DATASET,
-        scope_id=f"{instrument.inst_id}:{bar}",
-        kind="GAP",
-        since=start,
-        until=end,
-    )
-    for gap_start, gap_end in gaps:
-        await record_issue(
-            session,
-            dataset=DATASET,
-            scope_id=f"{instrument.inst_id}:{bar}",
-            kind="GAP",
-            window_start=gap_start,
-            window_end=gap_end,
-            severity="warning",
-            detail={
-                "inst_id": instrument.inst_id,
-                "bar": bar,
-                "expected_seconds": bar_seconds(bar),
-            },
-        )
+    present = set(actual)
+    gaps: list[tuple[datetime, datetime]] = []
+    step = bar_delta(bar)
+    run_start: datetime | None = None
+    cursor: datetime | None = None
+    for expected in expected_open_times(start, end, bar):
+        cursor = expected
+        if expected in present:
+            if run_start is not None:
+                gaps.append((run_start, expected))
+                run_start = None
+        elif run_start is None:
+            run_start = expected
+    if run_start is not None and cursor is not None:
+        gaps.append((run_start, cursor + step))
     return gaps
 
 
-async def record_collection_gap(
-    session: AsyncSession,
-    *,
-    instrument: Instrument,
-    bar: str,
-    now: datetime | None = None,
-    reason: str = "upstream_unavailable",
-) -> datetime:
-    """采集彻底失败时登记「待补窗口」，起点从最后一根之后算起。
+def duplicate_open_times(actual: Sequence[datetime]) -> list[datetime]:
+    """重复出现的 open_time（数据质量 DUPLICATE 判定）。"""
 
-    起点与 `record_gaps` 的缺口起点同口径，等数据补齐后同一条记录会自然收敛。
-    """
-
-    moment = now or datetime.now(tz=UTC)
-    normalized = normalize_bar(bar)
-    window_start, _ = _gap_window(normalized, moment)
-    latest = await latest_open_time(session, instrument.id, normalized)
-    step = timedelta(seconds=bar_seconds(normalized))
-    expected = latest + step if latest is not None else window_start
-    start = max(expected, window_start)
-    await record_issue(
-        session,
-        dataset=DATASET,
-        scope_id=f"{instrument.inst_id}:{normalized}",
-        kind="GAP",
-        window_start=start,
-        window_end=moment,
-        severity="warning",
-        detail={
-            "inst_id": instrument.inst_id,
-            "bar": normalized,
-            "reason": reason,
-            "expected_seconds": bar_seconds(normalized),
-        },
-    )
-    await session.commit()
-    return start
+    seen: set[datetime] = set()
+    duplicates: list[datetime] = []
+    for ts in actual:
+        if ts in seen and ts not in duplicates:
+            duplicates.append(ts)
+        seen.add(ts)
+    return duplicates
 
 
-async def ingest_recent(
-    session: AsyncSession,
-    source: CandleSource,
-    *,
-    instrument: Instrument,
-    bars: list[str],
-    limit: int = 300,
-    now: datetime | None = None,
-) -> dict[str, int]:
-    """增量采集：每根周期取最近 N 根并 upsert，随后登记缺口。"""
+def out_of_order(actual: Sequence[datetime]) -> bool:
+    """序列是否非严格升序。"""
 
-    moment = now or datetime.now(tz=UTC)
-    written: dict[str, int] = {}
-    bucket_start, bucket_end = sync_status.day_bucket(moment)
-    for bar in bars:
-        normalized = normalize_bar(bar)
-        rows = await source.fetch_candles(instrument.inst_id, normalized, limit=limit)
-        written[normalized] = await upsert_candles(session, instrument.id, rows)
-        start, end = _gap_window(normalized, moment)
-        await record_gaps(session, instrument=instrument, bar=normalized, start=start, end=end)
-        await sync_status.record_sync(
-            session,
-            source="okx",
-            dataset=DATASET,
-            scope=f"{instrument.inst_id}:{normalized}",
-            window_start=bucket_start,
-            window_end=bucket_end,
-            status="ok",
-            rows_written=written[normalized],
-        )
-    await session.commit()
-    return written
-
-
-async def backfill(
-    session: AsyncSession,
-    source: CandleSource,
-    *,
-    instrument: Instrument,
-    bar: str,
-    start: datetime,
-    end: datetime,
-    page_limit: int = 100,
-) -> BackfillResult:
-    """历史回补指定窗口，随后按 `[start, end)` 登记缺口。"""
-
-    normalized = normalize_bar(bar)
-    rows = await source.fetch_history(
-        instrument.inst_id, normalized, start, end, page_limit=page_limit
-    )
-    written = await upsert_candles(session, instrument.id, rows)
-    gaps = await record_gaps(session, instrument=instrument, bar=normalized, start=start, end=end)
-    await sync_status.record_sync(
-        session,
-        source="okx",
-        dataset=DATASET,
-        scope=f"{instrument.inst_id}:{normalized}",
-        window_start=start,
-        window_end=end,
-        status="partial" if gaps else "ok",
-        rows_written=written,
-        error=None if not gaps else f"{len(gaps)} gap(s) remain",
-    )
-    await session.commit()
-    return BackfillResult(
-        inst_id=instrument.inst_id, bar=normalized, rows_written=written, gaps=gaps
-    )
-
-
-async def coverage(
-    session: AsyncSession,
-    *,
-    instrument: Instrument,
-    bar: str,
-    start: datetime,
-    end: datetime,
-) -> dict[str, Any]:
-    """应到/实到/缺口的窗口汇总（逐日明细由 `core.coverage` 计算）。"""
-
-    normalized = normalize_bar(bar)
-    actual = list(
-        await session.scalars(
-            select(Candle.open_time).where(
-                Candle.instrument_id == instrument.id,
-                Candle.bar == normalized,
-                Candle.open_time >= start,
-                Candle.open_time < end,
-            )
-        )
-    )
-    buckets = coverage_by_day(actual, start, end, normalized)
-    return {
-        "inst_id": instrument.inst_id,
-        "bar": normalized,
-        "window_start": start,
-        "window_end": end,
-        "summary": summarize(buckets),
-        "days": [bucket.as_dict() for bucket in buckets],
-    }
-
-
-async def list_candles(
-    session: AsyncSession,
-    *,
-    inst_id: str,
-    bar: str,
-    start: datetime | None = None,
-    end: datetime | None = None,
-    limit: int = 200,
-    cursor: datetime | None = None,
-) -> tuple[list[Candle], datetime | None]:
-    """固定按 open_time 升序的分页（契约例外：行情序列必须升序）。"""
-
-    normalized = normalize_bar(bar)
-    statement = (
-        select(Candle)
-        .join(Instrument, Instrument.id == Candle.instrument_id)
-        .where(Instrument.inst_id == inst_id, Candle.bar == normalized)
-        .order_by(Candle.open_time)
-        .limit(limit + 1)
-    )
-    if start is not None:
-        statement = statement.where(Candle.open_time >= start)
-    if end is not None:
-        statement = statement.where(Candle.open_time < end)
-    if cursor is not None:
-        statement = statement.where(Candle.open_time > cursor)
-    rows = list(await session.scalars(statement))
-    next_cursor = rows[limit - 1].open_time if len(rows) > limit else None
-    return rows[:limit], next_cursor
-
-
-__all__ = [
-    "DATASET",
-    "BackfillResult",
-    "backfill",
-    "coverage",
-    "ingest_recent",
-    "latest_open_time",
-    "list_candles",
-    "record_collection_gap",
-    "record_gaps",
-    "upsert_candles",
-]
+    return any(later <= earlier for earlier, later in pairwise(actual))

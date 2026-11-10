@@ -1,6 +1,6 @@
 """资金费历史采集：分页方向、结算网格、幂等落库与空值语义。
 
-拓扑固定：真实 `OkxClient` → 线程内假 OKX → 临时 SQLite。期望值全部由
+拓扑固定：真实 `OkxClient` → 线程内假 OKX → 临时 schema 的 PostgreSQL。期望值全部由
 「8 小时结算网格」与假历史深度反推，不依赖上游返回顺序或本机当前时间。
 """
 
@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.core import UpstreamError, ValidationError
 from app.db import session_scope
@@ -221,17 +222,23 @@ def test_upsert_of_nothing_writes_nothing() -> None:
 def test_init_db_creates_funding_table_keyed_by_settlement() -> None:
     with session_scope() as session:
         tables = set(
-            session.execute(text("SELECT name FROM sqlite_master WHERE type='table'")).scalars()
+            session.execute(
+                text(
+                    "SELECT table_name FROM information_schema.tables "
+                    "WHERE table_schema = current_schema()"
+                )
+            ).scalars()
         )
         columns = {
-            row[1]: row for row in session.execute(text("PRAGMA table_info('funding')")).all()
+            row.column_name: row
+            for row in session.execute(
+                text(
+                    "SELECT column_name, is_nullable FROM information_schema.columns "
+                    "WHERE table_schema = current_schema() AND table_name = 'funding'"
+                )
+            ).all()
         }
-        indexes = session.execute(text("PRAGMA index_list('funding')")).all()
-        unique_columns = {
-            tuple(info[2] for info in session.execute(text(f"PRAGMA index_info('{row[1]}')")).all())
-            for row in indexes
-            if row[2] == 1
-        }
+        keys = _key_columns(session, "funding")
 
     assert "funding" in tables
     assert set(columns) == {
@@ -242,9 +249,32 @@ def test_init_db_creates_funding_table_keyed_by_settlement() -> None:
         "updated_at",
     }
     # 两档费率都可空：缺失与「真实为 0」必须能分开表达。
-    assert columns["funding_rate"][3] == 0
-    assert columns["realized_rate"][3] == 0
-    assert ("inst_id", "funding_time") in unique_columns
+    assert columns["funding_rate"].is_nullable == "YES"
+    assert columns["realized_rate"].is_nullable == "YES"
+    assert ("inst_id", "funding_time") in keys
+
+
+def _key_columns(session: Session, table: str) -> set[tuple[str, ...]]:
+    """表上的主键与唯一约束，按约束内的列顺序还原成元组集合。"""
+
+    rows = session.execute(
+        text(
+            "SELECT tc.constraint_name, kcu.column_name "
+            "FROM information_schema.table_constraints tc "
+            "JOIN information_schema.key_column_usage kcu "
+            "  ON kcu.constraint_name = tc.constraint_name "
+            " AND kcu.table_schema = tc.table_schema "
+            "WHERE tc.table_schema = current_schema() AND tc.table_name = :table "
+            "  AND tc.constraint_type IN ('PRIMARY KEY', 'UNIQUE') "
+            "ORDER BY tc.constraint_name, kcu.ordinal_position"
+        ),
+        {"table": table},
+    ).all()
+
+    grouped: dict[str, list[str]] = {}
+    for constraint_name, column_name in rows:
+        grouped.setdefault(constraint_name, []).append(column_name)
+    return {tuple(columns) for columns in grouped.values()}
 
 
 # ------------------------------------------------------------------ 分页方向

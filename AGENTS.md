@@ -8,17 +8,17 @@
 ```
 backend/            Python 3.12+ + FastAPI，单包
   app/
-    main.py         应用装配：lifespan 建表 → 挂载路由
+    main.py         应用装配：lifespan 执行迁移 → 挂载路由
     config.py       环境变量解析（pydantic-settings）
-    db/             引擎、会话、声明基类、建表入口
+    db/             引擎、会话、声明基类、迁移入口
     api/            对外 HTTP 协议层（无领域逻辑）
     shared/         跨域共享的纯函数（bar 周期等）
     market/         行情：K 线对齐、缺口、相关性
     backtest/       回测：成本模型、绩效指标
     indicators/ instrument/ watchlist/ strategy/ risk/ execution/ journal/ exchange/ jobs/
                     各域骨架，随对应阶段落地
-  data/             SQLite 库文件（不进版本库）
   tests/            pytest，按接口/模块建子目录
+  migrations/       Alembic 迁移脚本（表结构的唯一来源）
 frontend/           React + TS + Vite + Tailwind
   src/pages/        概览 / 自选 / 策略 / 回测 / 交易 / 设置
   src/components/   ui（基础件）与 layout（外壳）
@@ -68,10 +68,11 @@ Influence: <对系统/用户的影响>
 
 - 新增或修改业务逻辑必须带测试；纯函数（相关性、成本、指标）必须有「已知答案」用例。
 - 测试默认不连真实交易所、不发真实订单；外部响应必须用录制的真实 fixture。
-- 单测用独立临时库文件，不写 `backend/data/` 下的本地库。
+- 单测用独立临时 schema（同一本地库内建、用完即删），不共享表，也不碰业务 schema。
 - 门禁命令（提交前必跑，等价于 `make lint && make test`）：
 
 ```bash
+make db-up   # 测试库要先起来（podman run）；容器已存在时只启动
 cd backend && ../.venv/bin/python -m ruff check . \
   && ../.venv/bin/python -m ruff format --check . \
   && ../.venv/bin/python -m pytest -q
@@ -94,11 +95,13 @@ pnpm --dir frontend lint && pnpm --dir frontend build
 ```bash
 cp .env.example .env        # 环境变量清单；默认值可直接跑
 make install                # 建 .venv，安装后端与前端依赖
+make db-up                  # 用 podman run 起本地 PostgreSQL（已存在则启动）
+make migrate                # 表结构推进到最新版本（alembic upgrade head）
 make test                   # 后端 pytest + 前端构建
 make lint
 make format
 make verify-live            # 起真实 uvicorn 进程并请求 /api/health
 ```
 
-后端以 `backend/` 为 cwd 启动（`uvicorn app.main:app`），库文件位置由包路径推导，
-不受 cwd 影响。
+后端以 `backend/` 为 cwd 启动（`uvicorn app.main:app`）；数据库地址来自 `DATABASE_URL`，
+与 cwd 无关。部署方式不在项目范围，本地数据库只用 `podman run` 起容器。

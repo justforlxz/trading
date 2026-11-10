@@ -1,6 +1,6 @@
-"""watchlist 域测试装配：每个用例一个临时库，这里只负责建表。
+"""watchlist 域测试装配：每个用例一个临时 schema，这里只负责执行迁移。
 
-根 `conftest.py` 已把 `DATABASE_PATH` 指到 `tmp_path`。
+根 `conftest.py` 已把引擎指向本用例独有的 schema。
 """
 
 import pytest
@@ -15,6 +15,6 @@ from app.watchlist import WatchlistItemRow  # noqa: F401
 
 @pytest.fixture(autouse=True)
 def _watchlist_schema() -> None:
-    """每个用例开始前建好表；库文件由根 conftest 隔离。"""
+    """每个用例开始前执行迁移建好表；schema 由根 conftest 隔离。"""
 
     init_db()

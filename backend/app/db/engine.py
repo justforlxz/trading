@@ -1,10 +1,10 @@
-"""同步 SQLite 引擎：单文件库 + WAL + 外键约束。
+"""同步 PostgreSQL 引擎：连接串来自配置，schema 可选。
 
-`journal_mode` 是库文件级属性，写入一次后随文件持久化；仍在每次建连时显式设置，
-因为库文件可能由外部工具创建（此时默认是 `delete` 模式）。
-
-引擎按配置惰性创建并缓存：测试可以通过 `get_engine.cache_clear()` 换库，
+引擎按配置惰性创建并缓存：测试可以通过 `get_engine.cache_clear()` 换连接，
 不需要重载模块。
+
+`schema` 不为空时，每条连接都把 `search_path` 钉到该 schema：表与 Alembic 的
+版本表都落在里面，测试因此可以各自用一个临时 schema 互不干扰，不用建临时库。
 """
 
 from collections.abc import Iterator
@@ -12,40 +12,28 @@ from contextlib import contextmanager
 from functools import lru_cache
 from typing import Any
 
-from sqlalchemy import Engine, create_engine, event
+from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 
-# 写锁等待 5s：单进程下不预期争用，留出足够余量避免长事务直接报 locked。
-BUSY_TIMEOUT_MS = 5000
 
+def _connect_args(schema: str | None) -> dict[str, Any]:
+    """把 schema 变成 libpq 的 `options`；留空时用连接默认的 search_path。"""
 
-def _set_sqlite_pragmas(dbapi_connection: Any, _record: Any) -> None:
-    """每次新建连接都执行的库级设置。"""
-
-    cursor = dbapi_connection.cursor()
-    try:
-        cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.execute(f"PRAGMA busy_timeout={BUSY_TIMEOUT_MS}")
-    finally:
-        cursor.close()
+    return {"options": f"-csearch_path={schema}"} if schema else {}
 
 
 @lru_cache
 def get_engine() -> Engine:
-    """按配置构造引擎；父目录不存在时先建目录。"""
+    """按配置构造引擎。"""
 
-    database_path = get_settings().database_path
-    database_path.parent.mkdir(parents=True, exist_ok=True)
-    engine = create_engine(
-        f"sqlite:///{database_path}",
+    settings = get_settings()
+    return create_engine(
+        settings.database_url,
         future=True,
-        connect_args={"check_same_thread": False},
+        connect_args=_connect_args(settings.database_schema),
     )
-    event.listen(engine, "connect", _set_sqlite_pragmas)
-    return engine
 
 
 @contextmanager

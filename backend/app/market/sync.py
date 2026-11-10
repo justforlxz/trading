@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func, select
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 
 from app.core import Bar, MarketDataPort, Timeframe, ValidationError
 from app.db import session_scope
@@ -24,8 +24,8 @@ from app.shared import bar_seconds, normalize_bar
 MAX_PAGE_LIMIT = 100
 DEFAULT_PAGE_LIMIT = MAX_PAGE_LIMIT
 
-# 单条 INSERT 的批量上限：SQLite 绑定参数默认上限 32766，每行 10 个值约合 3276 行，
-# 取 1000 留足余量，保证默认构建与极大窗口都不会撞上 `too many SQL variables`。
+# 单条 INSERT 的批量上限：PostgreSQL 单条语句最多 65535 个绑定参数，每行 10 个值
+# 约合 6553 行；取 1000 留足余量，保证极大窗口也不会撞上参数上限。
 UPSERT_BATCH_SIZE = 1000
 
 
@@ -129,7 +129,7 @@ def sync_candles(
 def upsert_candles(rows: Iterable[Bar]) -> UpsertResult:
     """批量幂等写入：同一主键重复写不新增行，只覆盖价格。
 
-    写入按固定行数切块，避免大窗口一次性撞上 SQLite 的绑定参数上限；
+    写入按固定行数切块，避免大窗口一次性撞上 PostgreSQL 的绑定参数上限；
     同一批内的重复主键先合并，计数只按唯一主键算。"""
 
     prepared: dict[tuple[str, str, int, str], dict[str, Any]] = {}
@@ -158,7 +158,7 @@ def upsert_candles(rows: Iterable[Bar]) -> UpsertResult:
     with session_scope() as session:
         for batch in _batches(list(prepared.values()), UPSERT_BATCH_SIZE):
             existing |= _existing_keys(session, batch)
-            statement = sqlite_insert(Candle).values(batch)
+            statement = postgresql_insert(Candle).values(batch)
             statement = statement.on_conflict_do_update(
                 index_elements=["symbol", "bar", "open_time", "source"],
                 set_={

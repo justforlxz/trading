@@ -1,16 +1,25 @@
-"""建库建表：v2 用 `Base.metadata.create_all` 落 schema，不引入迁移工具。
+"""建库入口：执行版本化迁移（Alembic），不再 `create_all`。
 
-单进程 + 单文件库 + 空壳阶段没有历史数据，`create_all` 的「不存在才建」语义
-足够可靠；出现第一次需要改列的变更时再引入版本化迁移。
+表结构只有一条产生路径——迁移脚本；`init_db()` 把库推进到最新版本，进程启动
+与 `make migrate` 走的是同一条命令，不会出现「代码里的表」和「库里的表」不一致。
 """
 
-from app.config import get_settings
-from app.db.base import Base
-from app.db.engine import get_engine
+from alembic import command
+from alembic.config import Config
+
+from app.config import BACKEND_DIR
+
+# 迁移配置固定在包目录旁：进程 cwd 是 backend/ 还是仓库根都不影响定位。
+ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
+
+
+def alembic_config() -> Config:
+    """迁移配置；脚本位置与 sys.path 由 ini 里的 `%(here)s` 解析，与 cwd 无关。"""
+
+    return Config(str(ALEMBIC_INI))
 
 
 def init_db() -> None:
-    """创建库文件所在目录与全部缺失的表（幂等，可重复调用）。"""
+    """把库结构推进到最新版本；已是最新时为空操作（幂等，可重复调用）。"""
 
-    get_settings().database_path.parent.mkdir(parents=True, exist_ok=True)
-    Base.metadata.create_all(bind=get_engine())
+    command.upgrade(alembic_config(), "head")

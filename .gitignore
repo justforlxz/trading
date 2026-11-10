@@ -15,9 +15,6 @@ build/
 coverage.xml
 htmlcov/
 
-# 本地 SQLite 库文件（由 init_db 生成，不入库）
-backend/data/
-
 # Node
 node_modules/
 dist/

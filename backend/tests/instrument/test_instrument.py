@@ -22,7 +22,7 @@ from tests.factories.instruments import SAMPLE_LIST_TIME, load_instruments, make
 
 @pytest.fixture(autouse=True)
 def _schema() -> None:
-    """每个用例都在临时库里建表（Instrument 已随导入注册到 metadata）。"""
+    """每个用例都在临时 schema 里执行迁移（Instrument 已随导入注册到 metadata）。"""
 
     init_db()
 

@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "trading-backend"
 version = "0.2.0"
-description = "trading backend — 单进程 FastAPI + 同步 SQLAlchemy + SQLite"
+description = "trading backend — 单进程 FastAPI + 同步 SQLAlchemy + PostgreSQL"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115,<1.0",
@@ -13,6 +13,8 @@ dependencies = [
   "pydantic-settings>=2.6,<3.0",
   "sqlalchemy>=2.0,<2.1",
   "alembic>=1.14,<2.0",
+  # PostgreSQL 驱动：psycopg 3 同步实现，二进制轮子自带 libpq。
+  "psycopg[binary]>=3.2,<4.0",
   # 外部 HTTP 只在交易所适配层使用（OKX 公共 REST）。
   "httpx>=0.28,<1.0",
 ]

@@ -27,6 +27,10 @@ DAILY_OPEN_OFFSET_SECONDS = 57600
 
 _CENT = Decimal("0.01")
 
+# 夹具假定的永续合约乘数：每张 4 个标的币。刻意不取 1，好让上游的「张数」列
+# 与「币数」列取值不同——适配器取错列时断言立刻变红。
+CONTRACT_SIZE = Decimal("4")
+
 
 def bar_seconds(bar: str) -> int:
     """返回周期对应的秒数；未知周期直接报错，避免静默按 1m 处理。"""
@@ -57,8 +61,14 @@ def _price(*parts: object) -> Decimal:
     return (_seed(*parts) % 100_000 / Decimal(100) + Decimal(10)).quantize(_CENT)
 
 
-def make_candle_row(inst_id: str, bar: str, open_time: int, *, confirm: bool = True) -> list[str]:
-    """构造单根 K 线行：`[ts, open, high, low, close, vol, volCcy, volCcyQuote, confirm]`。"""
+def make_candle_row(
+    inst_id: str, bar: str, open_time: int, *, confirm: bool = True, inst_type: str = "SPOT"
+) -> list[str]:
+    """构造单根 K 线行：`[ts, open, high, low, close, vol, volCcy, volCcyQuote, confirm]`。
+
+    `vol` / `volCcy` 的口径与上游一致：现货是「标的币数量 / 计价额」，永续是
+    「张数 / 标的币数量」。
+    """
 
     open_price = _price(inst_id, bar, open_time)
     close_price = _price(inst_id, bar, open_time, "close")
@@ -66,17 +76,26 @@ def make_candle_row(inst_id: str, bar: str, open_time: int, *, confirm: bool = T
     low_price = min(open_price, close_price) - Decimal("0.41")
     volume = (_price(inst_id, bar, open_time, "volume") * 100).quantize(_CENT)
     turnover = (volume * close_price).quantize(_CENT)
+    vol, vol_ccy = _volume_columns(volume, turnover, inst_type)
     return [
         str(open_time * 1000),
         str(open_price),
         str(high_price.quantize(_CENT)),
         str(low_price.quantize(_CENT)),
         str(close_price),
-        str(volume),
-        str(turnover),
+        str(vol),
+        str(vol_ccy),
         str(turnover),
         "1" if confirm else "0",
     ]
+
+
+def _volume_columns(volume: Decimal, turnover: Decimal, inst_type: str) -> tuple[Decimal, Decimal]:
+    """标的币数量与计价额 → 上游的 `vol` / `volCcy` 两列。"""
+
+    if inst_type == "SWAP":
+        return (volume / CONTRACT_SIZE).quantize(_CENT), volume
+    return volume, turnover
 
 
 def make_candle_rows(
@@ -86,6 +105,7 @@ def make_candle_rows(
     count: int,
     end_time: int | None = None,
     include_incomplete: bool = True,
+    inst_type: str = "SPOT",
 ) -> list[list[str]]:
     """生成倒序（最新在前）的 K 线行；最新一根按 `include_incomplete` 决定是否未收盘。"""
 
@@ -95,7 +115,7 @@ def make_candle_rows(
     for index in range(count):
         open_time = newest - index * seconds
         confirm = not (include_incomplete and index == 0)
-        rows.append(make_candle_row(inst_id, bar, open_time, confirm=confirm))
+        rows.append(make_candle_row(inst_id, bar, open_time, confirm=confirm, inst_type=inst_type))
     return rows
 
 
@@ -109,6 +129,8 @@ def make_ticker_row(
     bid = last - Decimal("0.01")
     ask = last + Decimal("0.01")
     sod = _price(inst_id, "sod", timestamp // 86400)
+    volume = Decimal("1000")
+    vol, vol_ccy = _volume_columns(volume, (volume * last).quantize(_CENT), inst_type)
     return {
         "instType": inst_type,
         "instId": inst_id,
@@ -121,8 +143,8 @@ def make_ticker_row(
         "open24h": str(sod),
         "high24h": str(max(ask, sod) + Decimal("1.23")),
         "low24h": str(max(min(bid, sod) - Decimal("1.23"), _CENT)),
-        "volCcy24h": "1000",
-        "vol24h": "1000",
+        "volCcy24h": str(vol_ccy),
+        "vol24h": str(vol),
         "ts": str(timestamp * 1000),
         "sodUtc0": str(sod),
         "sodUtc8": str(sod),

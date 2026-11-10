@@ -695,7 +695,7 @@ export interface components {
              * Data Source
              * @enum {string}
              */
-            data_source: "okx" | "us_equity_proxy";
+            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
             /** Items */
             items: components["schemas"]["BacktestRankingRow"][];
             /**
@@ -739,7 +739,7 @@ export interface components {
              * Data Source
              * @enum {string}
              */
-            data_source: "okx" | "us_equity_proxy";
+            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
             /**
              * End Date
              * Format: date
@@ -817,7 +817,7 @@ export interface components {
              * Data Source
              * @enum {string}
              */
-            data_source: "okx" | "us_equity_proxy";
+            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
             /** Items */
             items: components["schemas"]["BacktestRunSummary"][];
             /** Total */
@@ -869,7 +869,7 @@ export interface components {
              * Data Source
              * @enum {string}
              */
-            data_source: "okx" | "us_equity_proxy";
+            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
             /**
              * End Date
              * Format: date
@@ -960,7 +960,7 @@ export interface components {
              * Data Source
              * @enum {string}
              */
-            data_source: "okx" | "us_equity_proxy";
+            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
             /**
              * Status
              * @enum {string}
@@ -1030,7 +1030,7 @@ export interface components {
              * Data Source
              * @enum {string}
              */
-            data_source: "okx" | "us_equity_proxy";
+            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
             /** High */
             high: string;
             /** Is Closed */
@@ -1084,7 +1084,7 @@ export interface components {
              * Data Source
              * @enum {string}
              */
-            data_source: "okx" | "us_equity_proxy";
+            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
             /**
              * Has Gap
              * @default false
@@ -2501,7 +2501,7 @@ export interface operations {
     list_backtests_api_backtests_get: {
         parameters: {
             query: {
-                data_source: "okx" | "us_equity_proxy";
+                data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
                 limit?: number;
             };
             header?: never;
@@ -2566,7 +2566,7 @@ export interface operations {
     get_backtest_ranking_api_backtests_ranking_get: {
         parameters: {
             query: {
-                data_source: "okx" | "us_equity_proxy";
+                data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
                 metric?: "total_return_pct" | "max_drawdown_pct" | "sharpe" | "profit_factor";
                 limit?: number;
             };

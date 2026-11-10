@@ -55,7 +55,7 @@ def _bar(
 
 def test_sync_pages_back_until_it_covers_the_window(market_port) -> None:
     start = DAILY_END - timedelta(hours=250)
-    result = sync_candles(market_port, SYMBOL, "1h", start, DAILY_END)
+    result = sync_candles(market_port, SYMBOL, "1h", start, DAILY_END, inst_type="SPOT")
 
     # 250 根按每页 100 根往回翻，需要 3 页。
     assert result.pages == 3
@@ -73,7 +73,7 @@ def test_sync_downloads_exactly_the_requested_window(market_port) -> None:
     """上游能给出更早数据时也要停在窗口边界，不越界多取。"""
 
     start = DAILY_END - timedelta(days=30)
-    result = sync_candles(market_port, SYMBOL, "1d", start, DAILY_END)
+    result = sync_candles(market_port, SYMBOL, "1d", start, DAILY_END, inst_type="SPOT")
 
     assert result.pages == 1
     assert result.downloaded == 30
@@ -84,7 +84,7 @@ def test_sync_handles_a_window_larger_than_one_write_batch(market_port) -> None:
     """3 天 1 分钟线共 4320 行，超过默认构建单条 INSERT 的绑定参数上限。"""
 
     start = DAILY_END - timedelta(days=3)
-    result = sync_candles(market_port, SYMBOL, "1m", start, DAILY_END)
+    result = sync_candles(market_port, SYMBOL, "1m", start, DAILY_END, inst_type="SPOT")
 
     assert result.pages == 44
     assert result.downloaded == 4320
@@ -97,8 +97,8 @@ def test_sync_handles_a_window_larger_than_one_write_batch(market_port) -> None:
 
 def test_syncing_the_same_batch_twice_does_not_add_rows(market_port) -> None:
     start = DAILY_END - timedelta(hours=12)
-    first = sync_candles(market_port, SYMBOL, "1h", start, DAILY_END)
-    second = sync_candles(market_port, SYMBOL, "1h", start, DAILY_END)
+    first = sync_candles(market_port, SYMBOL, "1h", start, DAILY_END, inst_type="SPOT")
+    second = sync_candles(market_port, SYMBOL, "1h", start, DAILY_END, inst_type="SPOT")
 
     assert first.inserted == 12
     assert (second.inserted, second.updated) == (0, 12)
@@ -183,7 +183,7 @@ def test_upsert_splits_statements_when_the_variable_limit_is_low(monkeypatch) ->
 
 def test_daily_bars_are_stored_on_the_utc8_boundary(market_port) -> None:
     start = DAILY_END - timedelta(days=5)
-    sync_candles(market_port, SYMBOL, "1d", start, DAILY_END)
+    sync_candles(market_port, SYMBOL, "1d", start, DAILY_END, inst_type="SPOT")
 
     with session_scope() as session:
         canonical = session.execute(
@@ -215,7 +215,7 @@ def test_daily_bars_are_stored_on_the_utc8_boundary(market_port) -> None:
 )
 def test_sync_rejects_invalid_arguments(market_port, bar, start, end, page_limit) -> None:
     with pytest.raises(ValidationError):
-        sync_candles(market_port, SYMBOL, bar, start, end, page_limit=page_limit)
+        sync_candles(market_port, SYMBOL, bar, start, end, inst_type="SPOT", page_limit=page_limit)
 
 
 def test_sync_rejects_naive_datetimes(market_port) -> None:
@@ -226,6 +226,7 @@ def test_sync_rejects_naive_datetimes(market_port) -> None:
             "1h",
             datetime(2026, 11, 6),  # 故意构造无时区时间
             DAILY_END,
+            inst_type="SPOT",
         )
 
 
@@ -236,7 +237,9 @@ def test_sync_propagates_upstream_failure_and_writes_nothing(
     port = create_market_data(settings=fake_okx_settings)
     try:
         with pytest.raises(ExchangeError):
-            sync_candles(port, SYMBOL, "1h", DAILY_END - timedelta(hours=3), DAILY_END)
+            sync_candles(
+                port, SYMBOL, "1h", DAILY_END - timedelta(hours=3), DAILY_END, inst_type="SPOT"
+            )
     finally:
         port.close()
 

@@ -49,7 +49,7 @@ def _bar(
 
 def _sync_window(port, symbol: str, hours: int, *, end: datetime = WINDOW_END) -> datetime:
     start = end - timedelta(hours=hours)
-    sync_candles(port, symbol, "1h", start, end)
+    sync_candles(port, symbol, "1h", start, end, inst_type="SPOT")
     return start
 
 

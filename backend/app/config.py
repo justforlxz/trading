@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     # 公共行情上游地址（只读公开 REST，不涉及下单）。
     okx_rest_base_url: str = "https://www.okx.com"
     okx_http_timeout_seconds: float = 10.0
+    # 限流重试上限：命中上游限流后最多再试几次，用尽即报「限流」错误。
+    okx_http_max_retries: int = 3
+    # 令牌桶容量与补充速率：按上游最紧的公共行情配额（20 次 / 2 秒）折算。
+    okx_rate_limit_capacity: int = 20
+    okx_rate_limit_refill_per_second: float = 10.0
 
 
 @lru_cache

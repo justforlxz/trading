@@ -1,4 +1,4 @@
-"""市场域：历史 K 线的下载/落库/完整性，以及相关性计算。
+"""市场域：历史 K 线与资金费的下载/落库/完整性，以及相关性计算。
 
 本域对外只发布两件事：
 - 纯函数（对齐、缺口、重复、相关系数）—— 输入输出可直接断言；
@@ -24,6 +24,13 @@ from app.market.correlation import (
     rolling_sign_agreement,
     spearman,
 )
+from app.market.funding import (
+    FundingPoint,
+    backfill_funding,
+    load_funding,
+    parse_funding_rows,
+    upsert_funding,
+)
 from app.market.model import Candle
 from app.market.service import correlation, integrity
 from app.market.sync import data_range, load_candles, sync_candles, upsert_candles
@@ -31,6 +38,8 @@ from app.market.sync import data_range, load_candles, sync_candles, upsert_candl
 __all__ = [
     "MIN_SAMPLES",
     "Candle",
+    "FundingPoint",
+    "backfill_funding",
     "correlate",
     "correlation",
     "data_range",
@@ -41,11 +50,14 @@ __all__ = [
     "integrity",
     "lagged_correlation",
     "load_candles",
+    "load_funding",
     "out_of_order",
     "p_value",
+    "parse_funding_rows",
     "pearson",
     "rolling_sign_agreement",
     "spearman",
     "sync_candles",
     "upsert_candles",
+    "upsert_funding",
 ]

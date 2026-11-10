@@ -1,8 +1,8 @@
 """假 OKX 的 ASGI 应用。
 
-只覆盖 T1.2 需要的 4 个公共行情端点；私有交易接口在后续节点扩展。
-应答封包、业务错误码与故障注入都按真实上游行为实现，让适配器能在
-不改代码的前提下直接指过来。
+只覆盖行情采集需要的公共端点（标的、K 线、资金费、行情快照）；私有交易接口
+在后续节点扩展。应答封包、业务错误码与故障注入都按真实上游行为实现，让适配器
+能在不改代码的前提下直接指过来。
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from tests.fakes.okx.scenarios import Scenarios
 from tests.fakes.okx.store import INVALID_PARAMETER_CODE, MAX_CANDLE_LIMIT, OkxApiError, OkxStore
 
 _INSTRUMENTS_PATH = "/api/v5/public/instruments"
+_FUNDING_RATE_HISTORY_PATH = "/api/v5/public/funding-rate-history"
 _CANDLES_PATH = "/api/v5/market/candles"
 _HISTORY_CANDLES_PATH = "/api/v5/market/history-candles"
 _TICKER_PATH = "/api/v5/market/ticker"
@@ -106,6 +107,23 @@ def create_app(*, store: OkxStore | None = None, scenarios: Scenarios | None = N
         except OkxApiError as exc:
             return okx_payload([], code=exc.code, msg=exc.message)
         return okx_payload([row])
+
+    @app.get(_FUNDING_RATE_HISTORY_PATH)
+    def read_funding_rate_history(
+        request: Request,
+        instId: str | None = None,
+        after: str | None = None,
+        limit: str | None = None,
+    ) -> dict[str, Any]:
+        try:
+            rows = request.app.state.okx_store.funding_rate_history(
+                instId or "",
+                after=_parse_after(after),
+                limit=_parse_limit(limit, default=MAX_CANDLE_LIMIT),
+            )
+        except OkxApiError as exc:
+            return okx_payload([], code=exc.code, msg=exc.message)
+        return okx_payload(rows)
 
     return app
 

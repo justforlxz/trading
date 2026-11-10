@@ -1,20 +1,20 @@
 {
-  "generated_at": "2026-11-07T22:36:21Z",
+  "generated_at": "2026-11-09T19:03:00Z",
   "api_base": "http://localhost:8000/api/v1",
-  "evaluation_key": "2026-11-07",
+  "evaluation_key": "2026-11-09",
   "real_trading_enabled": false,
   "steps": [
     {
-      "migration": "0008_execution_schema (head)"
+      "migration": "0009_mcp_schema (head)"
     },
     {
-      "seeded_strategy": 16
+      "seeded_strategy": 3
     },
     {
-      "evaluate_job": 2477
+      "evaluate_job": 248
     },
     {
-      "order_partial": 31
+      "order_partial": 1
     },
     {
       "position_quantity": 1.2

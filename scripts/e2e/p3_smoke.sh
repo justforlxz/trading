@@ -117,7 +117,7 @@ if [[ ${SKIP_MIGRATION_CHECK:-0} != "1" ]]; then
     docker compose -f "$COMPOSE_FILE" exec -T api alembic current 2>/dev/null \
       | tr -d '\r' | sed -n '$p'
   ) || fail "读取 alembic current 失败（需要 docker 与运行中的 compose 栈）"
-  [[ $migration == *"0008_execution_schema"* ]] || fail "迁移版本不是 0008_execution_schema：$migration"
+  [[ $migration == *"(head)"* ]] || fail "迁移版本不在 head：$migration"
 fi
 mode=$(curl -fsS "$API_BASE/execution/mode") || fail "GET /execution/mode 失败"
 [[ $(jq -r '.mode' <<<"$mode") == "paper" ]] || fail "默认模式不是 paper：$mode"

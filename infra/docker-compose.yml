@@ -12,6 +12,8 @@ x-backend-env: &backend-env
   SCHEDULER_HEARTBEAT_TIMEOUT_SECONDS: ${SCHEDULER_HEARTBEAT_TIMEOUT_SECONDS:-30}
   # P3 交易执行：真实交易默认关闭；凭据只从环境变量注入，缺省为空。
   REAL_TRADING_ENABLED: ${REAL_TRADING_ENABLED:-false}
+  # 公共行情上游地址；只在故障注入验收里覆盖（scripts/e2e/chaos.sh），正常运行用默认值。
+  OKX_REST_BASE_URL: ${OKX_REST_BASE_URL:-https://www.okx.com}
   OKX_API_KEY: ${OKX_API_KEY:-}
   OKX_API_SECRET: ${OKX_API_SECRET:-}
   OKX_API_PASSPHRASE: ${OKX_API_PASSPHRASE:-}

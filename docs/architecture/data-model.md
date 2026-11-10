@@ -1,6 +1,6 @@
 # 数据模型（P1）
 
-单一 PostgreSQL 16 实例，按限界上下文分 schema：`market`、`research`、`opportunity`、`strategy`、`backtest`、`ops`。跨 schema 外键白名单固定为三张表：`market.instrument`、`research.target_symbol`、`strategy.strategy`（与 `adr/0002-single-postgres-schema.md` 一致），其余禁止互相 JOIN 业务表。
+单一 PostgreSQL 16 实例，按限界上下文分 schema：`market`、`research`、`opportunity`、`strategy`、`backtest`、`ops`、`risk`、`execution`、`mcp`。跨 schema 外键白名单固定为三张表：`market.instrument`、`research.target_symbol`、`strategy.strategy`（与 `adr/0002-single-postgres-schema.md` 一致），其余禁止互相 JOIN 业务表。
 
 约定先行，表结构后列。
 
@@ -203,7 +203,7 @@ K 线锚定规则（实测，见 `docs/risk/external-dependencies.md`）：
 
 ### strategy（策略）
 
-`id`、`strategy_key`、`name`、`kind`（`directional`/`relative_value`）、`status`（`draft`/`pending_approval`/`approved`/`rejected`/`archived`）、`target_id`（可空）、`templates JSONB`、`params JSONB`、`content_hash`、`version`、`created_at`、`updated_at`、`approved_at`。唯一键：`UNIQUE (strategy_key)`；`UNIQUE (id, version)` 用于回测绑定版本。
+`id`、`strategy_key`、`name`、`kind`（`directional`/`relative_value`）、`status`（`draft`/`pending_approval`/`approved`/`rejected`/`archived`）、`target_id`（可空）、`templates JSONB`、`params JSONB`、`content_hash`、`version`、`created_at`、`updated_at`、`approved_at`、`paused_at`（可空，`0009_mcp_schema` 新增：策略被暂停时记录时刻；暂停中 `execute_strategy_action` 拒绝执行并返回 `strategy_paused`，策略状态本身不变，`resume_strategy` 清空该字段）。唯一键：`UNIQUE (strategy_key)`；`UNIQUE (id, version)` 用于回测绑定版本。
 
 ### strategy_leg（策略腿）
 
@@ -321,7 +321,41 @@ K 线锚定规则（实测，见 `docs/risk/external-dependencies.md`）：
 同一差异只保留一条未结记录，重复对账不叠加；结案后同一差异再次出现会产生新的 open 行，历史结案记录保留。
 对账**只记录差异，不改本地数据**；存在 open 差异时真实下单被拒绝（`execution_reconcile_pending`）。
 
-## 10. 存储量与保留
+## 10. mcp schema（S11 MCP 服务）
+
+由迁移 `0009_mcp_schema` 建立（同时给 `strategy.strategy` 增加 `paused_at`）。本 schema 只存客户端与调用审计，
+不存业务结论：MCP 不产生自己的策略、回测或订单，所有操作都走既有服务并落在对应 schema。
+
+### mcp_clients（MCP 客户端）
+
+`id`、`name`、`token_hash`（`sha256(token)`，**明文不落库**，只在创建响应返回一次）、`scopes JSONB`
+（`["read"]` / `["read","operate"]`）、`created_at`、`last_used_at`（可空）、`revoked_at`（可空）。
+唯一键：`UNIQUE (token_hash)`——同一令牌不能绑定两个客户端。吊销即写 `revoked_at`，下一次调用立即 401，
+客户端行保留用于审计追溯。
+
+### mcp_call_log（调用审计）
+
+`id`、`client_id`（→ `mcp_clients.id`，`ON DELETE CASCADE`）、`tool`（工具名；非 `tools/call` 方法记方法与
+资源名）、`args_digest`（参数摘要，不存原始参数，避免把业务数据二次落库）、`status`（`ok`/`error`/`forbidden`）、
+`error_code`（可空）、`reason`（可空，如 `missing scope operate`）、`latency_ms`、`created_at`。
+索引：`(created_at)`、`(client_id, created_at)`。每次调用（含被拒的越权调用）都写一行；越权调用**只**写审计行，
+不产生业务写入。
+
+迁移链完整清单（`backend/alembic/versions/`，`alembic current` 应恒为 `0009_mcp_schema (head)`）：
+
+| 版本 | 内容 |
+| --- | --- |
+| `0001_initial` | 基础表与 `ops`/`market` 骨架 |
+| `0002_market_ops_schema` | 行情、任务账本、审计 |
+| `0003_research_schema` | 目标股票、关系快照/边、相对强弱、市场截面 |
+| `0004_opportunity_schema` | 扫描批次、机会、聚类 |
+| `0005_strategy_schema` | 策略、腿、审批、状态迁移 |
+| `0006_backtest_schema` | 回测运行、指标、净值、成交 |
+| `0007_risk_schema` | 风控阈值版本与风险事件 |
+| `0008_execution_schema` | 订单、成交、虚拟持仓、对账差异 |
+| `0009_mcp_schema` | `mcp.mcp_clients`、`mcp.mcp_call_log`、`strategy.strategy.paused_at` |
+
+## 11. 存储量与保留
 
 按 227 个股票类合约、上市日起约 248 天估算：
 
@@ -338,7 +372,7 @@ K 线锚定规则（实测，见 `docs/risk/external-dependencies.md`）：
 
 保留任务（`app/market/retention.py`）按 `bar` 分组删除早于 cutoff 的行，每批 `batch_size`（默认 5000）提交一次，避免长事务与锁膨胀；`1h/4h/1d` 不参与清理。删除前必须确认对应 `data_source_sync` 已记录覆盖区间。
 
-## 11. 命名与枚举
+## 12. 命名与枚举
 
 - 表名小写复数、无前缀（schema 已表达上下文）；字段 `snake_case`。
 - 时间字段后缀：`_at` 表示时刻，`_time` 表示 K 线/时段边界，`_date` 表示本地业务日。

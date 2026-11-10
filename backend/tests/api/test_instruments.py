@@ -226,3 +226,33 @@ def test_non_equity_asset_types_and_upstream_states_are_readable(client: TestCli
 
     assert detail.status_code == 200
     assert detail.json()["instrument"]["trading_status"] == "suspend"
+
+
+def test_list_tradable_returns_only_the_requested_category(
+    market_data: TestClient,
+) -> None:
+    """`/api/instruments` 按类别返回可交易标的：两种形态各回各的，不混在一起。"""
+
+    spot = market_data.get("/api/instruments", params={"inst_type": "SPOT"})
+    swap = market_data.get("/api/instruments", params={"inst_type": "SWAP"})
+
+    assert spot.status_code == 200
+    assert [item["inst_id"] for item in spot.json()["items"]] == ["XAAPL-USDT"]
+    assert swap.status_code == 200
+    assert [item["inst_id"] for item in swap.json()["items"]] == ["AAPL-USDT-SWAP"]
+
+
+def test_list_tradable_requires_inst_type(market_data: TestClient) -> None:
+    """类别是必填参数：缺了就由查询参数校验拒绝，不返回跨类别的混合列表。"""
+
+    response = market_data.get("/api/instruments")
+
+    assert response.status_code == 422
+    assert response.json()["detail"]
+
+
+def test_list_tradable_rejects_unknown_category(market_data: TestClient) -> None:
+    response = market_data.get("/api/instruments", params={"inst_type": "FUTURES"})
+
+    assert response.status_code == 422
+    assert response.json()["detail"]

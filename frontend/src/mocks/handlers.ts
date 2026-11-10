@@ -12,6 +12,7 @@ import putExecutionMode from "./fixtures/trades/put-execution-mode.json";
 import getHealth from "./fixtures/health/get-health.json";
 import getIndicators from "./fixtures/indicators/get-indicators.json";
 import getIndicatorsSeries from "./fixtures/indicators/get-indicators-series.json";
+import getInstruments from "./fixtures/instruments/get-instruments.json";
 import getInstrumentsSearch from "./fixtures/instruments/get-instruments-search.json";
 import getInstrumentsInstId from "./fixtures/instruments/get-instruments-inst_id.json";
 import getInstrumentsInstIdCandles from "./fixtures/instruments/get-instruments-inst_id-candles.json";
@@ -47,6 +48,7 @@ export const handlers = [
   http.get("*/api/health", () => HttpResponse.json(getHealth)),
   http.get("*/api/indicators", () => HttpResponse.json(getIndicators)),
   http.get("*/api/indicators/series", () => HttpResponse.json(getIndicatorsSeries)),
+  http.get("*/api/instruments", () => HttpResponse.json(getInstruments)),
   http.get("*/api/instruments/search", () => HttpResponse.json(getInstrumentsSearch)),
   http.get("*/api/instruments/:inst_id", () => HttpResponse.json(getInstrumentsInstId)),
   http.get("*/api/instruments/:inst_id/candles", () => HttpResponse.json(getInstrumentsInstIdCandles)),

@@ -1979,6 +1979,37 @@
         "title": "InstrumentInfo",
         "type": "object"
       },
+      "InstrumentListResponse": {
+        "description": "某一类别的可交易标的（`state == live`）；交易参数走详情端点。",
+        "examples": [
+          {
+            "items": [
+              {
+                "asset_type": "tokenized_equity",
+                "base_currency": "AAPL",
+                "inst_id": "AAPL-USDT-SWAP",
+                "inst_type": "SWAP",
+                "product_key": "AAPL",
+                "quote_currency": "USDT"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InstrumentRef"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "InstrumentListResponse",
+        "type": "object"
+      },
       "InstrumentRef": {
         "description": "标的的最小可引用形状（列表、搜索结果用）。",
         "properties": {
@@ -4567,6 +4598,53 @@
         "summary": "Get Indicator Series",
         "tags": [
           "indicators"
+        ]
+      }
+    },
+    "/api/instruments": {
+      "get": {
+        "description": "某一类别的可交易标的（`state == live`），不按资产类别过滤。",
+        "operationId": "list_tradable_instruments_api_instruments_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "inst_type",
+            "required": true,
+            "schema": {
+              "enum": [
+                "SPOT",
+                "SWAP"
+              ],
+              "title": "Inst Type",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstrumentListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Tradable Instruments",
+        "tags": [
+          "instruments"
         ]
       }
     },

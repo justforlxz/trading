@@ -78,9 +78,11 @@ def test_tokenized_spot_drops_the_x_marker_for_pairing() -> None:
 
 
 def test_sync_is_idempotent_and_updates_existing_rows() -> None:
-    assert sync_instruments([make_ref(), make_swap_ref()]) == 2
+    assert sync_instruments([make_ref(), make_swap_ref()]).inserted == 2
     assert (
-        sync_instruments([make_ref(state="suspend", tick_size=Decimal("0.02")), make_swap_ref()])
+        sync_instruments(
+            [make_ref(state="suspend", tick_size=Decimal("0.02")), make_swap_ref()]
+        ).inserted
         == 2
     )
 
@@ -140,41 +142,80 @@ def test_swap_persists_contract_spec_and_currency() -> None:
     assert spot.settle_ccy is None
 
 
-def test_swap_without_ct_val_ccy_is_rejected() -> None:
-    with pytest.raises(ValidationError, match="ctValCcy"):
-        sync_instruments([make_swap_ref(ct_val_ccy="")])
+def test_swap_without_ct_val_ccy_is_skipped_not_fatal() -> None:
+    report = sync_instruments([make_ref(), make_swap_ref(ct_val_ccy="")])
 
-    assert list_instruments() == []
-
-
-def test_swap_without_settle_ccy_is_rejected() -> None:
-    with pytest.raises(ValidationError, match="settleCcy"):
-        sync_instruments([make_swap_ref(settle_ccy="")])
+    assert (report.inserted, report.total) == (1, 2)
+    assert [skip.inst_id for skip in report.skipped] == ["AAPL-USDT-SWAP"]
+    assert "ctValCcy" in report.skipped[0].reason
+    assert list(_by_symbol()) == ["XAAPL-USDT"]
 
 
-def test_tokenized_spot_without_x_marker_is_rejected() -> None:
-    with pytest.raises(ValidationError, match="X 标记"):
-        sync_instruments([make_ref(base_ccy="AAPL")])
+def test_swap_without_settle_ccy_is_skipped_not_fatal() -> None:
+    report = sync_instruments([make_ref(), make_swap_ref(settle_ccy="")])
+
+    assert (report.inserted, report.total) == (1, 2)
+    assert [skip.inst_id for skip in report.skipped] == ["AAPL-USDT-SWAP"]
+    assert "settleCcy" in report.skipped[0].reason
 
 
-def test_spot_without_quote_currency_is_rejected() -> None:
-    with pytest.raises(ValidationError, match="quoteCcy"):
-        sync_instruments([make_ref(quote_ccy="")])
+def test_tokenized_spot_without_x_marker_is_skipped_not_fatal() -> None:
+    report = sync_instruments([make_ref(), make_ref(inst_id="ZBAD-USDT", base_ccy="ZBAD")])
+
+    assert (report.inserted, report.total) == (1, 2)
+    assert [skip.inst_id for skip in report.skipped] == ["ZBAD-USDT"]
+    assert "X 标记" in report.skipped[0].reason
 
 
-def test_crypto_spot_without_base_currency_is_rejected() -> None:
-    with pytest.raises(ValidationError, match="baseCcy"):
-        sync_instruments([make_ref(inst_category="1", base_ccy="")])
+def test_spot_without_quote_currency_is_skipped_not_fatal() -> None:
+    report = sync_instruments([make_ref(), make_ref(inst_id="ZBAD-USDT", quote_ccy="")])
+
+    assert (report.inserted, report.total) == (1, 2)
+    assert [skip.inst_id for skip in report.skipped] == ["ZBAD-USDT"]
+    assert "quoteCcy" in report.skipped[0].reason
 
 
-def test_unsupported_inst_type_is_rejected() -> None:
-    with pytest.raises(ValidationError, match="instType"):
-        sync_instruments([make_ref(inst_type="FUTURES")])
+def test_crypto_spot_without_base_currency_is_skipped_not_fatal() -> None:
+    report = sync_instruments(
+        [make_ref(), make_ref(inst_id="ZBAD-USDT", inst_category="1", base_ccy="")]
+    )
+
+    assert (report.inserted, report.total) == (1, 2)
+    assert [skip.inst_id for skip in report.skipped] == ["ZBAD-USDT"]
+    assert "baseCcy" in report.skipped[0].reason
 
 
-def test_missing_trading_state_is_rejected() -> None:
-    with pytest.raises(ValidationError, match="state"):
-        sync_instruments([make_ref(state="  ")])
+def test_unsupported_inst_type_is_skipped_not_fatal() -> None:
+    report = sync_instruments([make_ref(), make_ref(inst_id="ZBAD-USDT", inst_type="FUTURES")])
+
+    assert (report.inserted, report.total) == (1, 2)
+    assert [skip.inst_id for skip in report.skipped] == ["ZBAD-USDT"]
+    assert "instType" in report.skipped[0].reason
+
+
+def test_missing_trading_state_is_skipped_not_fatal() -> None:
+    report = sync_instruments([make_ref(), make_ref(inst_id="ZBAD-USDT", state="  ")])
+
+    assert (report.inserted, report.total) == (1, 2)
+    assert [skip.inst_id for skip in report.skipped] == ["ZBAD-USDT"]
+    assert "state" in report.skipped[0].reason
+
+
+def test_sync_accounts_for_every_input_row() -> None:
+    """跳过的行逐条记下 `instId` 与原因，`inserted + skipped` 等于输入行数。"""
+
+    refs = [
+        make_ref(),
+        make_ref(inst_id="XRP-USDT", inst_category="1", base_ccy=""),
+        make_swap_ref(),
+        make_swap_ref(inst_id="MSFT-USDT-SWAP", ct_val_ccy=""),
+    ]
+
+    report = sync_instruments(refs)
+
+    assert (report.inserted, len(report.skipped), report.total) == (2, 2, 4)
+    assert [skip.inst_id for skip in report.skipped] == ["XRP-USDT", "MSFT-USDT-SWAP"]
+    assert [row.symbol for row in list_instruments()] == ["AAPL-USDT-SWAP", "XAAPL-USDT"]
 
 
 def test_pair_returns_both_forms_of_one_product() -> None:
@@ -276,7 +317,7 @@ def test_crypto_tickers_starting_with_x_keep_their_own_product_key() -> None:
 def test_sync_frozen_snapshot_matches_phase1_counts() -> None:
     refs = parse_instruments(load_instruments())
 
-    assert sync_instruments(refs) == 429
+    assert sync_instruments(refs).inserted == 429
     assert len(list_instruments()) == 429
 
     with session_scope() as session:

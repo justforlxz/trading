@@ -1,9 +1,10 @@
-# 已生效决策（PRD v2 定稿）
+# 已生效决策（PRD v3 口径）
 
-本文件记录 PRD v2 定稿时由 lxz 拍板、已经生效的产品与资金安全决策，以及这些决策对 [`v2.md`](./v2.md) 原文的改写。
+本文件记录由 lxz 拍板、已经生效的产品与资金安全决策，以及这些决策对 [`v2.md`](./v2.md) 原文的改写。v3 相对 v2 的差异来源见 [`v3-delta.md`](./v3-delta.md)。
 
 - 生效范围：本文件与 `v2.md` 冲突时，以本文件为准；`v2.md` 中已被推翻的原文已同步改写，不再保留旧口径。
 - 决策来源：2026-11-10 在 MKACG-707 讨论中的拍板（Q1/Q3/Q4/Q5、D1/D2/D3），由总控 MKACG-691 汇总；本文件只做事实记录，不新增决策。
+- 技术栈口径：PostgreSQL、单进程模块化单体、Podman 本地运行。这是项目约束，不是产品决策，记录在此只为消除歧义；具体工程约定见仓库根 `AGENTS.md`。
 - 变更方式：新增或修改决策必须由用户明确拍板，并在本文件追加记录、同步改写 `v2.md`；工程实现不得自行扩大或收窄决策边界。
 
 ## Q1 删除 MCP
@@ -22,15 +23,15 @@
 
 **决策**：第一版同时支持 OKX 现货（SPOT）与永续（SWAP）。二者是同一产品的两种交易形态（例如 `XAAPL-USDT` 与 `AAPL-USDT-SWAP`），在页面上可一键切换，切换时 K 线周期与指标参数保持不变。
 
-**依据**：v2 原文「永续合约、期货、杠杆交易暂时不作为第一版实现范围」被推翻；永续提供做空与杠杆能力，且与现货成对覆盖同一批代币化美股。
+**依据**：第一版标的范围是 `SPOT` 与 `SWAP` 两类并存，不是单一形态；现货与永续成对覆盖同一批代币化美股，永续另外提供做空与杠杆能力。
 
 **实施约束**：
 
 - `Instrument` 增加 `inst_type`（SPOT|SWAP）、`product_key`，以及仅 SWAP 非空的 `ct_val` / `ct_mult` / `ct_type` / `max_lever` / `settle_ccy`。
 - 配对只在 `instCategory == 3` 内成立：现货 `product_key = baseCcy[1:]`，永续 `product_key = ctValCcy`；不得用「去掉 X 前缀」的字符串规则替代品类判断（加密资产中同样存在 X 开头的 base）。
 - 标的详情接口返回同 `product_key` 的全部形态（`siblings`），页面提供 SPOT / PERP 切换，并同时展示另一形态的最新价与价差，不得暗示两者等价。
-- `strategy/`、`indicators/` 内禁止出现任何 `inst_type` 分支；形态差异只允许出现在 `exchange/`、`execution/`、`backtest/`。
-- 门禁：`ls backend/app` 只含既定 15 项；配对与形态用例由 `backend/tests/` 对应模块覆盖。
+- `strategy/`、`indicators/` 内禁止出现任何 `inst_type` 分支；类别差异只允许出现在 `instrument/`（按类别规则集合的唯一真源）、`exchange/`、`execution/`，由 `backend/tests/architecture/test_no_inst_type_branch.py` 把关。
+- 门禁：`ls backend/app` 与 `backend/tests/architecture/test_import_graph.py` 的 `PACKAGES` 对齐——当前是 15 个业务包，加上 `__init__.py`、`main.py`、`config.py` 三个文件；配对与形态用例由 `backend/tests/` 对应模块覆盖。
 
 ## Q4 实盘切换二次确认
 
@@ -90,9 +91,9 @@
 
 **实施约束**：
 
-- 回测记录 `data_source` 非空，取值限定为 `okx` 或 `us_equity_proxy`。
+- 回测记录 `data_source` 非空，取值限定为 `okx`、`okx_spot`、`okx_swap`、`us_equity_proxy` 之一。
 - 排行接口签名必须显式接收数据源参数，无默认值，缺参返回错误；生成的查询必须带数据源过滤。
-- 前端 Backtests 页拆成「真实 / 代理」两个独立列表，不提供「全部」视图，不存在跨数据源对比入口。
+- 前端 Backtests 页拆成「真实（`okx` / `okx_spot` / `okx_swap`）/ 代理（`us_equity_proxy`）」两个独立列表，不提供「全部」视图，不存在跨数据源对比入口。
 - 任何查询不得跨 `data_source` 排序或聚合。
 
 ## L1 资金安全四件套
@@ -138,5 +139,17 @@
 - 不新增全局状态库；页面在一屏内可见，不做专业交易终端的密集多面板。
 - 后端两个接口与 `params` 参数通道保持不变（见 D4），本次只改界面。
 
+## D6 交易时段按标的所属资产判，类别不承载时段语义
 
-Q2（v1 遗留 P5 架构评审 issue 的去留）由 PL 内部处置并已关闭对应 issue，不构成产品决策，不在本文件记录。
+**决策**：交易时段由标的所属资产决定，不由类别决定。`SPOT` 与 `SWAP` 都既可能是加密资产，也可能是代币化股票，两类标的的交易时段完全不同：`BTC-USDT-SWAP` 与 `BTC-USDT` 全天候交易，`AAPL-USDT-SWAP` 与 `XAAPL-USDT` 按美股盘前 / 正常 / 盘后 / 休市。因此类别规则集合不承载时段语义，`TradingRules.session_kind` 仅作为资产类型缺失时的兜底默认值，不得作为判定依据。
+
+**依据**：2026-11-10 PL 裁定。T1.11 已合并的实现里 `SPOT` 取 `crypto_24_7`、`SWAP` 取 `equity`，等于用类别代替了资产；而两类标的都会同时出现加密资产与代币化股票（`BTC-USDT-SWAP` 是加密永续，`XAAPL-USDT` 是代币化股票现货），按类别取时段必然有一半判错。时段是资产属性，不是类别属性。
+
+**实施约束**：
+
+- 时段判定的唯一入口按标的的 `asset_type` 取值：`crypto` 全天候（`24_7`），`tokenized_equity` 按美股盘前 / 正常 / 盘后 / 休市。
+- `TradingRules.session_kind` 降为兜底默认值，只在资产类型缺失或未知时使用；任何模块不得以它作为时段判定的依据。
+- 本条**只改文档定位，不要求改代码**：T1.11 已合并的 `TradingRules` 字段保持不动，代码侧由 T1.7（MKACG-746）按 `asset_type` 取值。
+- 本条只有一种说法，落在 `v2.md` §二「交易类别与资产」与 §三.2「混合行情与交易时段」两处；两处都按本条写，不得出现第二种。
+
+**附注**：Q2（v1 遗留 P5 架构评审 issue 的去留）由 PL 内部处置并已关闭对应 issue，不构成产品决策，不在本文件记录。

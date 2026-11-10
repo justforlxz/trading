@@ -5,11 +5,14 @@
 
 ## 1. 目录约定
 
+单进程**三层模块化单体**：`app/core` 叶子层 / 业务模块 / `app/api` 装配层。分层规则见 §2。
+
 ```
 backend/            Python 3.12+ + FastAPI，单包
   app/
     main.py         应用装配：lifespan 执行迁移 → 挂载路由
     config.py       环境变量解析（pydantic-settings）
+    core/            跨模块叶子层：错误、值对象、端口（不依赖任何业务模块）
     db/             引擎、会话、声明基类、迁移入口
     api/            对外 HTTP 协议层（无领域逻辑）
     shared/         跨域共享的纯函数（bar 周期等）
@@ -30,9 +33,16 @@ frontend/           React + TS + Vite + Tailwind
 
 ## 2. 分层与依赖方向
 
-`api → 各域纯函数与编排`，`db` 只被域模块使用。
+三层结构与本层之间的依赖方向：
+
+1. `app/core` 叶子层：错误类型、值对象、端口。每个模块都可以依赖它，它不依赖任何业务模块（由 `backend/tests/architecture/test_core_is_leaf.py` 把关）。
+2. 业务模块：`market` / `instrument` / `watchlist` / `indicators` / `strategy` / `backtest` / `risk` / `execution` / `journal` / `exchange` / `shared`。逐条依赖边登记在 `backend/tests/architecture/test_import_graph.py` 的 `ALLOWED_DEPS`，未登记的依赖边即失败。
+3. `app/api` 与 `jobs` 是装配层：`api` 是对外 HTTP 协议层，无领域逻辑；`jobs` 是进程内定时任务的装配，按 `ALLOWED_DEPS` 可依赖全部业务模块。
+
+`db` 只被域模块使用；`config` 与 `core` 是基础设施叶子，任何模块都可依赖。
 
 - 禁止：任何模块 `→ api`；`shared` 依赖任何业务模块；`market` 反向依赖 `strategy` / `execution`。
+- 类别差异（`SPOT` / `SWAP`）只允许出现在 `instrument`（按类别交易规则集合的唯一真源）、`exchange`、`execution` 三个目录；其他模块一律查表取值，不写散落的 `inst_type` 分支（由 `backend/tests/architecture/test_no_inst_type_branch.py` 把关）。
 - 业务计算只写成纯函数（无 IO、可直接断言）；编排层只做 IO 与事务边界。
 - 单进程部署：没有独立 worker / scheduler / 消息队列，定时任务跑在同一进程内。
 - 领域对象与表定义放在各自域目录，不建全局 `models.py`。
@@ -68,7 +78,7 @@ Influence: <对系统/用户的影响>
 
 - 新增或修改业务逻辑必须带测试；纯函数（相关性、成本、指标）必须有「已知答案」用例。
 - 测试默认不连真实交易所、不发真实订单；外部响应必须用录制的真实 fixture。
-- 单测用独立临时 schema（同一本地库内建、用完即删），不共享表，也不碰业务 schema。
+- 每个测试用例用一个独立的 PostgreSQL schema（同一本地库内建、用完即删），不共享表，也不碰业务 schema；表结构由 Alembic 迁移建出。
 - 门禁命令（提交前必跑，等价于 `make lint && make test`）：
 
 ```bash

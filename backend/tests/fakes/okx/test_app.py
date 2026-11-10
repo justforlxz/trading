@@ -9,6 +9,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from tests.factories.instruments import EXPECTED_ALL_COUNTS
 from tests.fakes.okx.scenarios import Scenarios
 
 _INSTRUMENTS = "/api/v5/public/instruments"
@@ -36,7 +37,7 @@ def test_instruments_endpoint_returns_the_spot_universe(okx_api: TestClient) -> 
     payload = response.json()
     assert payload["code"] == "0"
     assert payload["msg"] == ""
-    assert len(payload["data"]) == 199
+    assert len(payload["data"]) == EXPECTED_ALL_COUNTS["SPOT"]
 
 
 def test_missing_inst_type_is_a_business_error_not_a_422(okx_api: TestClient) -> None:

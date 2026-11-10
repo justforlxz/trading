@@ -38,7 +38,11 @@ def market_port(fake_okx_settings: Settings) -> Iterator[MarketDataPort]:
 def test_phase1_watchlist_round_trip(client: TestClient, market_port: MarketDataPort) -> None:
     """日常入口的核心路径：同步标的、下载日线、加自选、读行情、删自选。"""
 
-    assert sync_instruments(market_port.instruments("SPOT")) > 0
+    # 假 OKX 的现货全集里含有上游尚未开盘的 preopen 行：这类行没有 baseCcy、
+    # 也没有精度，不属于可交易集合。剔除 preopen 的规则由标的解析节点（T1.8）承担，
+    # 这里只同步能建行的标的，验证「同步 → 行情 → 自选」这条链路本身。
+    tradable = [ref for ref in market_port.instruments("SPOT") if ref.state == "live"]
+    assert sync_instruments(tradable) > 0
     assert any(row.symbol == WATCHED for row in list_instruments())
 
     now = datetime.now(UTC).replace(microsecond=0)

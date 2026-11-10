@@ -226,6 +226,29 @@ def load_candles(
         return [row.to_bar() for row in session.scalars(statement)]
 
 
+def candle_sources(symbols: Sequence[str], bar: str) -> dict[str, set[str]]:
+    """每个标的在该周期落过的来源集合；没有 K 线的标的不出现在结果里。
+
+    来源是行情的一部分：同一标的混存多种来源时，时间轴无法用同一个网格对齐
+    （代理日线开在美东 09:30、OKX 日线开在 16:00 UTC），因此相关性、矩阵与时段
+    判定都先查这一张表，要求调用方指定来源，绝不静默挑一个。
+    """
+
+    canonical = normalize_bar_or_raise(bar)
+    if not symbols:
+        return {}
+    statement = (
+        select(Candle.symbol, Candle.source)
+        .where(Candle.symbol.in_(list(symbols)), Candle.bar == canonical)
+        .distinct()
+    )
+    found: dict[str, set[str]] = {}
+    with session_scope() as session:
+        for symbol, source in session.execute(statement):
+            found.setdefault(symbol, set()).add(source)
+    return found
+
+
 def data_range(
     symbol: str,
     bar: str,

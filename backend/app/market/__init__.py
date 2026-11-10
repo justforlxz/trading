@@ -1,9 +1,9 @@
-"""市场域：历史 K 线的下载/落库/完整性、交易时段与来源治理，以及相关性计算。
+"""市场域：历史 K 线的下载/落库/完整性、交易时段与来源治理、相关性与关系矩阵。
 
 本域对外发布三类东西：
 - 纯函数（对齐、缺口、重复、相关系数、时段、跨源偏离）—— 输入输出可直接断言；
-- 编排入口（同步、读取、完整性报告、两标的相关性、当前有效行情）—— 负责 IO 与
-  事务边界；
+- 编排入口（同步、读取、完整性报告、两标的相关性、相关矩阵与快照、当前有效行情）
+  —— 负责 IO 与事务边界；
 - 时段与来源的词表（`SESSION_*` / `EXCHANGE_*` / 资产类别），供上层查表与落库。
 
 跨包调用一律走本门面，不允许 `from app.market.candles import ...` 之类的子模块直连。
@@ -34,8 +34,10 @@ from app.market.funding import (
     parse_funding_rows,
     upsert_funding,
 )
-from app.market.model import Candle
-from app.market.service import correlation, current_bar, integrity
+from app.market.matrix import correlation_matrix
+from app.market.model import Candle, CorrelationSnapshot
+from app.market.rolling import relative_strength_ratio, rolling_correlation
+from app.market.service import correlation, current_bar, integrity, load_snapshot, save_snapshot
 from app.market.session import (
     COMMODITY_TOKEN,
     CRYPTO,
@@ -69,6 +71,7 @@ __all__ = [
     "TOKENIZED_EQUITY",
     "UNKNOWN_ASSET",
     "Candle",
+    "CorrelationSnapshot",
     "DivergenceAlert",
     "FundingPoint",
     "Quote",
@@ -76,6 +79,7 @@ __all__ = [
     "backfill_funding",
     "correlate",
     "correlation",
+    "correlation_matrix",
     "current_bar",
     "daily_open_time",
     "data_range",
@@ -90,12 +94,16 @@ __all__ = [
     "lagged_correlation",
     "load_candles",
     "load_funding",
+    "load_snapshot",
     "out_of_order",
     "p_value",
     "parse_funding_rows",
     "pearson",
     "primary_source",
+    "relative_strength_ratio",
+    "rolling_correlation",
     "rolling_sign_agreement",
+    "save_snapshot",
     "spearman",
     "sync_candles",
     "upsert_candles",

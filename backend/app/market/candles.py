@@ -7,7 +7,7 @@ from collections.abc import Callable, Iterable, Sequence
 from datetime import UTC, datetime, timedelta, timezone
 from itertools import pairwise
 
-from app.shared.timeframe import bar_seconds, normalize_bar
+from app.shared import bar_seconds, normalize_bar
 
 # OKX 的 1D 以 UTC+8 为零点，内部仍用 UTC 存储，因此日线边界落在 16:00Z。
 UTC8 = timezone(timedelta(hours=8))

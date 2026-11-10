@@ -17,7 +17,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from decimal import Decimal
 
-from app.shared.timeframe import bar_seconds
+from app.shared import bar_seconds
 
 MONEY_QUANT = Decimal("0.0000000001")
 ONE = Decimal(1)

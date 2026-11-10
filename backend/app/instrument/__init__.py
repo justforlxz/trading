@@ -4,12 +4,15 @@
 """
 
 from app.instrument.model import Instrument, InstrumentPair
+from app.instrument.rules import TradingRules, trading_rules
 from app.instrument.service import get_instrument_pair, list_instruments, sync_instruments
 
 __all__ = [
     "Instrument",
     "InstrumentPair",
+    "TradingRules",
     "get_instrument_pair",
     "list_instruments",
     "sync_instruments",
+    "trading_rules",
 ]

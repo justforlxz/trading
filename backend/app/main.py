@@ -11,9 +11,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app import __version__
-from app.api.health import router as health_router
+from app.api import health_router
 from app.config import get_settings
-from app.db.init import init_db
+from app.db import init_db
 
 logger = logging.getLogger(__name__)
 

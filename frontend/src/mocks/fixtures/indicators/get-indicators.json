@@ -1,0 +1,23 @@
+{
+  "items": [
+    {
+      "min_bars": 15,
+      "name": "rsi",
+      "outputs": [
+        "rsi"
+      ],
+      "params": [
+        {
+          "default": 14,
+          "kind": "int",
+          "maximum": 200,
+          "minimum": 2,
+          "name": "period",
+          "title": "周期"
+        }
+      ],
+      "summary": "相对强弱指标: 衡量近期涨跌幅度之比。",
+      "title": "RSI"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "available_from": "2026-11-10T05:00:00Z",
+  "available_to": "2026-11-10T07:00:00Z",
+  "bar": "1h",
+  "candles": [
+    {
+      "close": "231.42",
+      "data_source": "okx",
+      "high": "232.10",
+      "is_closed": true,
+      "low": "229.44",
+      "open": "229.80",
+      "open_time": "2026-11-10T07:00:00Z",
+      "volume": "1520.335"
+    }
+  ],
+  "data_source": "okx",
+  "has_gap": false,
+  "inst_id": "XAAPL-USDT"
+}

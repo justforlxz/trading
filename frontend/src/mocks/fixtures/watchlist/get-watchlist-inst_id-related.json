@@ -1,0 +1,13 @@
+{
+  "inst_id": "XAAPL-USDT",
+  "items": [
+    {
+      "asset_type": "tokenized_equity",
+      "correlation": "0.87",
+      "inst_id": "XQQQ-USDT",
+      "product_key": "QQQ",
+      "window_days": 30
+    }
+  ],
+  "window_days": 30
+}

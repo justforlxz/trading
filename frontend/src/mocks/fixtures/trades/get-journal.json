@@ -1,0 +1,11 @@
+{
+  "items": [
+    {
+      "category": "mode_change",
+      "created_at": "2026-11-10T06:10:00Z",
+      "entry_id": "jrn_0001",
+      "message": "执行模式 paper -> live, 已二次确认风险"
+    }
+  ],
+  "total": 1
+}

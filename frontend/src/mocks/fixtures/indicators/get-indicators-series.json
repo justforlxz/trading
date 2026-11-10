@@ -1,0 +1,21 @@
+{
+  "bar": "1h",
+  "inst_id": "XAAPL-USDT",
+  "inst_type": "SPOT",
+  "series": [
+    {
+      "name": "rsi",
+      "params": {
+        "period": 14
+      },
+      "points": [
+        {
+          "time": "2026-11-10T07:00:00Z",
+          "values": {
+            "rsi": "58.21"
+          }
+        }
+      ]
+    }
+  ]
+}

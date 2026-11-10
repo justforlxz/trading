@@ -1,0 +1,35 @@
+{
+  "instrument": {
+    "asset_type": "tokenized_equity",
+    "base_currency": "XAAPL",
+    "inst_id": "XAAPL-USDT",
+    "inst_type": "SPOT",
+    "listing_time": "2026-07-01T00:00:00Z",
+    "lot_size": "0.001",
+    "min_order_size": "0.001",
+    "product_key": "AAPL",
+    "quote_currency": "USDT",
+    "tick_size": "0.01",
+    "trading_status": "live"
+  },
+  "latest_signal": {
+    "action": "BUY",
+    "bar": "1h",
+    "generated_at": "2026-11-10T07:00:00Z",
+    "inst_id": "XAAPL-USDT",
+    "inst_type": "SPOT",
+    "price": "231.42",
+    "reason": "MA20 上穿 MA60",
+    "signal_id": "sig_0001",
+    "strategy_instance_id": "si_0001",
+    "target_weight": "0.25"
+  },
+  "siblings": [
+    {
+      "inst_id": "AAPL-USDT-SWAP",
+      "inst_type": "SWAP",
+      "last_price": "231.55",
+      "price_spread_pct": "0.06"
+    }
+  ]
+}

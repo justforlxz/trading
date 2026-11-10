@@ -1,0 +1,15 @@
+{
+  "data_source": "okx",
+  "items": [
+    {
+      "inst_id": "XAAPL-USDT",
+      "inst_type": "SPOT",
+      "max_drawdown_pct": "-6.12",
+      "profit_factor": "1.95",
+      "sharpe": "1.31",
+      "total_return_pct": "12.4055",
+      "trade_count": 37
+    }
+  ],
+  "metric": "total_return_pct"
+}

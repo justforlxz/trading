@@ -16,11 +16,12 @@ from app.api.schemas import Candle as CandlePayload
 from app.api.schemas import (
     CandleSeriesResponse,
     InstrumentDetailResponse,
+    InstrumentListResponse,
     InstrumentSearchResponse,
     SiblingQuote,
 )
 from app.api.schemas.common import Bar, InstType
-from app.instrument import Instrument, get_instrument_pair, list_instruments
+from app.instrument import Instrument, get_instrument_pair, list_instruments, list_tradable
 from app.market import data_range, integrity, load_candles
 
 __all__ = ["instruments_router"]
@@ -50,6 +51,14 @@ def search_instruments(
         and (needle in row.symbol.lower() or needle in row.product_key.lower())
     ]
     return InstrumentSearchResponse(items=items)
+
+
+@instruments_router.get("/instruments")
+def list_tradable_instruments(inst_type: InstType = Query(...)) -> InstrumentListResponse:
+    """某一类别的可交易标的（`state == live`），不按资产类别过滤。"""
+
+    rows = list_tradable(inst_type)
+    return InstrumentListResponse(items=[instrument_ref(row) for row in rows])
 
 
 @instruments_router.get("/instruments/{inst_id}")

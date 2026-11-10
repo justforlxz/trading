@@ -5,7 +5,13 @@
 
 from app.instrument.model import Instrument, InstrumentPair
 from app.instrument.rules import TradingRules, trading_rules
-from app.instrument.service import get_instrument_pair, list_instruments, sync_instruments
+from app.instrument.service import (
+    get_instrument_pair,
+    list_instruments,
+    list_tradable,
+    resolve_instrument,
+    sync_instruments,
+)
 
 __all__ = [
     "Instrument",
@@ -13,6 +19,8 @@ __all__ = [
     "TradingRules",
     "get_instrument_pair",
     "list_instruments",
+    "list_tradable",
+    "resolve_instrument",
     "sync_instruments",
     "trading_rules",
 ]

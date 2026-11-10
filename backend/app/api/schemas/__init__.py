@@ -79,6 +79,7 @@ from app.api.schemas.trades import (
 from app.api.schemas.watchlist import (
     CandleSeriesResponse,
     InstrumentDetailResponse,
+    InstrumentListResponse,
     InstrumentSearchResponse,
     PriceAlert,
     PriceAlertRequest,
@@ -125,6 +126,7 @@ __all__ = [
     "IndicatorSeriesResponse",
     "InstrumentDetailResponse",
     "InstrumentInfo",
+    "InstrumentListResponse",
     "InstrumentRef",
     "InstrumentSearchResponse",
     "JournalEntry",

@@ -25,6 +25,7 @@ from app.api.schemas.common import (
 __all__ = [
     "CandleSeriesResponse",
     "InstrumentDetailResponse",
+    "InstrumentListResponse",
     "InstrumentSearchResponse",
     "PriceAlert",
     "PriceAlertRequest",
@@ -159,6 +160,31 @@ class InstrumentSearchResponse(BaseModel):
                             "base_currency": "AAPL",
                             "quote_currency": "USDT",
                         },
+                    ]
+                }
+            ]
+        }
+    )
+
+
+class InstrumentListResponse(BaseModel):
+    """某一类别的可交易标的（`state == live`）；交易参数走详情端点。"""
+
+    items: list[InstrumentRef]
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "items": [
+                        {
+                            "inst_id": "AAPL-USDT-SWAP",
+                            "inst_type": "SWAP",
+                            "product_key": "AAPL",
+                            "asset_type": "tokenized_equity",
+                            "base_currency": "AAPL",
+                            "quote_currency": "USDT",
+                        }
                     ]
                 }
             ]

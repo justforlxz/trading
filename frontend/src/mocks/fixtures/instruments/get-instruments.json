@@ -1,0 +1,12 @@
+{
+  "items": [
+    {
+      "asset_type": "tokenized_equity",
+      "base_currency": "AAPL",
+      "inst_id": "AAPL-USDT-SWAP",
+      "inst_type": "SWAP",
+      "product_key": "AAPL",
+      "quote_currency": "USDT"
+    }
+  ]
+}

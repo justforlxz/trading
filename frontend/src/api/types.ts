@@ -164,6 +164,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/instruments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Tradable Instruments
+         * @description 某一类别的可交易标的（`state == live`），不按资产类别过滤。
+         */
+        get: operations["list_tradable_instruments_api_instruments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/instruments/search": {
         parameters: {
             query?: never;
@@ -1445,6 +1465,26 @@ export interface components {
              * @enum {string}
              */
             trading_status: "live" | "suspend" | "preopen" | "test" | "expired" | "unknown";
+        };
+        /**
+         * InstrumentListResponse
+         * @description 某一类别的可交易标的（`state == live`）；交易参数走详情端点。
+         * @example {
+         *       "items": [
+         *         {
+         *           "asset_type": "tokenized_equity",
+         *           "base_currency": "AAPL",
+         *           "inst_id": "AAPL-USDT-SWAP",
+         *           "inst_type": "SWAP",
+         *           "product_key": "AAPL",
+         *           "quote_currency": "USDT"
+         *         }
+         *       ]
+         *     }
+         */
+        InstrumentListResponse: {
+            /** Items */
+            items: components["schemas"]["InstrumentRef"][];
         };
         /**
          * InstrumentRef
@@ -2773,6 +2813,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IndicatorSeriesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tradable_instruments_api_instruments_get: {
+        parameters: {
+            query: {
+                inst_type: "SPOT" | "SWAP";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstrumentListResponse"];
                 };
             };
             /** @description Validation Error */

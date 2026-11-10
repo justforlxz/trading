@@ -9,7 +9,7 @@
  * 校验（任一不满足即非 0 退出）：
  *   - 每个 path 都出现在生成的 types.ts 里；
  *   - 每个 2xx JSON 响应都有 example（否则 MSW 无从取值）；
- *   - 七个业务域都至少生成了一条 handler。
+ *   - 十二个业务域都至少生成了一条 handler。
  *
  * 生成物禁止手改：契约只改后端 schema，再跑一次本脚本。
  * 用法：`pnpm --dir frontend api:sync`（或 `make api`）。
@@ -30,7 +30,20 @@ const FIXTURES_DIR = path.join(MOCKS_DIR, "fixtures");
 const HANDLERS_PATH = path.join(MOCKS_DIR, "handlers.ts");
 
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete"];
-const DOMAINS = ["watchlist", "indicators", "strategy", "backtest", "trades", "settings", "overview"];
+const DOMAINS = [
+  "watchlist",
+  "indicators",
+  "strategy",
+  "backtest",
+  "trades",
+  "settings",
+  "overview",
+  "correlation",
+  "relations",
+  "opportunity",
+  "portfolio",
+  "approval",
+];
 
 const contract = JSON.parse(await readFile(CONTRACT_PATH, "utf8"));
 

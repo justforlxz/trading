@@ -1,0 +1,43 @@
+{
+  "portfolio": {
+    "capital_budget": "2000.00",
+    "gross_exposure": "1997.15",
+    "instance_id": "si_0001",
+    "lifecycle_status": "live_running",
+    "name": "AAPL 均线趋势",
+    "net_exposure": "1997.15",
+    "open_positions": 1,
+    "priority": 10,
+    "realized_pnl": "12.05",
+    "strategy_id": "ma_cross",
+    "unrealized_pnl": "28.64"
+  },
+  "positions": [
+    {
+      "avg_cost": "228.10",
+      "direction": "long",
+      "inst_id": "XAAPL-USDT",
+      "inst_type": "SPOT",
+      "mark_price": "231.42",
+      "notional": "1997.15",
+      "opened_at": "2026-11-09T14:00:00Z",
+      "product_key": "AAPL",
+      "qty": "8.63",
+      "unit": "base",
+      "unrealized_pnl": "28.64"
+    }
+  ],
+  "target": {
+    "legs": [
+      {
+        "direction": "long",
+        "inst_id": "XAAPL-USDT",
+        "inst_type": "SPOT",
+        "qty": "8.63",
+        "target_weight": "0.25",
+        "unit": "base"
+      }
+    ],
+    "net_exposure": "0.25"
+  }
+}

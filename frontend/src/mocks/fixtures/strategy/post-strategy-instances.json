@@ -1,6 +1,7 @@
 {
   "bar": "1h",
   "created_at": "2026-11-08T02:15:00Z",
+  "enabled": true,
   "execution_mode": "paper",
   "inst_ids": [
     "XAAPL-USDT"
@@ -12,7 +13,7 @@
     "fast": 20,
     "slow": 60
   },
-  "status": "enabled",
+  "status": "paper_trading",
   "strategy_id": "ma_cross",
   "strategy_version": "1.0.0",
   "updated_at": "2026-11-10T07:00:00Z"

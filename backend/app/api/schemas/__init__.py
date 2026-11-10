@@ -1,9 +1,16 @@
-"""七个业务域的 API 契约门面。
+"""API 契约门面：一个业务域一个 schema 模块，这里集中发布模型。
 
 对外只发布模型；HTTP 形状（路径与响应模型绑定）见 `app/api/contract.py`，
 fixture 与前端类型都由 `contracts/openapi.json` 生成，不从这里手抄。
 """
 
+from app.api.schemas.approval import (
+    LiveAuthorizationRequest,
+    StrategyApprovalDecisionRequest,
+    StrategyApprovalListResponse,
+    StrategyApprovalRequest,
+    StrategyApprovalTransition,
+)
 from app.api.schemas.backtest import (
     BacktestCosts,
     BacktestDetailResponse,
@@ -30,6 +37,15 @@ from app.api.schemas.common import (
     SiblingQuote,
     Signal,
 )
+from app.api.schemas.correlation import (
+    CorrelationCell,
+    CorrelationMatrixResponse,
+    CorrelationPoint,
+    CorrelationSeriesResponse,
+    MarketBreadth,
+    MarketOverviewResponse,
+    MarketResonance,
+)
 from app.api.schemas.indicators import (
     IndicatorCatalogResponse,
     IndicatorDefinition,
@@ -37,12 +53,40 @@ from app.api.schemas.indicators import (
     IndicatorSeries,
     IndicatorSeriesResponse,
 )
+from app.api.schemas.opportunity import (
+    Opportunity,
+    OpportunityLeg,
+    OpportunityListResponse,
+    OpportunityMode,
+    OpportunityStatus,
+    OpportunityStatusUpdateRequest,
+)
 from app.api.schemas.overview import (
     AccountSummary,
     ExposureSummary,
     OverviewResponse,
     StrategyBrief,
     WatchlistBrief,
+)
+from app.api.schemas.portfolio import (
+    ExposureOverviewResponse,
+    PortfolioAdjustment,
+    PortfolioAdjustmentCreateRequest,
+    PortfolioAdjustmentDecisionRequest,
+    PortfolioAdjustmentListResponse,
+    PortfolioConflict,
+    StrategyPortfolio,
+    StrategyPortfolioDetailResponse,
+    StrategyPortfolioListResponse,
+    VirtualPosition,
+)
+from app.api.schemas.relations import (
+    RelationCommunity,
+    RelationEdge,
+    RelationGraphResponse,
+    RelationNeighbor,
+    RelationNeighborsResponse,
+    RelationNode,
 )
 from app.api.schemas.settings import (
     BacktestSettings,
@@ -109,6 +153,10 @@ __all__ = [
     "BacktestTrade",
     "Candle",
     "CandleSeriesResponse",
+    "CorrelationCell",
+    "CorrelationMatrixResponse",
+    "CorrelationPoint",
+    "CorrelationSeriesResponse",
     "CostSettings",
     "DataSettings",
     "EquityPoint",
@@ -116,6 +164,7 @@ __all__ = [
     "ExecutionModeRequest",
     "ExecutionSettings",
     "ExecutionStateResponse",
+    "ExposureOverviewResponse",
     "ExposureSummary",
     "Fill",
     "FillListResponse",
@@ -131,11 +180,26 @@ __all__ = [
     "InstrumentSearchResponse",
     "JournalEntry",
     "JournalListResponse",
+    "LiveAuthorizationRequest",
+    "MarketBreadth",
+    "MarketOverviewResponse",
+    "MarketResonance",
+    "Opportunity",
+    "OpportunityLeg",
+    "OpportunityListResponse",
+    "OpportunityMode",
+    "OpportunityStatus",
+    "OpportunityStatusUpdateRequest",
     "Order",
     "OrderCreateRequest",
     "OrderListResponse",
     "OverviewResponse",
     "ParamSpec",
+    "PortfolioAdjustment",
+    "PortfolioAdjustmentCreateRequest",
+    "PortfolioAdjustmentDecisionRequest",
+    "PortfolioAdjustmentListResponse",
+    "PortfolioConflict",
     "Position",
     "PositionListResponse",
     "PriceAlert",
@@ -143,12 +207,22 @@ __all__ = [
     "RankingMetric",
     "RelatedInstrument",
     "RelatedInstrumentsResponse",
+    "RelationCommunity",
+    "RelationEdge",
+    "RelationGraphResponse",
+    "RelationNeighbor",
+    "RelationNeighborsResponse",
+    "RelationNode",
     "RiskSettings",
     "SettingsResponse",
     "SettingsUpdateRequest",
     "SiblingQuote",
     "Signal",
     "SignalListResponse",
+    "StrategyApprovalDecisionRequest",
+    "StrategyApprovalListResponse",
+    "StrategyApprovalRequest",
+    "StrategyApprovalTransition",
     "StrategyBrief",
     "StrategyCatalogResponse",
     "StrategyDefinition",
@@ -156,7 +230,13 @@ __all__ = [
     "StrategyInstanceCreateRequest",
     "StrategyInstanceListResponse",
     "StrategyInstanceUpdateRequest",
+    "StrategyPortfolio",
+    "StrategyPortfolioDetailResponse",
+    "StrategyPortfolioListResponse",
+    "TargetLeg",
+    "TargetPortfolio",
     "TimeSplit",
+    "VirtualPosition",
     "WatchlistAddRequest",
     "WatchlistBrief",
     "WatchlistItem",

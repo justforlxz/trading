@@ -2,11 +2,18 @@
 // 数据一律来自 backend/contracts/openapi.json 的 example，handler 里不写业务常量。
 import { HttpResponse, http } from "msw";
 
+import getApprovals from "./fixtures/approval/get-approvals.json";
+import postApprovals from "./fixtures/approval/post-approvals.json";
+import postApprovalsInstanceIdApprove from "./fixtures/approval/post-approvals-instance_id-approve.json";
+import postApprovalsInstanceIdLiveAuthorization from "./fixtures/approval/post-approvals-instance_id-live-authorization.json";
+import postApprovalsInstanceIdReject from "./fixtures/approval/post-approvals-instance_id-reject.json";
 import postBacktestSweeps from "./fixtures/backtest/post-backtest-sweeps.json";
 import getBacktests from "./fixtures/backtest/get-backtests.json";
 import postBacktests from "./fixtures/backtest/post-backtests.json";
 import getBacktestsRanking from "./fixtures/backtest/get-backtests-ranking.json";
 import getBacktestsRunId from "./fixtures/backtest/get-backtests-run_id.json";
+import getCorrelationMatrix from "./fixtures/correlation/get-correlation-matrix.json";
+import getCorrelationSeries from "./fixtures/correlation/get-correlation-series.json";
 import getExecution from "./fixtures/trades/get-execution.json";
 import putExecutionMode from "./fixtures/trades/put-execution-mode.json";
 import getHealth from "./fixtures/health/get-health.json";
@@ -17,7 +24,19 @@ import getInstrumentsSearch from "./fixtures/instruments/get-instruments-search.
 import getInstrumentsInstId from "./fixtures/instruments/get-instruments-inst_id.json";
 import getInstrumentsInstIdCandles from "./fixtures/instruments/get-instruments-inst_id-candles.json";
 import getJournal from "./fixtures/trades/get-journal.json";
+import getMarketOverview from "./fixtures/correlation/get-market-overview.json";
+import getOpportunities from "./fixtures/opportunity/get-opportunities.json";
+import getOpportunitiesOpportunityId from "./fixtures/opportunity/get-opportunities-opportunity_id.json";
+import patchOpportunitiesOpportunityId from "./fixtures/opportunity/patch-opportunities-opportunity_id.json";
 import getOverview from "./fixtures/overview/get-overview.json";
+import getPortfolioAdjustments from "./fixtures/portfolio/get-portfolio-adjustments.json";
+import postPortfolioAdjustments from "./fixtures/portfolio/post-portfolio-adjustments.json";
+import patchPortfolioAdjustmentsAdjustmentId from "./fixtures/portfolio/patch-portfolio-adjustments-adjustment_id.json";
+import getPortfolioExposure from "./fixtures/portfolio/get-portfolio-exposure.json";
+import getPortfolioStrategies from "./fixtures/portfolio/get-portfolio-strategies.json";
+import getPortfolioStrategiesInstanceId from "./fixtures/portfolio/get-portfolio-strategies-instance_id.json";
+import getRelationsGraph from "./fixtures/relations/get-relations-graph.json";
+import getRelationsNeighbors from "./fixtures/relations/get-relations-neighbors.json";
 import getSettings from "./fixtures/settings/get-settings.json";
 import putSettings from "./fixtures/settings/put-settings.json";
 import getSignals from "./fixtures/trades/get-signals.json";
@@ -37,12 +56,19 @@ import putWatchlistInstIdAlert from "./fixtures/watchlist/put-watchlist-inst_id-
 import getWatchlistInstIdRelated from "./fixtures/watchlist/get-watchlist-inst_id-related.json";
 
 export const handlers = [
+  http.get("*/api/approvals", () => HttpResponse.json(getApprovals)),
+  http.post("*/api/approvals", () => HttpResponse.json(postApprovals, { status: 201 })),
+  http.post("*/api/approvals/:instance_id/approve", () => HttpResponse.json(postApprovalsInstanceIdApprove)),
+  http.post("*/api/approvals/:instance_id/live-authorization", () => HttpResponse.json(postApprovalsInstanceIdLiveAuthorization)),
+  http.post("*/api/approvals/:instance_id/reject", () => HttpResponse.json(postApprovalsInstanceIdReject)),
   http.post("*/api/backtest-sweeps", () => HttpResponse.json(postBacktestSweeps, { status: 202 })),
   http.get("*/api/backtests", () => HttpResponse.json(getBacktests)),
   http.post("*/api/backtests", () => HttpResponse.json(postBacktests, { status: 202 })),
   http.get("*/api/backtests/ranking", () => HttpResponse.json(getBacktestsRanking)),
   http.get("*/api/backtests/:run_id", () => HttpResponse.json(getBacktestsRunId)),
   http.delete("*/api/backtests/:run_id", () => new HttpResponse(null, { status: 204 })),
+  http.get("*/api/correlation/matrix", () => HttpResponse.json(getCorrelationMatrix)),
+  http.get("*/api/correlation/series", () => HttpResponse.json(getCorrelationSeries)),
   http.get("*/api/execution", () => HttpResponse.json(getExecution)),
   http.put("*/api/execution/mode", () => HttpResponse.json(putExecutionMode)),
   http.get("*/api/health", () => HttpResponse.json(getHealth)),
@@ -53,7 +79,19 @@ export const handlers = [
   http.get("*/api/instruments/:inst_id", () => HttpResponse.json(getInstrumentsInstId)),
   http.get("*/api/instruments/:inst_id/candles", () => HttpResponse.json(getInstrumentsInstIdCandles)),
   http.get("*/api/journal", () => HttpResponse.json(getJournal)),
+  http.get("*/api/market/overview", () => HttpResponse.json(getMarketOverview)),
+  http.get("*/api/opportunities", () => HttpResponse.json(getOpportunities)),
+  http.get("*/api/opportunities/:opportunity_id", () => HttpResponse.json(getOpportunitiesOpportunityId)),
+  http.patch("*/api/opportunities/:opportunity_id", () => HttpResponse.json(patchOpportunitiesOpportunityId)),
   http.get("*/api/overview", () => HttpResponse.json(getOverview)),
+  http.get("*/api/portfolio/adjustments", () => HttpResponse.json(getPortfolioAdjustments)),
+  http.post("*/api/portfolio/adjustments", () => HttpResponse.json(postPortfolioAdjustments, { status: 201 })),
+  http.patch("*/api/portfolio/adjustments/:adjustment_id", () => HttpResponse.json(patchPortfolioAdjustmentsAdjustmentId)),
+  http.get("*/api/portfolio/exposure", () => HttpResponse.json(getPortfolioExposure)),
+  http.get("*/api/portfolio/strategies", () => HttpResponse.json(getPortfolioStrategies)),
+  http.get("*/api/portfolio/strategies/:instance_id", () => HttpResponse.json(getPortfolioStrategiesInstanceId)),
+  http.get("*/api/relations/graph", () => HttpResponse.json(getRelationsGraph)),
+  http.get("*/api/relations/neighbors", () => HttpResponse.json(getRelationsNeighbors)),
   http.get("*/api/settings", () => HttpResponse.json(getSettings)),
   http.put("*/api/settings", () => HttpResponse.json(putSettings)),
   http.get("*/api/signals", () => HttpResponse.json(getSignals)),

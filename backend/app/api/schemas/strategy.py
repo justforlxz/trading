@@ -87,7 +87,8 @@ _EXAMPLE_INSTANCE = {
     "bar": "1h",
     "params": {"fast": 20, "slow": 60},
     "inst_ids": ["XAAPL-USDT"],
-    "status": "enabled",
+    "status": "paper_trading",
+    "enabled": True,
     "execution_mode": "paper",
     "latest_signal_at": "2026-11-10T07:00:00Z",
     "created_at": "2026-11-08T02:15:00Z",
@@ -104,6 +105,7 @@ class StrategyInstance(BaseModel):
     params: dict[str, ParamValue]
     inst_ids: list[str]
     status: StrategyStatus
+    enabled: bool = True
     execution_mode: ExecutionMode
     latest_signal_at: UtcDatetime | None = None
     created_at: UtcDatetime
@@ -130,9 +132,19 @@ class StrategyInstanceCreateRequest(BaseModel):
 
 
 class StrategyInstanceUpdateRequest(BaseModel):
-    """PATCH 语义：只落显式提交的字段。"""
+    """PATCH 语义：只落显式提交的字段。
+
+    生命周期阶段**不在这条端点上改**：阶段推进只经 `/api/approvals` 的状态机，
+    否则一次 PATCH 就能从草稿跳到实盘运行，绕过人工审核、历史回测与量化验证
+    （`docs/prd/v2.md` §三.5「任何阶段都不能被跳过」）。提交 `status` 会因
+    `extra="forbid"` 直接 422，不会静默忽略。
+
+    `enabled` 是实例的启停开关，只决定它是否产出信号，不改变生命周期阶段。
+    """
+
+    model_config = ConfigDict(extra="forbid")
 
     name: str | None = None
     params: dict[str, ParamValue] | None = None
     inst_ids: list[str] | None = None
-    status: StrategyStatus | None = None
+    enabled: bool | None = None

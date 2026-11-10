@@ -152,4 +152,21 @@
 - 本条**只改文档定位，不要求改代码**：T1.11 已合并的 `TradingRules` 字段保持不动，代码侧由 T1.7（MKACG-746）按 `asset_type` 取值。
 - 本条只有一种说法，落在 `v2.md` §二「交易类别与资产」与 §三.2「混合行情与交易时段」两处；两处都按本条写，不得出现第二种。
 
+## D7 策略生命周期枚举与契约对齐（MKACG-745 契约记录）
+
+**决策**：策略状态取自 `v2.md` §三.5 的八阶段生命周期，`backend/app/api/schemas/common.py` 的 `StrategyStatus` 与本节列出的取值逐字一致；策略的交易目标由「目标组合」形状承载，`SignalAction` 只保留组件层判断。
+
+**依据**：八阶段生命周期是 `v2.md` §三.5 已定稿的内容，本节点不新增阶段，只把它变成契约取值；T3.6 的验收要求状态机可直接使用 `strategy_generation`、`backtested`、`validated`、`live_authorized` 与驳回分支 `rejected`，因此这些名称必须落在契约里，不能由 T3.6 另起一套。本节按 T0.8 的范围要求记录契约变更，不是新的产品决策。
+
+**实施约束**（评审按此条复核）：
+
+- `StrategyStatus` 的八个阶段取值依次是 `opportunity_discovery`、`strategy_generation`、`pending_review`、`backtested`、`validated`、`paper_trading`、`live_authorized`、`live_running`；驳回分支是 `rejected`，只能回到 `strategy_generation`。
+- 阶段含义：`opportunity_discovery` 是由机会发现产生的候选；`strategy_generation` 是策略定义已生成、提交审核之前的草稿；`pending_review` 是已提交人工审核；`backtested` 是历史回测已完成；`validated` 是量化验证达标；`paper_trading` 是模拟交易；`live_authorized` 是已获实盘授权；`live_running` 是实盘运行中。
+- `SignalAction`（`BUY` / `SELL` / `HOLD`）只是组件层对单个标的方向的判断，不表达仓位，也不表达组合；多腿、方向、目标权重与数量统一由 `TargetLeg` / `TargetPortfolio` 表达。数量单位按类别取 `base`（现货的标的币数量）或 `contract`（永续的合约张数），策略层不判断类别。
+- `AssetType` 覆盖 `app/instrument/model.py` 的四种落库取值（含 `commodity_token` 与 `unknown`）；`DataSource` 的取值与 `candles.source` 的实际写入值一致，见 D3，不再存在只含 `okx` 的笼统来源标识。
+- 生命周期阶段只有一个写入口：`/api/approvals` 的状态机。`PATCH /api/strategy-instances/{instance_id}` 不接收 `status`（模型设 `extra="forbid"`，提交即 422），因此不存在「用一次 PATCH 从草稿跳到实盘运行」的绕过路径。T3.3 需要的启停改用显式字段 `enabled`（只决定实例是否产出信号，不改变生命周期阶段）。
+- T3.6（MKACG-756）验收里的 `draft` 就是本节的 `strategy_generation`，`rejected` 回到的是同一个阶段；契约以本节的名称唯一，T3.6 正文的旧写法待 PL 同步修订，两侧不得各用一套名字。
+- 目标组合的 `qty` / `unit` 是服务端按价格、合约面值与精度换算出的派生值，请求侧可以留空（`AGENTS.md` §6「前端不做派生计算」）；调整申请因此只提交方向与目标权重，数量由服务端在批准时换算。
+- 本节与枚举的一致性由 `backend/tests/api/test_contract_schema.py` 强制（只比对 D7 段落）：取值名称一旦冻结，T2.4 / T2.5 / T3.4 / T3.6 / T7.1 直接沿用，不再另起命名。
+
 **附注**：Q2（v1 遗留 P5 架构评审 issue 的去留）由 PL 内部处置并已关闭对应 issue，不构成产品决策，不在本文件记录。

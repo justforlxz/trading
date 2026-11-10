@@ -1,0 +1,19 @@
+{
+  "bar": "1d",
+  "items": [
+    {
+      "asset_type": "tokenized_equity",
+      "coefficient": "0.87",
+      "product_key": "MSFT",
+      "samples": 60
+    },
+    {
+      "asset_type": "tokenized_equity",
+      "coefficient": "-0.64",
+      "product_key": "NVDA",
+      "samples": 60
+    }
+  ],
+  "product_key": "AAPL",
+  "window": 60
+}

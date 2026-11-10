@@ -34,10 +34,13 @@ __all__ = [
     "ParamSpec",
     "ParamValue",
     "PositionSide",
+    "QtyUnit",
     "SiblingQuote",
     "Signal",
     "SignalAction",
     "StrategyStatus",
+    "TargetLeg",
+    "TargetPortfolio",
     "TradingStatus",
     "UtcDatetime",
 ]
@@ -70,6 +73,8 @@ AssetType = Literal["tokenized_equity", "crypto", "commodity_token", "unknown"]
 # （见 `app/api/routes/instruments.py` 的 `get_instrument_candles`），因此它也
 # 必须留在契约里；同时它也是早期未区分形态的存量取值。
 DataSource = Literal["okx", "okx_spot", "okx_swap", "us_equity_proxy"]
+# 组件层判断：单个基础组件对某个标的看多、看空还是不动。它不表达仓位，也不表达
+# 组合——「怎么做、做多少、做哪几条腿」由下面的 `TargetPortfolio` 承载。
 SignalAction = Literal["BUY", "SELL", "HOLD"]
 PositionSide = Literal["long", "short"]
 OrderSide = Literal["buy", "sell"]
@@ -77,7 +82,24 @@ OrderType = Literal["market", "limit"]
 OrderStatus = Literal["pending", "open", "partially_filled", "filled", "cancelled", "rejected"]
 ExecutionMode = Literal["manual", "paper", "live"]
 ExecutionModel = Literal["next_open", "next_close"]
-StrategyStatus = Literal["draft", "enabled", "disabled"]
+# 策略生命周期（`docs/prd/v2.md` §三.5 的八阶段）：机会发现 → 策略生成（草稿）→
+# 人工审核 → 历史回测 → 量化验证 → 模拟交易 → 实盘授权 → 实盘运行。
+# `rejected` 是生命周期之外的驳回分支：人工审核或量化验证不通过时落到这里，
+# 只能回到 `strategy_generation` 重新提交（见 `docs/prd/decisions.md` D7）。
+# 名称必须与 `decisions.md` D7 逐字一致，由 `tests/api/test_contract_schema.py` 把关。
+StrategyStatus = Literal[
+    "opportunity_discovery",
+    "strategy_generation",
+    "pending_review",
+    "backtested",
+    "validated",
+    "paper_trading",
+    "live_authorized",
+    "live_running",
+    "rejected",
+]
+# 目标组合的每条腿以什么计价：SPOT 按标的币数量，SWAP 按合约张数。
+QtyUnit = Literal["base", "contract"]
 # 与上游 `state` 原文一一对应：交易所适配层不做词表翻译，契约也不能收窄。
 TradingStatus = Literal["live", "suspend", "preopen", "test", "expired", "unknown"]
 AlertDirection = Literal["above", "below"]
@@ -156,3 +178,30 @@ class Signal(BaseModel):
     reason: str
     generated_at: UtcDatetime
     target_weight: DecimalString | None = None
+
+
+class TargetLeg(BaseModel):
+    """目标组合的一条腿：某个标的、某个方向、某个目标权重。
+
+    `target_weight` 是权重（占组合资金的比例，正数表示该腿的大小），方向单独由
+    `direction` 表达——不用权重符号再编码一次方向。
+
+    `qty` 与 `unit` 是**服务端换算出的**下单数量：`SPOT` 按标的币数量（`base`），
+    `SWAP` 按合约张数（`contract`），换算依赖价格、合约面值与精度，前端不做这类
+    派生计算（`AGENTS.md` §6）。因此请求里可以不带这两个字段，由服务端在生成目标
+    组合时填入；读到 `null` 表示这一步尚未换算。
+    """
+
+    inst_id: str
+    inst_type: InstType
+    direction: PositionSide
+    target_weight: DecimalString
+    qty: DecimalString | None = None
+    unit: QtyUnit | None = None
+
+
+class TargetPortfolio(BaseModel):
+    """目标组合：多腿、多空并存，`net_exposure` 是多头权重之和减空头权重之和。"""
+
+    legs: list[TargetLeg]
+    net_exposure: DecimalString

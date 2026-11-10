@@ -1,0 +1,64 @@
+{
+  "as_of": "2026-11-10T00:00:00Z",
+  "bar": "1d",
+  "cells": [
+    {
+      "coefficient": "1",
+      "product_key_a": "AAPL",
+      "product_key_b": "AAPL",
+      "samples": 60
+    },
+    {
+      "coefficient": "0.87",
+      "product_key_a": "AAPL",
+      "product_key_b": "MSFT",
+      "samples": 60
+    },
+    {
+      "product_key_a": "AAPL",
+      "product_key_b": "NVDA",
+      "samples": 2
+    },
+    {
+      "coefficient": "0.87",
+      "product_key_a": "MSFT",
+      "product_key_b": "AAPL",
+      "samples": 60
+    },
+    {
+      "coefficient": "1",
+      "product_key_a": "MSFT",
+      "product_key_b": "MSFT",
+      "samples": 60
+    },
+    {
+      "coefficient": "0.64",
+      "product_key_a": "MSFT",
+      "product_key_b": "NVDA",
+      "samples": 60
+    },
+    {
+      "product_key_a": "NVDA",
+      "product_key_b": "AAPL",
+      "samples": 2
+    },
+    {
+      "coefficient": "0.64",
+      "product_key_a": "NVDA",
+      "product_key_b": "MSFT",
+      "samples": 60
+    },
+    {
+      "coefficient": "1",
+      "product_key_a": "NVDA",
+      "product_key_b": "NVDA",
+      "samples": 60
+    }
+  ],
+  "product_keys": [
+    "AAPL",
+    "MSFT",
+    "NVDA"
+  ],
+  "window": 60
+}

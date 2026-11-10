@@ -31,6 +31,7 @@ TESTS_ROOT = BACKEND_ROOT / "tests"
 PACKAGES: tuple[str, ...] = (
     "api",
     "backtest",
+    "core",
     "db",
     "exchange",
     "execution",
@@ -47,11 +48,16 @@ PACKAGES: tuple[str, ...] = (
 
 # 基础设施叶子：进程级配置单例，不属于业务包。任何模块都可依赖它，它不依赖任何
 # 业务包；单独列出而不是写进每一行，避免矩阵被同一项噪音淹没。
-INFRA: frozenset[str] = frozenset({"config"})
+#
+# `core` 同样在此：它是跨模块公共层（错误/值对象/端口），每个模块都要用，但它自己
+# 只依赖外部库。严格的「core 谁也不依赖」由 `test_core_is_leaf.py` 单独把关，这里
+# 登记是为了不用在每行矩阵里重复写一遍。
+INFRA: frozenset[str] = frozenset({"config", "core"})
 
 # 唯一真源：模块 → 允许依赖的模块集合（规划 MKACG-707 定稿，逐行即契约）。
-# `jobs` / `api` 是装配层（"全部"），`main` 是装配根，`config` 是配置叶子。
+# `jobs` / `api` 是装配层（"全部"），`main` 是装配根，`config` / `core` 是叶子。
 ALLOWED_DEPS: dict[str, frozenset[str]] = {
+    "core": frozenset(),
     "shared": frozenset(),
     "db": frozenset({"shared"}),
     "exchange": frozenset({"shared", "instrument"}),
@@ -74,9 +80,13 @@ ALLOWED_DEPS: dict[str, frozenset[str]] = {
 
 
 def allowed_for(module: str) -> frozenset[str]:
-    """模块的允许依赖 = 矩阵行 + 基础设施叶子。"""
+    """模块的允许依赖 = 矩阵行 + 基础设施叶子。
 
-    return ALLOWED_DEPS.get(module, frozenset()) | INFRA
+    叶子集合里同时包含本模块时（`core` 就是这种情况）要减掉自己，否则矩阵行
+    `frozenset()` 与「任何模块都可依赖 core」会互相抵消，让 core 可以依赖自己。
+    """
+
+    return (ALLOWED_DEPS.get(module, frozenset()) | INFRA) - {module}
 
 
 @dataclass(frozen=True)

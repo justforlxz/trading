@@ -6,11 +6,11 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from app.core import Bar, InstrumentRef, MarketDataPort, Ticker, Timeframe, utc_from_millis
 from app.exchange.errors import ExchangeError
-from app.exchange.okx.bars import from_okx_bar, to_okx_bar
+from app.exchange.okx.bars import to_okx_bar
 from app.exchange.okx.client import OkxClient
 from app.exchange.okx.instruments import parse_instruments
-from app.exchange.ports import Candle, InstrumentInfo, Ticker, utc_from_millis
 
 __all__ = ["MAX_CANDLE_LIMIT", "OkxMarketData"]
 
@@ -28,38 +28,41 @@ _SPOT = "SPOT"
 _SOURCE = "okx"
 
 
-class OkxMarketData:
+class OkxMarketData(MarketDataPort):
     """基于 OKX 公开 REST 的行情端口实现。
 
-    K 线统一按 `open_time` 升序返回（上游是倒序），`bar` 统一是内部规范写法。
+    K 线统一按 `open_time` 升序返回（上游是倒序）。周期在上游是 `1H`/`1D` 这类
+    写法，进出本类一律是规范 `Timeframe`，映射只发生在 `okx.bars`。
     """
 
     def __init__(self, client: OkxClient, *, source: str = _SOURCE) -> None:
         self._client = client
         self._source = source
 
-    def instruments(self) -> list[InstrumentInfo]:
+    def instruments(self) -> list[InstrumentRef]:
         """拉取全部现货标的元数据。"""
 
         rows = self._client.get(_INSTRUMENTS_PATH, {"instType": _SPOT})
         return parse_instruments(rows)
 
-    def candles(self, inst_id: str, bar: str, *, limit: int = MAX_CANDLE_LIMIT) -> list[Candle]:
+    def candles(
+        self, inst_id: str, timeframe: Timeframe, *, limit: int = MAX_CANDLE_LIMIT
+    ) -> list[Bar]:
         """拉取最近 `limit` 根 K 线。"""
 
-        return self._candles(_CANDLES_PATH, inst_id, bar, limit=limit)
+        return self._candles(_CANDLES_PATH, inst_id, timeframe, limit=limit)
 
     def history_candles(
         self,
         inst_id: str,
-        bar: str,
+        timeframe: Timeframe,
         *,
         after: datetime | None = None,
         limit: int = MAX_CANDLE_LIMIT,
-    ) -> list[Candle]:
+    ) -> list[Bar]:
         """拉取历史 K 线；`after` 指向更早的一段（不含该时刻本身）。"""
 
-        return self._candles(_HISTORY_CANDLES_PATH, inst_id, bar, limit=limit, after=after)
+        return self._candles(_HISTORY_CANDLES_PATH, inst_id, timeframe, limit=limit, after=after)
 
     def ticker(self, inst_id: str) -> Ticker:
         """拉取最新行情快照。"""
@@ -78,33 +81,35 @@ class OkxMarketData:
         self,
         path: str,
         inst_id: str,
-        bar: str,
+        timeframe: Timeframe,
         *,
         limit: int,
         after: datetime | None = None,
-    ) -> list[Candle]:
+    ) -> list[Bar]:
         if not 1 <= limit <= MAX_CANDLE_LIMIT:
             raise ValueError(f"limit 必须在 1..{MAX_CANDLE_LIMIT} 之间")
-        okx_bar = to_okx_bar(bar)
-        params: dict[str, Any] = {"instId": inst_id, "bar": okx_bar, "limit": str(limit)}
+        params: dict[str, Any] = {
+            "instId": inst_id,
+            "bar": to_okx_bar(timeframe.value),
+            "limit": str(limit),
+        }
         if after is not None:
             if after.tzinfo is None:
                 raise ValueError("after 必须是带时区的时间")
             params["after"] = str(round(after.timestamp() * 1000))
         rows = self._client.get(path, params)
-        canonical_bar = from_okx_bar(okx_bar)
-        return [_parse_candle(row, inst_id, canonical_bar, self._source) for row in reversed(rows)]
+        return [_parse_candle(row, inst_id, timeframe, self._source) for row in reversed(rows)]
 
 
-def _parse_candle(row: Any, inst_id: str, bar: str, source: str) -> Candle:
+def _parse_candle(row: Any, inst_id: str, timeframe: Timeframe, source: str) -> Bar:
     """上游行格式：`[ts, open, high, low, close, vol, volCcy, volCcyQuote, confirm]`。"""
 
     if not isinstance(row, list) or len(row) < 9:
         raise ExchangeError(f"K 线数据结构异常:{row!r}")
     try:
-        return Candle(
+        return Bar(
             inst_id=inst_id,
-            bar=bar,
+            timeframe=timeframe,
             open_time=utc_from_millis(row[0]),
             open=Decimal(str(row[1])),
             high=Decimal(str(row[2])),

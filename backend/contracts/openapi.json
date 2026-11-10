@@ -1850,7 +1850,9 @@
           "asset_type": {
             "enum": [
               "tokenized_equity",
-              "crypto"
+              "crypto",
+              "commodity_token",
+              "unknown"
             ],
             "title": "Asset Type",
             "type": "string"
@@ -1942,8 +1944,10 @@
             "default": "unknown",
             "enum": [
               "live",
+              "suspend",
               "preopen",
-              "suspended",
+              "test",
+              "expired",
               "unknown"
             ],
             "title": "Trading Status",
@@ -1967,7 +1971,9 @@
           "asset_type": {
             "enum": [
               "tokenized_equity",
-              "crypto"
+              "crypto",
+              "commodity_token",
+              "unknown"
             ],
             "title": "Asset Type",
             "type": "string"
@@ -2831,7 +2837,9 @@
           "asset_type": {
             "enum": [
               "tokenized_equity",
-              "crypto"
+              "crypto",
+              "commodity_token",
+              "unknown"
             ],
             "title": "Asset Type",
             "type": "string"
@@ -4526,6 +4534,7 @@
     },
     "/api/instruments/search": {
       "get": {
+        "description": "按代码或产品键做大小写不敏感的包含匹配，可按标的类型过滤。",
         "operationId": "search_instruments_api_instruments_search_get",
         "parameters": [
           {
@@ -4583,12 +4592,13 @@
         },
         "summary": "Search Instruments",
         "tags": [
-          "watchlist"
+          "instruments"
         ]
       }
     },
     "/api/instruments/{inst_id}": {
       "get": {
+        "description": "单标的详情：交易参数 + 同产品的另一条腿（有行情时才有价差）。",
         "operationId": "get_instrument_api_instruments__inst_id__get",
         "parameters": [
           {
@@ -4625,12 +4635,13 @@
         },
         "summary": "Get Instrument",
         "tags": [
-          "watchlist"
+          "instruments"
         ]
       }
     },
     "/api/instruments/{inst_id}/candles": {
       "get": {
+        "description": "已落库 K 线的尾部窗口，附带库里真实的可用区间与缺口标记。",
         "operationId": "get_instrument_candles_api_instruments__inst_id__candles_get",
         "parameters": [
           {
@@ -4696,7 +4707,7 @@
         },
         "summary": "Get Instrument Candles",
         "tags": [
-          "watchlist"
+          "instruments"
         ]
       }
     },
@@ -5168,6 +5179,7 @@
     },
     "/api/watchlist": {
       "get": {
+        "description": "按加入顺序返回全部自选条目，以及当前存在的分组名。",
         "operationId": "list_watchlist_api_watchlist_get",
         "responses": {
           "200": {
@@ -5187,6 +5199,7 @@
         ]
       },
       "post": {
+        "description": "把标的加入自选；标的必须已同步，且已有足够的日线可算行情。",
         "operationId": "add_watchlist_item_api_watchlist_post",
         "requestBody": {
           "content": {
@@ -5228,6 +5241,7 @@
     },
     "/api/watchlist/{inst_id}": {
       "delete": {
+        "description": "删除自选条目及其提醒；分组空了会一并清理。",
         "operationId": "delete_watchlist_item_api_watchlist__inst_id__delete",
         "parameters": [
           {
@@ -5261,6 +5275,7 @@
         ]
       },
       "patch": {
+        "description": "把自选条目换到另一个分组；分组不存在时按需创建。",
         "operationId": "update_watchlist_item_api_watchlist__inst_id__patch",
         "parameters": [
           {
@@ -5313,6 +5328,7 @@
     },
     "/api/watchlist/{inst_id}/alert": {
       "delete": {
+        "description": "删除价格提醒；没有提醒时按不存在处理。",
         "operationId": "delete_price_alert_api_watchlist__inst_id__alert_delete",
         "parameters": [
           {
@@ -5346,6 +5362,7 @@
         ]
       },
       "put": {
+        "description": "写入或覆盖价格提醒；标的必须已在自选里。",
         "operationId": "put_price_alert_api_watchlist__inst_id__alert_put",
         "parameters": [
           {
@@ -5398,6 +5415,7 @@
     },
     "/api/watchlist/{inst_id}/related": {
       "get": {
+        "description": "按窗口内日线相关性排序的关联标的；样本不足的候选不出现在结果里。",
         "operationId": "get_related_instruments_api_watchlist__inst_id__related_get",
         "parameters": [
           {

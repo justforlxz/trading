@@ -165,7 +165,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Search Instruments */
+        /**
+         * Search Instruments
+         * @description 按代码或产品键做大小写不敏感的包含匹配，可按标的类型过滤。
+         */
         get: operations["search_instruments_api_instruments_search_get"];
         put?: never;
         post?: never;
@@ -182,7 +185,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Instrument */
+        /**
+         * Get Instrument
+         * @description 单标的详情：交易参数 + 同产品的另一条腿（有行情时才有价差）。
+         */
         get: operations["get_instrument_api_instruments__inst_id__get"];
         put?: never;
         post?: never;
@@ -199,7 +205,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Instrument Candles */
+        /**
+         * Get Instrument Candles
+         * @description 已落库 K 线的尾部窗口，附带库里真实的可用区间与缺口标记。
+         */
         get: operations["get_instrument_candles_api_instruments__inst_id__candles_get"];
         put?: never;
         post?: never;
@@ -408,10 +417,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Watchlist */
+        /**
+         * List Watchlist
+         * @description 按加入顺序返回全部自选条目，以及当前存在的分组名。
+         */
         get: operations["list_watchlist_api_watchlist_get"];
         put?: never;
-        /** Add Watchlist Item */
+        /**
+         * Add Watchlist Item
+         * @description 把标的加入自选；标的必须已同步，且已有足够的日线可算行情。
+         */
         post: operations["add_watchlist_item_api_watchlist_post"];
         delete?: never;
         options?: never;
@@ -429,11 +444,17 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete Watchlist Item */
+        /**
+         * Delete Watchlist Item
+         * @description 删除自选条目及其提醒；分组空了会一并清理。
+         */
         delete: operations["delete_watchlist_item_api_watchlist__inst_id__delete"];
         options?: never;
         head?: never;
-        /** Update Watchlist Item */
+        /**
+         * Update Watchlist Item
+         * @description 把自选条目换到另一个分组；分组不存在时按需创建。
+         */
         patch: operations["update_watchlist_item_api_watchlist__inst_id__patch"];
         trace?: never;
     };
@@ -445,10 +466,16 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Put Price Alert */
+        /**
+         * Put Price Alert
+         * @description 写入或覆盖价格提醒；标的必须已在自选里。
+         */
         put: operations["put_price_alert_api_watchlist__inst_id__alert_put"];
         post?: never;
-        /** Delete Price Alert */
+        /**
+         * Delete Price Alert
+         * @description 删除价格提醒；没有提醒时按不存在处理。
+         */
         delete: operations["delete_price_alert_api_watchlist__inst_id__alert_delete"];
         options?: never;
         head?: never;
@@ -462,7 +489,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Related Instruments */
+        /**
+         * Get Related Instruments
+         * @description 按窗口内日线相关性排序的关联标的；样本不足的候选不出现在结果里。
+         */
         get: operations["get_related_instruments_api_watchlist__inst_id__related_get"];
         put?: never;
         post?: never;
@@ -1379,7 +1409,7 @@ export interface components {
              * Asset Type
              * @enum {string}
              */
-            asset_type: "tokenized_equity" | "crypto";
+            asset_type: "tokenized_equity" | "crypto" | "commodity_token" | "unknown";
             /** Base Currency */
             base_currency: string;
             /** Inst Id */
@@ -1408,7 +1438,7 @@ export interface components {
              * @default unknown
              * @enum {string}
              */
-            trading_status: "live" | "preopen" | "suspended" | "unknown";
+            trading_status: "live" | "suspend" | "preopen" | "test" | "expired" | "unknown";
         };
         /**
          * InstrumentRef
@@ -1419,7 +1449,7 @@ export interface components {
              * Asset Type
              * @enum {string}
              */
-            asset_type: "tokenized_equity" | "crypto";
+            asset_type: "tokenized_equity" | "crypto" | "commodity_token" | "unknown";
             /** Base Currency */
             base_currency: string;
             /** Inst Id */
@@ -1852,7 +1882,7 @@ export interface components {
              * Asset Type
              * @enum {string}
              */
-            asset_type: "tokenized_equity" | "crypto";
+            asset_type: "tokenized_equity" | "crypto" | "commodity_token" | "unknown";
             /** Correlation */
             correlation: string;
             /** Inst Id */

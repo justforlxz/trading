@@ -11,12 +11,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app import __version__
-from app.api import contract_router, health_router
+from app.api import include_routers, register_error_handlers
 from app.config import get_settings
 from app.db import init_db
 
-# 导入即注册 `candles` 表：建表只认已经定义过的元数据，装配根负责把域模型拉进来。
+# 导入即注册域模型：建表只认已经定义过的元数据，装配根负责把域模型拉进来。
+from app.instrument import Instrument  # noqa: F401
 from app.market import Candle  # noqa: F401
+from app.watchlist import WatchlistItemRow  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +47,8 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json",
         lifespan=lifespan,
     )
-    app.include_router(health_router, prefix="/api")
-    app.include_router(contract_router, prefix="/api")
+    register_error_handlers(app)
+    include_routers(app)
     return app
 
 

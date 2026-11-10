@@ -38,11 +38,13 @@ def market_port(fake_okx_settings: Settings) -> Iterator[MarketDataPort]:
 def test_phase1_watchlist_round_trip(client: TestClient, market_port: MarketDataPort) -> None:
     """日常入口的核心路径：同步标的、下载日线、加自选、读行情、删自选。"""
 
-    assert sync_instruments(market_port.instruments()) > 0
+    assert sync_instruments(market_port.instruments("SPOT")) > 0
     assert any(row.symbol == WATCHED for row in list_instruments())
 
     now = datetime.now(UTC).replace(microsecond=0)
-    result = sync_candles(market_port, WATCHED, "1d", now - timedelta(days=4), now)
+    result = sync_candles(
+        market_port, WATCHED, "1d", now - timedelta(days=4), now, inst_type="SPOT"
+    )
     assert result.inserted >= 2
 
     candles = load_candles(WATCHED, "1d")
@@ -75,7 +77,7 @@ def test_phase1_watchlist_round_trip(client: TestClient, market_port: MarketData
     series = client.get(f"/api/instruments/{WATCHED}/candles", params={"bar": "1d", "limit": 2})
     assert series.status_code == 200
     payload = series.json()
-    assert payload["data_source"] == "okx"
+    assert payload["data_source"] == "okx_spot"
     assert payload["has_gap"] is False
     assert [row["close"] for row in payload["candles"]] == [
         format(candle.close.normalize(), "f") for candle in candles[-2:]

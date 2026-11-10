@@ -30,6 +30,7 @@ from app.core import (
     Ticker,
     Timeframe,
     TradePort,
+    ValidationError,
 )
 
 #: 测试内部使用的时间点，避免依赖真实时钟。
@@ -51,10 +52,19 @@ class InMemoryMarketData(MarketDataPort):
         self._bars = list(bars)
         self._snapshot = snapshot
 
-    def instruments(self) -> list[InstrumentRef]:
-        return list(self._instruments)
+    def instruments(self, inst_type: str) -> list[InstrumentRef]:
+        self._require_known_type(inst_type)
+        return [item for item in self._instruments if item.inst_type == inst_type]
 
-    def candles(self, inst_id: str, timeframe: Timeframe, *, limit: int = 100) -> list[Bar]:
+    def candles(
+        self,
+        inst_id: str,
+        timeframe: Timeframe,
+        *,
+        inst_type: str,
+        limit: int = 100,
+    ) -> list[Bar]:
+        self._require_known_type(inst_type)
         return self._select(inst_id, timeframe)[-limit:]
 
     def history_candles(
@@ -62,21 +72,31 @@ class InMemoryMarketData(MarketDataPort):
         inst_id: str,
         timeframe: Timeframe,
         *,
+        inst_type: str,
         after: datetime | None = None,
         limit: int = 100,
     ) -> list[Bar]:
+        self._require_known_type(inst_type)
         bars = self._select(inst_id, timeframe)
         if after is not None:
             bars = [bar for bar in bars if bar.open_time < after]
         return bars[-limit:]
 
-    def ticker(self, inst_id: str) -> Ticker:
+    def ticker(self, inst_id: str, *, inst_type: str) -> Ticker:
+        self._require_known_type(inst_type)
         if inst_id != self._snapshot.inst_id:
             raise DataUnavailable(f"没有 {inst_id} 的行情快照")
         return self._snapshot
 
     def close(self) -> None:
         self.closed = True
+
+    @staticmethod
+    def _require_known_type(inst_type: str) -> None:
+        """端口约定：未登记的类别直接报错，不返回空结果、也不退回另一类的口径。"""
+
+        if inst_type not in {"SPOT", "SWAP"}:
+            raise ValidationError(f"不支持的标的类别 {inst_type!r}")
 
     def _select(self, inst_id: str, timeframe: Timeframe) -> list[Bar]:
         return [bar for bar in self._bars if bar.inst_id == inst_id and bar.timeframe == timeframe]

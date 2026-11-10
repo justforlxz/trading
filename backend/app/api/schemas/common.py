@@ -64,7 +64,12 @@ InstType = Literal["SPOT", "SWAP"]
 # 取值必须覆盖 `app.instrument` 的全部落库结果（含商品代币与未登记分类），
 # 否则契约比领域层窄，遇到真实标的会在响应构造时校验失败。
 AssetType = Literal["tokenized_equity", "crypto", "commodity_token", "unknown"]
-DataSource = Literal["okx", "us_equity_proxy"]
+# 行情来源标识与 `candles.source` 同值：同一产品的现货与永续是两行行情，必须能
+# 分开取数。`okx` 仍在产出：K 线接口没有该标的行情时，路由会用标的自身的
+# `exchange`（`app.instrument.model.EXCHANGE`，值为 `okx`）填 `data_source`
+# （见 `app/api/routes/instruments.py` 的 `get_instrument_candles`），因此它也
+# 必须留在契约里；同时它也是早期未区分形态的存量取值。
+DataSource = Literal["okx", "okx_spot", "okx_swap", "us_equity_proxy"]
 SignalAction = Literal["BUY", "SELL", "HOLD"]
 PositionSide = Literal["long", "short"]
 OrderSide = Literal["buy", "sell"]

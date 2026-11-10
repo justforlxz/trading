@@ -49,6 +49,7 @@ from app.core import (
 
 NOW = datetime(2026, 11, 10, 12, 0, tzinfo=UTC)
 INST_ID = "XAAPL-USDT"
+INST_TYPE = "SPOT"
 
 
 # --------------------------------------------------------------------------- 端口契约
@@ -73,7 +74,7 @@ class MarketDataPortContract:
         assert isinstance(port, MarketDataPort)
 
     def test_instruments_carry_venue_metadata(self, port: MarketDataPort) -> None:
-        instruments = port.instruments()
+        instruments = port.instruments(INST_TYPE)
 
         assert instruments
         for item in instruments:
@@ -82,10 +83,18 @@ class MarketDataPortContract:
             assert item.inst_type
             assert item.quote_ccy
 
+    def test_unknown_category_raises(self, port: MarketDataPort, timeframe: Timeframe) -> None:
+        """未登记的类别必须报错：不返回空结果，也不退回另一类的口径。"""
+
+        with pytest.raises(ValidationError):
+            port.instruments("FUTURES")
+        with pytest.raises(ValidationError):
+            port.candles(INST_ID, timeframe, inst_type="FUTURES")
+
     def test_candles_are_ascending_and_match_the_request(
         self, port: MarketDataPort, timeframe: Timeframe
     ) -> None:
-        bars = port.candles(INST_ID, timeframe, limit=100)
+        bars = port.candles(INST_ID, timeframe, inst_type=INST_TYPE, limit=100)
 
         assert bars
         assert all(isinstance(bar, Bar) for bar in bars)
@@ -94,20 +103,20 @@ class MarketDataPortContract:
         assert [bar.open_time for bar in bars] == sorted(bar.open_time for bar in bars)
 
     def test_candles_respect_the_limit(self, port: MarketDataPort, timeframe: Timeframe) -> None:
-        assert len(port.candles(INST_ID, timeframe, limit=1)) <= 1
+        assert len(port.candles(INST_ID, timeframe, inst_type=INST_TYPE, limit=1)) <= 1
 
     def test_history_candles_stop_before_the_cursor(
         self, port: MarketDataPort, timeframe: Timeframe
     ) -> None:
-        bars = port.history_candles(INST_ID, timeframe)
+        bars = port.history_candles(INST_ID, timeframe, inst_type=INST_TYPE)
         cursor = bars[-1].open_time
 
-        older = port.history_candles(INST_ID, timeframe, after=cursor)
+        older = port.history_candles(INST_ID, timeframe, inst_type=INST_TYPE, after=cursor)
 
         assert all(bar.open_time < cursor for bar in older)
 
     def test_ticker_snapshot_is_timezone_aware(self, port: MarketDataPort) -> None:
-        snapshot = port.ticker(INST_ID)
+        snapshot = port.ticker(INST_ID, inst_type=INST_TYPE)
 
         assert isinstance(snapshot, Ticker)
         assert snapshot.inst_id == INST_ID
@@ -225,13 +234,13 @@ def test_empty_implementation_raises_on_every_port_method(
     assert issubclass(_EmptyTradePort, TradePort)
 
     with pytest.raises(NotImplementedError):
-        market.instruments()
+        market.instruments(INST_TYPE)
     with pytest.raises(NotImplementedError):
-        market.candles(INST_ID, one_hour)
+        market.candles(INST_ID, one_hour, inst_type=INST_TYPE)
     with pytest.raises(NotImplementedError):
-        market.history_candles(INST_ID, one_hour)
+        market.history_candles(INST_ID, one_hour, inst_type=INST_TYPE)
     with pytest.raises(NotImplementedError):
-        market.ticker(INST_ID)
+        market.ticker(INST_ID, inst_type=INST_TYPE)
     with pytest.raises(NotImplementedError):
         market.close()
 

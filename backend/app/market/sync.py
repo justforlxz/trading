@@ -84,12 +84,14 @@ def sync_candles(
     start: datetime,
     end: datetime,
     *,
+    inst_type: str,
     page_limit: int = DEFAULT_PAGE_LIMIT,
 ) -> SyncResult:
     """下载 `[start, end)` 的历史 K 线并幂等落库。
 
     从 `end` 往前翻页，直到覆盖 `start`、上游返回空页、或游标不再前进。
     只把窗口内已收盘的 K 线写进历史表；缺口不补造——缺多少由 `integrity` 报。
+    `inst_type` 原样交给行情端口，决定成交量的取列口径。
     """
 
     canonical = normalize_bar_or_raise(bar)
@@ -103,7 +105,9 @@ def sync_candles(
     cursor = end
     pages = 0
     while True:
-        page = port.history_candles(symbol, timeframe, after=cursor, limit=page_limit)
+        page = port.history_candles(
+            symbol, timeframe, inst_type=inst_type, after=cursor, limit=page_limit
+        )
         if not page:
             break
         pages += 1

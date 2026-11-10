@@ -90,7 +90,7 @@ class OkxStore:
     def candles(self, inst_id: str, bar: str, limit: int) -> list[list[str]]:
         """最近 `limit` 根 K 线，倒序（最新在前），最新一根未收盘。"""
 
-        self._require_inst_id(inst_id)
+        row = self._require_inst_id(inst_id)
         self._validate_bar(bar)
         self._validate_limit(limit)
         return make_candle_rows(
@@ -99,6 +99,7 @@ class OkxStore:
             count=limit,
             end_time=int(self._clock()),
             include_incomplete=True,
+            inst_type=row["instType"],
         )
 
     def history_candles(
@@ -114,7 +115,7 @@ class OkxStore:
         上游用毫秒传游标，由 `app` 层换算后再进来，避免这里出现两套单位。
         """
 
-        self._require_inst_id(inst_id)
+        row = self._require_inst_id(inst_id)
         self._validate_bar(bar)
         self._validate_limit(limit)
         if after is None:
@@ -126,6 +127,7 @@ class OkxStore:
             count=limit,
             end_time=newest,
             include_incomplete=False,
+            inst_type=row["instType"],
         )
 
     def ticker(self, inst_id: str) -> dict[str, str]:

@@ -347,6 +347,8 @@
           "data_source": {
             "enum": [
               "okx",
+              "okx_spot",
+              "okx_swap",
               "us_equity_proxy"
             ],
             "title": "Data Source",
@@ -450,6 +452,8 @@
           "data_source": {
             "enum": [
               "okx",
+              "okx_spot",
+              "okx_swap",
               "us_equity_proxy"
             ],
             "title": "Data Source",
@@ -566,6 +570,8 @@
           "data_source": {
             "enum": [
               "okx",
+              "okx_spot",
+              "okx_swap",
               "us_equity_proxy"
             ],
             "title": "Data Source",
@@ -645,6 +651,8 @@
           "data_source": {
             "enum": [
               "okx",
+              "okx_spot",
+              "okx_swap",
               "us_equity_proxy"
             ],
             "title": "Data Source",
@@ -893,6 +901,8 @@
           "data_source": {
             "enum": [
               "okx",
+              "okx_spot",
+              "okx_swap",
               "us_equity_proxy"
             ],
             "title": "Data Source",
@@ -1060,6 +1070,8 @@
           "data_source": {
             "enum": [
               "okx",
+              "okx_spot",
+              "okx_swap",
               "us_equity_proxy"
             ],
             "title": "Data Source",
@@ -1176,6 +1188,8 @@
           "data_source": {
             "enum": [
               "okx",
+              "okx_spot",
+              "okx_swap",
               "us_equity_proxy"
             ],
             "title": "Data Source",
@@ -4110,6 +4124,8 @@
             "schema": {
               "enum": [
                 "okx",
+                "okx_spot",
+                "okx_swap",
                 "us_equity_proxy"
               ],
               "title": "Data Source",
@@ -4207,6 +4223,8 @@
             "schema": {
               "enum": [
                 "okx",
+                "okx_spot",
+                "okx_swap",
                 "us_equity_proxy"
               ],
               "title": "Data Source",

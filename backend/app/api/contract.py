@@ -19,24 +19,18 @@ from app.api.schemas import (
     BacktestRunSummary,
     BacktestSweepRequest,
     BacktestSweepResponse,
-    CandleSeriesResponse,
     ExecutionModeRequest,
     ExecutionStateResponse,
     FillListResponse,
     IndicatorCatalogResponse,
     IndicatorSeriesResponse,
-    InstrumentDetailResponse,
-    InstrumentSearchResponse,
     JournalListResponse,
     Order,
     OrderCreateRequest,
     OrderListResponse,
     OverviewResponse,
     PositionListResponse,
-    PriceAlert,
-    PriceAlertRequest,
     RankingMetric,
-    RelatedInstrumentsResponse,
     SettingsResponse,
     SettingsUpdateRequest,
     SignalListResponse,
@@ -45,12 +39,8 @@ from app.api.schemas import (
     StrategyInstanceCreateRequest,
     StrategyInstanceListResponse,
     StrategyInstanceUpdateRequest,
-    WatchlistAddRequest,
-    WatchlistItem,
-    WatchlistResponse,
-    WatchlistUpdateRequest,
 )
-from app.api.schemas.common import Bar, DataSource, InstType
+from app.api.schemas.common import Bar, DataSource
 
 __all__ = ["contract_router"]
 
@@ -61,68 +51,6 @@ def _stub(node: str) -> HTTPException:
     """契约桩统一响应：501 明确表示「形状已定、实现未到」。"""
 
     return HTTPException(status_code=501, detail=f"contract stub; implemented by {node}")
-
-
-# ---------------------------------------------------------------- watchlist
-
-watchlist_router = APIRouter(tags=["watchlist"])
-
-
-@watchlist_router.get("/watchlist", response_model=WatchlistResponse)
-def list_watchlist() -> WatchlistResponse:
-    raise _stub("T1.5")
-
-
-@watchlist_router.post("/watchlist", response_model=WatchlistItem, status_code=201)
-def add_watchlist_item(payload: WatchlistAddRequest) -> WatchlistItem:
-    raise _stub("T1.5")
-
-
-@watchlist_router.get("/watchlist/{inst_id}/related", response_model=RelatedInstrumentsResponse)
-def get_related_instruments(inst_id: str, window_days: int = Query(30, ge=5, le=180)):
-    raise _stub("T2.2")
-
-
-@watchlist_router.put("/watchlist/{inst_id}/alert", response_model=PriceAlert)
-def put_price_alert(inst_id: str, payload: PriceAlertRequest) -> PriceAlert:
-    raise _stub("T1.5")
-
-
-@watchlist_router.delete("/watchlist/{inst_id}/alert", status_code=204, response_model=None)
-def delete_price_alert(inst_id: str) -> None:
-    raise _stub("T1.5")
-
-
-@watchlist_router.patch("/watchlist/{inst_id}", response_model=WatchlistItem)
-def update_watchlist_item(inst_id: str, payload: WatchlistUpdateRequest) -> WatchlistItem:
-    raise _stub("T1.5")
-
-
-@watchlist_router.delete("/watchlist/{inst_id}", status_code=204, response_model=None)
-def delete_watchlist_item(inst_id: str) -> None:
-    raise _stub("T1.5")
-
-
-@watchlist_router.get("/instruments/search", response_model=InstrumentSearchResponse)
-def search_instruments(
-    q: str = Query(..., min_length=1),
-    inst_type: InstType | None = None,
-) -> InstrumentSearchResponse:
-    raise _stub("T1.3")
-
-
-@watchlist_router.get("/instruments/{inst_id}", response_model=InstrumentDetailResponse)
-def get_instrument(inst_id: str) -> InstrumentDetailResponse:
-    raise _stub("T1.3")
-
-
-@watchlist_router.get("/instruments/{inst_id}/candles", response_model=CandleSeriesResponse)
-def get_instrument_candles(
-    inst_id: str,
-    bar: Bar = Query(...),
-    limit: int = Query(200, ge=1, le=1000),
-) -> CandleSeriesResponse:
-    raise _stub("T1.4")
 
 
 # ---------------------------------------------------------------- indicators
@@ -300,7 +228,6 @@ def get_overview() -> OverviewResponse:
 
 
 for _router in (
-    watchlist_router,
     indicators_router,
     strategy_router,
     backtest_router,

@@ -1,10 +1,10 @@
-"""HTTP 协议层：只做入参校验与响应组装，业务规则不进这一层。
+"""HTTP 协议层门面：只发布装配入口，端点与响应模型属于本包内部实现。
 
-门面只发布可挂载的路由对象；端点与响应模型属于本包内部实现。
-`contract_router` 是七个业务域的契约桩，真实端点落地时替换同名路径。
+端点按业务域拆在 `app.api.routes` 下，由 `app.api.registry` 统一挂载；域层异常由
+`app.api.errors` 翻译成 HTTP 响应，状态码只在边界读取一次。
 """
 
-from app.api.contract import contract_router
-from app.api.health import router as health_router
+from app.api.errors import register_error_handlers
+from app.api.registry import include_routers
 
-__all__ = ["contract_router", "health_router"]
+__all__ = ["include_routers", "register_error_handlers"]

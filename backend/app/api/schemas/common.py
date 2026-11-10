@@ -61,7 +61,9 @@ UtcDatetime = Annotated[
 # 与 `app/shared/timeframe.py` 的内部枚举一致；上游写法只允许出现在交易所适配层。
 Bar = Literal["1m", "5m", "15m", "1h", "4h", "1d"]
 InstType = Literal["SPOT", "SWAP"]
-AssetType = Literal["tokenized_equity", "crypto"]
+# 取值必须覆盖 `app.instrument` 的全部落库结果（含商品代币与未登记分类），
+# 否则契约比领域层窄，遇到真实标的会在响应构造时校验失败。
+AssetType = Literal["tokenized_equity", "crypto", "commodity_token", "unknown"]
 DataSource = Literal["okx", "us_equity_proxy"]
 SignalAction = Literal["BUY", "SELL", "HOLD"]
 PositionSide = Literal["long", "short"]
@@ -71,7 +73,8 @@ OrderStatus = Literal["pending", "open", "partially_filled", "filled", "cancelle
 ExecutionMode = Literal["manual", "paper", "live"]
 ExecutionModel = Literal["next_open", "next_close"]
 StrategyStatus = Literal["draft", "enabled", "disabled"]
-TradingStatus = Literal["live", "preopen", "suspended", "unknown"]
+# 与上游 `state` 原文一一对应：交易所适配层不做词表翻译，契约也不能收窄。
+TradingStatus = Literal["live", "suspend", "preopen", "test", "expired", "unknown"]
 AlertDirection = Literal["above", "below"]
 
 # 策略/指标参数值：JSON 标量，不做进一步的域内校验（各指标自证其参数）。

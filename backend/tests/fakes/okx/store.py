@@ -1,6 +1,7 @@
 """假 OKX 的内存数据源。
 
-标的清单来自冻结快照；K 线、资金费与行情快照按标的名确定性生成，无需预置数据。
+标的清单默认来自全类别冻结快照（两类 `instType`、四类 `instCategory`）；K 线、
+资金费与行情快照按标的名确定性生成，无需预置数据。
 业务错误用 `OkxApiError` 表达（HTTP 200 + 非零 code），与限流/上游故障区分。
 """
 
@@ -18,7 +19,7 @@ from tests.factories.candles import (
     make_candle_rows,
     make_ticker_row,
 )
-from tests.factories.instruments import load_instruments
+from tests.factories.instruments import load_all_instruments
 
 UNKNOWN_INST_ID_CODE = "51001"
 INVALID_PARAMETER_CODE = "51000"
@@ -75,7 +76,7 @@ class OkxStore:
         instruments: Sequence[dict[str, Any]] | None = None,
         clock: Callable[[], float] = time.time,
     ) -> None:
-        rows = list(instruments) if instruments is not None else load_instruments()
+        rows = list(instruments) if instruments is not None else load_all_instruments()
         self._instruments = rows
         self._by_inst_id = {row["instId"]: row for row in rows}
         self._clock = clock

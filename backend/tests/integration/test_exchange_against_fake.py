@@ -23,6 +23,7 @@ from app.exchange import (
     OkxMarketData,
     RateLimitedError,
 )
+from tests.factories.instruments import EXPECTED_ALL_COUNTS
 from tests.fakes.okx.server import FakeOkxServer
 
 SPOT = "SPOT"
@@ -67,7 +68,7 @@ def _raw_candles(client: OkxClient, inst_id: str, limit: int = 5) -> list[tuple[
 def test_instruments_are_normalised_to_the_port_dto(market: OkxMarketData) -> None:
     instruments = market.instruments(SPOT)
 
-    assert len(instruments) == 199
+    assert len(instruments) == EXPECTED_ALL_COUNTS[SPOT]
     assert all(isinstance(item, InstrumentRef) for item in instruments)
     assert {item.inst_type for item in instruments} == {SPOT}
 
@@ -87,7 +88,7 @@ def test_swap_instruments_fall_back_to_contract_currencies(market: OkxMarketData
 
     instruments = market.instruments(SWAP)
 
-    assert len(instruments) == 230
+    assert len(instruments) == EXPECTED_ALL_COUNTS[SWAP]
     assert {item.inst_type for item in instruments} == {SWAP}
 
     sample = next(item for item in instruments if item.inst_id == SWAP_SAMPLE)

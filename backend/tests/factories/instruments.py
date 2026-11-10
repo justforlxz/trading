@@ -1,7 +1,10 @@
 """标的清单夹具工厂。
 
-数据来源封闭：只有 `tests/fixtures/okx/instruments_2026-11-10.json`
-这一份冻结快照，以及本模块构造的单行样本。快照是测试夹具，不是实时行情。
+数据来源封闭：`tests/fixtures/okx/` 下两份冻结快照，以及本模块构造的单行样本。
+- `instruments_2026-11-10.json`：只含代币化股票（`instCategory == "3"`）。
+- `instruments_all_2026-11-10.json`：全类别，两类 `instType` 与四类 `instCategory` 都在。
+
+两份都是测试夹具，不是实时行情。
 """
 
 from __future__ import annotations
@@ -16,7 +19,11 @@ from app.core import InstrumentRef
 
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "okx"
 INSTRUMENT_SNAPSHOT_PATH = FIXTURES_DIR / "instruments_2026-11-10.json"
+ALL_INSTRUMENT_SNAPSHOT_PATH = FIXTURES_DIR / "instruments_all_2026-11-10.json"
 SAMPLE_LIST_TIME = datetime(2026, 7, 15, 10, 0, tzinfo=UTC)
+
+# OKX 上游 `instCategory` 的全部取值：3 代币化股票、1 加密、4 代币化商品、""（上游未下发）。
+INST_CATEGORIES: tuple[str, ...] = ("3", "1", "4", "")
 
 # 快照自带的计数，用来防止夹具被无声改动导致下游验收数字漂移。
 EXPECTED_COUNTS: dict[str, int] = {
@@ -24,6 +31,18 @@ EXPECTED_COUNTS: dict[str, int] = {
     "spot": 199,
     "swap": 230,
     "spot_product_keys_with_swap": 169,
+}
+
+# 全类别快照的计数：`counts` 按 instType，`category_counts` 按 instCategory，各自求和等于行数。
+EXPECTED_ALL_COUNTS: dict[str, int] = {
+    "SPOT": 1221,
+    "SWAP": 543,
+}
+EXPECTED_ALL_CATEGORY_COUNTS: dict[str, int] = {
+    "": 5,
+    "1": 1316,
+    "3": 430,
+    "4": 13,
 }
 
 
@@ -49,8 +68,43 @@ def load_instruments() -> list[dict[str, Any]]:
     return rows
 
 
-def make_instrument_row(**overrides: Any) -> dict[str, Any]:
-    """构造单行标的样本，默认值模仿 OKX 代币化股票现货。"""
+def load_all_snapshot() -> dict[str, Any]:
+    """读取整份全类别快照文档（含 meta）。"""
+
+    with ALL_INSTRUMENT_SNAPSHOT_PATH.open(encoding="utf-8") as handle:
+        document: dict[str, Any] = json.load(handle)
+    return document
+
+
+def load_all_instruments() -> list[dict[str, Any]]:
+    """读取全类别快照的全部标的行，并校验计数与行数一致。
+
+    假 OKX 的默认数据集就是这份快照，因此这里的校验挡住的是「夹具被改动后
+    下游条数静默漂移」。
+    """
+
+    document = load_all_snapshot()
+    meta = document["meta"]
+    counts = meta["counts"]
+    if counts != EXPECTED_ALL_COUNTS:
+        raise AssertionError(f"全类别夹具计数漂移:{counts} != {EXPECTED_ALL_COUNTS}")
+    if meta["category_counts"] != EXPECTED_ALL_CATEGORY_COUNTS:
+        raise AssertionError(
+            "全类别夹具资产类别计数漂移:"
+            f"{meta['category_counts']} != {EXPECTED_ALL_CATEGORY_COUNTS}"
+        )
+    rows: list[dict[str, Any]] = document["instruments"]
+    if sum(counts.values()) != len(rows):
+        raise AssertionError(f"全类别夹具计数之和与行数不符:{sum(counts.values())} != {len(rows)}")
+    return rows
+
+
+def make_instrument_row(*, inst_category: str | None = None, **overrides: Any) -> dict[str, Any]:
+    """构造单行标的样本，默认值模仿 OKX 代币化股票现货。
+
+    `inst_category` 用下划线写法覆盖上游 `instCategory`；四种取值都能直接构造：
+    `"3"` 代币化股票、`"1"` 加密、`"4"` 代币化商品、`""`（上游未下发）。
+    """
 
     row: dict[str, Any] = {
         "instType": "SPOT",
@@ -77,6 +131,8 @@ def make_instrument_row(**overrides: Any) -> dict[str, Any]:
         "alias": "",
     }
     row.update(overrides)
+    if inst_category is not None:
+        row["instCategory"] = inst_category
     return row
 
 

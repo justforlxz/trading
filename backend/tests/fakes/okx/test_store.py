@@ -8,7 +8,12 @@ import pytest
 
 from app.exchange import ExchangeError
 from app.exchange.okx.instruments import parse_instruments
-from tests.factories.instruments import make_instrument_row
+from tests.factories.instruments import (
+    EXPECTED_ALL_COUNTS,
+    INST_CATEGORIES,
+    load_all_instruments,
+    make_instrument_row,
+)
 from tests.fakes.okx.store import (
     INVALID_PARAMETER_CODE,
     UNKNOWN_INST_ID_CODE,
@@ -26,21 +31,18 @@ def store() -> OkxStore:
     return OkxStore(clock=lambda: float(FIXED_NOW))
 
 
-def test_spot_instruments_only_include_live_tokenized_equities(store: OkxStore) -> None:
-    rows = store.instruments("SPOT")
+def test_default_dataset_is_the_all_category_fixture(store: OkxStore) -> None:
+    """默认数据集是全类别快照：两类 instType 的行数与内容都取自夹具本身。"""
 
-    assert len(rows) == 199
-    assert {row["instType"] for row in rows} == {"SPOT"}
-    assert {row["instCategory"] for row in rows} == {"3"}
-    assert {row["state"] for row in rows} == {"live"}
+    snapshot = load_all_instruments()
 
+    for inst_type in ("SPOT", "SWAP"):
+        rows = store.instruments(inst_type)
+        assert len(rows) == EXPECTED_ALL_COUNTS[inst_type]
+        assert rows == [row for row in snapshot if row["instType"] == inst_type]
 
-def test_swap_instruments_cover_the_full_contract_set(store: OkxStore) -> None:
-    rows = store.instruments("SWAP")
-
-    assert len(rows) == 230
-    assert {row["instType"] for row in rows} == {"SWAP"}
-    assert {row["instCategory"] for row in rows} == {"3"}
+    assert {row["instCategory"] for row in store.instruments("SPOT")} == set(INST_CATEGORIES)
+    assert {row["instCategory"] for row in store.instruments("SWAP")} == {"1", "3", "4"}
 
 
 def test_unknown_inst_type_is_a_business_error(store: OkxStore) -> None:

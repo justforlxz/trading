@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import httpx
 
+from tests.factories.instruments import EXPECTED_ALL_COUNTS
 from tests.fakes.okx.server import FakeOkxServer, start_server
 
 _INSTRUMENTS = "/api/v5/public/instruments"
@@ -16,7 +17,7 @@ def test_server_listens_on_a_real_port(fake_okx_server: FakeOkxServer) -> None:
     response = httpx.get(f"{fake_okx_server.base_url}{_INSTRUMENTS}", params={"instType": "SPOT"})
 
     assert response.status_code == 200
-    assert len(response.json()["data"]) == 199
+    assert len(response.json()["data"]) == EXPECTED_ALL_COUNTS["SPOT"]
 
 
 def test_scenarios_can_be_switched_on_a_running_server(fake_okx_server: FakeOkxServer) -> None:

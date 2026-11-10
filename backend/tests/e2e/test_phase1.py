@@ -47,7 +47,14 @@ def test_phase1_watchlist_round_trip(client: TestClient, market_port: MarketData
 
     now = datetime.now(UTC).replace(microsecond=0)
     result = sync_candles(
-        market_port, WATCHED, "1d", now - timedelta(days=4), now, inst_type="SPOT"
+        market_port,
+        WATCHED,
+        "1d",
+        now - timedelta(days=4),
+        now,
+        inst_type="SPOT",
+        asset_type="tokenized_equity",
+        source="okx_spot",
     )
     assert result.inserted >= 2
 

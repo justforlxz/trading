@@ -23,6 +23,7 @@ from app.market import (
 
 SYMBOL_A = "XAAPL-USDT"
 SYMBOL_B = "XMSFT-USDT"
+ASSET_TYPE = "tokenized_equity"
 WINDOW_END = datetime(2026, 11, 6, 16, 0, tzinfo=UTC)
 
 
@@ -49,7 +50,9 @@ def _bar(
 
 def _sync_window(port, symbol: str, hours: int, *, end: datetime = WINDOW_END) -> datetime:
     start = end - timedelta(hours=hours)
-    sync_candles(port, symbol, "1h", start, end, inst_type="SPOT")
+    sync_candles(
+        port, symbol, "1h", start, end, inst_type="SPOT", asset_type=ASSET_TYPE, source="okx_spot"
+    )
     return start
 
 
@@ -187,7 +190,7 @@ def test_correlation_respects_the_requested_window(market_port) -> None:
     start = WINDOW_END - timedelta(hours=4)
     result = correlation(SYMBOL_A, SYMBOL_B, "1h", start=start, end=WINDOW_END)
 
-    assert result.sample_size == len(expected_open_times(start, WINDOW_END, "1h")) == 4
+    assert result.sample_size == len(expected_open_times(start, WINDOW_END, "1h", ASSET_TYPE)) == 4
 
 
 def test_correlation_supports_spearman(market_port) -> None:

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import func, select
@@ -16,9 +16,10 @@ from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 
 from app.core import Bar, MarketDataPort, Timeframe, ValidationError
 from app.db import session_scope
-from app.market.candles import dedupe_sorted, floor_open_time
+from app.market.candles import dedupe_sorted, floor_open_time, next_open_time
 from app.market.model import Candle, from_epoch, to_epoch
-from app.shared import bar_seconds, normalize_bar
+from app.market.session import day_asset_type
+from app.shared import normalize_bar
 
 # 上游单次请求的 K 线上限；`page_limit` 不得超过它，否则适配层直接报错。
 MAX_PAGE_LIMIT = 100
@@ -69,12 +70,14 @@ def require_range(start: datetime, end: datetime) -> None:
         raise ValidationError(f"start 必须早于 end:{start.isoformat()} >= {end.isoformat()}")
 
 
-def first_open_time(start: datetime, bar: str) -> datetime:
-    """`[start, end)` 窗口里第一个可能的 open_time（对齐到周期边界）。"""
+def first_open_time(start: datetime, bar: str, asset_type: str) -> datetime:
+    """`[start, end)` 窗口里第一个可能的 open_time（对齐到周期边界）。
 
-    aligned = floor_open_time(start, bar)
-    step = timedelta(seconds=bar_seconds(bar))
-    return aligned if aligned >= start else aligned + step
+    日线的边界由 `asset_type` 所属市场的交易时段决定（见 `floor_open_time`）。
+    """
+
+    aligned = floor_open_time(start, bar, asset_type)
+    return aligned if aligned >= start else next_open_time(aligned, bar, asset_type)
 
 
 def sync_candles(
@@ -85,6 +88,8 @@ def sync_candles(
     end: datetime,
     *,
     inst_type: str,
+    asset_type: str,
+    source: str,
     page_limit: int = DEFAULT_PAGE_LIMIT,
 ) -> SyncResult:
     """下载 `[start, end)` 的历史 K 线并幂等落库。
@@ -92,6 +97,11 @@ def sync_candles(
     从 `end` 往前翻页，直到覆盖 `start`、上游返回空页、或游标不再前进。
     只把窗口内已收盘的 K 线写进历史表；缺口不补造——缺多少由 `integrity` 报。
     `inst_type` 原样交给行情端口，决定成交量的取列口径。
+
+    日线的窗口按**这批行情所属市场**对齐：`source` 是该端口会写出的来源（OKX 的
+    `okx_*`，或美股代理源的标识），`asset_type` 是标的所属资产。两者一起定界——
+    OKX 的日线是交易所自己的交易日（含周末），美股代理源的日线只在交易日产生，
+    用错网格会把正确的行情裁掉。
     """
 
     canonical = normalize_bar_or_raise(bar)
@@ -99,7 +109,7 @@ def sync_candles(
     if not 1 <= page_limit <= MAX_PAGE_LIMIT:
         raise ValidationError(f"page_limit 必须在 1..{MAX_PAGE_LIMIT} 之间")
     timeframe = Timeframe.parse(canonical)
-    window_start = first_open_time(start, canonical)
+    window_start = first_open_time(start, canonical, day_asset_type(asset_type, source))
 
     collected: list[Bar] = []
     cursor = end
@@ -154,6 +164,7 @@ def upsert_candles(rows: Iterable[Bar]) -> UpsertResult:
             "close": row.close,
             "volume": row.volume,
             "updated_at": row.updated_at,
+            "market_session": row.market_session,
         }
     if not prepared:
         return UpsertResult(inserted=0, updated=0, skipped_unconfirmed=skipped)

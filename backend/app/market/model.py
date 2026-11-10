@@ -7,8 +7,13 @@
 同样让重复采集幂等。两档费率都可为空：上游对「本期没有实现费率」与「费率恰好是 0」
 给的是空串 / `"0"` 两种不同事实，落库必须保留这个区别。
 
-时间列存 epoch 秒（整数）：可以直接用 `open_time % 86400` 校验日线边界，不依赖
-字符串时间格式。价格以文本列存储、用 `Decimal` 收发，避免浮点往返丢掉精度。
+时间列存 epoch 秒（整数），不依赖字符串时间格式。价格以文本列存储、用 `Decimal`
+收发，避免浮点往返丢掉精度。
+
+日线的 `open_time` 由上游给出（OKX 是 16:00 UTC），本表不改写它；**期望的日界**由
+`app/market/session.py` 定：同步窗口与缺口网格都按「该条行情所属市场的交易日
+首个 `open_time`」算（美股代理源落在美东 09:30，24/7 市场仍是 UTC+8 零点）。时段
+另存一列 `market_session`，读回时随 `Bar` 一起带出。
 """
 
 from __future__ import annotations
@@ -80,6 +85,7 @@ class Candle(Base):
     close: Mapped[Decimal] = mapped_column(DecimalText, nullable=False)
     volume: Mapped[Decimal] = mapped_column(DecimalText, nullable=False)
     updated_at: Mapped[int] = mapped_column(Integer, nullable=False)
+    market_session: Mapped[str] = mapped_column(String(16), nullable=False, default="")
 
     @classmethod
     def from_bar(cls, bar: Bar) -> Candle:
@@ -98,6 +104,7 @@ class Candle(Base):
             close=bar.close,
             volume=bar.volume,
             updated_at=now_epoch(),
+            market_session=bar.market_session,
         )
 
     def to_bar(self) -> Bar:
@@ -114,6 +121,7 @@ class Candle(Base):
             volume=self.volume,
             confirm=True,
             source=self.source,
+            market_session=self.market_session,
         )
 
 

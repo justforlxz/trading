@@ -88,7 +88,10 @@ class Bar:
     """一根 K 线。
 
     `confirm` 为 False 表示该周期尚未收盘（仍会变动）；`source` 标明数据来源，
-    是持久化的主键之一。
+    是持久化的主键之一，空来源没有意义——不知道从哪来的价格不能当行情用。
+
+    `market_session` 是这根 K 线所属的资产时段（`app/market/session.py` 的四个取值），
+    空字符串表示来源没有声明；时段语义属于 market 域，core 只带值不解释。
     """
 
     inst_id: str
@@ -101,10 +104,13 @@ class Bar:
     volume: Decimal
     confirm: bool
     source: str
+    market_session: str = ""
 
     def __post_init__(self) -> None:
         if self.open_time.tzinfo is None:
             raise ValidationError("K 线的 open_time 必须带时区")
+        if not self.source.strip():
+            raise ValidationError("K 线缺少数据来源")
 
 
 @dataclass(frozen=True, slots=True)

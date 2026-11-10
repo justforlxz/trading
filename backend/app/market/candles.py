@@ -4,46 +4,60 @@
 """
 
 from collections.abc import Callable, Iterable, Sequence
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from itertools import pairwise
 
+from app.market.session import daily_open_time, next_daily_open_time
 from app.shared import bar_seconds, normalize_bar
-
-# OKX 的 1D 以 UTC+8 为零点，内部仍用 UTC 存储，因此日线边界落在 16:00Z。
-UTC8 = timezone(timedelta(hours=8))
 
 
 def bar_delta(bar: str) -> timedelta:
     return timedelta(seconds=bar_seconds(bar))
 
 
-def floor_open_time(ts: datetime, bar: str) -> datetime:
-    """把时间戳向下对齐到该周期的 open_time（UTC）。"""
+def floor_open_time(ts: datetime, bar: str, asset_type: str) -> datetime:
+    """把时间戳向下对齐到该周期的 open_time（UTC）。
+
+    日线的定界不是全局常量，也不是自然日零点：它由 `asset_type` 所属市场的交易时段
+    决定（`app.market.session.daily_open_time`，24/7 市场仍是 OKX 的 UTC+8 零点）。
+    其余周期按固定步长对齐，与资产无关。
+    """
 
     if ts.tzinfo is None:
         raise ValueError("ts must be timezone-aware")
     canonical = normalize_bar(bar)
     utc = ts.astimezone(UTC)
     if canonical == "1d":
-        local = utc.astimezone(UTC8)
-        floored = local.replace(hour=0, minute=0, second=0, microsecond=0)
-        return floored.astimezone(UTC)
+        return daily_open_time(asset_type, utc)
     epoch = int(utc.timestamp())
     step = bar_seconds(canonical)
     return datetime.fromtimestamp(epoch - epoch % step, tz=UTC)
 
 
-def expected_open_times(start: datetime, end: datetime, bar: str) -> list[datetime]:
+def next_open_time(cursor: datetime, bar: str, asset_type: str) -> datetime:
+    """`cursor` 之后的下一个 open_time。
+
+    日线按交易时段推进（美股跳过周末与休市日，24/7 资产每天一根），其余周期按固定
+    步长推进——日线不是均匀网格，不能用「加 24 小时」代替。
+    """
+
+    if normalize_bar(bar) == "1d":
+        return next_daily_open_time(asset_type, cursor)
+    return cursor + bar_delta(bar)
+
+
+def expected_open_times(
+    start: datetime, end: datetime, bar: str, asset_type: str
+) -> list[datetime]:
     """`[start, end)` 内应到的 open_time 序列（含缺口检测的分母）。"""
 
-    step = bar_delta(bar)
-    cursor = floor_open_time(start, bar)
+    cursor = floor_open_time(start, bar, asset_type)
     if cursor < start:
-        cursor += step
+        cursor = next_open_time(cursor, bar, asset_type)
     result: list[datetime] = []
     while cursor < end:
         result.append(cursor)
-        cursor += step
+        cursor = next_open_time(cursor, bar, asset_type)
     return result
 
 
@@ -61,15 +75,15 @@ def find_gaps(
     start: datetime,
     end: datetime,
     bar: str,
+    asset_type: str,
 ) -> list[tuple[datetime, datetime]]:
     """返回缺口窗口 `[window_start, window_end)`，按时间升序合并连续缺失。"""
 
     present = set(actual)
     gaps: list[tuple[datetime, datetime]] = []
-    step = bar_delta(bar)
     run_start: datetime | None = None
     cursor: datetime | None = None
-    for expected in expected_open_times(start, end, bar):
+    for expected in expected_open_times(start, end, bar, asset_type):
         cursor = expected
         if expected in present:
             if run_start is not None:
@@ -78,7 +92,7 @@ def find_gaps(
         elif run_start is None:
             run_start = expected
     if run_start is not None and cursor is not None:
-        gaps.append((run_start, cursor + step))
+        gaps.append((run_start, next_open_time(cursor, bar, asset_type)))
     return gaps
 
 

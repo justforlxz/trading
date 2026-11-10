@@ -10,16 +10,8 @@ import httpx
 import pytest
 
 from app.config import Settings
-from app.exchange import (
-    Candle,
-    ExchangeError,
-    InstrumentInfo,
-    MarketDataPort,
-    OkxClient,
-    OkxMarketData,
-    Ticker,
-    create_market_data,
-)
+from app.core import Bar, InstrumentRef, MarketDataPort, Ticker, Timeframe
+from app.exchange import ExchangeError, OkxClient, OkxMarketData, create_market_data
 
 SPOT_INSTRUMENT = {
     "instId": "XAAPL-USDT",
@@ -52,6 +44,10 @@ TICKER = {
     "sodUtc0": "351",
     "sodUtc8": "352",
 }
+
+
+ONE_HOUR = Timeframe.parse("1h")
+ONE_DAY = Timeframe.parse("1d")
 
 
 def _envelope(data: list[Any]) -> dict[str, Any]:
@@ -97,7 +93,7 @@ def test_instruments_requests_spot_only_and_parses_metadata() -> None:
     assert requests[0].url.path == "/api/v5/public/instruments"
     assert requests[0].url.params["instType"] == "SPOT"
     assert items == [
-        InstrumentInfo(
+        InstrumentRef(
             inst_id="XAAPL-USDT",
             inst_type="SPOT",
             base_ccy="AAPL",
@@ -197,13 +193,12 @@ def test_instruments_invalid_list_time_raises() -> None:
     market.close()
 
 
-@pytest.mark.parametrize("bar", ["1h", "1H"])
-def test_candles_map_bar_and_return_ascending_from_newest_first(bar: str) -> None:
+def test_candles_map_timeframe_and_return_ascending_from_newest_first() -> None:
     newest = _candle_row(1794290400000, close="352.11", confirm="0")
     older = _candle_row(1794286800000, close="351.00", confirm="1")
     market, requests = _market(_envelope([newest, older]))
 
-    candles = market.candles("XAAPL-USDT", bar, limit=2)
+    candles = market.candles("XAAPL-USDT", ONE_HOUR, limit=2)
 
     assert requests[0].url.path == "/api/v5/market/candles"
     assert requests[0].url.params["instId"] == "XAAPL-USDT"
@@ -213,12 +208,12 @@ def test_candles_map_bar_and_return_ascending_from_newest_first(bar: str) -> Non
         datetime.fromtimestamp(1794286800, tz=UTC),
         datetime.fromtimestamp(1794290400, tz=UTC),
     ]
-    assert all(candle.bar == "1h" for candle in candles)
+    assert all(candle.timeframe == ONE_HOUR for candle in candles)
     assert all(candle.source == "okx" for candle in candles)
     assert [candle.confirm for candle in candles] == [True, False]
-    assert candles[1] == Candle(
+    assert candles[1] == Bar(
         inst_id="XAAPL-USDT",
-        bar="1h",
+        timeframe=ONE_HOUR,
         open_time=datetime.fromtimestamp(1794290400, tz=UTC),
         open=Decimal("351.62"),
         high=Decimal("352.22"),
@@ -234,7 +229,7 @@ def test_candles_map_bar_and_return_ascending_from_newest_first(bar: str) -> Non
 def test_candles_daily_bar_maps_to_uppercase_d() -> None:
     market, requests = _market(_envelope([_candle_row(1794240000000)]))
 
-    market.candles("XAAPL-USDT", "1d", limit=1)
+    market.candles("XAAPL-USDT", ONE_DAY, limit=1)
 
     assert requests[0].url.params["bar"] == "1D"
     market.close()
@@ -245,7 +240,7 @@ def test_candles_invalid_limit_raises_before_any_request(limit: int) -> None:
     market, requests = _market(_envelope([]))
 
     with pytest.raises(ValueError, match="limit"):
-        market.candles("XAAPL-USDT", "1h", limit=limit)
+        market.candles("XAAPL-USDT", ONE_HOUR, limit=limit)
 
     assert requests == []
     market.close()
@@ -255,7 +250,7 @@ def test_candles_short_row_raises() -> None:
     market, _ = _market(_envelope([["1794290400000", "1", "2"]]))
 
     with pytest.raises(ExchangeError, match="K 线数据结构异常"):
-        market.candles("XAAPL-USDT", "1h")
+        market.candles("XAAPL-USDT", ONE_HOUR)
     market.close()
 
 
@@ -263,7 +258,7 @@ def test_candles_non_array_row_raises() -> None:
     market, _ = _market(_envelope([{"ts": "1794290400000"}]))
 
     with pytest.raises(ExchangeError, match="K 线数据结构异常"):
-        market.candles("XAAPL-USDT", "1h")
+        market.candles("XAAPL-USDT", ONE_HOUR)
     market.close()
 
 
@@ -271,7 +266,7 @@ def test_candles_non_numeric_value_raises() -> None:
     market, _ = _market(_envelope([_candle_row(1794290400000, close="nope")]))
 
     with pytest.raises(ExchangeError, match="K 线数据非法"):
-        market.candles("XAAPL-USDT", "1h")
+        market.candles("XAAPL-USDT", ONE_HOUR)
     market.close()
 
 
@@ -279,7 +274,7 @@ def test_history_candles_uses_history_path_and_after_cursor() -> None:
     market, requests = _market(_envelope([_candle_row(1794240000000)]))
     after = datetime(2026, 11, 9, tzinfo=UTC)
 
-    market.history_candles("XAAPL-USDT", "1D", after=after, limit=50)
+    market.history_candles("XAAPL-USDT", ONE_DAY, after=after, limit=50)
 
     assert requests[0].url.path == "/api/v5/market/history-candles"
     assert requests[0].url.params["bar"] == "1D"
@@ -291,7 +286,7 @@ def test_history_candles_uses_history_path_and_after_cursor() -> None:
 def test_history_candles_without_cursor_omits_after() -> None:
     market, requests = _market(_envelope([]))
 
-    assert market.history_candles("XAAPL-USDT", "1d") == []
+    assert market.history_candles("XAAPL-USDT", ONE_DAY) == []
     assert "after" not in requests[0].url.params
     market.close()
 
@@ -300,7 +295,7 @@ def test_history_candles_rejects_naive_cursor() -> None:
     market, requests = _market(_envelope([]))
 
     with pytest.raises(ValueError, match="时区"):
-        market.history_candles("XAAPL-USDT", "1d", after=datetime(2026, 11, 9))
+        market.history_candles("XAAPL-USDT", ONE_DAY, after=datetime(2026, 11, 9))
 
     assert requests == []
     market.close()

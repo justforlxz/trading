@@ -1,7 +1,8 @@
 """交易所适配层门面。
 
-业务模块只通过这里拿行情：端口协议、中立数据结构、异常类型，以及默认的
-OKX 现货实现。HTTP 细节（请求、限流、重试、字段名）全部留在本包内部。
+本包是行情端口的**实现方**：端口与值对象定义在 `app.core`，这里只发布「怎么连
+交易所」——客户端、默认现货实现、装配函数，以及适配层自己的异常类型。
+业务模块依赖 `app.core` 的端口，不依赖本包的实现细节。
 """
 
 from __future__ import annotations
@@ -12,17 +13,12 @@ from app.config import Settings
 from app.exchange.errors import ExchangeError, RateLimitedError
 from app.exchange.okx.client import OkxClient
 from app.exchange.okx.market import OkxMarketData
-from app.exchange.ports import Candle, InstrumentInfo, MarketDataPort, Ticker
 
 __all__ = [
-    "Candle",
     "ExchangeError",
-    "InstrumentInfo",
-    "MarketDataPort",
     "OkxClient",
     "OkxMarketData",
     "RateLimitedError",
-    "Ticker",
     "create_market_data",
 ]
 

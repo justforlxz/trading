@@ -1,21 +1,17 @@
 """bar 周期的内部枚举与别名归一化（纯函数，无 IO）。
 
-内部枚举固定为 `1m/5m/15m/1h/4h/1d`。对外只接受一批常见别名，并**只**归一化到
-上述枚举；上游的原始 bar 写法在适配层映射，业务层不出现上游写法。
+周期表本身定义在 `app.core.Timeframe`（单一真源），这里只做派生与别名归一化。
+对外只接受一批常见别名，并**只**归一化到规范枚举；上游的原始 bar 写法在适配层
+映射，业务层不出现上游写法。
 """
 
 from collections.abc import Iterable
 
-CANONICAL_BARS: tuple[str, ...] = ("1m", "5m", "15m", "1h", "4h", "1d")
+from app.core import Timeframe
 
-BAR_SECONDS: dict[str, int] = {
-    "1m": 60,
-    "5m": 300,
-    "15m": 900,
-    "1h": 3600,
-    "4h": 14400,
-    "1d": 86400,
-}
+CANONICAL_BARS: tuple[str, ...] = tuple(item.value for item in Timeframe.ALL)
+
+BAR_SECONDS: dict[str, int] = {item.value: item.seconds for item in Timeframe.ALL}
 
 # 别名 → 内部枚举；查询时大小写不敏感（"1H" / "1D" 是 OKX 写法，也接受）。
 ALIASES: dict[str, str] = {

@@ -1,17 +1,17 @@
-"""上游标的元数据 → 中立 `InstrumentInfo`。"""
+"""上游标的元数据 → 中立 `InstrumentRef`。"""
 
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from app.core import InstrumentRef, utc_from_millis
 from app.exchange.errors import ExchangeError
-from app.exchange.ports import InstrumentInfo, utc_from_millis
 
 __all__ = ["parse_instruments"]
 
 
-def parse_instruments(rows: list[Any]) -> list[InstrumentInfo]:
+def parse_instruments(rows: list[Any]) -> list[InstrumentRef]:
     """逐条解析上游标的元数据；字段缺失或数值非法时抛 `ExchangeError`。
 
     尚未开盘的标的会把精度字段留空，这类字段按「未知」（None）处理，不让单条
@@ -21,11 +21,11 @@ def parse_instruments(rows: list[Any]) -> list[InstrumentInfo]:
     return [_parse_instrument(row) for row in rows]
 
 
-def _parse_instrument(row: Any) -> InstrumentInfo:
+def _parse_instrument(row: Any) -> InstrumentRef:
     if not isinstance(row, dict):
         raise ExchangeError("标的元数据结构异常")
     try:
-        return InstrumentInfo(
+        return InstrumentRef(
             inst_id=str(row["instId"]),
             inst_type=str(row["instType"]),
             base_ccy=str(row["baseCcy"]),

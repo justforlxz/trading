@@ -17,7 +17,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from sqlalchemy import select
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 
 from app.core import UpstreamError, ValidationError, utc_from_millis
 from app.db import session_scope
@@ -32,7 +32,7 @@ FUNDING_PATH = "/api/v5/public/funding-rate-history"
 MAX_PAGE_LIMIT = 100
 DEFAULT_PAGE_LIMIT = MAX_PAGE_LIMIT
 
-# 单条 INSERT 的批量上限：每行 5 个绑定值，1000 行远低于 SQLite 的绑定参数上限。
+# 单条 INSERT 的批量上限：每行 5 个绑定值，1000 行远低于 PostgreSQL 的绑定参数上限。
 UPSERT_BATCH_SIZE = 1000
 
 
@@ -142,7 +142,7 @@ def backfill_funding(
 def upsert_funding(points: Iterable[FundingPoint]) -> FundingUpsertResult:
     """批量幂等写入：同一 `(inst_id, funding_time)` 重复写只覆盖费率。
 
-    写入按固定行数切块，避免深回溯一次撞上 SQLite 的绑定参数上限；
+    写入按固定行数切块，避免深回溯一次撞上 PostgreSQL 的绑定参数上限；
     同一批内的重复结算时刻先合并，计数只按唯一键算。
     """
 
@@ -165,7 +165,7 @@ def upsert_funding(points: Iterable[FundingPoint]) -> FundingUpsertResult:
         for offset in range(0, len(rows), UPSERT_BATCH_SIZE):
             batch = rows[offset : offset + UPSERT_BATCH_SIZE]
             existing |= _existing_keys(session, batch)
-            statement = sqlite_insert(Funding).values(batch)
+            statement = postgresql_insert(Funding).values(batch)
             statement = statement.on_conflict_do_update(
                 index_elements=["inst_id", "funding_time"],
                 set_={

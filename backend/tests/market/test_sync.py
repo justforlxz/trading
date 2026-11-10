@@ -1,10 +1,9 @@
 """历史 K 线同步：分页、窗口过滤、只写已收盘、幂等落库。
 
-拓扑固定：真实 `OkxMarketData` → 线程内假 OKX → 临时 SQLite。
+拓扑固定：真实 `OkxMarketData` → 线程内假 OKX → 临时 schema 的 PostgreSQL。
 期望值全部由窗口与周期反推，不依赖上游返回顺序。
 """
 
-import sqlite3
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
@@ -81,7 +80,7 @@ def test_sync_downloads_exactly_the_requested_window(market_port) -> None:
 
 
 def test_sync_handles_a_window_larger_than_one_write_batch(market_port) -> None:
-    """3 天 1 分钟线共 4320 行，超过默认构建单条 INSERT 的绑定参数上限。"""
+    """3 天 1 分钟线共 4320 行，远超单条 INSERT 的批大小，必须分多批写入。"""
 
     start = DAILY_END - timedelta(days=3)
     result = sync_candles(market_port, SYMBOL, "1m", start, DAILY_END, inst_type="SPOT")
@@ -129,8 +128,8 @@ def test_upsert_overwrites_prices_without_changing_row_count() -> None:
     assert [bar.close for bar in load_candles(SYMBOL, "1h")] == [Decimal("20.00")]
 
 
-def test_upsert_splits_writes_beyond_the_sqlite_parameter_limit() -> None:
-    """4320 行 × 10 个绑定值远超默认上限 32766，必须切块写入而不是整体失败。"""
+def test_upsert_writes_windows_far_beyond_one_batch() -> None:
+    """4320 行远超单批上限，必须切块写入而不是整体失败。"""
 
     start = DAILY_END - timedelta(days=3)
     bars = [_bar(start + timedelta(minutes=offset), bar="1m") for offset in range(4320)]
@@ -153,29 +152,41 @@ def test_upsert_counts_unique_keys_when_a_batch_repeats() -> None:
     assert len(load_candles(SYMBOL, "1h")) == 5
 
 
-def test_upsert_splits_statements_when_the_variable_limit_is_low(monkeypatch) -> None:
-    """按批大小收紧 SQLite 变量上限：单条写入整批必失败，切块才能写进去。
+def test_upsert_splits_statements_by_batch_size(monkeypatch) -> None:
+    """把批大小压到 4 行：20 行必须分成 5 条 INSERT 语句，计数仍按唯一主键算。
 
-    真实构建的上限（32766）在本机被抬到 250000，只有收紧上限才能稳定证明切块生效。
+    单条语句的参数上限（65535）在本机造不出来，因此统计实际发出的 INSERT 条数：
+    不切块只会发出 1 条，切块生效才会是 5 条。
     """
 
     monkeypatch.setattr(sync_module, "UPSERT_BATCH_SIZE", 4)
-    variable_limit = 10 * sync_module.UPSERT_BATCH_SIZE
-
-    engine = get_engine()
-    engine.dispose()
-
-    @event.listens_for(engine, "connect")
-    def _cap_variables(connection, _record) -> None:
-        connection.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, variable_limit)
 
     start = DAILY_END - timedelta(hours=20)
     bars = [_bar(start + timedelta(hours=offset)) for offset in range(20)]
 
-    result = upsert_candles(bars)
+    result, inserts = _count_insert_statements(upsert_candles, bars)
 
-    assert result.inserted == 20
+    assert (result.inserted, result.updated) == (20, 0)
+    assert inserts == 5
     assert len(load_candles(SYMBOL, "1h")) == 20
+
+
+def _count_insert_statements(call, *args):
+    """执行一次写入，返回 `(写入结果, INSERT INTO candles 语句条数)`。"""
+
+    statements: list[str] = []
+
+    def _record(_conn, _cursor, statement, _parameters, _context, _executemany) -> None:
+        if statement.lstrip().upper().startswith("INSERT INTO CANDLES"):
+            statements.append(statement)
+
+    engine = get_engine()
+    event.listen(engine, "before_cursor_execute", _record)
+    try:
+        result = call(*args)
+    finally:
+        event.remove(engine, "before_cursor_execute", _record)
+    return result, len(statements)
 
 
 # ------------------------------------------------------------- 日线边界（UTC+8）

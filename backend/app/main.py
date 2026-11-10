@@ -1,6 +1,6 @@
 """FastAPI 应用入口：`uvicorn app.main:app`（cwd = 仓库根）。
 
-v2 是单进程同步栈：一个 uvicorn 进程、一个 SQLite 文件、没有消息队列与独立 worker。
+v2 是单进程同步栈：一个 uvicorn 进程、一个 PostgreSQL 库、没有消息队列与独立 worker。
 装配顺序即分层顺序：配置 → 数据库 → HTTP 协议层。
 """
 
@@ -15,7 +15,7 @@ from app.api import include_routers, register_error_handlers
 from app.config import get_settings
 from app.db import init_db
 
-# 导入即注册域模型：建表只认已经定义过的元数据，装配根负责把域模型拉进来。
+# 导入即注册域模型：迁移只认得已注册的元数据，装配根负责把域模型拉进来。
 from app.instrument import Instrument  # noqa: F401
 from app.market import Candle  # noqa: F401
 from app.watchlist import WatchlistItemRow  # noqa: F401
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> Iterator[None]:
-    """启动时就地建库建表；退出无需清理（SQLite 连接随进程关闭）。"""
+    """启动时把库结构推进到最新版本；退出无需清理（连接池随进程关闭）。"""
 
     init_db()
     logger.info("trading api ready: version=%s", __version__)

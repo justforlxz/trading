@@ -5,7 +5,7 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# 后端包所在目录：库文件位置按包路径反推，不依赖进程 cwd。
+# 后端包所在目录：`.env` 与 `alembic.ini` 按包路径定位，不依赖进程 cwd。
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 
 
@@ -27,8 +27,11 @@ class Settings(BaseSettings):
     app_env: str = "dev"
     log_level: str = "INFO"
 
-    # SQLite 单文件库：固定落在 backend/data/ 下，由 init_db 建目录与表。
-    database_path: Path = BACKEND_DIR / "data" / "trading.db"
+    # PostgreSQL 连接串，必须由外部注入（`.env.example` 是清单）。
+    # 没有内建默认值：本地地址属于「怎么起库」，由 `make db-up` 与测试各自决定。
+    database_url: str
+    # 表落在哪个 schema。留空走连接的默认 search_path（public）；测试用它换独立临时 schema。
+    database_schema: str | None = None
 
     # 公共行情上游地址（只读公开 REST，不涉及下单）。
     okx_rest_base_url: str = "https://www.okx.com"

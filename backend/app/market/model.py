@@ -7,9 +7,8 @@
 同样让重复采集幂等。两档费率都可为空：上游对「本期没有实现费率」与「费率恰好是 0」
 给的是空串 / `"0"` 两种不同事实，落库必须保留这个区别。
 
-时间列存 epoch 秒（整数）：SQLite 里可以直接用 `open_time % 86400` 校验
-日线边界，不依赖字符串时间格式。价格以 TEXT 存储、用 `Decimal` 收发，
-避免浮点往返丢掉精度。
+时间列存 epoch 秒（整数）：可以直接用 `open_time % 86400` 校验日线边界，不依赖
+字符串时间格式。价格以文本列存储、用 `Decimal` 收发，避免浮点往返丢掉精度。
 """
 
 from __future__ import annotations
@@ -31,7 +30,7 @@ _PRICE = String(32)
 
 
 class DecimalText(TypeDecorator[Decimal]):
-    """`Decimal` ↔ TEXT：SQLite 没有定点小数，转字符串才能原样往返。"""
+    """`Decimal` ↔ 文本列：全仓只有一套十进制精度约定，转字符串才能原样往返。"""
 
     impl = _PRICE
     cache_ok = True

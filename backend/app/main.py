@@ -1,25 +1,34 @@
-"""FastAPI 应用入口：`uvicorn app.main:app`。
+"""FastAPI 应用入口：`uvicorn app.main:app`（cwd = 仓库根）。
 
-装配顺序即分层顺序：运维探针 → `/api/v1` 协议层。业务模块在 S3 起注册。
+v2 是单进程同步栈：一个 uvicorn 进程、一个 SQLite 文件、没有消息队列与独立 worker。
+装配顺序即分层顺序：配置 → 数据库 → HTTP 协议层。
 """
 
 import logging
-from uuid import uuid4
+from collections.abc import Iterator
+from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 
 from app import __version__
-from app.api.errors import REQUEST_ID_HEADER, install_error_handlers
-from app.api.v1 import router as api_v1_router
+from app.api.health import router as health_router
 from app.config import get_settings
-from app.mcp.server import router as mcp_router
-from app.ops.health import router as ops_router
+from app.db.init import init_db
 
 logger = logging.getLogger(__name__)
 
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> Iterator[None]:
+    """启动时就地建库建表；退出无需清理（SQLite 连接随进程关闭）。"""
+
+    init_db()
+    logger.info("trading api ready: version=%s", __version__)
+    yield
+
+
 def create_app() -> FastAPI:
-    """构造应用实例（测试与生产共用，避免导入即建连）。"""
+    """构造应用实例：测试与生产共用同一装配路径。"""
 
     settings = get_settings()
     logging.basicConfig(level=settings.log_level.upper())
@@ -27,26 +36,13 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="trading",
         version=__version__,
-        description="自托管美股永续量化交易系统 — P1 骨架",
+        description="个人量化工作台 — v2 单进程骨架",
         docs_url="/docs",
         redoc_url=None,
         openapi_url="/openapi.json",
+        lifespan=lifespan,
     )
-    install_error_handlers(app)
-
-    @app.middleware("http")
-    async def attach_request_id(request: Request, call_next):
-        request_id = request.headers.get(REQUEST_ID_HEADER) or uuid4().hex
-        request.state.request_id = request_id
-        response = await call_next(request)
-        response.headers[REQUEST_ID_HEADER] = request_id
-        return response
-
-    app.include_router(ops_router)
-    app.include_router(api_v1_router)
-    # MCP 的 Streamable HTTP 端点独立挂载在 `/mcp`（不属于 `/api/v1` 的业务契约）。
-    app.include_router(mcp_router)
-    logger.info("trading api initialized: env=%s version=%s", settings.app_env, __version__)
+    app.include_router(health_router, prefix="/api")
     return app
 
 

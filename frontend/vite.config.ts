@@ -3,7 +3,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
-  // 开发服务器把 /api 反代到本机 API，生产由 nginx 承担同样的转发。
+  // 开发服务器把 /api 反代到本机 API 进程；生产由同一个 uvicorn 直接服务静态产物。
   server: {
     port: 5173,
     host: true,

@@ -1,37 +1,35 @@
-"""pytest 公共夹具。
+"""测试装配：TestClient 直连应用实例，不启动真实 uvicorn。
 
-数据库 URL 在**导入 app 之前**确定：`TEST_DATABASE_URL` 优先，否则把
-`DATABASE_URL` 的库名换成 `trading_test`，避免误伤开发库。
+每个用例用独立的临时库文件，既避免污染 `backend/data/trading.db`，
+也保证用例之间没有残留数据。
 """
 
-import os
-from urllib.parse import urlsplit, urlunsplit
+from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
-from httpx import ASGITransport, AsyncClient
+from fastapi.testclient import TestClient
+
+from app.config import get_settings
+from app.db.engine import get_engine
+from app.main import create_app
 
 
-def _test_database_url() -> str | None:
-    explicit = os.environ.get("TEST_DATABASE_URL")
-    if explicit:
-        return explicit
-    base = os.environ.get("DATABASE_URL")
-    if not base:
-        return None
-    parts = urlsplit(base)
-    return urlunsplit(parts._replace(path="/trading_test"))
+@pytest.fixture(autouse=True)
+def _isolated_database(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """把库文件指向临时目录；用完清掉配置与引擎缓存。"""
+
+    monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "trading.db"))
+    get_settings.cache_clear()
+    get_engine.cache_clear()
+    yield
+    get_engine.cache_clear()
+    get_settings.cache_clear()
 
 
-TEST_DATABASE_URL = _test_database_url()
-if TEST_DATABASE_URL:
-    os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+@pytest.fixture()
+def client() -> Iterator[TestClient]:
+    """会触发 lifespan（建表）的客户端。"""
 
-from app.main import create_app  # noqa: E402 - 必须在设置 DATABASE_URL 之后导入
-
-
-@pytest.fixture
-async def client() -> AsyncClient:
-    app = create_app()
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://testserver") as async_client:
-        yield async_client
+    with TestClient(create_app()) as test_client:
+        yield test_client

@@ -1,22 +1,22 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { AppShell } from "./components/layout/app-shell";
-import BacktestDetailPage from "./pages/backtests/detail";
-import DashboardPage from "./pages/dashboard";
-import ResearchPage from "./pages/research/index";
-import RiskPage from "./pages/risk/index";
+import BacktestsPage from "./pages/backtests";
+import OverviewPage from "./pages/overview";
 import SettingsPage from "./pages/settings";
-import StrategiesPage from "./pages/strategies/index";
+import StrategiesPage from "./pages/strategies";
+import TradesPage from "./pages/trades";
+import WatchlistPage from "./pages/watchlist";
 
 export default function App() {
   return (
     <Routes>
       <Route element={<AppShell />}>
-        <Route index element={<DashboardPage />} />
-        <Route path="research" element={<ResearchPage />} />
+        <Route index element={<OverviewPage />} />
+        <Route path="watchlist" element={<WatchlistPage />} />
         <Route path="strategies" element={<StrategiesPage />} />
-        <Route path="risk" element={<RiskPage />} />
-        <Route path="backtests/:id" element={<BacktestDetailPage />} />
+        <Route path="backtests" element={<BacktestsPage />} />
+        <Route path="trades" element={<TradesPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

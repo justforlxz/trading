@@ -29,7 +29,7 @@ _WEIGHT_FIELDS = ("max_leg_weight", "max_long_weight", "max_short_weight", "min_
 
 @dataclass(frozen=True, slots=True)
 class PortfolioConstraints:
-    """目标组合的五项边界：单标的上限、多空各自上限、最小腿权重、腿数上限。
+    """目标组合的五项边界：单标的上限、多空各自上限、单腿权重下限、腿数上限。
 
     `min_leg_weight` 允许为 0，表示不设下界；它不能大于 `max_leg_weight`，否则任何
     权重都同时「太小」和「太大」。
@@ -61,7 +61,7 @@ def check_upper_bounds(legs: Iterable[TargetLeg], constraints: PortfolioConstrai
     """只判四项上限：腿数、单标的、多头之和、空头之和。
 
     上限在看请求权重的阶段就要判：超额请求本来就不合规，而缩放只会把权重变小，
-    只判缩放后的结果等于给超额请求留了一条捷径。最小腿权重不在这里，理由见
+    只判缩放后的结果等于给超额请求留了一条捷径。单腿权重下限不在这里，理由见
     `check_constraints`。
 
     腿权重是大小（`TargetLeg` 不接收负权重），方向由 `side` 单独表达，因此这里
@@ -101,8 +101,8 @@ def check_upper_bounds(legs: Iterable[TargetLeg], constraints: PortfolioConstrai
 def check_constraints(legs: Iterable[TargetLeg], constraints: PortfolioConstraints) -> None:
     """判全部五项边界；只用于归一化之后的最终权重。
 
-    最小腿权重不参与请求阶段的判定：权重是相对比例，两腿各 0.2（合计 0.4）配最小
-    腿权重 0.25，归一化后是 0.5 与 0.5，完全合规；在请求阶段按 0.2 判下限会把这
+    单腿权重下限不参与请求阶段的判定：权重是相对比例，两腿各 0.2（合计 0.4）配单腿
+    权重下限 0.25，归一化后是 0.5 与 0.5，完全合规；在请求阶段按 0.2 判下限会把这
     种合法输入误拒，给出的原因还与真实情况不符。上限相反：缩放只会把权重变小，
     只判缩放后的结果拦不住超额请求，因此请求阶段也要判，见 `check_upper_bounds`。
     """
@@ -113,6 +113,6 @@ def check_constraints(legs: Iterable[TargetLeg], constraints: PortfolioConstrain
         if leg.target_weight < constraints.min_leg_weight:
             raise RiskBlocked(
                 "min_leg_weight",
-                f"{leg.product_key} 的权重 {leg.target_weight} 低于最小腿权重 "
+                f"{leg.product_key} 的权重 {leg.target_weight} 低于单腿权重下限 "
                 f"{constraints.min_leg_weight}",
             )

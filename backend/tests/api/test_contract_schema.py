@@ -320,13 +320,12 @@ def test_lifecycle_can_only_be_advanced_through_approvals() -> None:
             StrategyInstanceUpdateRequest.model_validate({"status": value})
 
 
-def test_as_of_requires_timezone() -> None:
+def test_as_of_requires_timezone(client: TestClient) -> None:
     """`as_of` 必须带时区：本地时间不得被当成 UTC（`AGENTS.md` §3）。"""
 
-    client = TestClient(create_app())
     params = {"inst_type": "SPOT", "as_of": "2026-11-10T00:00:00"}
 
     assert client.get("/api/market/overview", params=params).status_code == 422
 
     params["as_of"] = "2026-11-10T00:00:00Z"
-    assert client.get("/api/market/overview", params=params).status_code == 501
+    assert client.get("/api/market/overview", params=params).status_code == 200

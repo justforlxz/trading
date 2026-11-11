@@ -24,7 +24,7 @@ import getInstrumentsSearch from "./fixtures/instruments/get-instruments-search.
 import getInstrumentsInstId from "./fixtures/instruments/get-instruments-inst_id.json";
 import getInstrumentsInstIdCandles from "./fixtures/instruments/get-instruments-inst_id-candles.json";
 import getJournal from "./fixtures/trades/get-journal.json";
-import getMarketOverview from "./fixtures/correlation/get-market-overview.json";
+import getMarketOverview from "./fixtures/market/get-market-overview.json";
 import getOpportunities from "./fixtures/opportunity/get-opportunities.json";
 import getOpportunitiesOpportunityId from "./fixtures/opportunity/get-opportunities-opportunity_id.json";
 import patchOpportunitiesOpportunityId from "./fixtures/opportunity/patch-opportunities-opportunity_id.json";

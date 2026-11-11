@@ -371,7 +371,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Market Overview */
+        /**
+         * Get Market Overview
+         * @description 该类别在 `as_of`（缺省为当前时刻）的涨跌家数与同向程度。
+         */
         get: operations["get_market_overview_api_market_overview_get"];
         put?: never;
         post?: never;

@@ -529,7 +529,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Relation Graph */
+        /**
+         * Get Relation Graph
+         * @description 自选范围内的整张关系网络；`as_of` 缺省取库里最后一根 K 线。
+         */
         get: operations["get_relation_graph_api_relations_graph_get"];
         put?: never;
         post?: never;
@@ -546,7 +549,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Relation Neighbors */
+        /**
+         * Get Relation Neighbors
+         * @description 某个产品的邻居，按系数绝对值从大到小、同值按产品键排列。
+         *
+         *     邻居来自与整图同一张网络（同样的产品范围与阈值）；产品已登记但不在网络里时
+         *     返回空列表——「没有被跟踪」与「没有相关标的」是两件事，只有前者查不到产品。
+         */
         get: operations["get_relation_neighbors_api_relations_neighbors_get"];
         put?: never;
         post?: never;
@@ -2806,7 +2815,7 @@ export interface components {
          * @description 一次请求返回一张完整的小图：节点、边、社区与图级平均连通度。
          * @example {
          *       "as_of": "2026-11-10T00:00:00Z",
-         *       "average_degree": "1.75",
+         *       "average_degree": "2",
          *       "bar": "1d",
          *       "communities": [
          *         {
@@ -2854,28 +2863,28 @@ export interface components {
          *       "nodes": [
          *         {
          *           "asset_type": "tokenized_equity",
-         *           "centrality": "0.67",
+         *           "centrality": "0.6667",
          *           "community_id": 0,
          *           "degree": 2,
          *           "product_key": "AAPL"
          *         },
          *         {
          *           "asset_type": "tokenized_equity",
-         *           "centrality": "0.67",
+         *           "centrality": "0.6667",
          *           "community_id": 0,
          *           "degree": 2,
          *           "product_key": "MSFT"
          *         },
          *         {
          *           "asset_type": "tokenized_equity",
-         *           "centrality": "0.67",
+         *           "centrality": "1",
          *           "community_id": 1,
-         *           "degree": 2,
+         *           "degree": 3,
          *           "product_key": "NVDA"
          *         },
          *         {
          *           "asset_type": "tokenized_equity",
-         *           "centrality": "0.33",
+         *           "centrality": "0.3333",
          *           "community_id": 1,
          *           "degree": 1,
          *           "product_key": "TSLA"

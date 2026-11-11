@@ -43,8 +43,6 @@ from app.api.schemas import (
     PortfolioAdjustmentListResponse,
     PositionListResponse,
     RankingMetric,
-    RelationGraphResponse,
-    RelationNeighborsResponse,
     SettingsResponse,
     SettingsUpdateRequest,
     SignalListResponse,
@@ -255,31 +253,6 @@ def get_correlation_series(
     raise _stub("T2.3")
 
 
-# ---------------------------------------------------------------- relations
-
-relations_router = APIRouter(tags=["relations"])
-
-
-@relations_router.get("/relations/graph", response_model=RelationGraphResponse)
-def get_relation_graph(
-    bar: Bar = Query(...),
-    window: int = Query(..., ge=2, le=250),
-    min_abs_corr: float = Query(0.5, ge=0, le=1),
-    as_of: AwareDatetime | None = Query(None),
-) -> RelationGraphResponse:
-    raise _stub("T2.4")
-
-
-@relations_router.get("/relations/neighbors", response_model=RelationNeighborsResponse)
-def get_relation_neighbors(
-    product_key: str = Query(...),
-    bar: Bar = Query(...),
-    window: int = Query(..., ge=2, le=250),
-    min_abs_corr: float = Query(0.5, ge=0, le=1),
-) -> RelationNeighborsResponse:
-    raise _stub("T2.4")
-
-
 # ---------------------------------------------------------------- opportunity
 
 opportunity_router = APIRouter(tags=["opportunity"])
@@ -398,7 +371,6 @@ for _router in (
     settings_router,
     overview_router,
     correlation_router,
-    relations_router,
     opportunity_router,
     portfolio_router,
     approval_router,

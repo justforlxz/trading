@@ -30,6 +30,9 @@ export type WatchlistItem = components["schemas"]["WatchlistItem"];
 export type InstrumentDetailResponse = components["schemas"]["InstrumentDetailResponse"];
 export type CandleSeriesResponse = components["schemas"]["CandleSeriesResponse"];
 export type CandleBar = CandleSeriesResponse["bar"];
+export type RelationGraphResponse = components["schemas"]["RelationGraphResponse"];
+export type RelationNode = components["schemas"]["RelationNode"];
+export type RelationEdge = components["schemas"]["RelationEdge"];
 export type IndicatorSeries = components["schemas"]["IndicatorSeries"];
 export type IndicatorSeriesResponse = components["schemas"]["IndicatorSeriesResponse"];
 export type IndicatorParamValue = IndicatorSeries["params"][string];
@@ -81,4 +84,17 @@ export function fetchIndicatorSeries(
   });
   if (params && Object.keys(params).length > 0) query.set("params", JSON.stringify(params));
   return request<IndicatorSeriesResponse>(`/indicators/series?${query.toString()}`);
+}
+
+export function fetchRelationGraph(
+  bar: CandleBar,
+  window: number,
+  minAbsCorr: number,
+): Promise<RelationGraphResponse> {
+  const query = new URLSearchParams({
+    bar,
+    window: String(window),
+    min_abs_corr: String(minAbsCorr),
+  });
+  return request<RelationGraphResponse>(`/relations/graph?${query.toString()}`);
 }

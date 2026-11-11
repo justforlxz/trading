@@ -6,6 +6,10 @@
 
 `edges` 里出现过的 `product_key` 必须全部出现在 `nodes` 里（无悬空边），
 `min_abs_corr` 是裁边阈值，两边系数绝对值低于它的边不返回，也不返回自环。
+
+下面的图示例与 `app.relations` 的算法逐项一致（度数与边数之和等于 `2E`、中心性等于
+`度数 / (节点数 - 1)`、平均连通度等于 `2E / V`、社区只由正相关边给出），它同时生成
+前端的 MSW fixture，示例里写错一个度数就会在页面上变成可见矛盾。
 """
 
 from __future__ import annotations
@@ -56,28 +60,28 @@ _EXAMPLE_NODES = [
         "asset_type": "tokenized_equity",
         "community_id": 0,
         "degree": 2,
-        "centrality": "0.67",
+        "centrality": "0.6667",
     },
     {
         "product_key": "MSFT",
         "asset_type": "tokenized_equity",
         "community_id": 0,
         "degree": 2,
-        "centrality": "0.67",
+        "centrality": "0.6667",
     },
     {
         "product_key": "NVDA",
         "asset_type": "tokenized_equity",
         "community_id": 1,
-        "degree": 2,
-        "centrality": "0.67",
+        "degree": 3,
+        "centrality": "1",
     },
     {
         "product_key": "TSLA",
         "asset_type": "tokenized_equity",
         "community_id": 1,
         "degree": 1,
-        "centrality": "0.33",
+        "centrality": "0.3333",
     },
 ]
 
@@ -129,7 +133,7 @@ class RelationGraphResponse(BaseModel):
                     "bar": "1d",
                     "window": 60,
                     "min_abs_corr": "0.5",
-                    "average_degree": "1.75",
+                    "average_degree": "2",
                     "nodes": _EXAMPLE_NODES,
                     "edges": _EXAMPLE_EDGES,
                     "communities": [

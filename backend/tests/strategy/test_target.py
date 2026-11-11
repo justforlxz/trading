@@ -156,10 +156,10 @@ def test_build_target_rejects_more_legs_than_cap() -> None:
 
 
 def test_build_target_accepts_legs_that_reach_the_minimum_after_normalization() -> None:
-    """两腿各 0.2（合计 0.4）配最小腿权重 0.25：作为比例，归一化后是 0.5 与 0.5。
+    """两腿各 0.2（合计 0.4）配单腿权重下限 0.25：作为比例，归一化后是 0.5 与 0.5。
 
     权重是相对比例（见 `normalize_weights`），在请求阶段按 0.2 判下限会把这条合法
-    输入误拒，所以最小腿权重只在归一化之后判。
+    输入误拒，所以单腿权重下限只在归一化之后判。
     """
 
     legs = (
@@ -184,6 +184,7 @@ def test_build_target_rejects_leg_below_min_weight_after_normalization() -> None
         build_target(legs, make_constraints(min_leg_weight=Decimal("0.2")), as_of=START)
 
     assert raised.value.rule == "min_leg_weight"
+    assert "单腿权重下限" in str(raised.value)
     assert "0.142" in raised.value.detail
 
 

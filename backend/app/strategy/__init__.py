@@ -1,16 +1,47 @@
-"""策略域：目标组合、只读行情视图、策略协议、注册表与参数校验。
+"""策略域：目标组合、只读行情视图、组件/模板/策略协议、注册表与参数校验。
 
 本域对外只发布一种交易目标：`TargetPortfolio`（多腿、方向、目标权重）。策略只产出
 权重，组合生成 `build_target` 把权重归一化并比对约束，`target_quantity` 再把一条腿
 换成按类别换算出的数量。策略不产出单标的的动作序列，也不接触交易所、账户与会话。
 
+拓扑是「六个组件 + 两类模板」：组件各自回答「这个标的偏多还是偏空、强度多少」，
+模板决定用哪些组件、怎么配权、组合成什么形态。旧的单指标策略保留为组件的用例，
+登记在策略表里，不是组合模板。
+
 跨包调用一律走本门面，不允许 `from app.strategy.target import ...` 之类的子模块直连。
 """
 
+from app.strategy.builtin import BollingerReversion, MacdMomentum, MaCross, RsiReversal
+from app.strategy.components import (
+    Breadth,
+    CorrelationShift,
+    MeanReversion,
+    Momentum,
+    RelativeStrength,
+    Trend,
+)
 from app.strategy.constraints import PortfolioConstraints, check_constraints
+from app.strategy.model import StrategyInstanceRow, StrategyTemplateRow
 from app.strategy.params import resolve_params
-from app.strategy.protocol import Requirements, Strategy, StrategyMeta
-from app.strategy.registry import get_strategy, list_strategies, register_strategy
+from app.strategy.protocol import (
+    Component,
+    ComponentSignal,
+    Requirements,
+    Strategy,
+    StrategyMeta,
+    Template,
+)
+from app.strategy.registry import (
+    get_component,
+    get_strategy,
+    get_template,
+    list_components,
+    list_strategies,
+    list_templates,
+    register_component,
+    register_strategy,
+    register_template,
+)
 from app.strategy.target import (
     TargetLeg,
     TargetPortfolio,
@@ -19,23 +50,47 @@ from app.strategy.target import (
     normalize_weights,
     target_quantity,
 )
+from app.strategy.templates import Directional, RelativeValue
 from app.strategy.view import MarketView
 
 __all__ = [
+    "BollingerReversion",
+    "Breadth",
+    "Component",
+    "ComponentSignal",
+    "CorrelationShift",
+    "Directional",
+    "MaCross",
+    "MacdMomentum",
     "MarketView",
+    "MeanReversion",
+    "Momentum",
     "PortfolioConstraints",
+    "RelativeStrength",
+    "RelativeValue",
     "Requirements",
+    "RsiReversal",
     "Strategy",
+    "StrategyInstanceRow",
     "StrategyMeta",
+    "StrategyTemplateRow",
     "TargetLeg",
     "TargetPortfolio",
     "TargetQuantity",
+    "Template",
+    "Trend",
     "build_target",
     "check_constraints",
+    "get_component",
     "get_strategy",
+    "get_template",
+    "list_components",
     "list_strategies",
+    "list_templates",
     "normalize_weights",
+    "register_component",
     "register_strategy",
+    "register_template",
     "resolve_params",
     "target_quantity",
 ]

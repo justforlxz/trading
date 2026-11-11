@@ -421,15 +421,26 @@ def test_params_reject_duplicate_schema_field() -> None:
 
 
 def _strategy_sources() -> list[Path]:
-    return sorted(STRATEGY_DIR.glob("*.py"))
+    return sorted(STRATEGY_DIR.rglob("*.py"))
+
+
+def _relative(path: Path) -> str:
+    return path.relative_to(STRATEGY_DIR).as_posix()
 
 
 def test_strategy_imports_no_io_layers() -> None:
-    """`app/strategy` 不导入数据库、会话、HTTP 客户端与交易所适配层。"""
+    """`app/strategy` 的计算代码不导入数据库、HTTP 客户端与交易所适配层。
+
+    唯一的例外是 `model.py`：表定义必须声明在 `app.db.Base` 上（本域表结构的唯一
+    来源），它只被迁移与装配层导入，不进入任何组件、模板或策略的计算路径。这里仍然
+    逐文件检查，因此把 IO 带进计算模块（含 components / templates / builtin）会红。
+    """
 
     forbidden = ("app.db", "app.exchange", "session", "httpx")
     violations: list[str] = []
     for path in _strategy_sources():
+        if _relative(path) == "model.py":
+            continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
@@ -441,7 +452,7 @@ def test_strategy_imports_no_io_layers() -> None:
             for module in modules:
                 for token in forbidden:
                     if token in module:
-                        violations.append(f"{path.name}:{node.lineno}: {module}")
+                        violations.append(f"{_relative(path)}:{node.lineno}: {module}")
 
     assert not violations, "\n".join(violations)
 
@@ -451,7 +462,7 @@ def test_strategy_has_no_three_value_action_tokens() -> None:
 
     pattern = re.compile(r"BUY|SELL|HOLD")
     hits = [
-        f"{path.name}:{index}"
+        f"{_relative(path)}:{index}"
         for path in _strategy_sources()
         for index, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1)
         if pattern.search(line)

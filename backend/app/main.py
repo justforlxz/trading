@@ -18,6 +18,7 @@ from app.db import init_db
 # 导入即注册域模型：迁移只认得已注册的元数据，装配根负责把域模型拉进来。
 from app.instrument import Instrument  # noqa: F401
 from app.market import Candle  # noqa: F401
+from app.strategy import StrategyInstanceRow, StrategyTemplateRow  # noqa: F401
 from app.watchlist import WatchlistItemRow  # noqa: F401
 
 logger = logging.getLogger(__name__)

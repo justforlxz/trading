@@ -21,6 +21,7 @@ import pytest
 from app.core import (
     Bar,
     Clock,
+    Conflict,
     DataUnavailable,
     ExecutionRejected,
     Fill,
@@ -421,6 +422,7 @@ def test_error_hierarchy_is_closed() -> None:
         ValidationError,
         UpstreamError,
         DataUnavailable,
+        Conflict,
         RiskBlocked,
         ExecutionRejected,
         InvariantViolation,
@@ -433,6 +435,7 @@ def test_error_hierarchy_is_closed() -> None:
         (ValidationError, 400),
         (UpstreamError, 502),
         (DataUnavailable, 503),
+        (Conflict, 409),
         (RiskBlocked, 409),
         (ExecutionRejected, 422),
         (InvariantViolation, 500),

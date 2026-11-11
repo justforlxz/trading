@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from app.core.clock import Clock, ReplayClock, SystemClock, utc_from_millis
 from app.core.errors import (
+    Conflict,
     DataUnavailable,
     ExecutionRejected,
     InvariantViolation,
@@ -26,6 +27,7 @@ from app.core.types import Bar, InstrumentRef, Money, OrderIntent, Signal, Timef
 __all__ = [
     "Bar",
     "Clock",
+    "Conflict",
     "DataUnavailable",
     "ExecutionRejected",
     "Fill",

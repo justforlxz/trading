@@ -431,15 +431,21 @@ def _relative(path: Path) -> str:
 def test_strategy_imports_no_io_layers() -> None:
     """`app/strategy` 的计算代码不导入数据库、HTTP 客户端与交易所适配层。
 
-    唯一的例外是 `model.py`：表定义必须声明在 `app.db.Base` 上（本域表结构的唯一
-    来源），它只被迁移与装配层导入，不进入任何组件、模板或策略的计算路径。这里仍然
-    逐文件检查，因此把 IO 带进计算模块（含 components / templates / builtin）会红。
+    两个模块是 IO 与事务边界，不参与计算：
+
+    - `model.py`：表定义必须声明在 `app.db.Base` 上（本域表结构的唯一来源）；
+    - `service.py`：模板投影、实例读写与回放编排（T3.3），与 `app/opportunity/service.py`
+      同一分工——取数、写库、事务边界都在这里，组合计算仍然只经组件与模板。
+
+    其余模块逐文件检查，因此把 IO 带进计算模块（含 components / templates / builtin）
+    会红。
     """
 
+    io_boundary = frozenset({"model.py", "service.py"})
     forbidden = ("app.db", "app.exchange", "session", "httpx")
     violations: list[str] = []
     for path in _strategy_sources():
-        if _relative(path) == "model.py":
+        if _relative(path) in io_boundary:
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):

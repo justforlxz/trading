@@ -607,8 +607,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Strategies */
-        get: operations["list_strategies_api_strategies_get"];
+        /**
+         * List Strategy Templates
+         * @description 模板目录：内容来自代码注册表，同时把它投影进 `strategy_templates` 表。
+         *
+         *     `required_indicators` 与 `emitted_actions` 按空列表返回：模板只产出目标组合，
+         *     既不引用指标模块的序列，也不产出单标的动作。
+         */
+        get: operations["list_strategy_templates_api_strategies_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -624,10 +630,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Strategy Instances */
+        /**
+         * List Strategy Instances
+         * @description 按模板与启停状态过滤的实例列表；`total` 是过滤条件下的全部条数。
+         */
         get: operations["list_strategy_instances_api_strategy_instances_get"];
         put?: never;
-        /** Create Strategy Instance */
+        /**
+         * Create Strategy Instance
+         * @description 建实例：模板必须已登记、参数必须过模板 schema、标的必须已同步。
+         */
         post: operations["create_strategy_instance_api_strategy_instances_post"];
         delete?: never;
         options?: never;
@@ -646,12 +658,47 @@ export interface paths {
         get: operations["get_strategy_instance_api_strategy_instances__instance_id__get"];
         put?: never;
         post?: never;
-        /** Delete Strategy Instance */
+        /**
+         * Delete Strategy Instance
+         * @description 删除实例及其回放记录。
+         */
         delete: operations["delete_strategy_instance_api_strategy_instances__instance_id__delete"];
         options?: never;
         head?: never;
-        /** Update Strategy Instance */
+        /**
+         * Update Strategy Instance
+         * @description 改参、换标的、启停；生命周期阶段不在这条端点上改。
+         */
         patch: operations["update_strategy_instance_api_strategy_instances__instance_id__patch"];
+        trace?: never;
+    };
+    "/api/strategy-instances/{instance_id}/replays": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Strategy Replays
+         * @description 该实例已落库的回放记录；实例不存在返回 404，还没回放过返回空列表。
+         */
+        get: operations["list_strategy_replays_api_strategy_instances__instance_id__replays_get"];
+        put?: never;
+        /**
+         * Create Strategy Replay
+         * @description 在历史区间上回放该实例的目标组合并落库。
+         *
+         *     停用的实例返回 409（域层的 `Conflict`）：空结果与「没有信号」分不清。
+         *
+         *     顺序是「算好 → 映射成契约模型 → 落库」：契约校验失败时库里不会多出一行读不出来
+         *     的记录，历史接口也不会被一条坏行永久打坏。
+         */
+        post: operations["create_strategy_replay_api_strategy_instances__instance_id__replays_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/trades/fills": {
@@ -3570,6 +3617,171 @@ export interface components {
             total: number;
         };
         /**
+         * StrategyReplay
+         * @description 一次目标组合回放：目标组合 + 逐点净敞口 + 可复现的规范化 JSON 与哈希。
+         *
+         *     `target` 用 `TargetPortfolio` 的既有形状；`canonical_json` 是它的规范化序列化
+         *     （腿按 `product_key` 排序、键排序、无多余空白），`target_hash` 是这段文本的
+         *     sha256——同一历史区间回放两次，两者都相同。
+         * @example {
+         *       "bar": "1d",
+         *       "canonical_json": "{\"legs\":[{\"product_key\":\"AAPL\",\"side\":\"long\",\"target_weight\":\"0.5\"},{\"product_key\":\"MSFT\",\"side\":\"short\",\"target_weight\":\"0.5\"}],\"net_exposure\":\"0\"}",
+         *       "created_at": "2026-11-10T09:30:00Z",
+         *       "end": "2026-11-10T00:00:00Z",
+         *       "instance_id": "si_0001",
+         *       "points": [
+         *         {
+         *           "as_of": "2026-11-09T00:00:00Z",
+         *           "leg_count": 2,
+         *           "net_exposure": "0.12"
+         *         },
+         *         {
+         *           "as_of": "2026-11-10T00:00:00Z",
+         *           "leg_count": 2,
+         *           "net_exposure": "0"
+         *         }
+         *       ],
+         *       "replay_id": "srp_0001",
+         *       "start": "2026-10-10T00:00:00Z",
+         *       "strategy_id": "relative_value",
+         *       "target": {
+         *         "legs": [
+         *           {
+         *             "direction": "long",
+         *             "inst_id": "XAAPL-USDT",
+         *             "inst_type": "SPOT",
+         *             "target_weight": "0.5"
+         *           },
+         *           {
+         *             "direction": "short",
+         *             "inst_id": "XMSFT-USDT",
+         *             "inst_type": "SPOT",
+         *             "target_weight": "0.5"
+         *           }
+         *         ],
+         *         "net_exposure": "0"
+         *       },
+         *       "target_hash": "0f3c8c1a2b7d4e5f60718293a4b5c6d7e8f90123a4b5c6d7e8f90123a4b5c6d7"
+         *     }
+         */
+        StrategyReplay: {
+            /**
+             * Bar
+             * @enum {string}
+             */
+            bar: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+            /** Canonical Json */
+            canonical_json: string;
+            /** Created At */
+            created_at: string;
+            /** End */
+            end: string;
+            /** Instance Id */
+            instance_id: string;
+            /** Points */
+            points: components["schemas"]["StrategyReplayPoint"][];
+            /** Replay Id */
+            replay_id: string;
+            /** Start */
+            start: string;
+            /** Strategy Id */
+            strategy_id: string;
+            target: components["schemas"]["TargetPortfolio"];
+            /** Target Hash */
+            target_hash: string;
+        };
+        /**
+         * StrategyReplayListResponse
+         * @example {
+         *       "items": [
+         *         {
+         *           "bar": "1d",
+         *           "canonical_json": "{\"legs\":[{\"product_key\":\"AAPL\",\"side\":\"long\",\"target_weight\":\"0.5\"},{\"product_key\":\"MSFT\",\"side\":\"short\",\"target_weight\":\"0.5\"}],\"net_exposure\":\"0\"}",
+         *           "created_at": "2026-11-10T09:30:00Z",
+         *           "end": "2026-11-10T00:00:00Z",
+         *           "instance_id": "si_0001",
+         *           "points": [
+         *             {
+         *               "as_of": "2026-11-09T00:00:00Z",
+         *               "leg_count": 2,
+         *               "net_exposure": "0.12"
+         *             },
+         *             {
+         *               "as_of": "2026-11-10T00:00:00Z",
+         *               "leg_count": 2,
+         *               "net_exposure": "0"
+         *             }
+         *           ],
+         *           "replay_id": "srp_0001",
+         *           "start": "2026-10-10T00:00:00Z",
+         *           "strategy_id": "relative_value",
+         *           "target": {
+         *             "legs": [
+         *               {
+         *                 "direction": "long",
+         *                 "inst_id": "XAAPL-USDT",
+         *                 "inst_type": "SPOT",
+         *                 "target_weight": "0.5"
+         *               },
+         *               {
+         *                 "direction": "short",
+         *                 "inst_id": "XMSFT-USDT",
+         *                 "inst_type": "SPOT",
+         *                 "target_weight": "0.5"
+         *               }
+         *             ],
+         *             "net_exposure": "0"
+         *           },
+         *           "target_hash": "0f3c8c1a2b7d4e5f60718293a4b5c6d7e8f90123a4b5c6d7e8f90123a4b5c6d7"
+         *         }
+         *       ],
+         *       "total": 1
+         *     }
+         */
+        StrategyReplayListResponse: {
+            /** Items */
+            items: components["schemas"]["StrategyReplay"][];
+            /** Total */
+            total: number;
+        };
+        /**
+         * StrategyReplayPoint
+         * @description 回放曲线上的一个点：该时点的目标组合有几条腿、净敞口是多少。
+         *
+         *     `as_of` 是**该根 K 线的开盘时刻**，不是决策时刻：回放在这个时点构造的视图包含
+         *     这根已收盘的 K 线，因此它表达的是「这根 K 线收盘之后」的目标组合。下游不要把它
+         *     当成「开盘前只知道历史」的时刻。
+         *
+         *     净值需要资金与成本假设，属于回测；这里画的是目标组合本身的净敞口走势。
+         */
+        StrategyReplayPoint: {
+            /** As Of */
+            as_of: string;
+            /** Leg Count */
+            leg_count: number;
+            /** Net Exposure */
+            net_exposure: string;
+        };
+        /**
+         * StrategyReplayRequest
+         * @description 回放区间：左闭右闭，`end` 那一根已收盘 K 线也在内。
+         *
+         *     周期不由请求决定：回放始终用实例配置的周期，避免「实例按日线建、回放却按小时跑」
+         *     这种对不上配置的结果。
+         */
+        StrategyReplayRequest: {
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+        };
+        /**
          * TargetLeg
          * @description 目标组合的一条腿：某个标的、某个方向、某个目标权重。
          *
@@ -4966,7 +5178,7 @@ export interface operations {
             };
         };
     };
-    list_strategies_api_strategies_get: {
+    list_strategy_templates_api_strategies_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -4988,7 +5200,11 @@ export interface operations {
     };
     list_strategy_instances_api_strategy_instances_get: {
         parameters: {
-            query?: never;
+            query?: {
+                strategy_id?: string | null;
+                enabled?: boolean | null;
+                limit?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -5002,6 +5218,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StrategyInstanceListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5121,6 +5346,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StrategyInstance"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_strategy_replays_api_strategy_instances__instance_id__replays_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                instance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyReplayListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_strategy_replay_api_strategy_instances__instance_id__replays_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                instance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StrategyReplayRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyReplay"];
                 };
             };
             /** @description Validation Error */

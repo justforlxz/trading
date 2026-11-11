@@ -36,6 +36,8 @@ from app.api.schemas.common import (
     ParamSpec,
     SiblingQuote,
     Signal,
+    TargetLeg,
+    TargetPortfolio,
 )
 from app.api.schemas.correlation import (
     CorrelationCell,
@@ -105,6 +107,10 @@ from app.api.schemas.strategy import (
     StrategyInstanceCreateRequest,
     StrategyInstanceListResponse,
     StrategyInstanceUpdateRequest,
+    StrategyReplay,
+    StrategyReplayListResponse,
+    StrategyReplayPoint,
+    StrategyReplayRequest,
 )
 from app.api.schemas.trades import (
     ExecutionModeRequest,
@@ -233,6 +239,10 @@ __all__ = [
     "StrategyPortfolio",
     "StrategyPortfolioDetailResponse",
     "StrategyPortfolioListResponse",
+    "StrategyReplay",
+    "StrategyReplayListResponse",
+    "StrategyReplayPoint",
+    "StrategyReplayRequest",
     "TargetLeg",
     "TargetPortfolio",
     "TimeSplit",

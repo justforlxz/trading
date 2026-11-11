@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import ClassVar
 
 __all__ = [
+    "Conflict",
     "DataUnavailable",
     "ExecutionRejected",
     "InvariantViolation",
@@ -50,6 +51,16 @@ class DataUnavailable(TradingError):
     """数据暂不可用：本地没有、上游休市或还没同步。稍后重试可能成功。"""
 
     http_status: ClassVar[int] = 503
+
+
+class Conflict(TradingError):
+    """请求与资源当前状态冲突（已停用、状态不允许等）。
+
+    请求本身是合法的，改成别的状态之后才可能成功；因此与参数不合法（400）区分开，
+    也不属于风控拒绝（风控拒绝的是交易意图，这里拒绝的是一次操作）。
+    """
+
+    http_status: ClassVar[int] = 409
 
 
 class RiskBlocked(TradingError):

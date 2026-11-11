@@ -23,12 +23,12 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
 
-__all__ = ["StrategyInstanceRow", "StrategyTemplateRow"]
+__all__ = ["StrategyInstanceRow", "StrategyReplayRow", "StrategyTemplateRow"]
 
 
 class StrategyTemplateRow(Base):
@@ -73,3 +73,34 @@ class StrategyInstanceRow(Base):
     latest_signal_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[int] = mapped_column(Integer, nullable=False)
     updated_at: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class StrategyReplayRow(Base):
+    """一次目标组合回放的结果：区间 + 规范化目标组合 + 逐点敞口序列。
+
+    回放是「按历史行情把模板重算一遍」的执行记录，不是策略配置：同一实例、同一区间
+    回放两次会得到两行，但两行的 `target_hash` 必须相同（这是可复现的判据）。因此
+    不按内容做幂等去重——重复行记录的是「又算了一次」，而算出来的东西是否一致由
+    `target_hash` 回答。
+
+    `result_json` 存目标组合的每条腿（含 `product_key`，按它排序）与净敞口；
+    `points_json` 存逐点净敞口序列，供页面画单条折线。两者都是 JSON 文本，读回时由
+    使用方解析，与实例表的 params / inst_ids 同口径。
+    """
+
+    __tablename__ = "strategy_replays"
+
+    replay_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    instance_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("strategy_instances.instance_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    bar: Mapped[str] = mapped_column(String(8), nullable=False)
+    start_at: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_at: Mapped[int] = mapped_column(Integer, nullable=False)
+    result_json: Mapped[str] = mapped_column(Text, nullable=False)
+    target_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    points_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[int] = mapped_column(Integer, nullable=False)

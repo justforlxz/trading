@@ -21,7 +21,7 @@ from app.strategy.components import (
     Trend,
 )
 from app.strategy.constraints import PortfolioConstraints, check_constraints
-from app.strategy.model import StrategyInstanceRow, StrategyTemplateRow
+from app.strategy.model import StrategyInstanceRow, StrategyReplayRow, StrategyTemplateRow
 from app.strategy.params import resolve_params
 from app.strategy.protocol import (
     Component,
@@ -42,6 +42,23 @@ from app.strategy.registry import (
     register_strategy,
     register_template,
 )
+from app.strategy.service import (
+    MAX_REPLAY_POINTS,
+    InstanceRecord,
+    ReplayOutcome,
+    ReplayRecord,
+    TemplateDefinition,
+    create_instance,
+    delete_instance,
+    evaluate_replay,
+    get_instance,
+    list_instances,
+    list_replays,
+    prepare_replay,
+    project_templates,
+    save_replay,
+    update_instance,
+)
 from app.strategy.target import (
     TargetLeg,
     TargetPortfolio,
@@ -54,12 +71,14 @@ from app.strategy.templates import Directional, RelativeValue
 from app.strategy.view import MarketView
 
 __all__ = [
+    "MAX_REPLAY_POINTS",
     "BollingerReversion",
     "Breadth",
     "Component",
     "ComponentSignal",
     "CorrelationShift",
     "Directional",
+    "InstanceRecord",
     "MaCross",
     "MacdMomentum",
     "MarketView",
@@ -68,29 +87,43 @@ __all__ = [
     "PortfolioConstraints",
     "RelativeStrength",
     "RelativeValue",
+    "ReplayOutcome",
+    "ReplayRecord",
     "Requirements",
     "RsiReversal",
     "Strategy",
     "StrategyInstanceRow",
     "StrategyMeta",
+    "StrategyReplayRow",
     "StrategyTemplateRow",
     "TargetLeg",
     "TargetPortfolio",
     "TargetQuantity",
     "Template",
+    "TemplateDefinition",
     "Trend",
     "build_target",
     "check_constraints",
+    "create_instance",
+    "delete_instance",
+    "evaluate_replay",
     "get_component",
+    "get_instance",
     "get_strategy",
     "get_template",
     "list_components",
+    "list_instances",
+    "list_replays",
     "list_strategies",
     "list_templates",
     "normalize_weights",
+    "prepare_replay",
+    "project_templates",
     "register_component",
     "register_strategy",
     "register_template",
     "resolve_params",
+    "save_replay",
     "target_quantity",
+    "update_instance",
 ]

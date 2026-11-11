@@ -58,4 +58,4 @@ def test_init_db_is_idempotent() -> None:
     with session_scope() as session:
         versions = session.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
 
-    assert versions == ["0003"]
+    assert versions == ["0004"]

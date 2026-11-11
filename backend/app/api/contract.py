@@ -28,11 +28,6 @@ from app.api.schemas import (
     FillListResponse,
     JournalListResponse,
     LiveAuthorizationRequest,
-    Opportunity,
-    OpportunityListResponse,
-    OpportunityMode,
-    OpportunityStatus,
-    OpportunityStatusUpdateRequest,
     Order,
     OrderCreateRequest,
     OrderListResponse,
@@ -253,33 +248,6 @@ def get_correlation_series(
     raise _stub("T2.3")
 
 
-# ---------------------------------------------------------------- opportunity
-
-opportunity_router = APIRouter(tags=["opportunity"])
-
-
-@opportunity_router.get("/opportunities", response_model=OpportunityListResponse)
-def list_opportunities(
-    mode: OpportunityMode | None = Query(None),
-    anchor_product_key: str | None = Query(None),
-    status: OpportunityStatus | None = Query(None),
-    limit: int = Query(50, ge=1, le=200),
-) -> OpportunityListResponse:
-    raise _stub("T3.4")
-
-
-@opportunity_router.get("/opportunities/{opportunity_id}", response_model=Opportunity)
-def get_opportunity(opportunity_id: str) -> Opportunity:
-    raise _stub("T3.4")
-
-
-@opportunity_router.patch("/opportunities/{opportunity_id}", response_model=Opportunity)
-def update_opportunity_status(
-    opportunity_id: str, payload: OpportunityStatusUpdateRequest
-) -> Opportunity:
-    raise _stub("T3.4")
-
-
 # ---------------------------------------------------------------- portfolio
 
 portfolio_router = APIRouter(tags=["portfolio"])
@@ -371,7 +339,6 @@ for _router in (
     settings_router,
     overview_router,
     correlation_router,
-    opportunity_router,
     portfolio_router,
     approval_router,
 ):

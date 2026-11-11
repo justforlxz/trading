@@ -1,0 +1,14 @@
+{
+  "items": [
+    {
+      "actor": "lxz",
+      "approval_id": "apr_0001",
+      "at": "2026-11-10T07:10:00Z",
+      "from_status": "strategy_generation",
+      "instance_id": "si_0001",
+      "note": "提交人工审核",
+      "to_status": "pending_review"
+    }
+  ],
+  "total": 1
+}

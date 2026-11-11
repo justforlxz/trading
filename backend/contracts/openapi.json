@@ -1214,6 +1214,283 @@
         "title": "CandleSeriesResponse",
         "type": "object"
       },
+      "CorrelationCell": {
+        "description": "矩阵的一格；`coefficient` 为 `null` 表示该格样本不足。",
+        "properties": {
+          "coefficient": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coefficient"
+          },
+          "product_key_a": {
+            "title": "Product Key A",
+            "type": "string"
+          },
+          "product_key_b": {
+            "title": "Product Key B",
+            "type": "string"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "product_key_a",
+          "product_key_b",
+          "coefficient",
+          "samples"
+        ],
+        "title": "CorrelationCell",
+        "type": "object"
+      },
+      "CorrelationMatrixResponse": {
+        "description": "某一时点、某一周期、某一窗口的整张相关矩阵（格子全量给出，含对角线）。",
+        "examples": [
+          {
+            "as_of": "2026-11-10T00:00:00Z",
+            "bar": "1d",
+            "cells": [
+              {
+                "coefficient": "1",
+                "product_key_a": "AAPL",
+                "product_key_b": "AAPL",
+                "samples": 60
+              },
+              {
+                "coefficient": "0.87",
+                "product_key_a": "AAPL",
+                "product_key_b": "MSFT",
+                "samples": 60
+              },
+              {
+                "product_key_a": "AAPL",
+                "product_key_b": "NVDA",
+                "samples": 2
+              },
+              {
+                "coefficient": "0.87",
+                "product_key_a": "MSFT",
+                "product_key_b": "AAPL",
+                "samples": 60
+              },
+              {
+                "coefficient": "1",
+                "product_key_a": "MSFT",
+                "product_key_b": "MSFT",
+                "samples": 60
+              },
+              {
+                "coefficient": "0.64",
+                "product_key_a": "MSFT",
+                "product_key_b": "NVDA",
+                "samples": 60
+              },
+              {
+                "product_key_a": "NVDA",
+                "product_key_b": "AAPL",
+                "samples": 2
+              },
+              {
+                "coefficient": "0.64",
+                "product_key_a": "NVDA",
+                "product_key_b": "MSFT",
+                "samples": 60
+              },
+              {
+                "coefficient": "1",
+                "product_key_a": "NVDA",
+                "product_key_b": "NVDA",
+                "samples": 60
+              }
+            ],
+            "product_keys": [
+              "AAPL",
+              "MSFT",
+              "NVDA"
+            ],
+            "window": 60
+          }
+        ],
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "bar": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Bar",
+            "type": "string"
+          },
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/CorrelationCell"
+            },
+            "title": "Cells",
+            "type": "array"
+          },
+          "product_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Product Keys",
+            "type": "array"
+          },
+          "window": {
+            "title": "Window",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "bar",
+          "window",
+          "as_of",
+          "product_keys",
+          "cells"
+        ],
+        "title": "CorrelationMatrixResponse",
+        "type": "object"
+      },
+      "CorrelationPoint": {
+        "description": "滚动相关序列上的一个点；样本不足时 `coefficient` 为 `null`。",
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "coefficient": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coefficient"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "as_of",
+          "coefficient",
+          "samples"
+        ],
+        "title": "CorrelationPoint",
+        "type": "object"
+      },
+      "CorrelationSeriesResponse": {
+        "description": "两个标的在滚动窗口上的相关性随时间的变化。",
+        "examples": [
+          {
+            "available_from": "2026-10-01T00:00:00Z",
+            "available_to": "2026-11-10T00:00:00Z",
+            "bar": "1d",
+            "points": [
+              {
+                "as_of": "2026-11-08T00:00:00Z",
+                "coefficient": "0.83",
+                "samples": 30
+              },
+              {
+                "as_of": "2026-11-09T00:00:00Z",
+                "coefficient": "0.85",
+                "samples": 30
+              },
+              {
+                "as_of": "2026-11-10T00:00:00Z",
+                "coefficient": "0.87",
+                "samples": 30
+              }
+            ],
+            "product_key_a": "AAPL",
+            "product_key_b": "MSFT",
+            "window": 30
+          }
+        ],
+        "properties": {
+          "available_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available From"
+          },
+          "available_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available To"
+          },
+          "bar": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Bar",
+            "type": "string"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/CorrelationPoint"
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "product_key_a": {
+            "title": "Product Key A",
+            "type": "string"
+          },
+          "product_key_b": {
+            "title": "Product Key B",
+            "type": "string"
+          },
+          "window": {
+            "title": "Window",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "product_key_a",
+          "product_key_b",
+          "bar",
+          "window",
+          "points"
+        ],
+        "title": "CorrelationSeriesResponse",
+        "type": "object"
+      },
       "CostSettings": {
         "properties": {
           "maker_fee_bps": {
@@ -1396,6 +1673,91 @@
           "emergency_stop"
         ],
         "title": "ExecutionStateResponse",
+        "type": "object"
+      },
+      "ExposureOverviewResponse": {
+        "description": "全局敞口总览。`largest_position_share` 是单一标的最大权重占组合权益的比例。",
+        "examples": [
+          {
+            "conflicts": [
+              {
+                "long_instance_ids": [
+                  "si_0001"
+                ],
+                "product_key": "AAPL",
+                "short_instance_ids": [
+                  "si_0002"
+                ]
+              }
+            ],
+            "generated_at": "2026-11-10T08:00:00Z",
+            "gross_exposure": "3510.40",
+            "largest_position_share": "0.24",
+            "long_exposure": "2753.78",
+            "net_exposure": "1997.15",
+            "open_positions": 3,
+            "product_count": 2,
+            "short_exposure": "756.62"
+          }
+        ],
+        "properties": {
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioConflict"
+            },
+            "title": "Conflicts",
+            "type": "array"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "gross_exposure": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Gross Exposure",
+            "type": "string"
+          },
+          "largest_position_share": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Largest Position Share",
+            "type": "string"
+          },
+          "long_exposure": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Long Exposure",
+            "type": "string"
+          },
+          "net_exposure": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Net Exposure",
+            "type": "string"
+          },
+          "open_positions": {
+            "title": "Open Positions",
+            "type": "integer"
+          },
+          "product_count": {
+            "title": "Product Count",
+            "type": "integer"
+          },
+          "short_exposure": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Short Exposure",
+            "type": "string"
+          }
+        },
+        "required": [
+          "gross_exposure",
+          "net_exposure",
+          "long_exposure",
+          "short_exposure",
+          "largest_position_share",
+          "open_positions",
+          "product_count",
+          "conflicts",
+          "generated_at"
+        ],
+        "title": "ExposureOverviewResponse",
         "type": "object"
       },
       "ExposureSummary": {
@@ -2178,6 +2540,399 @@
         "title": "JournalListResponse",
         "type": "object"
       },
+      "LiveAuthorizationRequest": {
+        "description": "申请实盘授权：记录授权人与已批准的资金预算，不打开实盘开关。",
+        "properties": {
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "capital_budget": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Capital Budget",
+            "type": "string"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "actor",
+          "capital_budget"
+        ],
+        "title": "LiveAuthorizationRequest",
+        "type": "object"
+      },
+      "MarketBreadth": {
+        "description": "某一类别在某一时点上的涨跌家数。\n\n`ratio` 是上涨家数除以下跌家数；没有下跌标的时除以零不成立，如实给 `null`，\n不写成无穷大或一个很大的数。`unchanged` 是涨跌幅恰好为零的标的数。",
+        "properties": {
+          "advancers": {
+            "title": "Advancers",
+            "type": "integer"
+          },
+          "decliners": {
+            "title": "Decliners",
+            "type": "integer"
+          },
+          "participants": {
+            "title": "Participants",
+            "type": "integer"
+          },
+          "ratio": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ratio"
+          },
+          "unchanged": {
+            "title": "Unchanged",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "advancers",
+          "decliners",
+          "unchanged",
+          "ratio",
+          "participants"
+        ],
+        "title": "MarketBreadth",
+        "type": "object"
+      },
+      "MarketOverviewResponse": {
+        "description": "某一类别（`inst_type`）的横截面总览；两类标的各自统计，互不混入。",
+        "examples": [
+          {
+            "as_of": "2026-11-10T00:00:00Z",
+            "bar": "1d",
+            "breadth": {
+              "advancers": 8,
+              "decliners": 2,
+              "participants": 11,
+              "ratio": "4",
+              "unchanged": 1
+            },
+            "inst_type": "SPOT",
+            "resonance": {
+              "participants": 11,
+              "strength": "0.62",
+              "window": 20
+            }
+          }
+        ],
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "bar": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Bar",
+            "type": "string"
+          },
+          "breadth": {
+            "$ref": "#/components/schemas/MarketBreadth"
+          },
+          "inst_type": {
+            "enum": [
+              "SPOT",
+              "SWAP"
+            ],
+            "title": "Inst Type",
+            "type": "string"
+          },
+          "resonance": {
+            "$ref": "#/components/schemas/MarketResonance"
+          }
+        },
+        "required": [
+          "inst_type",
+          "bar",
+          "as_of",
+          "breadth",
+          "resonance"
+        ],
+        "title": "MarketOverviewResponse",
+        "type": "object"
+      },
+      "MarketResonance": {
+        "description": "同一类别内部的同向程度：全部同向上涨为 1，涨跌各半为 0，恒在 [0, 1]。\n\n参与标的少于 5 个时不给数（`strength` 为 `null`）：样本不足时的「共振强度」\n没有意义，编一个数字比留空更糟。",
+        "properties": {
+          "participants": {
+            "title": "Participants",
+            "type": "integer"
+          },
+          "strength": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strength"
+          },
+          "window": {
+            "title": "Window",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "strength",
+          "participants",
+          "window"
+        ],
+        "title": "MarketResonance",
+        "type": "object"
+      },
+      "Opportunity": {
+        "description": "一条机会记录。\n\n`evidence` 是判定依据的 JSON 文本（相关系数、广度、共振强度等），原样透传，\n不在契约层二次解释；`score` 是筛选用的综合分数。",
+        "examples": [
+          {
+            "anchor_product_key": "AAPL",
+            "as_of": "2026-11-10T00:00:00Z",
+            "evidence": "{\"correlation\":0.87,\"breadth\":0.8,\"resonance\":0.62}",
+            "legs": [
+              {
+                "direction": "long",
+                "inst_id": "MSFT-USDT-SWAP",
+                "inst_type": "SWAP",
+                "product_key": "MSFT",
+                "score": "0.82"
+              },
+              {
+                "direction": "short",
+                "inst_id": "NVDA-USDT-SWAP",
+                "inst_type": "SWAP",
+                "product_key": "NVDA",
+                "score": "0.71"
+              }
+            ],
+            "mode": "target",
+            "opportunity_id": "opp_0001",
+            "score": "0.78",
+            "status": "new"
+          }
+        ],
+        "properties": {
+          "anchor_product_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anchor Product Key"
+          },
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "evidence": {
+            "title": "Evidence",
+            "type": "string"
+          },
+          "legs": {
+            "items": {
+              "$ref": "#/components/schemas/OpportunityLeg"
+            },
+            "title": "Legs",
+            "type": "array"
+          },
+          "mode": {
+            "enum": [
+              "target",
+              "market"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "opportunity_id": {
+            "title": "Opportunity Id",
+            "type": "string"
+          },
+          "score": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Score",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "new",
+              "reviewed",
+              "adopted",
+              "rejected",
+              "expired"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "opportunity_id",
+          "mode",
+          "as_of",
+          "score",
+          "legs",
+          "evidence",
+          "status"
+        ],
+        "title": "Opportunity",
+        "type": "object"
+      },
+      "OpportunityLeg": {
+        "description": "候选腿：某个标的方向与得分。目标权重由 T3.5 的组合生成阶段给出。",
+        "properties": {
+          "direction": {
+            "enum": [
+              "long",
+              "short"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "inst_type": {
+            "enum": [
+              "SPOT",
+              "SWAP"
+            ],
+            "title": "Inst Type",
+            "type": "string"
+          },
+          "product_key": {
+            "title": "Product Key",
+            "type": "string"
+          },
+          "score": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Score",
+            "type": "string"
+          }
+        },
+        "required": [
+          "inst_id",
+          "inst_type",
+          "product_key",
+          "direction",
+          "score"
+        ],
+        "title": "OpportunityLeg",
+        "type": "object"
+      },
+      "OpportunityListResponse": {
+        "examples": [
+          {
+            "items": [
+              {
+                "anchor_product_key": "AAPL",
+                "as_of": "2026-11-10T00:00:00Z",
+                "evidence": "{\"correlation\":0.87,\"breadth\":0.8,\"resonance\":0.62}",
+                "legs": [
+                  {
+                    "direction": "long",
+                    "inst_id": "MSFT-USDT-SWAP",
+                    "inst_type": "SWAP",
+                    "product_key": "MSFT",
+                    "score": "0.82"
+                  },
+                  {
+                    "direction": "short",
+                    "inst_id": "NVDA-USDT-SWAP",
+                    "inst_type": "SWAP",
+                    "product_key": "NVDA",
+                    "score": "0.71"
+                  }
+                ],
+                "mode": "target",
+                "opportunity_id": "opp_0001",
+                "score": "0.78",
+                "status": "new"
+              }
+            ],
+            "total": 1
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Opportunity"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "OpportunityListResponse",
+        "type": "object"
+      },
+      "OpportunityStatusUpdateRequest": {
+        "description": "状态变更请求：目标状态必须是取值集合内、且是 `status` 允许的下一步。",
+        "properties": {
+          "status": {
+            "enum": [
+              "new",
+              "reviewed",
+              "adopted",
+              "rejected",
+              "expired"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "OpportunityStatusUpdateRequest",
+        "type": "object"
+      },
       "Order": {
         "examples": [
           {
@@ -2466,7 +3221,7 @@
                 "instance_id": "si_0001",
                 "latest_signal_at": "2026-11-10T07:00:00Z",
                 "name": "AAPL 均线趋势",
-                "status": "enabled",
+                "status": "paper_trading",
                 "strategy_id": "ma_cross"
               }
             ],
@@ -2637,6 +3392,252 @@
           "default"
         ],
         "title": "ParamSpec",
+        "type": "object"
+      },
+      "PortfolioAdjustment": {
+        "description": "一条组合调整申请；批准之前 `target` 不生效。",
+        "examples": [
+          {
+            "adjustment_id": "adj_0001",
+            "instance_id": "si_0001",
+            "note": "把 AAPL 目标权重从 0.25 提到 0.30",
+            "requested_at": "2026-11-10T07:30:00Z",
+            "requested_by": "lxz",
+            "status": "pending",
+            "target": {
+              "legs": [
+                {
+                  "direction": "long",
+                  "inst_id": "XAAPL-USDT",
+                  "inst_type": "SPOT",
+                  "qty": "8.63",
+                  "target_weight": "0.25",
+                  "unit": "base"
+                }
+              ],
+              "net_exposure": "0.25"
+            }
+          }
+        ],
+        "properties": {
+          "adjustment_id": {
+            "title": "Adjustment Id",
+            "type": "string"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By"
+          },
+          "instance_id": {
+            "title": "Instance Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "requested_at": {
+            "title": "Requested At",
+            "type": "string"
+          },
+          "requested_by": {
+            "title": "Requested By",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "approved",
+              "rejected"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "$ref": "#/components/schemas/TargetPortfolio"
+          }
+        },
+        "required": [
+          "adjustment_id",
+          "instance_id",
+          "status",
+          "requested_by",
+          "requested_at",
+          "target"
+        ],
+        "title": "PortfolioAdjustment",
+        "type": "object"
+      },
+      "PortfolioAdjustmentCreateRequest": {
+        "description": "提交调整申请：只写申请，不改生效状态。",
+        "properties": {
+          "instance_id": {
+            "title": "Instance Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "requested_by": {
+            "title": "Requested By",
+            "type": "string"
+          },
+          "target": {
+            "$ref": "#/components/schemas/TargetPortfolio"
+          }
+        },
+        "required": [
+          "instance_id",
+          "requested_by",
+          "target"
+        ],
+        "title": "PortfolioAdjustmentCreateRequest",
+        "type": "object"
+      },
+      "PortfolioAdjustmentDecisionRequest": {
+        "description": "批准或驳回一条申请；决定必须由人工作出。",
+        "properties": {
+          "decided_by": {
+            "title": "Decided By",
+            "type": "string"
+          },
+          "decision": {
+            "enum": [
+              "approved",
+              "rejected"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "decision",
+          "decided_by"
+        ],
+        "title": "PortfolioAdjustmentDecisionRequest",
+        "type": "object"
+      },
+      "PortfolioAdjustmentListResponse": {
+        "examples": [
+          {
+            "items": [
+              {
+                "adjustment_id": "adj_0001",
+                "instance_id": "si_0001",
+                "note": "把 AAPL 目标权重从 0.25 提到 0.30",
+                "requested_at": "2026-11-10T07:30:00Z",
+                "requested_by": "lxz",
+                "status": "pending",
+                "target": {
+                  "legs": [
+                    {
+                      "direction": "long",
+                      "inst_id": "XAAPL-USDT",
+                      "inst_type": "SPOT",
+                      "qty": "8.63",
+                      "target_weight": "0.25",
+                      "unit": "base"
+                    }
+                  ],
+                  "net_exposure": "0.25"
+                }
+              }
+            ],
+            "total": 1
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioAdjustment"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "PortfolioAdjustmentListResponse",
+        "type": "object"
+      },
+      "PortfolioConflict": {
+        "description": "同一 `product_key` 在多个策略上方向相反；两侧策略都要列出，不合并成一条。",
+        "properties": {
+          "long_instance_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Long Instance Ids",
+            "type": "array"
+          },
+          "product_key": {
+            "title": "Product Key",
+            "type": "string"
+          },
+          "short_instance_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Short Instance Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "product_key",
+          "long_instance_ids",
+          "short_instance_ids"
+        ],
+        "title": "PortfolioConflict",
         "type": "object"
       },
       "Position": {
@@ -2956,6 +3957,344 @@
           "items"
         ],
         "title": "RelatedInstrumentsResponse",
+        "type": "object"
+      },
+      "RelationCommunity": {
+        "description": "一个社区：编号由社区划分算法给出，成员是标的的 `product_key`。",
+        "properties": {
+          "community_id": {
+            "title": "Community Id",
+            "type": "integer"
+          },
+          "product_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Product Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "community_id",
+          "product_keys"
+        ],
+        "title": "RelationCommunity",
+        "type": "object"
+      },
+      "RelationEdge": {
+        "description": "一条相关边；`samples` 是算这个系数时实际用到的样本条数。",
+        "properties": {
+          "coefficient": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Coefficient",
+            "type": "string"
+          },
+          "product_key_a": {
+            "title": "Product Key A",
+            "type": "string"
+          },
+          "product_key_b": {
+            "title": "Product Key B",
+            "type": "string"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "product_key_a",
+          "product_key_b",
+          "coefficient",
+          "samples"
+        ],
+        "title": "RelationEdge",
+        "type": "object"
+      },
+      "RelationGraphResponse": {
+        "description": "一次请求返回一张完整的小图：节点、边、社区与图级平均连通度。",
+        "examples": [
+          {
+            "as_of": "2026-11-10T00:00:00Z",
+            "average_degree": "1.75",
+            "bar": "1d",
+            "communities": [
+              {
+                "community_id": 0,
+                "product_keys": [
+                  "AAPL",
+                  "MSFT"
+                ]
+              },
+              {
+                "community_id": 1,
+                "product_keys": [
+                  "NVDA",
+                  "TSLA"
+                ]
+              }
+            ],
+            "edges": [
+              {
+                "coefficient": "0.87",
+                "product_key_a": "AAPL",
+                "product_key_b": "MSFT",
+                "samples": 60
+              },
+              {
+                "coefficient": "-0.64",
+                "product_key_a": "AAPL",
+                "product_key_b": "NVDA",
+                "samples": 60
+              },
+              {
+                "coefficient": "-0.64",
+                "product_key_a": "MSFT",
+                "product_key_b": "NVDA",
+                "samples": 60
+              },
+              {
+                "coefficient": "0.58",
+                "product_key_a": "NVDA",
+                "product_key_b": "TSLA",
+                "samples": 60
+              }
+            ],
+            "min_abs_corr": "0.5",
+            "nodes": [
+              {
+                "asset_type": "tokenized_equity",
+                "centrality": "0.67",
+                "community_id": 0,
+                "degree": 2,
+                "product_key": "AAPL"
+              },
+              {
+                "asset_type": "tokenized_equity",
+                "centrality": "0.67",
+                "community_id": 0,
+                "degree": 2,
+                "product_key": "MSFT"
+              },
+              {
+                "asset_type": "tokenized_equity",
+                "centrality": "0.67",
+                "community_id": 1,
+                "degree": 2,
+                "product_key": "NVDA"
+              },
+              {
+                "asset_type": "tokenized_equity",
+                "centrality": "0.33",
+                "community_id": 1,
+                "degree": 1,
+                "product_key": "TSLA"
+              }
+            ],
+            "window": 60
+          }
+        ],
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "average_degree": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Average Degree",
+            "type": "string"
+          },
+          "bar": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Bar",
+            "type": "string"
+          },
+          "communities": {
+            "items": {
+              "$ref": "#/components/schemas/RelationCommunity"
+            },
+            "title": "Communities",
+            "type": "array"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/RelationEdge"
+            },
+            "title": "Edges",
+            "type": "array"
+          },
+          "min_abs_corr": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Min Abs Corr",
+            "type": "string"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/RelationNode"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "window": {
+            "title": "Window",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "as_of",
+          "bar",
+          "window",
+          "min_abs_corr",
+          "average_degree",
+          "nodes",
+          "edges",
+          "communities"
+        ],
+        "title": "RelationGraphResponse",
+        "type": "object"
+      },
+      "RelationNeighbor": {
+        "description": "某个标的的邻居及其系数；按系数绝对值从大到小排列。",
+        "properties": {
+          "asset_type": {
+            "enum": [
+              "tokenized_equity",
+              "crypto",
+              "commodity_token",
+              "unknown"
+            ],
+            "title": "Asset Type",
+            "type": "string"
+          },
+          "coefficient": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Coefficient",
+            "type": "string"
+          },
+          "product_key": {
+            "title": "Product Key",
+            "type": "string"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "product_key",
+          "asset_type",
+          "coefficient",
+          "samples"
+        ],
+        "title": "RelationNeighbor",
+        "type": "object"
+      },
+      "RelationNeighborsResponse": {
+        "examples": [
+          {
+            "bar": "1d",
+            "items": [
+              {
+                "asset_type": "tokenized_equity",
+                "coefficient": "0.87",
+                "product_key": "MSFT",
+                "samples": 60
+              },
+              {
+                "asset_type": "tokenized_equity",
+                "coefficient": "-0.64",
+                "product_key": "NVDA",
+                "samples": 60
+              }
+            ],
+            "product_key": "AAPL",
+            "window": 60
+          }
+        ],
+        "properties": {
+          "bar": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Bar",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RelationNeighbor"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "product_key": {
+            "title": "Product Key",
+            "type": "string"
+          },
+          "window": {
+            "title": "Window",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "product_key",
+          "bar",
+          "window",
+          "items"
+        ],
+        "title": "RelationNeighborsResponse",
+        "type": "object"
+      },
+      "RelationNode": {
+        "description": "网络里的一个标的及其网络指标（度数、中心性、所属社区）。",
+        "properties": {
+          "asset_type": {
+            "enum": [
+              "tokenized_equity",
+              "crypto",
+              "commodity_token",
+              "unknown"
+            ],
+            "title": "Asset Type",
+            "type": "string"
+          },
+          "centrality": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Centrality",
+            "type": "string"
+          },
+          "community_id": {
+            "title": "Community Id",
+            "type": "integer"
+          },
+          "degree": {
+            "title": "Degree",
+            "type": "integer"
+          },
+          "product_key": {
+            "title": "Product Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "product_key",
+          "asset_type",
+          "community_id",
+          "degree",
+          "centrality"
+        ],
+        "title": "RelationNode",
         "type": "object"
       },
       "RiskSettings": {
@@ -3306,6 +4645,209 @@
         "title": "SignalListResponse",
         "type": "object"
       },
+      "StrategyApprovalDecisionRequest": {
+        "description": "审核决定：通过或驳回。驳回只能回到 `strategy_generation`。",
+        "properties": {
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "actor"
+        ],
+        "title": "StrategyApprovalDecisionRequest",
+        "type": "object"
+      },
+      "StrategyApprovalListResponse": {
+        "examples": [
+          {
+            "items": [
+              {
+                "actor": "lxz",
+                "approval_id": "apr_0001",
+                "at": "2026-11-10T07:10:00Z",
+                "from_status": "strategy_generation",
+                "instance_id": "si_0001",
+                "note": "提交人工审核",
+                "to_status": "pending_review"
+              }
+            ],
+            "total": 1
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StrategyApprovalTransition"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "StrategyApprovalListResponse",
+        "type": "object"
+      },
+      "StrategyApprovalRequest": {
+        "description": "提交人工审核：策略实例从「已生成」进入待审核，不改策略配置。",
+        "properties": {
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "instance_id": {
+            "title": "Instance Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "instance_id",
+          "actor"
+        ],
+        "title": "StrategyApprovalRequest",
+        "type": "object"
+      },
+      "StrategyApprovalTransition": {
+        "description": "一次状态推进记录。\n\n`from_status` 为 `null` 表示该实例的第一条记录（从「已生成」进入审核）。\n`evidence` 是推进依据的引用，例如量化验证的达标报告编号；没有依据的推进留空。",
+        "examples": [
+          {
+            "actor": "lxz",
+            "approval_id": "apr_0001",
+            "at": "2026-11-10T07:10:00Z",
+            "from_status": "strategy_generation",
+            "instance_id": "si_0001",
+            "note": "提交人工审核",
+            "to_status": "pending_review"
+          }
+        ],
+        "properties": {
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "approval_id": {
+            "title": "Approval Id",
+            "type": "string"
+          },
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "opportunity_discovery",
+                  "strategy_generation",
+                  "pending_review",
+                  "backtested",
+                  "validated",
+                  "paper_trading",
+                  "live_authorized",
+                  "live_running",
+                  "rejected"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Status"
+          },
+          "instance_id": {
+            "title": "Instance Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "to_status": {
+            "enum": [
+              "opportunity_discovery",
+              "strategy_generation",
+              "pending_review",
+              "backtested",
+              "validated",
+              "paper_trading",
+              "live_authorized",
+              "live_running",
+              "rejected"
+            ],
+            "title": "To Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approval_id",
+          "instance_id",
+          "to_status",
+          "actor",
+          "at"
+        ],
+        "title": "StrategyApprovalTransition",
+        "type": "object"
+      },
       "StrategyBrief": {
         "properties": {
           "instance_id": {
@@ -3329,9 +4871,15 @@
           },
           "status": {
             "enum": [
-              "draft",
-              "enabled",
-              "disabled"
+              "opportunity_discovery",
+              "strategy_generation",
+              "pending_review",
+              "backtested",
+              "validated",
+              "paper_trading",
+              "live_authorized",
+              "live_running",
+              "rejected"
             ],
             "title": "Status",
             "type": "string"
@@ -3488,6 +5036,7 @@
           {
             "bar": "1h",
             "created_at": "2026-11-08T02:15:00Z",
+            "enabled": true,
             "execution_mode": "paper",
             "inst_ids": [
               "XAAPL-USDT"
@@ -3499,7 +5048,7 @@
               "fast": 20,
               "slow": 60
             },
-            "status": "enabled",
+            "status": "paper_trading",
             "strategy_id": "ma_cross",
             "strategy_version": "1.0.0",
             "updated_at": "2026-11-10T07:00:00Z"
@@ -3521,6 +5070,11 @@
           "created_at": {
             "title": "Created At",
             "type": "string"
+          },
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
           },
           "execution_mode": {
             "enum": [
@@ -3579,9 +5133,15 @@
           },
           "status": {
             "enum": [
-              "draft",
-              "enabled",
-              "disabled"
+              "opportunity_discovery",
+              "strategy_generation",
+              "pending_review",
+              "backtested",
+              "validated",
+              "paper_trading",
+              "live_authorized",
+              "live_running",
+              "rejected"
             ],
             "title": "Status",
             "type": "string"
@@ -3681,6 +5241,7 @@
               {
                 "bar": "1h",
                 "created_at": "2026-11-08T02:15:00Z",
+                "enabled": true,
                 "execution_mode": "paper",
                 "inst_ids": [
                   "XAAPL-USDT"
@@ -3692,7 +5253,7 @@
                   "fast": 20,
                   "slow": 60
                 },
-                "status": "enabled",
+                "status": "paper_trading",
                 "strategy_id": "ma_cross",
                 "strategy_version": "1.0.0",
                 "updated_at": "2026-11-10T07:00:00Z"
@@ -3722,8 +5283,20 @@
         "type": "object"
       },
       "StrategyInstanceUpdateRequest": {
-        "description": "PATCH 语义：只落显式提交的字段。",
+        "additionalProperties": false,
+        "description": "PATCH 语义：只落显式提交的字段。\n\n生命周期阶段**不在这条端点上改**：阶段推进只经 `/api/approvals` 的状态机，\n否则一次 PATCH 就能从草稿跳到实盘运行，绕过人工审核、历史回测与量化验证\n（`docs/prd/v2.md` §三.5「任何阶段都不能被跳过」）。提交 `status` 会因\n`extra=\"forbid\"` 直接 422，不会静默忽略。\n\n`enabled` 是实例的启停开关，只决定它是否产出信号，不改变生命周期阶段。",
         "properties": {
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
           "inst_ids": {
             "anyOf": [
               {
@@ -3775,14 +5348,254 @@
               }
             ],
             "title": "Params"
+          }
+        },
+        "title": "StrategyInstanceUpdateRequest",
+        "type": "object"
+      },
+      "StrategyPortfolio": {
+        "description": "一个策略实例的资金与敞口概览（组合列表的一行）。\n\n`priority` 越大越优先；`capital_budget` 是已批准给该策略的资金预算。",
+        "properties": {
+          "capital_budget": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Capital Budget",
+            "type": "string"
           },
-          "status": {
+          "gross_exposure": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Gross Exposure",
+            "type": "string"
+          },
+          "instance_id": {
+            "title": "Instance Id",
+            "type": "string"
+          },
+          "lifecycle_status": {
+            "enum": [
+              "opportunity_discovery",
+              "strategy_generation",
+              "pending_review",
+              "backtested",
+              "validated",
+              "paper_trading",
+              "live_authorized",
+              "live_running",
+              "rejected"
+            ],
+            "title": "Lifecycle Status",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "net_exposure": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Net Exposure",
+            "type": "string"
+          },
+          "open_positions": {
+            "title": "Open Positions",
+            "type": "integer"
+          },
+          "priority": {
+            "title": "Priority",
+            "type": "integer"
+          },
+          "realized_pnl": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Realized Pnl",
+            "type": "string"
+          },
+          "strategy_id": {
+            "title": "Strategy Id",
+            "type": "string"
+          },
+          "unrealized_pnl": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Unrealized Pnl",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instance_id",
+          "strategy_id",
+          "name",
+          "lifecycle_status",
+          "priority",
+          "capital_budget",
+          "gross_exposure",
+          "net_exposure",
+          "unrealized_pnl",
+          "realized_pnl",
+          "open_positions"
+        ],
+        "title": "StrategyPortfolio",
+        "type": "object"
+      },
+      "StrategyPortfolioDetailResponse": {
+        "description": "单个策略的明细：资金与敞口、虚拟持仓、当前生效的目标组合（尚未生成时为 `null`）。",
+        "examples": [
+          {
+            "portfolio": {
+              "capital_budget": "2000.00",
+              "gross_exposure": "1997.15",
+              "instance_id": "si_0001",
+              "lifecycle_status": "live_running",
+              "name": "AAPL 均线趋势",
+              "net_exposure": "1997.15",
+              "open_positions": 1,
+              "priority": 10,
+              "realized_pnl": "12.05",
+              "strategy_id": "ma_cross",
+              "unrealized_pnl": "28.64"
+            },
+            "positions": [
+              {
+                "avg_cost": "228.10",
+                "direction": "long",
+                "inst_id": "XAAPL-USDT",
+                "inst_type": "SPOT",
+                "mark_price": "231.42",
+                "notional": "1997.15",
+                "opened_at": "2026-11-09T14:00:00Z",
+                "product_key": "AAPL",
+                "qty": "8.63",
+                "unit": "base",
+                "unrealized_pnl": "28.64"
+              }
+            ],
+            "target": {
+              "legs": [
+                {
+                  "direction": "long",
+                  "inst_id": "XAAPL-USDT",
+                  "inst_type": "SPOT",
+                  "qty": "8.63",
+                  "target_weight": "0.25",
+                  "unit": "base"
+                }
+              ],
+              "net_exposure": "0.25"
+            }
+          }
+        ],
+        "properties": {
+          "portfolio": {
+            "$ref": "#/components/schemas/StrategyPortfolio"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/VirtualPosition"
+            },
+            "title": "Positions",
+            "type": "array"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TargetPortfolio"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "portfolio",
+          "positions"
+        ],
+        "title": "StrategyPortfolioDetailResponse",
+        "type": "object"
+      },
+      "StrategyPortfolioListResponse": {
+        "examples": [
+          {
+            "items": [
+              {
+                "capital_budget": "2000.00",
+                "gross_exposure": "1997.15",
+                "instance_id": "si_0001",
+                "lifecycle_status": "live_running",
+                "name": "AAPL 均线趋势",
+                "net_exposure": "1997.15",
+                "open_positions": 1,
+                "priority": 10,
+                "realized_pnl": "12.05",
+                "strategy_id": "ma_cross",
+                "unrealized_pnl": "28.64"
+              }
+            ],
+            "total": 1
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StrategyPortfolio"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "StrategyPortfolioListResponse",
+        "type": "object"
+      },
+      "TargetLeg": {
+        "description": "目标组合的一条腿：某个标的、某个方向、某个目标权重。\n\n`target_weight` 是权重（占组合资金的比例，正数表示该腿的大小），方向单独由\n`direction` 表达——不用权重符号再编码一次方向。\n\n`qty` 与 `unit` 是**服务端换算出的**下单数量：`SPOT` 按标的币数量（`base`），\n`SWAP` 按合约张数（`contract`），换算依赖价格、合约面值与精度，前端不做这类\n派生计算（`AGENTS.md` §6）。因此请求里可以不带这两个字段，由服务端在生成目标\n组合时填入；读到 `null` 表示这一步尚未换算。",
+        "properties": {
+          "direction": {
+            "enum": [
+              "long",
+              "short"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "inst_type": {
+            "enum": [
+              "SPOT",
+              "SWAP"
+            ],
+            "title": "Inst Type",
+            "type": "string"
+          },
+          "qty": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qty"
+          },
+          "target_weight": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Target Weight",
+            "type": "string"
+          },
+          "unit": {
             "anyOf": [
               {
                 "enum": [
-                  "draft",
-                  "enabled",
-                  "disabled"
+                  "base",
+                  "contract"
                 ],
                 "type": "string"
               },
@@ -3790,10 +5603,39 @@
                 "type": "null"
               }
             ],
-            "title": "Status"
+            "title": "Unit"
           }
         },
-        "title": "StrategyInstanceUpdateRequest",
+        "required": [
+          "inst_id",
+          "inst_type",
+          "direction",
+          "target_weight"
+        ],
+        "title": "TargetLeg",
+        "type": "object"
+      },
+      "TargetPortfolio": {
+        "description": "目标组合：多腿、多空并存，`net_exposure` 是多头权重之和减空头权重之和。",
+        "properties": {
+          "legs": {
+            "items": {
+              "$ref": "#/components/schemas/TargetLeg"
+            },
+            "title": "Legs",
+            "type": "array"
+          },
+          "net_exposure": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Net Exposure",
+            "type": "string"
+          }
+        },
+        "required": [
+          "legs",
+          "net_exposure"
+        ],
+        "title": "TargetPortfolio",
         "type": "object"
       },
       "TimeSplit": {
@@ -3864,6 +5706,87 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "VirtualPosition": {
+        "description": "策略账本里的一条持仓；`avg_cost` 是当前剩余持仓的成本价（FIFO 核算后）。",
+        "properties": {
+          "avg_cost": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Avg Cost",
+            "type": "string"
+          },
+          "direction": {
+            "enum": [
+              "long",
+              "short"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "inst_type": {
+            "enum": [
+              "SPOT",
+              "SWAP"
+            ],
+            "title": "Inst Type",
+            "type": "string"
+          },
+          "mark_price": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Mark Price",
+            "type": "string"
+          },
+          "notional": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Notional",
+            "type": "string"
+          },
+          "opened_at": {
+            "title": "Opened At",
+            "type": "string"
+          },
+          "product_key": {
+            "title": "Product Key",
+            "type": "string"
+          },
+          "qty": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Qty",
+            "type": "string"
+          },
+          "unit": {
+            "enum": [
+              "base",
+              "contract"
+            ],
+            "title": "Unit",
+            "type": "string"
+          },
+          "unrealized_pnl": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Unrealized Pnl",
+            "type": "string"
+          }
+        },
+        "required": [
+          "inst_id",
+          "inst_type",
+          "product_key",
+          "direction",
+          "qty",
+          "unit",
+          "avg_cost",
+          "mark_price",
+          "notional",
+          "unrealized_pnl",
+          "opened_at"
+        ],
+        "title": "VirtualPosition",
         "type": "object"
       },
       "WatchlistAddRequest": {
@@ -4103,6 +6026,222 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/approvals": {
+      "get": {
+        "operationId": "list_approvals_api_approvals_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyApprovalListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Approvals",
+        "tags": [
+          "approval"
+        ]
+      },
+      "post": {
+        "operationId": "submit_for_review_api_approvals_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StrategyApprovalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyApprovalTransition"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit For Review",
+        "tags": [
+          "approval"
+        ]
+      }
+    },
+    "/api/approvals/{instance_id}/approve": {
+      "post": {
+        "operationId": "approve_strategy_api_approvals__instance_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instance_id",
+            "required": true,
+            "schema": {
+              "title": "Instance Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StrategyApprovalDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyApprovalTransition"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Strategy",
+        "tags": [
+          "approval"
+        ]
+      }
+    },
+    "/api/approvals/{instance_id}/live-authorization": {
+      "post": {
+        "operationId": "authorize_live_trading_api_approvals__instance_id__live_authorization_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instance_id",
+            "required": true,
+            "schema": {
+              "title": "Instance Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LiveAuthorizationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyApprovalTransition"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Authorize Live Trading",
+        "tags": [
+          "approval"
+        ]
+      }
+    },
+    "/api/approvals/{instance_id}/reject": {
+      "post": {
+        "operationId": "reject_strategy_api_approvals__instance_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instance_id",
+            "required": true,
+            "schema": {
+              "title": "Instance Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StrategyApprovalDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyApprovalTransition"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject Strategy",
+        "tags": [
+          "approval"
+        ]
+      }
+    },
     "/api/backtest-sweeps": {
       "post": {
         "operationId": "create_backtest_sweep_api_backtest_sweeps_post",
@@ -4391,6 +6530,176 @@
         "summary": "Get Backtest",
         "tags": [
           "backtest"
+        ]
+      }
+    },
+    "/api/correlation/matrix": {
+      "get": {
+        "operationId": "get_correlation_matrix_api_correlation_matrix_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "product_keys",
+            "required": true,
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "title": "Product Keys",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "bar",
+            "required": true,
+            "schema": {
+              "enum": [
+                "1m",
+                "5m",
+                "15m",
+                "1h",
+                "4h",
+                "1d"
+              ],
+              "title": "Bar",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "window",
+            "required": true,
+            "schema": {
+              "maximum": 250,
+              "minimum": 2,
+              "title": "Window",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorrelationMatrixResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Correlation Matrix",
+        "tags": [
+          "correlation"
+        ]
+      }
+    },
+    "/api/correlation/series": {
+      "get": {
+        "operationId": "get_correlation_series_api_correlation_series_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "product_key_a",
+            "required": true,
+            "schema": {
+              "title": "Product Key A",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "product_key_b",
+            "required": true,
+            "schema": {
+              "title": "Product Key B",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "bar",
+            "required": true,
+            "schema": {
+              "enum": [
+                "1m",
+                "5m",
+                "15m",
+                "1h",
+                "4h",
+                "1d"
+              ],
+              "title": "Bar",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "window",
+            "required": true,
+            "schema": {
+              "maximum": 250,
+              "minimum": 2,
+              "title": "Window",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorrelationSeriesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Correlation Series",
+        "tags": [
+          "correlation"
         ]
       }
     },
@@ -4848,6 +7157,283 @@
         ]
       }
     },
+    "/api/market/overview": {
+      "get": {
+        "operationId": "get_market_overview_api_market_overview_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "inst_type",
+            "required": true,
+            "schema": {
+              "enum": [
+                "SPOT",
+                "SWAP"
+              ],
+              "title": "Inst Type",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "bar",
+            "required": false,
+            "schema": {
+              "default": "1d",
+              "enum": [
+                "1m",
+                "5m",
+                "15m",
+                "1h",
+                "4h",
+                "1d"
+              ],
+              "title": "Bar",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketOverviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Market Overview",
+        "tags": [
+          "correlation"
+        ]
+      }
+    },
+    "/api/opportunities": {
+      "get": {
+        "operationId": "list_opportunities_api_opportunities_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "target",
+                    "market"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mode"
+            }
+          },
+          {
+            "in": "query",
+            "name": "anchor_product_key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Anchor Product Key"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "new",
+                    "reviewed",
+                    "adopted",
+                    "rejected",
+                    "expired"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpportunityListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Opportunities",
+        "tags": [
+          "opportunity"
+        ]
+      }
+    },
+    "/api/opportunities/{opportunity_id}": {
+      "get": {
+        "operationId": "get_opportunity_api_opportunities__opportunity_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "opportunity_id",
+            "required": true,
+            "schema": {
+              "title": "Opportunity Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Opportunity"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Opportunity",
+        "tags": [
+          "opportunity"
+        ]
+      },
+      "patch": {
+        "operationId": "update_opportunity_status_api_opportunities__opportunity_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "opportunity_id",
+            "required": true,
+            "schema": {
+              "title": "Opportunity Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpportunityStatusUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Opportunity"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Opportunity Status",
+        "tags": [
+          "opportunity"
+        ]
+      }
+    },
     "/api/overview": {
       "get": {
         "operationId": "get_overview_api_overview_get",
@@ -4866,6 +7452,374 @@
         "summary": "Get Overview",
         "tags": [
           "overview"
+        ]
+      }
+    },
+    "/api/portfolio/adjustments": {
+      "get": {
+        "operationId": "list_portfolio_adjustments_api_portfolio_adjustments_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioAdjustmentListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Portfolio Adjustments",
+        "tags": [
+          "portfolio"
+        ]
+      },
+      "post": {
+        "operationId": "create_portfolio_adjustment_api_portfolio_adjustments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortfolioAdjustmentCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioAdjustment"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Portfolio Adjustment",
+        "tags": [
+          "portfolio"
+        ]
+      }
+    },
+    "/api/portfolio/adjustments/{adjustment_id}": {
+      "patch": {
+        "operationId": "decide_portfolio_adjustment_api_portfolio_adjustments__adjustment_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "adjustment_id",
+            "required": true,
+            "schema": {
+              "title": "Adjustment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortfolioAdjustmentDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioAdjustment"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Decide Portfolio Adjustment",
+        "tags": [
+          "portfolio"
+        ]
+      }
+    },
+    "/api/portfolio/exposure": {
+      "get": {
+        "operationId": "get_portfolio_exposure_api_portfolio_exposure_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExposureOverviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Portfolio Exposure",
+        "tags": [
+          "portfolio"
+        ]
+      }
+    },
+    "/api/portfolio/strategies": {
+      "get": {
+        "operationId": "list_strategy_portfolios_api_portfolio_strategies_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyPortfolioListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Strategy Portfolios",
+        "tags": [
+          "portfolio"
+        ]
+      }
+    },
+    "/api/portfolio/strategies/{instance_id}": {
+      "get": {
+        "operationId": "get_strategy_portfolio_api_portfolio_strategies__instance_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instance_id",
+            "required": true,
+            "schema": {
+              "title": "Instance Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyPortfolioDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Strategy Portfolio",
+        "tags": [
+          "portfolio"
+        ]
+      }
+    },
+    "/api/relations/graph": {
+      "get": {
+        "operationId": "get_relation_graph_api_relations_graph_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "bar",
+            "required": true,
+            "schema": {
+              "enum": [
+                "1m",
+                "5m",
+                "15m",
+                "1h",
+                "4h",
+                "1d"
+              ],
+              "title": "Bar",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "window",
+            "required": true,
+            "schema": {
+              "maximum": 250,
+              "minimum": 2,
+              "title": "Window",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "min_abs_corr",
+            "required": false,
+            "schema": {
+              "default": 0.5,
+              "maximum": 1,
+              "minimum": 0,
+              "title": "Min Abs Corr",
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelationGraphResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Relation Graph",
+        "tags": [
+          "relations"
+        ]
+      }
+    },
+    "/api/relations/neighbors": {
+      "get": {
+        "operationId": "get_relation_neighbors_api_relations_neighbors_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "product_key",
+            "required": true,
+            "schema": {
+              "title": "Product Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "bar",
+            "required": true,
+            "schema": {
+              "enum": [
+                "1m",
+                "5m",
+                "15m",
+                "1h",
+                "4h",
+                "1d"
+              ],
+              "title": "Bar",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "window",
+            "required": true,
+            "schema": {
+              "maximum": 250,
+              "minimum": 2,
+              "title": "Window",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "min_abs_corr",
+            "required": false,
+            "schema": {
+              "default": 0.5,
+              "maximum": 1,
+              "minimum": 0,
+              "title": "Min Abs Corr",
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelationNeighborsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Relation Neighbors",
+        "tags": [
+          "relations"
         ]
       }
     },

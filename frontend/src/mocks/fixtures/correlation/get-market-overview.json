@@ -1,0 +1,17 @@
+{
+  "as_of": "2026-11-10T00:00:00Z",
+  "bar": "1d",
+  "breadth": {
+    "advancers": 8,
+    "decliners": 2,
+    "participants": 11,
+    "ratio": "4",
+    "unchanged": 1
+  },
+  "inst_type": "SPOT",
+  "resonance": {
+    "participants": 11,
+    "strength": "0.62",
+    "window": 20
+  }
+}

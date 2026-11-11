@@ -1,0 +1,30 @@
+{
+  "items": [
+    {
+      "anchor_product_key": "AAPL",
+      "as_of": "2026-11-10T00:00:00Z",
+      "evidence": "{\"correlation\":0.87,\"breadth\":0.8,\"resonance\":0.62}",
+      "legs": [
+        {
+          "direction": "long",
+          "inst_id": "MSFT-USDT-SWAP",
+          "inst_type": "SWAP",
+          "product_key": "MSFT",
+          "score": "0.82"
+        },
+        {
+          "direction": "short",
+          "inst_id": "NVDA-USDT-SWAP",
+          "inst_type": "SWAP",
+          "product_key": "NVDA",
+          "score": "0.71"
+        }
+      ],
+      "mode": "target",
+      "opportunity_id": "opp_0001",
+      "score": "0.78",
+      "status": "new"
+    }
+  ],
+  "total": 1
+}

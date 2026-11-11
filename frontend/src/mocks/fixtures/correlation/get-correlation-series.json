@@ -1,0 +1,25 @@
+{
+  "available_from": "2026-10-01T00:00:00Z",
+  "available_to": "2026-11-10T00:00:00Z",
+  "bar": "1d",
+  "points": [
+    {
+      "as_of": "2026-11-08T00:00:00Z",
+      "coefficient": "0.83",
+      "samples": 30
+    },
+    {
+      "as_of": "2026-11-09T00:00:00Z",
+      "coefficient": "0.85",
+      "samples": 30
+    },
+    {
+      "as_of": "2026-11-10T00:00:00Z",
+      "coefficient": "0.87",
+      "samples": 30
+    }
+  ],
+  "product_key_a": "AAPL",
+  "product_key_b": "MSFT",
+  "window": 30
+}

@@ -16,7 +16,7 @@ afterAll(() => server.close());
 const BASE = "http://localhost";
 
 /**
- * 七个业务域各挑一个最常用的端点：任何一个没有 handler，前端就无法独立开发。
+ * 十二个业务域各挑一个最常用的端点：任何一个没有 handler，前端就无法独立开发。
  */
 const DOMAIN_PROBES = [
   ["watchlist", "/api/watchlist"],
@@ -26,6 +26,11 @@ const DOMAIN_PROBES = [
   ["trades", "/api/trades/positions"],
   ["settings", "/api/settings"],
   ["overview", "/api/overview"],
+  ["correlation", "/api/correlation/matrix?bar=1d&window=60&product_keys=AAPL"],
+  ["relations", "/api/relations/graph?bar=1d&window=60"],
+  ["opportunity", "/api/opportunities"],
+  ["portfolio", "/api/portfolio/strategies"],
+  ["approval", "/api/approvals"],
 ] as const;
 
 describe("MSW 假后端", () => {

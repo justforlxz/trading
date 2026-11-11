@@ -103,7 +103,7 @@ class OverviewResponse(BaseModel):
                             "instance_id": "si_0001",
                             "name": "AAPL 均线趋势",
                             "strategy_id": "ma_cross",
-                            "status": "enabled",
+                            "status": "paper_trading",
                             "latest_signal_at": "2026-11-10T07:00:00Z",
                         }
                     ],

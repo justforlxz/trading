@@ -1,5 +1,74 @@
 // 由 `pnpm --dir frontend api:sync` 生成，勿手改。契约源：backend/contracts/openapi.json
 export interface paths {
+    "/api/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Approvals */
+        get: operations["list_approvals_api_approvals_get"];
+        put?: never;
+        /** Submit For Review */
+        post: operations["submit_for_review_api_approvals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/approvals/{instance_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Strategy */
+        post: operations["approve_strategy_api_approvals__instance_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/approvals/{instance_id}/live-authorization": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Authorize Live Trading */
+        post: operations["authorize_live_trading_api_approvals__instance_id__live_authorization_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/approvals/{instance_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject Strategy */
+        post: operations["reject_strategy_api_approvals__instance_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/backtest-sweeps": {
         parameters: {
             query?: never;
@@ -65,6 +134,40 @@ export interface paths {
         post?: never;
         /** Delete Backtest */
         delete: operations["delete_backtest_api_backtests__run_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/correlation/matrix": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Correlation Matrix */
+        get: operations["get_correlation_matrix_api_correlation_matrix_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/correlation/series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Correlation Series */
+        get: operations["get_correlation_series_api_correlation_series_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -261,6 +364,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/market/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Market Overview */
+        get: operations["get_market_overview_api_market_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/opportunities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Opportunities */
+        get: operations["list_opportunities_api_opportunities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/opportunities/{opportunity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Opportunity */
+        get: operations["get_opportunity_api_opportunities__opportunity_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Opportunity Status */
+        patch: operations["update_opportunity_status_api_opportunities__opportunity_id__patch"];
+        trace?: never;
+    };
     "/api/overview": {
         parameters: {
             query?: never;
@@ -270,6 +425,126 @@ export interface paths {
         };
         /** Get Overview */
         get: operations["get_overview_api_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Portfolio Adjustments */
+        get: operations["list_portfolio_adjustments_api_portfolio_adjustments_get"];
+        put?: never;
+        /** Create Portfolio Adjustment */
+        post: operations["create_portfolio_adjustment_api_portfolio_adjustments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/adjustments/{adjustment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Decide Portfolio Adjustment */
+        patch: operations["decide_portfolio_adjustment_api_portfolio_adjustments__adjustment_id__patch"];
+        trace?: never;
+    };
+    "/api/portfolio/exposure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Portfolio Exposure */
+        get: operations["get_portfolio_exposure_api_portfolio_exposure_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/strategies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Strategy Portfolios */
+        get: operations["list_strategy_portfolios_api_portfolio_strategies_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/strategies/{instance_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Strategy Portfolio */
+        get: operations["get_strategy_portfolio_api_portfolio_strategies__instance_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/relations/graph": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Relation Graph */
+        get: operations["get_relation_graph_api_relations_graph_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/relations/neighbors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Relation Neighbors */
+        get: operations["get_relation_neighbors_api_relations_neighbors_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1113,6 +1388,163 @@ export interface components {
             /** Inst Id */
             inst_id: string;
         };
+        /**
+         * CorrelationCell
+         * @description 矩阵的一格；`coefficient` 为 `null` 表示该格样本不足。
+         */
+        CorrelationCell: {
+            /** Coefficient */
+            coefficient: string | null;
+            /** Product Key A */
+            product_key_a: string;
+            /** Product Key B */
+            product_key_b: string;
+            /** Samples */
+            samples: number;
+        };
+        /**
+         * CorrelationMatrixResponse
+         * @description 某一时点、某一周期、某一窗口的整张相关矩阵（格子全量给出，含对角线）。
+         * @example {
+         *       "as_of": "2026-11-10T00:00:00Z",
+         *       "bar": "1d",
+         *       "cells": [
+         *         {
+         *           "coefficient": "1",
+         *           "product_key_a": "AAPL",
+         *           "product_key_b": "AAPL",
+         *           "samples": 60
+         *         },
+         *         {
+         *           "coefficient": "0.87",
+         *           "product_key_a": "AAPL",
+         *           "product_key_b": "MSFT",
+         *           "samples": 60
+         *         },
+         *         {
+         *           "product_key_a": "AAPL",
+         *           "product_key_b": "NVDA",
+         *           "samples": 2
+         *         },
+         *         {
+         *           "coefficient": "0.87",
+         *           "product_key_a": "MSFT",
+         *           "product_key_b": "AAPL",
+         *           "samples": 60
+         *         },
+         *         {
+         *           "coefficient": "1",
+         *           "product_key_a": "MSFT",
+         *           "product_key_b": "MSFT",
+         *           "samples": 60
+         *         },
+         *         {
+         *           "coefficient": "0.64",
+         *           "product_key_a": "MSFT",
+         *           "product_key_b": "NVDA",
+         *           "samples": 60
+         *         },
+         *         {
+         *           "product_key_a": "NVDA",
+         *           "product_key_b": "AAPL",
+         *           "samples": 2
+         *         },
+         *         {
+         *           "coefficient": "0.64",
+         *           "product_key_a": "NVDA",
+         *           "product_key_b": "MSFT",
+         *           "samples": 60
+         *         },
+         *         {
+         *           "coefficient": "1",
+         *           "product_key_a": "NVDA",
+         *           "product_key_b": "NVDA",
+         *           "samples": 60
+         *         }
+         *       ],
+         *       "product_keys": [
+         *         "AAPL",
+         *         "MSFT",
+         *         "NVDA"
+         *       ],
+         *       "window": 60
+         *     }
+         */
+        CorrelationMatrixResponse: {
+            /** As Of */
+            as_of: string;
+            /**
+             * Bar
+             * @enum {string}
+             */
+            bar: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+            /** Cells */
+            cells: components["schemas"]["CorrelationCell"][];
+            /** Product Keys */
+            product_keys: string[];
+            /** Window */
+            window: number;
+        };
+        /**
+         * CorrelationPoint
+         * @description 滚动相关序列上的一个点；样本不足时 `coefficient` 为 `null`。
+         */
+        CorrelationPoint: {
+            /** As Of */
+            as_of: string;
+            /** Coefficient */
+            coefficient: string | null;
+            /** Samples */
+            samples: number;
+        };
+        /**
+         * CorrelationSeriesResponse
+         * @description 两个标的在滚动窗口上的相关性随时间的变化。
+         * @example {
+         *       "available_from": "2026-10-01T00:00:00Z",
+         *       "available_to": "2026-11-10T00:00:00Z",
+         *       "bar": "1d",
+         *       "points": [
+         *         {
+         *           "as_of": "2026-11-08T00:00:00Z",
+         *           "coefficient": "0.83",
+         *           "samples": 30
+         *         },
+         *         {
+         *           "as_of": "2026-11-09T00:00:00Z",
+         *           "coefficient": "0.85",
+         *           "samples": 30
+         *         },
+         *         {
+         *           "as_of": "2026-11-10T00:00:00Z",
+         *           "coefficient": "0.87",
+         *           "samples": 30
+         *         }
+         *       ],
+         *       "product_key_a": "AAPL",
+         *       "product_key_b": "MSFT",
+         *       "window": 30
+         *     }
+         */
+        CorrelationSeriesResponse: {
+            /** Available From */
+            available_from?: string | null;
+            /** Available To */
+            available_to?: string | null;
+            /**
+             * Bar
+             * @enum {string}
+             */
+            bar: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+            /** Points */
+            points: components["schemas"]["CorrelationPoint"][];
+            /** Product Key A */
+            product_key_a: string;
+            /** Product Key B */
+            product_key_b: string;
+            /** Window */
+            window: number;
+        };
         /** CostSettings */
         CostSettings: {
             /** Maker Fee Bps */
@@ -1190,6 +1622,51 @@ export interface components {
              * @enum {string}
              */
             mode: "manual" | "paper" | "live";
+        };
+        /**
+         * ExposureOverviewResponse
+         * @description 全局敞口总览。`largest_position_share` 是单一标的最大权重占组合权益的比例。
+         * @example {
+         *       "conflicts": [
+         *         {
+         *           "long_instance_ids": [
+         *             "si_0001"
+         *           ],
+         *           "product_key": "AAPL",
+         *           "short_instance_ids": [
+         *             "si_0002"
+         *           ]
+         *         }
+         *       ],
+         *       "generated_at": "2026-11-10T08:00:00Z",
+         *       "gross_exposure": "3510.40",
+         *       "largest_position_share": "0.24",
+         *       "long_exposure": "2753.78",
+         *       "net_exposure": "1997.15",
+         *       "open_positions": 3,
+         *       "product_count": 2,
+         *       "short_exposure": "756.62"
+         *     }
+         */
+        ExposureOverviewResponse: {
+            /** Conflicts */
+            conflicts: components["schemas"]["PortfolioConflict"][];
+            /** Generated At */
+            generated_at: string;
+            /** Gross Exposure */
+            gross_exposure: string;
+            /** Largest Position Share */
+            largest_position_share: string;
+            /** Long Exposure */
+            long_exposure: string;
+            /** Net Exposure */
+            net_exposure: string;
+            /** Open Positions */
+            open_positions: number;
+            /** Product Count */
+            product_count: number;
+            /** Short Exposure */
+            short_exposure: string;
         };
         /** ExposureSummary */
         ExposureSummary: {
@@ -1574,6 +2051,219 @@ export interface components {
             total: number;
         };
         /**
+         * LiveAuthorizationRequest
+         * @description 申请实盘授权：记录授权人与已批准的资金预算，不打开实盘开关。
+         */
+        LiveAuthorizationRequest: {
+            /** Actor */
+            actor: string;
+            /** Capital Budget */
+            capital_budget: string;
+            /** Evidence */
+            evidence?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /**
+         * MarketBreadth
+         * @description 某一类别在某一时点上的涨跌家数。
+         *
+         *     `ratio` 是上涨家数除以下跌家数；没有下跌标的时除以零不成立，如实给 `null`，
+         *     不写成无穷大或一个很大的数。`unchanged` 是涨跌幅恰好为零的标的数。
+         */
+        MarketBreadth: {
+            /** Advancers */
+            advancers: number;
+            /** Decliners */
+            decliners: number;
+            /** Participants */
+            participants: number;
+            /** Ratio */
+            ratio: string | null;
+            /** Unchanged */
+            unchanged: number;
+        };
+        /**
+         * MarketOverviewResponse
+         * @description 某一类别（`inst_type`）的横截面总览；两类标的各自统计，互不混入。
+         * @example {
+         *       "as_of": "2026-11-10T00:00:00Z",
+         *       "bar": "1d",
+         *       "breadth": {
+         *         "advancers": 8,
+         *         "decliners": 2,
+         *         "participants": 11,
+         *         "ratio": "4",
+         *         "unchanged": 1
+         *       },
+         *       "inst_type": "SPOT",
+         *       "resonance": {
+         *         "participants": 11,
+         *         "strength": "0.62",
+         *         "window": 20
+         *       }
+         *     }
+         */
+        MarketOverviewResponse: {
+            /** As Of */
+            as_of: string;
+            /**
+             * Bar
+             * @enum {string}
+             */
+            bar: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+            breadth: components["schemas"]["MarketBreadth"];
+            /**
+             * Inst Type
+             * @enum {string}
+             */
+            inst_type: "SPOT" | "SWAP";
+            resonance: components["schemas"]["MarketResonance"];
+        };
+        /**
+         * MarketResonance
+         * @description 同一类别内部的同向程度：全部同向上涨为 1，涨跌各半为 0，恒在 [0, 1]。
+         *
+         *     参与标的少于 5 个时不给数（`strength` 为 `null`）：样本不足时的「共振强度」
+         *     没有意义，编一个数字比留空更糟。
+         */
+        MarketResonance: {
+            /** Participants */
+            participants: number;
+            /** Strength */
+            strength: string | null;
+            /** Window */
+            window: number;
+        };
+        /**
+         * Opportunity
+         * @description 一条机会记录。
+         *
+         *     `evidence` 是判定依据的 JSON 文本（相关系数、广度、共振强度等），原样透传，
+         *     不在契约层二次解释；`score` 是筛选用的综合分数。
+         * @example {
+         *       "anchor_product_key": "AAPL",
+         *       "as_of": "2026-11-10T00:00:00Z",
+         *       "evidence": "{\"correlation\":0.87,\"breadth\":0.8,\"resonance\":0.62}",
+         *       "legs": [
+         *         {
+         *           "direction": "long",
+         *           "inst_id": "MSFT-USDT-SWAP",
+         *           "inst_type": "SWAP",
+         *           "product_key": "MSFT",
+         *           "score": "0.82"
+         *         },
+         *         {
+         *           "direction": "short",
+         *           "inst_id": "NVDA-USDT-SWAP",
+         *           "inst_type": "SWAP",
+         *           "product_key": "NVDA",
+         *           "score": "0.71"
+         *         }
+         *       ],
+         *       "mode": "target",
+         *       "opportunity_id": "opp_0001",
+         *       "score": "0.78",
+         *       "status": "new"
+         *     }
+         */
+        Opportunity: {
+            /** Anchor Product Key */
+            anchor_product_key?: string | null;
+            /** As Of */
+            as_of: string;
+            /** Evidence */
+            evidence: string;
+            /** Legs */
+            legs: components["schemas"]["OpportunityLeg"][];
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "target" | "market";
+            /** Opportunity Id */
+            opportunity_id: string;
+            /** Score */
+            score: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "new" | "reviewed" | "adopted" | "rejected" | "expired";
+        };
+        /**
+         * OpportunityLeg
+         * @description 候选腿：某个标的方向与得分。目标权重由 T3.5 的组合生成阶段给出。
+         */
+        OpportunityLeg: {
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "long" | "short";
+            /** Inst Id */
+            inst_id: string;
+            /**
+             * Inst Type
+             * @enum {string}
+             */
+            inst_type: "SPOT" | "SWAP";
+            /** Product Key */
+            product_key: string;
+            /** Score */
+            score: string;
+        };
+        /**
+         * OpportunityListResponse
+         * @example {
+         *       "items": [
+         *         {
+         *           "anchor_product_key": "AAPL",
+         *           "as_of": "2026-11-10T00:00:00Z",
+         *           "evidence": "{\"correlation\":0.87,\"breadth\":0.8,\"resonance\":0.62}",
+         *           "legs": [
+         *             {
+         *               "direction": "long",
+         *               "inst_id": "MSFT-USDT-SWAP",
+         *               "inst_type": "SWAP",
+         *               "product_key": "MSFT",
+         *               "score": "0.82"
+         *             },
+         *             {
+         *               "direction": "short",
+         *               "inst_id": "NVDA-USDT-SWAP",
+         *               "inst_type": "SWAP",
+         *               "product_key": "NVDA",
+         *               "score": "0.71"
+         *             }
+         *           ],
+         *           "mode": "target",
+         *           "opportunity_id": "opp_0001",
+         *           "score": "0.78",
+         *           "status": "new"
+         *         }
+         *       ],
+         *       "total": 1
+         *     }
+         */
+        OpportunityListResponse: {
+            /** Items */
+            items: components["schemas"]["Opportunity"][];
+            /** Total */
+            total: number;
+        };
+        /**
+         * OpportunityStatusUpdateRequest
+         * @description 状态变更请求：目标状态必须是取值集合内、且是 `status` 允许的下一步。
+         */
+        OpportunityStatusUpdateRequest: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "new" | "reviewed" | "adopted" | "rejected" | "expired";
+        };
+        /**
          * Order
          * @example {
          *       "avg_fill_price": "228.10",
@@ -1725,7 +2415,7 @@ export interface components {
          *           "instance_id": "si_0001",
          *           "latest_signal_at": "2026-11-10T07:00:00Z",
          *           "name": "AAPL 均线趋势",
-         *           "status": "enabled",
+         *           "status": "paper_trading",
          *           "strategy_id": "ma_cross"
          *         }
          *       ],
@@ -1810,6 +2500,128 @@ export interface components {
             name: string;
             /** Title */
             title: string;
+        };
+        /**
+         * PortfolioAdjustment
+         * @description 一条组合调整申请；批准之前 `target` 不生效。
+         * @example {
+         *       "adjustment_id": "adj_0001",
+         *       "instance_id": "si_0001",
+         *       "note": "把 AAPL 目标权重从 0.25 提到 0.30",
+         *       "requested_at": "2026-11-10T07:30:00Z",
+         *       "requested_by": "lxz",
+         *       "status": "pending",
+         *       "target": {
+         *         "legs": [
+         *           {
+         *             "direction": "long",
+         *             "inst_id": "XAAPL-USDT",
+         *             "inst_type": "SPOT",
+         *             "qty": "8.63",
+         *             "target_weight": "0.25",
+         *             "unit": "base"
+         *           }
+         *         ],
+         *         "net_exposure": "0.25"
+         *       }
+         *     }
+         */
+        PortfolioAdjustment: {
+            /** Adjustment Id */
+            adjustment_id: string;
+            /** Decided At */
+            decided_at?: string | null;
+            /** Decided By */
+            decided_by?: string | null;
+            /** Instance Id */
+            instance_id: string;
+            /** Note */
+            note?: string | null;
+            /** Requested At */
+            requested_at: string;
+            /** Requested By */
+            requested_by: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "approved" | "rejected";
+            target: components["schemas"]["TargetPortfolio"];
+        };
+        /**
+         * PortfolioAdjustmentCreateRequest
+         * @description 提交调整申请：只写申请，不改生效状态。
+         */
+        PortfolioAdjustmentCreateRequest: {
+            /** Instance Id */
+            instance_id: string;
+            /** Note */
+            note?: string | null;
+            /** Requested By */
+            requested_by: string;
+            target: components["schemas"]["TargetPortfolio"];
+        };
+        /**
+         * PortfolioAdjustmentDecisionRequest
+         * @description 批准或驳回一条申请；决定必须由人工作出。
+         */
+        PortfolioAdjustmentDecisionRequest: {
+            /** Decided By */
+            decided_by: string;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approved" | "rejected";
+            /** Note */
+            note?: string | null;
+        };
+        /**
+         * PortfolioAdjustmentListResponse
+         * @example {
+         *       "items": [
+         *         {
+         *           "adjustment_id": "adj_0001",
+         *           "instance_id": "si_0001",
+         *           "note": "把 AAPL 目标权重从 0.25 提到 0.30",
+         *           "requested_at": "2026-11-10T07:30:00Z",
+         *           "requested_by": "lxz",
+         *           "status": "pending",
+         *           "target": {
+         *             "legs": [
+         *               {
+         *                 "direction": "long",
+         *                 "inst_id": "XAAPL-USDT",
+         *                 "inst_type": "SPOT",
+         *                 "qty": "8.63",
+         *                 "target_weight": "0.25",
+         *                 "unit": "base"
+         *               }
+         *             ],
+         *             "net_exposure": "0.25"
+         *           }
+         *         }
+         *       ],
+         *       "total": 1
+         *     }
+         */
+        PortfolioAdjustmentListResponse: {
+            /** Items */
+            items: components["schemas"]["PortfolioAdjustment"][];
+            /** Total */
+            total: number;
+        };
+        /**
+         * PortfolioConflict
+         * @description 同一 `product_key` 在多个策略上方向相反；两侧策略都要列出，不合并成一条。
+         */
+        PortfolioConflict: {
+            /** Long Instance Ids */
+            long_instance_ids: string[];
+            /** Product Key */
+            product_key: string;
+            /** Short Instance Ids */
+            short_instance_ids: string[];
         };
         /** Position */
         Position: {
@@ -1961,6 +2773,205 @@ export interface components {
             items: components["schemas"]["RelatedInstrument"][];
             /** Window Days */
             window_days: number;
+        };
+        /**
+         * RelationCommunity
+         * @description 一个社区：编号由社区划分算法给出，成员是标的的 `product_key`。
+         */
+        RelationCommunity: {
+            /** Community Id */
+            community_id: number;
+            /** Product Keys */
+            product_keys: string[];
+        };
+        /**
+         * RelationEdge
+         * @description 一条相关边；`samples` 是算这个系数时实际用到的样本条数。
+         */
+        RelationEdge: {
+            /** Coefficient */
+            coefficient: string;
+            /** Product Key A */
+            product_key_a: string;
+            /** Product Key B */
+            product_key_b: string;
+            /** Samples */
+            samples: number;
+        };
+        /**
+         * RelationGraphResponse
+         * @description 一次请求返回一张完整的小图：节点、边、社区与图级平均连通度。
+         * @example {
+         *       "as_of": "2026-11-10T00:00:00Z",
+         *       "average_degree": "1.75",
+         *       "bar": "1d",
+         *       "communities": [
+         *         {
+         *           "community_id": 0,
+         *           "product_keys": [
+         *             "AAPL",
+         *             "MSFT"
+         *           ]
+         *         },
+         *         {
+         *           "community_id": 1,
+         *           "product_keys": [
+         *             "NVDA",
+         *             "TSLA"
+         *           ]
+         *         }
+         *       ],
+         *       "edges": [
+         *         {
+         *           "coefficient": "0.87",
+         *           "product_key_a": "AAPL",
+         *           "product_key_b": "MSFT",
+         *           "samples": 60
+         *         },
+         *         {
+         *           "coefficient": "-0.64",
+         *           "product_key_a": "AAPL",
+         *           "product_key_b": "NVDA",
+         *           "samples": 60
+         *         },
+         *         {
+         *           "coefficient": "-0.64",
+         *           "product_key_a": "MSFT",
+         *           "product_key_b": "NVDA",
+         *           "samples": 60
+         *         },
+         *         {
+         *           "coefficient": "0.58",
+         *           "product_key_a": "NVDA",
+         *           "product_key_b": "TSLA",
+         *           "samples": 60
+         *         }
+         *       ],
+         *       "min_abs_corr": "0.5",
+         *       "nodes": [
+         *         {
+         *           "asset_type": "tokenized_equity",
+         *           "centrality": "0.67",
+         *           "community_id": 0,
+         *           "degree": 2,
+         *           "product_key": "AAPL"
+         *         },
+         *         {
+         *           "asset_type": "tokenized_equity",
+         *           "centrality": "0.67",
+         *           "community_id": 0,
+         *           "degree": 2,
+         *           "product_key": "MSFT"
+         *         },
+         *         {
+         *           "asset_type": "tokenized_equity",
+         *           "centrality": "0.67",
+         *           "community_id": 1,
+         *           "degree": 2,
+         *           "product_key": "NVDA"
+         *         },
+         *         {
+         *           "asset_type": "tokenized_equity",
+         *           "centrality": "0.33",
+         *           "community_id": 1,
+         *           "degree": 1,
+         *           "product_key": "TSLA"
+         *         }
+         *       ],
+         *       "window": 60
+         *     }
+         */
+        RelationGraphResponse: {
+            /** As Of */
+            as_of: string;
+            /** Average Degree */
+            average_degree: string;
+            /**
+             * Bar
+             * @enum {string}
+             */
+            bar: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+            /** Communities */
+            communities: components["schemas"]["RelationCommunity"][];
+            /** Edges */
+            edges: components["schemas"]["RelationEdge"][];
+            /** Min Abs Corr */
+            min_abs_corr: string;
+            /** Nodes */
+            nodes: components["schemas"]["RelationNode"][];
+            /** Window */
+            window: number;
+        };
+        /**
+         * RelationNeighbor
+         * @description 某个标的的邻居及其系数；按系数绝对值从大到小排列。
+         */
+        RelationNeighbor: {
+            /**
+             * Asset Type
+             * @enum {string}
+             */
+            asset_type: "tokenized_equity" | "crypto" | "commodity_token" | "unknown";
+            /** Coefficient */
+            coefficient: string;
+            /** Product Key */
+            product_key: string;
+            /** Samples */
+            samples: number;
+        };
+        /**
+         * RelationNeighborsResponse
+         * @example {
+         *       "bar": "1d",
+         *       "items": [
+         *         {
+         *           "asset_type": "tokenized_equity",
+         *           "coefficient": "0.87",
+         *           "product_key": "MSFT",
+         *           "samples": 60
+         *         },
+         *         {
+         *           "asset_type": "tokenized_equity",
+         *           "coefficient": "-0.64",
+         *           "product_key": "NVDA",
+         *           "samples": 60
+         *         }
+         *       ],
+         *       "product_key": "AAPL",
+         *       "window": 60
+         *     }
+         */
+        RelationNeighborsResponse: {
+            /**
+             * Bar
+             * @enum {string}
+             */
+            bar: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+            /** Items */
+            items: components["schemas"]["RelationNeighbor"][];
+            /** Product Key */
+            product_key: string;
+            /** Window */
+            window: number;
+        };
+        /**
+         * RelationNode
+         * @description 网络里的一个标的及其网络指标（度数、中心性、所属社区）。
+         */
+        RelationNode: {
+            /**
+             * Asset Type
+             * @enum {string}
+             */
+            asset_type: "tokenized_equity" | "crypto" | "commodity_token" | "unknown";
+            /** Centrality */
+            centrality: string;
+            /** Community Id */
+            community_id: number;
+            /** Degree */
+            degree: number;
+            /** Product Key */
+            product_key: string;
         };
         /**
          * RiskSettings
@@ -2123,6 +3134,90 @@ export interface components {
             /** Total */
             total: number;
         };
+        /**
+         * StrategyApprovalDecisionRequest
+         * @description 审核决定：通过或驳回。驳回只能回到 `strategy_generation`。
+         */
+        StrategyApprovalDecisionRequest: {
+            /** Actor */
+            actor: string;
+            /** Evidence */
+            evidence?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /**
+         * StrategyApprovalListResponse
+         * @example {
+         *       "items": [
+         *         {
+         *           "actor": "lxz",
+         *           "approval_id": "apr_0001",
+         *           "at": "2026-11-10T07:10:00Z",
+         *           "from_status": "strategy_generation",
+         *           "instance_id": "si_0001",
+         *           "note": "提交人工审核",
+         *           "to_status": "pending_review"
+         *         }
+         *       ],
+         *       "total": 1
+         *     }
+         */
+        StrategyApprovalListResponse: {
+            /** Items */
+            items: components["schemas"]["StrategyApprovalTransition"][];
+            /** Total */
+            total: number;
+        };
+        /**
+         * StrategyApprovalRequest
+         * @description 提交人工审核：策略实例从「已生成」进入待审核，不改策略配置。
+         */
+        StrategyApprovalRequest: {
+            /** Actor */
+            actor: string;
+            /** Instance Id */
+            instance_id: string;
+            /** Note */
+            note?: string | null;
+        };
+        /**
+         * StrategyApprovalTransition
+         * @description 一次状态推进记录。
+         *
+         *     `from_status` 为 `null` 表示该实例的第一条记录（从「已生成」进入审核）。
+         *     `evidence` 是推进依据的引用，例如量化验证的达标报告编号；没有依据的推进留空。
+         * @example {
+         *       "actor": "lxz",
+         *       "approval_id": "apr_0001",
+         *       "at": "2026-11-10T07:10:00Z",
+         *       "from_status": "strategy_generation",
+         *       "instance_id": "si_0001",
+         *       "note": "提交人工审核",
+         *       "to_status": "pending_review"
+         *     }
+         */
+        StrategyApprovalTransition: {
+            /** Actor */
+            actor: string;
+            /** Approval Id */
+            approval_id: string;
+            /** At */
+            at: string;
+            /** Evidence */
+            evidence?: string | null;
+            /** From Status */
+            from_status?: ("opportunity_discovery" | "strategy_generation" | "pending_review" | "backtested" | "validated" | "paper_trading" | "live_authorized" | "live_running" | "rejected") | null;
+            /** Instance Id */
+            instance_id: string;
+            /** Note */
+            note?: string | null;
+            /**
+             * To Status
+             * @enum {string}
+             */
+            to_status: "opportunity_discovery" | "strategy_generation" | "pending_review" | "backtested" | "validated" | "paper_trading" | "live_authorized" | "live_running" | "rejected";
+        };
         /** StrategyBrief */
         StrategyBrief: {
             /** Instance Id */
@@ -2135,7 +3230,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "draft" | "enabled" | "disabled";
+            status: "opportunity_discovery" | "strategy_generation" | "pending_review" | "backtested" | "validated" | "paper_trading" | "live_authorized" | "live_running" | "rejected";
             /** Strategy Id */
             strategy_id: string;
         };
@@ -2214,6 +3309,7 @@ export interface components {
          * @example {
          *       "bar": "1h",
          *       "created_at": "2026-11-08T02:15:00Z",
+         *       "enabled": true,
          *       "execution_mode": "paper",
          *       "inst_ids": [
          *         "XAAPL-USDT"
@@ -2225,7 +3321,7 @@ export interface components {
          *         "fast": 20,
          *         "slow": 60
          *       },
-         *       "status": "enabled",
+         *       "status": "paper_trading",
          *       "strategy_id": "ma_cross",
          *       "strategy_version": "1.0.0",
          *       "updated_at": "2026-11-10T07:00:00Z"
@@ -2239,6 +3335,11 @@ export interface components {
             bar: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
             /** Created At */
             created_at: string;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
             /**
              * Execution Mode
              * @enum {string}
@@ -2260,7 +3361,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "draft" | "enabled" | "disabled";
+            status: "opportunity_discovery" | "strategy_generation" | "pending_review" | "backtested" | "validated" | "paper_trading" | "live_authorized" | "live_running" | "rejected";
             /** Strategy Id */
             strategy_id: string;
             /** Strategy Version */
@@ -2293,6 +3394,7 @@ export interface components {
          *         {
          *           "bar": "1h",
          *           "created_at": "2026-11-08T02:15:00Z",
+         *           "enabled": true,
          *           "execution_mode": "paper",
          *           "inst_ids": [
          *             "XAAPL-USDT"
@@ -2304,7 +3406,7 @@ export interface components {
          *             "fast": 20,
          *             "slow": 60
          *           },
-         *           "status": "enabled",
+         *           "status": "paper_trading",
          *           "strategy_id": "ma_cross",
          *           "strategy_version": "1.0.0",
          *           "updated_at": "2026-11-10T07:00:00Z"
@@ -2322,8 +3424,17 @@ export interface components {
         /**
          * StrategyInstanceUpdateRequest
          * @description PATCH 语义：只落显式提交的字段。
+         *
+         *     生命周期阶段**不在这条端点上改**：阶段推进只经 `/api/approvals` 的状态机，
+         *     否则一次 PATCH 就能从草稿跳到实盘运行，绕过人工审核、历史回测与量化验证
+         *     （`docs/prd/v2.md` §三.5「任何阶段都不能被跳过」）。提交 `status` 会因
+         *     `extra="forbid"` 直接 422，不会静默忽略。
+         *
+         *     `enabled` 是实例的启停开关，只决定它是否产出信号，不改变生命周期阶段。
          */
         StrategyInstanceUpdateRequest: {
+            /** Enabled */
+            enabled?: boolean | null;
             /** Inst Ids */
             inst_ids?: string[] | null;
             /** Name */
@@ -2332,8 +3443,161 @@ export interface components {
             params?: {
                 [key: string]: number | string | boolean;
             } | null;
-            /** Status */
-            status?: ("draft" | "enabled" | "disabled") | null;
+        };
+        /**
+         * StrategyPortfolio
+         * @description 一个策略实例的资金与敞口概览（组合列表的一行）。
+         *
+         *     `priority` 越大越优先；`capital_budget` 是已批准给该策略的资金预算。
+         */
+        StrategyPortfolio: {
+            /** Capital Budget */
+            capital_budget: string;
+            /** Gross Exposure */
+            gross_exposure: string;
+            /** Instance Id */
+            instance_id: string;
+            /**
+             * Lifecycle Status
+             * @enum {string}
+             */
+            lifecycle_status: "opportunity_discovery" | "strategy_generation" | "pending_review" | "backtested" | "validated" | "paper_trading" | "live_authorized" | "live_running" | "rejected";
+            /** Name */
+            name: string;
+            /** Net Exposure */
+            net_exposure: string;
+            /** Open Positions */
+            open_positions: number;
+            /** Priority */
+            priority: number;
+            /** Realized Pnl */
+            realized_pnl: string;
+            /** Strategy Id */
+            strategy_id: string;
+            /** Unrealized Pnl */
+            unrealized_pnl: string;
+        };
+        /**
+         * StrategyPortfolioDetailResponse
+         * @description 单个策略的明细：资金与敞口、虚拟持仓、当前生效的目标组合（尚未生成时为 `null`）。
+         * @example {
+         *       "portfolio": {
+         *         "capital_budget": "2000.00",
+         *         "gross_exposure": "1997.15",
+         *         "instance_id": "si_0001",
+         *         "lifecycle_status": "live_running",
+         *         "name": "AAPL 均线趋势",
+         *         "net_exposure": "1997.15",
+         *         "open_positions": 1,
+         *         "priority": 10,
+         *         "realized_pnl": "12.05",
+         *         "strategy_id": "ma_cross",
+         *         "unrealized_pnl": "28.64"
+         *       },
+         *       "positions": [
+         *         {
+         *           "avg_cost": "228.10",
+         *           "direction": "long",
+         *           "inst_id": "XAAPL-USDT",
+         *           "inst_type": "SPOT",
+         *           "mark_price": "231.42",
+         *           "notional": "1997.15",
+         *           "opened_at": "2026-11-09T14:00:00Z",
+         *           "product_key": "AAPL",
+         *           "qty": "8.63",
+         *           "unit": "base",
+         *           "unrealized_pnl": "28.64"
+         *         }
+         *       ],
+         *       "target": {
+         *         "legs": [
+         *           {
+         *             "direction": "long",
+         *             "inst_id": "XAAPL-USDT",
+         *             "inst_type": "SPOT",
+         *             "qty": "8.63",
+         *             "target_weight": "0.25",
+         *             "unit": "base"
+         *           }
+         *         ],
+         *         "net_exposure": "0.25"
+         *       }
+         *     }
+         */
+        StrategyPortfolioDetailResponse: {
+            portfolio: components["schemas"]["StrategyPortfolio"];
+            /** Positions */
+            positions: components["schemas"]["VirtualPosition"][];
+            target?: components["schemas"]["TargetPortfolio"] | null;
+        };
+        /**
+         * StrategyPortfolioListResponse
+         * @example {
+         *       "items": [
+         *         {
+         *           "capital_budget": "2000.00",
+         *           "gross_exposure": "1997.15",
+         *           "instance_id": "si_0001",
+         *           "lifecycle_status": "live_running",
+         *           "name": "AAPL 均线趋势",
+         *           "net_exposure": "1997.15",
+         *           "open_positions": 1,
+         *           "priority": 10,
+         *           "realized_pnl": "12.05",
+         *           "strategy_id": "ma_cross",
+         *           "unrealized_pnl": "28.64"
+         *         }
+         *       ],
+         *       "total": 1
+         *     }
+         */
+        StrategyPortfolioListResponse: {
+            /** Items */
+            items: components["schemas"]["StrategyPortfolio"][];
+            /** Total */
+            total: number;
+        };
+        /**
+         * TargetLeg
+         * @description 目标组合的一条腿：某个标的、某个方向、某个目标权重。
+         *
+         *     `target_weight` 是权重（占组合资金的比例，正数表示该腿的大小），方向单独由
+         *     `direction` 表达——不用权重符号再编码一次方向。
+         *
+         *     `qty` 与 `unit` 是**服务端换算出的**下单数量：`SPOT` 按标的币数量（`base`），
+         *     `SWAP` 按合约张数（`contract`），换算依赖价格、合约面值与精度，前端不做这类
+         *     派生计算（`AGENTS.md` §6）。因此请求里可以不带这两个字段，由服务端在生成目标
+         *     组合时填入；读到 `null` 表示这一步尚未换算。
+         */
+        TargetLeg: {
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "long" | "short";
+            /** Inst Id */
+            inst_id: string;
+            /**
+             * Inst Type
+             * @enum {string}
+             */
+            inst_type: "SPOT" | "SWAP";
+            /** Qty */
+            qty?: string | null;
+            /** Target Weight */
+            target_weight: string;
+            /** Unit */
+            unit?: ("base" | "contract") | null;
+        };
+        /**
+         * TargetPortfolio
+         * @description 目标组合：多腿、多空并存，`net_exposure` 是多头权重之和减空头权重之和。
+         */
+        TargetPortfolio: {
+            /** Legs */
+            legs: components["schemas"]["TargetLeg"][];
+            /** Net Exposure */
+            net_exposure: string;
         };
         /** TimeSplit */
         TimeSplit: {
@@ -2365,6 +3629,43 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /**
+         * VirtualPosition
+         * @description 策略账本里的一条持仓；`avg_cost` 是当前剩余持仓的成本价（FIFO 核算后）。
+         */
+        VirtualPosition: {
+            /** Avg Cost */
+            avg_cost: string;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "long" | "short";
+            /** Inst Id */
+            inst_id: string;
+            /**
+             * Inst Type
+             * @enum {string}
+             */
+            inst_type: "SPOT" | "SWAP";
+            /** Mark Price */
+            mark_price: string;
+            /** Notional */
+            notional: string;
+            /** Opened At */
+            opened_at: string;
+            /** Product Key */
+            product_key: string;
+            /** Qty */
+            qty: string;
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "base" | "contract";
+            /** Unrealized Pnl */
+            unrealized_pnl: string;
         };
         /** WatchlistAddRequest */
         WatchlistAddRequest: {
@@ -2505,6 +3806,164 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_approvals_api_approvals_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyApprovalListResponse"];
+                };
+            };
+        };
+    };
+    submit_for_review_api_approvals_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StrategyApprovalRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyApprovalTransition"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_strategy_api_approvals__instance_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                instance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StrategyApprovalDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyApprovalTransition"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    authorize_live_trading_api_approvals__instance_id__live_authorization_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                instance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LiveAuthorizationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyApprovalTransition"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_strategy_api_approvals__instance_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                instance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StrategyApprovalDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyApprovalTransition"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_backtest_sweep_api_backtest_sweeps_post: {
         parameters: {
             query?: never;
@@ -2684,6 +4143,74 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_correlation_matrix_api_correlation_matrix_get: {
+        parameters: {
+            query: {
+                product_keys: string[];
+                bar: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+                window: number;
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrelationMatrixResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_correlation_series_api_correlation_series_get: {
+        parameters: {
+            query: {
+                product_key_a: string;
+                product_key_b: string;
+                bar: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+                window: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CorrelationSeriesResponse"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -2974,6 +4501,139 @@ export interface operations {
             };
         };
     };
+    get_market_overview_api_market_overview_get: {
+        parameters: {
+            query: {
+                inst_type: "SPOT" | "SWAP";
+                bar?: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketOverviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_opportunities_api_opportunities_get: {
+        parameters: {
+            query?: {
+                mode?: ("target" | "market") | null;
+                anchor_product_key?: string | null;
+                status?: ("new" | "reviewed" | "adopted" | "rejected" | "expired") | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_opportunity_api_opportunities__opportunity_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                opportunity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Opportunity"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_opportunity_status_api_opportunities__opportunity_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                opportunity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpportunityStatusUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Opportunity"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_overview_api_overview_get: {
         parameters: {
             query?: never;
@@ -2990,6 +4650,233 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OverviewResponse"];
+                };
+            };
+        };
+    };
+    list_portfolio_adjustments_api_portfolio_adjustments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioAdjustmentListResponse"];
+                };
+            };
+        };
+    };
+    create_portfolio_adjustment_api_portfolio_adjustments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioAdjustmentCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioAdjustment"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_portfolio_adjustment_api_portfolio_adjustments__adjustment_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                adjustment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioAdjustmentDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioAdjustment"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_portfolio_exposure_api_portfolio_exposure_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExposureOverviewResponse"];
+                };
+            };
+        };
+    };
+    list_strategy_portfolios_api_portfolio_strategies_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyPortfolioListResponse"];
+                };
+            };
+        };
+    };
+    get_strategy_portfolio_api_portfolio_strategies__instance_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                instance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyPortfolioDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_relation_graph_api_relations_graph_get: {
+        parameters: {
+            query: {
+                bar: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+                window: number;
+                min_abs_corr?: number;
+                as_of?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelationGraphResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_relation_neighbors_api_relations_neighbors_get: {
+        parameters: {
+            query: {
+                product_key: string;
+                bar: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+                window: number;
+                min_abs_corr?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelationNeighborsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

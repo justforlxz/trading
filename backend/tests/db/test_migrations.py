@@ -17,7 +17,11 @@ from app.db.init import alembic_config
 # 导入即注册表元数据（与 `app.main` 的装配顺序一致），否则 `Base.metadata` 是空的。
 from app.instrument import Instrument  # noqa: F401
 from app.market import Candle  # noqa: F401
-from app.strategy import StrategyInstanceRow, StrategyTemplateRow  # noqa: F401
+from app.strategy import (  # noqa: F401
+    StrategyInstanceRow,
+    StrategyReplayRow,
+    StrategyTemplateRow,
+)
 from app.watchlist import WatchlistItemRow  # noqa: F401
 
 BOOKKEEPING = "alembic_version"
@@ -59,4 +63,4 @@ def test_init_db_is_idempotent() -> None:
     with session_scope() as session:
         versions = session.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
 
-    assert versions == ["0005"]
+    assert versions == ["0006"]

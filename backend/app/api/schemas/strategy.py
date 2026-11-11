@@ -1,4 +1,8 @@
-"""策略契约：策略模板定义（Definition）与可启停的实例（Instance）严格分离。"""
+"""策略契约：策略模板定义（Definition）与可启停的实例（Instance）严格分离。
+
+模板目录来自代码注册表，实例是用户配置；回放（`StrategyReplay`）是「按历史行情把
+模板重算一遍」的执行记录，目标组合直接复用 `TargetPortfolio`，不另立一套形状。
+"""
 
 from __future__ import annotations
 
@@ -6,11 +10,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.api.schemas.common import (
     Bar,
+    DecimalString,
     ExecutionMode,
     ParamSpec,
     ParamValue,
     SignalAction,
     StrategyStatus,
+    TargetPortfolio,
     UtcDatetime,
 )
 
@@ -21,6 +27,10 @@ __all__ = [
     "StrategyInstanceCreateRequest",
     "StrategyInstanceListResponse",
     "StrategyInstanceUpdateRequest",
+    "StrategyReplay",
+    "StrategyReplayListResponse",
+    "StrategyReplayPoint",
+    "StrategyReplayRequest",
 ]
 
 
@@ -148,3 +158,105 @@ class StrategyInstanceUpdateRequest(BaseModel):
     params: dict[str, ParamValue] | None = None
     inst_ids: list[str] | None = None
     enabled: bool | None = None
+
+
+class StrategyReplayRequest(BaseModel):
+    """回放区间：左闭右闭，`end` 那一根已收盘 K 线也在内。
+
+    周期不由请求决定：回放始终用实例配置的周期，避免「实例按日线建、回放却按小时跑」
+    这种对不上配置的结果。
+    """
+
+    start: UtcDatetime
+    end: UtcDatetime
+
+
+class StrategyReplayPoint(BaseModel):
+    """回放曲线上的一个点：该时点的目标组合有几条腿、净敞口是多少。
+
+    `as_of` 是**该根 K 线的开盘时刻**，不是决策时刻：回放在这个时点构造的视图包含
+    这根已收盘的 K 线，因此它表达的是「这根 K 线收盘之后」的目标组合。下游不要把它
+    当成「开盘前只知道历史」的时刻。
+
+    净值需要资金与成本假设，属于回测；这里画的是目标组合本身的净敞口走势。
+    """
+
+    as_of: UtcDatetime
+    net_exposure: DecimalString
+    leg_count: int
+
+
+_EXAMPLE_REPLAY_TARGET = {
+    "legs": [
+        {
+            "inst_id": "XAAPL-USDT",
+            "inst_type": "SPOT",
+            "direction": "long",
+            "target_weight": "0.5",
+            "qty": None,
+            "unit": None,
+        },
+        {
+            "inst_id": "XMSFT-USDT",
+            "inst_type": "SPOT",
+            "direction": "short",
+            "target_weight": "0.5",
+            "qty": None,
+            "unit": None,
+        },
+    ],
+    "net_exposure": "0",
+}
+
+_EXAMPLE_REPLAY = {
+    "replay_id": "srp_0001",
+    "instance_id": "si_0001",
+    "strategy_id": "relative_value",
+    "bar": "1d",
+    "start": "2026-10-10T00:00:00Z",
+    "end": "2026-11-10T00:00:00Z",
+    "target": _EXAMPLE_REPLAY_TARGET,
+    "canonical_json": (
+        '{"legs":[{"product_key":"AAPL","side":"long","target_weight":"0.5"},'
+        '{"product_key":"MSFT","side":"short","target_weight":"0.5"}],'
+        '"net_exposure":"0"}'
+    ),
+    "target_hash": "0f3c8c1a2b7d4e5f60718293a4b5c6d7e8f90123a4b5c6d7e8f90123a4b5c6d7",
+    "points": [
+        {"as_of": "2026-11-09T00:00:00Z", "net_exposure": "0.12", "leg_count": 2},
+        {"as_of": "2026-11-10T00:00:00Z", "net_exposure": "0", "leg_count": 2},
+    ],
+    "created_at": "2026-11-10T09:30:00Z",
+}
+
+
+class StrategyReplay(BaseModel):
+    """一次目标组合回放：目标组合 + 逐点净敞口 + 可复现的规范化 JSON 与哈希。
+
+    `target` 用 `TargetPortfolio` 的既有形状；`canonical_json` 是它的规范化序列化
+    （腿按 `product_key` 排序、键排序、无多余空白），`target_hash` 是这段文本的
+    sha256——同一历史区间回放两次，两者都相同。
+    """
+
+    replay_id: str
+    instance_id: str
+    strategy_id: str
+    bar: Bar
+    start: UtcDatetime
+    end: UtcDatetime
+    target: TargetPortfolio
+    canonical_json: str
+    target_hash: str
+    points: list[StrategyReplayPoint]
+    created_at: UtcDatetime
+
+    model_config = ConfigDict(json_schema_extra={"examples": [_EXAMPLE_REPLAY]})
+
+
+class StrategyReplayListResponse(BaseModel):
+    items: list[StrategyReplay]
+    total: int
+
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"items": [_EXAMPLE_REPLAY], "total": 1}]}
+    )

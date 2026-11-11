@@ -4,20 +4,30 @@ import { cn } from "../../lib/utils";
 export type LineChartProps = {
   points: ClosePoint[];
   className?: string;
+  /** 折线表达什么（无障碍标签），例如「收盘价折线」「净敞口走势」。 */
+  label?: string;
+  /** 没有可画的点时显示的说明。 */
+  emptyText?: string;
 };
 
 /**
- * 收盘价折线。
+ * 单条折线。
  *
- * 只画一条线：没有蜡烛、影线、成交量、十字光标与缩放。
+ * 只画一条线：没有蜡烛、影线、成交量、十字光标与缩放。纵向数值与横轴时间都取自
+ * 传入的点，组件不解释它们的业务含义。
  */
-export function LineChart({ points, className }: LineChartProps) {
+export function LineChart({
+  points,
+  className,
+  label = "收盘价折线",
+  emptyText = "该周期暂无收盘价数据。",
+}: LineChartProps) {
   const geometry = buildLineChart(points);
 
   if (geometry.points.length === 0) {
     return (
       <p className={cn("py-10 text-center text-sm text-muted-foreground", className)}>
-        该周期暂无收盘价数据。
+        {emptyText}
       </p>
     );
   }
@@ -27,7 +37,7 @@ export function LineChart({ points, className }: LineChartProps) {
       className={cn("w-full", className)}
       viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
       role="img"
-      aria-label={`收盘价折线，共 ${geometry.points.length} 个点`}
+      aria-label={`${label}，共 ${geometry.points.length} 个点`}
     >
       {geometry.priceTicks.map((tick) => (
         <g key={`price-${tick.y}`}>

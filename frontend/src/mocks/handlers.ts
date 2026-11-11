@@ -45,6 +45,8 @@ import getStrategyInstances from "./fixtures/strategy/get-strategy-instances.jso
 import postStrategyInstances from "./fixtures/strategy/post-strategy-instances.json";
 import getStrategyInstancesInstanceId from "./fixtures/strategy/get-strategy-instances-instance_id.json";
 import patchStrategyInstancesInstanceId from "./fixtures/strategy/patch-strategy-instances-instance_id.json";
+import getStrategyInstancesInstanceIdReplays from "./fixtures/strategy/get-strategy-instances-instance_id-replays.json";
+import postStrategyInstancesInstanceIdReplays from "./fixtures/strategy/post-strategy-instances-instance_id-replays.json";
 import getTradesFills from "./fixtures/trades/get-trades-fills.json";
 import getTradesOrders from "./fixtures/trades/get-trades-orders.json";
 import postTradesOrders from "./fixtures/trades/post-trades-orders.json";
@@ -101,6 +103,8 @@ export const handlers = [
   http.get("*/api/strategy-instances/:instance_id", () => HttpResponse.json(getStrategyInstancesInstanceId)),
   http.patch("*/api/strategy-instances/:instance_id", () => HttpResponse.json(patchStrategyInstancesInstanceId)),
   http.delete("*/api/strategy-instances/:instance_id", () => new HttpResponse(null, { status: 204 })),
+  http.get("*/api/strategy-instances/:instance_id/replays", () => HttpResponse.json(getStrategyInstancesInstanceIdReplays)),
+  http.post("*/api/strategy-instances/:instance_id/replays", () => HttpResponse.json(postStrategyInstancesInstanceIdReplays, { status: 201 })),
   http.get("*/api/trades/fills", () => HttpResponse.json(getTradesFills)),
   http.get("*/api/trades/orders", () => HttpResponse.json(getTradesOrders)),
   http.post("*/api/trades/orders", () => HttpResponse.json(postTradesOrders, { status: 201 })),

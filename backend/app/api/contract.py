@@ -45,11 +45,6 @@ from app.api.schemas import (
     StrategyApprovalListResponse,
     StrategyApprovalRequest,
     StrategyApprovalTransition,
-    StrategyCatalogResponse,
-    StrategyInstance,
-    StrategyInstanceCreateRequest,
-    StrategyInstanceListResponse,
-    StrategyInstanceUpdateRequest,
     StrategyPortfolioDetailResponse,
     StrategyPortfolioListResponse,
 )
@@ -64,43 +59,6 @@ def _stub(node: str) -> HTTPException:
     """契约桩统一响应：501 明确表示「形状已定、实现未到」。"""
 
     return HTTPException(status_code=501, detail=f"contract stub; implemented by {node}")
-
-
-# ---------------------------------------------------------------- strategy
-
-strategy_router = APIRouter(tags=["strategy"])
-
-
-@strategy_router.get("/strategies", response_model=StrategyCatalogResponse)
-def list_strategies() -> StrategyCatalogResponse:
-    raise _stub("T3.1")
-
-
-@strategy_router.get("/strategy-instances", response_model=StrategyInstanceListResponse)
-def list_strategy_instances() -> StrategyInstanceListResponse:
-    raise _stub("T3.3")
-
-
-@strategy_router.post("/strategy-instances", response_model=StrategyInstance, status_code=201)
-def create_strategy_instance(payload: StrategyInstanceCreateRequest) -> StrategyInstance:
-    raise _stub("T3.3")
-
-
-@strategy_router.get("/strategy-instances/{instance_id}", response_model=StrategyInstance)
-def get_strategy_instance(instance_id: str) -> StrategyInstance:
-    raise _stub("T3.3")
-
-
-@strategy_router.patch("/strategy-instances/{instance_id}", response_model=StrategyInstance)
-def update_strategy_instance(
-    instance_id: str, payload: StrategyInstanceUpdateRequest
-) -> StrategyInstance:
-    raise _stub("T3.3")
-
-
-@strategy_router.delete("/strategy-instances/{instance_id}", status_code=204, response_model=None)
-def delete_strategy_instance(instance_id: str) -> None:
-    raise _stub("T3.3")
 
 
 # ---------------------------------------------------------------- backtest
@@ -333,7 +291,6 @@ def authorize_live_trading(
 
 
 for _router in (
-    strategy_router,
     backtest_router,
     trades_router,
     settings_router,

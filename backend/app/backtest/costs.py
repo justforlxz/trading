@@ -18,6 +18,7 @@ BPS = Decimal(10000)
 
 VALID_FEE_ROLES = ("taker", "maker")
 VALID_SIDES = ("long", "short")
+VALID_TRADE_SIDES = ("buy", "sell")
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,28 +37,54 @@ class CostModel:
 
     def as_dict(self) -> dict[str, Any]:
         return {
-            "taker_fee_bps": _text(self.taker_fee_bps),
-            "maker_fee_bps": _text(self.maker_fee_bps),
-            "slippage_bps": _text(self.slippage_bps),
+            "taker_fee_bps": decimal_text(self.taker_fee_bps),
+            "maker_fee_bps": decimal_text(self.maker_fee_bps),
+            "slippage_bps": decimal_text(self.slippage_bps),
             "fee_role": self.fee_role,
         }
 
 
-def _text(value: Decimal) -> str:
+def decimal_text(value: Decimal) -> str:
+    """`Decimal` 的规范文本：去掉尾随零、不用科学计数法。对外契约与摘要都只认这个形状。"""
+
     return format(Decimal(value).normalize(), "f")
+
+
+def execution_price(trade_side: str, price: Decimal, slippage_bps: Decimal) -> Decimal:
+    """单笔成交价：买入抬高、卖出压低，滑点以 bps 计。
+
+    回测引擎逐笔成交，成交方向是「买」或「卖」；多空只是持仓方向，不改变「买入
+    抬高、卖出压低」这条口径，因此这里不接收 long/short。
+    """
+
+    if trade_side not in VALID_TRADE_SIDES:
+        raise ValueError(f"unknown trade side: {trade_side!r}")
+    slip = Decimal(slippage_bps) / BPS
+    if trade_side == "buy":
+        return Decimal(price) * (Decimal(1) + slip)
+    return Decimal(price) * (Decimal(1) - slip)
 
 
 def execution_prices(
     side: str, close_in: Decimal, close_out: Decimal, slippage_bps: Decimal
 ) -> tuple[Decimal, Decimal]:
-    """把理论收盘价换成含滑点的实际成交价（买入抬高、卖出压低）。"""
+    """把理论收盘价换成含滑点的实际成交价（买入抬高、卖出压低）。
+
+    建仓与平仓各是一个方向：多头买入建仓、卖出平仓，空头反过来。两条腿的公式都由
+    `execution_price` 给出，本函数只负责把建仓/平仓配到买卖方向上。
+    """
 
     if side not in VALID_SIDES:
         raise ValueError(f"unknown side: {side!r}")
-    slip = Decimal(slippage_bps) / BPS
     if side == "long":
-        return close_in * (Decimal(1) + slip), close_out * (Decimal(1) - slip)
-    return close_in * (Decimal(1) - slip), close_out * (Decimal(1) + slip)
+        return (
+            execution_price("buy", close_in, slippage_bps),
+            execution_price("sell", close_out, slippage_bps),
+        )
+    return (
+        execution_price("sell", close_in, slippage_bps),
+        execution_price("buy", close_out, slippage_bps),
+    )
 
 
 def fee_cost(fee_bps: Decimal, entry_notional: Decimal, exit_notional: Decimal) -> Decimal:
@@ -78,7 +105,9 @@ __all__ = [
     "BPS",
     "VALID_FEE_ROLES",
     "VALID_SIDES",
+    "VALID_TRADE_SIDES",
     "CostModel",
+    "execution_price",
     "execution_prices",
     "fee_cost",
     "slippage_cost",

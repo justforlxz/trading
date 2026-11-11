@@ -1,4 +1,4 @@
-"""`candles` / `funding` 表：历史 K 线与资金费的持久化模型。
+"""`candles` / `funding` / `correlation_snapshots` 表：行情、资金费与相关矩阵快照。
 
 `candles` 里一行是一个标的在一个周期、一个开盘时刻上、来自一个数据源的已收盘 K 线；
 主键 `(symbol, bar, open_time, source)` 让重复下载变成幂等 upsert，而不是追加副本。
@@ -22,7 +22,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Integer, String, TypeDecorator
+from sqlalchemy import Float, Index, Integer, String, TypeDecorator
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core import Bar, Timeframe, ValidationError
@@ -51,10 +51,10 @@ def to_epoch(moment: datetime) -> int:
     """带时区的时刻 → epoch 秒；精确到秒，不带小数。"""
 
     if moment.tzinfo is None:
-        raise ValidationError("K 线的 open_time 必须带时区")
+        raise ValidationError("时刻必须带时区")
     seconds = moment.timestamp()
     if seconds != int(seconds):
-        raise ValidationError(f"K 线的 open_time 必须精确到秒:{moment.isoformat()}")
+        raise ValidationError(f"时刻必须精确到秒:{moment.isoformat()}")
     return int(seconds)
 
 
@@ -165,3 +165,30 @@ class Funding(Base):
             funding_rate=self.funding_rate,
             realized_rate=self.realized_rate,
         )
+
+
+class CorrelationSnapshot(Base):
+    """一组标的在某个时刻、某个窗口上的相关矩阵快照，可按时间回看。
+
+    主键 `(product_key_a, product_key_b, bar, window, as_of)`：同一 `as_of` 重复保存
+    只覆盖那一行，不追加副本，因此回看时同一条关系不会出现两份数值。
+
+    标识是**产品键**而不是交易所标识：关系分析看的是产品，同一产品的现货与永续
+    不该各算一条边。对角线（产品与自己的相关）同样入库，`samples` 才有「这个标的
+    有多少条样本」这一事实。`coefficient` 是无量纲浮点，double precision 往返无损，
+    不需要走十进制文本列；无法计算时为空，`samples` 照实记录实际条数。
+
+    时间列沿用 `candles` 的口径：`as_of` 存 epoch 秒（整数）。
+    """
+
+    __tablename__ = "correlation_snapshots"
+    # 回看按 (bar, window, as_of) 过滤，主键首列是产品键，用不上；单列出来一条索引。
+    __table_args__ = (Index("ix_correlation_snapshots_bar_window_as_of", "bar", "window", "as_of"),)
+
+    product_key_a: Mapped[str] = mapped_column(String(32), primary_key=True)
+    product_key_b: Mapped[str] = mapped_column(String(32), primary_key=True)
+    bar: Mapped[str] = mapped_column(String(8), primary_key=True)
+    window: Mapped[int] = mapped_column(Integer, primary_key=True)
+    as_of: Mapped[int] = mapped_column(Integer, primary_key=True)
+    coefficient: Mapped[float | None] = mapped_column(Float, nullable=True)
+    samples: Mapped[int] = mapped_column(Integer, nullable=False)

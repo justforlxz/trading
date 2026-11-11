@@ -39,6 +39,7 @@ __all__ = [
     "related_instruments",
     "remove_item",
     "set_alert",
+    "tracked_instruments",
 ]
 
 DEFAULT_GROUP = "默认"
@@ -147,6 +148,26 @@ def list_groups() -> list[str]:
         return list(
             session.scalars(
                 select(WatchlistGroup.name).order_by(WatchlistGroup.created_at, WatchlistGroup.name)
+            )
+        )
+
+
+def tracked_instruments() -> list[Instrument]:
+    """自选里跟踪的标的，不取行情、不读提醒；按 `symbol` 固定顺序返回。
+
+    只回答「用户在跟踪哪些标的」，不参与行情计算：入口页的行情快照由
+    `list_entries` 负责，这里给分析层（关系网络）一个不依赖 K 线是否齐全的标的集合。
+    """
+
+    with session_scope() as session:
+        ids = list(
+            session.scalars(select(WatchlistItemRow.inst_id).order_by(WatchlistItemRow.inst_id))
+        )
+        if not ids:
+            return []
+        return list(
+            session.scalars(
+                select(Instrument).where(Instrument.symbol.in_(ids)).order_by(Instrument.symbol)
             )
         )
 

@@ -1,6 +1,6 @@
 {
   "as_of": "2026-11-10T00:00:00Z",
-  "average_degree": "1.75",
+  "average_degree": "2",
   "bar": "1d",
   "communities": [
     {
@@ -48,28 +48,28 @@
   "nodes": [
     {
       "asset_type": "tokenized_equity",
-      "centrality": "0.67",
+      "centrality": "0.6667",
       "community_id": 0,
       "degree": 2,
       "product_key": "AAPL"
     },
     {
       "asset_type": "tokenized_equity",
-      "centrality": "0.67",
+      "centrality": "0.6667",
       "community_id": 0,
       "degree": 2,
       "product_key": "MSFT"
     },
     {
       "asset_type": "tokenized_equity",
-      "centrality": "0.67",
+      "centrality": "1",
       "community_id": 1,
-      "degree": 2,
+      "degree": 3,
       "product_key": "NVDA"
     },
     {
       "asset_type": "tokenized_equity",
-      "centrality": "0.33",
+      "centrality": "0.3333",
       "community_id": 1,
       "degree": 1,
       "product_key": "TSLA"

@@ -1,5 +1,13 @@
 import type { LucideIcon } from "lucide-react";
-import { ArrowLeftRight, LayoutDashboard, Layers, LineChart, Settings2, Star } from "lucide-react";
+import {
+  ArrowLeftRight,
+  LayoutDashboard,
+  Layers,
+  LineChart,
+  Settings2,
+  Share2,
+  Star,
+} from "lucide-react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { cn } from "../../lib/utils";
@@ -15,6 +23,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { to: "/", label: "概览", icon: LayoutDashboard, end: true },
   { to: "/watchlist", label: "自选", icon: Star },
+  { to: "/relations", label: "关系", icon: Share2 },
   { to: "/strategies", label: "策略", icon: Layers },
   { to: "/backtests", label: "回测", icon: LineChart },
   { to: "/trades", label: "交易", icon: ArrowLeftRight },

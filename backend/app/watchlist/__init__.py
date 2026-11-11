@@ -17,6 +17,7 @@ from app.watchlist.service import (
     related_instruments,
     remove_item,
     set_alert,
+    tracked_instruments,
 )
 
 __all__ = [
@@ -32,4 +33,5 @@ __all__ = [
     "related_instruments",
     "remove_item",
     "set_alert",
+    "tracked_instruments",
 ]

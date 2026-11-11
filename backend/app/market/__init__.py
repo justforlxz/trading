@@ -39,7 +39,7 @@ from app.market.funding import (
     parse_funding_rows,
     upsert_funding,
 )
-from app.market.matrix import correlation_matrix
+from app.market.matrix import Matrix, correlation_matrix
 from app.market.model import Candle, CorrelationSnapshot
 from app.market.rolling import relative_strength_ratio, rolling_correlation
 from app.market.service import (
@@ -87,6 +87,7 @@ __all__ = [
     "CorrelationSnapshot",
     "DivergenceAlert",
     "FundingPoint",
+    "Matrix",
     "Quote",
     "advance_decline",
     "asset_session",

@@ -12,10 +12,15 @@ from fastapi import FastAPI
 
 from app import __version__
 from app.api import include_routers, register_error_handlers
-from app.config import get_settings
-from app.db import init_db
 
 # 导入即注册域模型：迁移只认得已注册的元数据，装配根负责把域模型拉进来。
+from app.backtest import (  # noqa: F401
+    BacktestEquityRow,
+    BacktestRunRow,
+    BacktestTradeRow,
+)
+from app.config import get_settings
+from app.db import init_db
 from app.instrument import Instrument  # noqa: F401
 from app.market import Candle  # noqa: F401
 from app.strategy import (  # noqa: F401

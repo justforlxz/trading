@@ -336,7 +336,11 @@ export interface paths {
         };
         /**
          * Get Instrument Candles
-         * @description 已落库 K 线的尾部窗口，附带库里真实的可用区间与缺口标记。
+         * @description 某一来源的已落库 K 线尾部窗口，附带该来源真实的可用区间与缺口标记。
+         *
+         *     `source` 必填、没有默认值：同一标的可能同时存有 OKX 行情与美股代理行情，两者
+         *     的日界不同（OKX 是 16:00 UTC，代理是美东 09:30），静默挑一个就把两种来源拼成
+         *     一条时间轴（Q5 / D3）。缺参会由参数校验直接拒绝，不会默认成 OKX。
          */
         get: operations["get_instrument_candles_api_instruments__inst_id__candles_get"];
         put?: never;
@@ -4675,6 +4679,7 @@ export interface operations {
         parameters: {
             query: {
                 bar: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+                source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
                 limit?: number;
             };
             header?: never;

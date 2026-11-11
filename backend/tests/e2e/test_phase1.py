@@ -85,7 +85,10 @@ def test_phase1_watchlist_round_trip(client: TestClient, market_port: MarketData
     assert detail.status_code == 200
     assert detail.json()["instrument"]["inst_id"] == WATCHED
 
-    series = client.get(f"/api/instruments/{WATCHED}/candles", params={"bar": "1d", "limit": 2})
+    series = client.get(
+        f"/api/instruments/{WATCHED}/candles",
+        params={"bar": "1d", "source": "okx_spot", "limit": 2},
+    )
     assert series.status_code == 200
     payload = series.json()
     assert payload["data_source"] == "okx_spot"

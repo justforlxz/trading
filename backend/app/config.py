@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     okx_rate_limit_capacity: int = 20
     okx_rate_limit_refill_per_second: float = 10.0
 
+    # 美股代理行情上游（只读公开接口）：正常交易时段的参考价格来源。
+    us_equity_rest_base_url: str = "https://query1.finance.yahoo.com"
+    us_equity_http_timeout_seconds: float = 10.0
+
 
 @lru_cache
 def get_settings() -> Settings:

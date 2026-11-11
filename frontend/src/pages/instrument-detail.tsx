@@ -9,6 +9,7 @@ import {
   fetchCandles,
   fetchIndicatorSeries,
   fetchInstrumentDetail,
+  okxCandleSource,
   type CandleBar,
   type CandleSeriesResponse,
   type IndicatorParamValue,
@@ -130,11 +131,12 @@ export default function InstrumentDetailPage() {
   }, [instId]);
 
   useEffect(() => {
-    if (!instId) return;
+    const instType = detail?.instrument.inst_type;
+    if (!instId || !instType) return;
     let active = true;
     setCandles(null);
     setCandleError(null);
-    fetchCandles(instId, bar)
+    fetchCandles(instId, bar, okxCandleSource(instType))
       .then((value) => {
         if (active) setCandles(value);
       })
@@ -144,7 +146,7 @@ export default function InstrumentDetailPage() {
     return () => {
       active = false;
     };
-  }, [instId, bar]);
+  }, [instId, bar, detail]);
 
   useEffect(() => {
     if (!instId) return;

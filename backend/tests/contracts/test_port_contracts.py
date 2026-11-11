@@ -3,8 +3,9 @@
 这里固定的是「所有实现方都要遵守」的那部分语义，分成三块：
 
 - 值对象与错误的不可变、封闭性——改动它们会静默污染全仓，所以逐条钉住。
-- 端口契约 mixin——`tests/fakes/okx`、真实 OKX 适配器、`us_equity` provider 都继承
-  同一组断言，避免「三个实现三种语义」。
+- 端口契约 mixin——`tests/fakes/okx` 与真实 OKX 适配器继承同一组断言，避免「两个
+  实现两种语义」。美股代理源（`us_equity_proxy`）刻意不下发标的元数据、不提供实时
+  快照，因此有自己的一组断言（`tests/exchange/test_us_equity.py`）。
 - registry / clock 这两个跨模块原语的行为。
 
 构造数据一律来自 `conftest.py` 的 fixture。

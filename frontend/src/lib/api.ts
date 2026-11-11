@@ -99,12 +99,19 @@ export function fetchInstrumentDetail(instId: string): Promise<InstrumentDetailR
   return request<InstrumentDetailResponse>(`/instruments/${encodeURIComponent(instId)}`);
 }
 
+/** 详情页读的是标的自身在 OKX 的行情：现货与永续是两条来源，按形态取值。 */
+export function okxCandleSource(instType: "SPOT" | "SWAP"): "okx_spot" | "okx_swap" {
+  return instType === "SWAP" ? "okx_swap" : "okx_spot";
+}
+
+/** K 线必须显式带来源：同一标的可能同时存有 OKX 与美股代理两条行情。 */
 export function fetchCandles(
   instId: string,
   bar: CandleBar,
+  source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy",
   limit?: number,
 ): Promise<CandleSeriesResponse> {
-  const query = new URLSearchParams({ bar });
+  const query = new URLSearchParams({ bar, source });
   if (limit !== undefined) query.set("limit", String(limit));
   return request<CandleSeriesResponse>(
     `/instruments/${encodeURIComponent(instId)}/candles?${query.toString()}`,

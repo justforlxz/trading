@@ -20,7 +20,7 @@ from app.api.schemas import (
     InstrumentSearchResponse,
     SiblingQuote,
 )
-from app.api.schemas.common import Bar, InstType
+from app.api.schemas.common import Bar, DataSource, InstType
 from app.instrument import Instrument, get_instrument_pair, list_instruments, list_tradable
 from app.market import data_range, integrity, load_candles
 
@@ -74,21 +74,29 @@ def get_instrument(inst_id: str) -> InstrumentDetailResponse:
 
 @instruments_router.get("/instruments/{inst_id}/candles")
 def get_instrument_candles(
-    inst_id: str, bar: Bar = Query(...), limit: int = Query(200, ge=1, le=1000)
+    inst_id: str,
+    bar: Bar = Query(...),
+    source: DataSource = Query(...),
+    limit: int = Query(200, ge=1, le=1000),
 ) -> CandleSeriesResponse:
-    """已落库 K 线的尾部窗口，附带库里真实的可用区间与缺口标记。"""
+    """某一来源的已落库 K 线尾部窗口，附带该来源真实的可用区间与缺口标记。
+
+    `source` 必填、没有默认值：同一标的可能同时存有 OKX 行情与美股代理行情，两者
+    的日界不同（OKX 是 16:00 UTC，代理是美东 09:30），静默挑一个就把两种来源拼成
+    一条时间轴（Q5 / D3）。缺参会由参数校验直接拒绝，不会默认成 OKX。
+    """
 
     row = _require_instrument(inst_id)
-    candles = load_candles(row.symbol, bar)[-limit:]
-    available = data_range(row.symbol, bar)
+    candles = load_candles(row.symbol, bar, source=source)[-limit:]
+    available = data_range(row.symbol, bar, source=source)
 
     return CandleSeriesResponse(
         inst_id=row.symbol,
         bar=bar,
-        data_source=candles[-1].source if candles else row.exchange,
+        data_source=source,
         available_from=None if available is None else available[0],
         available_to=None if available is None else available[1],
-        has_gap=integrity(row.symbol, bar).missing > 0,
+        has_gap=integrity(row.symbol, bar, source=source).missing > 0,
         candles=[
             CandlePayload(
                 open_time=candle.open_time,

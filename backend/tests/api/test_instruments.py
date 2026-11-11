@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import re
+from decimal import Decimal
 
 from fastapi.testclient import TestClient
 
-from tests.api.conftest import seed_daily, seed_instruments
+from app.core import Bar, Timeframe
+from app.market import upsert_candles
+from tests.api.conftest import latest_opens, seed_daily, seed_instruments
 from tests.factories.instruments import make_ref, make_swap_ref
 
 DECIMAL = re.compile(r"^-?\d{1,20}(\.\d{1,12})?$")
@@ -154,7 +157,8 @@ def test_candles_window_reports_available_range(market_data: TestClient) -> None
     """K 线窗口取最后 limit 根，同时给出库里真实的可用区间。"""
 
     response = market_data.get(
-        "/api/instruments/XAAPL-USDT/candles", params={"bar": "1d", "limit": 2}
+        "/api/instruments/XAAPL-USDT/candles",
+        params={"bar": "1d", "source": "okx", "limit": 2},
     )
 
     assert response.status_code == 200
@@ -176,7 +180,9 @@ def test_candles_without_data_are_empty(market_data: TestClient) -> None:
 
     seed_instruments(make_ref(inst_id="XETH-USDT", base_ccy="XETH"))
 
-    response = market_data.get("/api/instruments/XETH-USDT/candles", params={"bar": "1d"})
+    response = market_data.get(
+        "/api/instruments/XETH-USDT/candles", params={"bar": "1d", "source": "okx"}
+    )
 
     assert response.status_code == 200
     body = response.json()
@@ -186,11 +192,59 @@ def test_candles_without_data_are_empty(market_data: TestClient) -> None:
     assert body["has_gap"] is False
 
 
+def test_candles_require_a_data_source(market_data: TestClient) -> None:
+    """缺 source 直接 422：同一标的可能有两种来源，不许默认成任何一个。"""
+
+    response = market_data.get("/api/instruments/XAAPL-USDT/candles", params={"bar": "1d"})
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert any(item["loc"][-1] == "source" for item in detail)
+
+
+def test_candles_return_only_the_requested_source(market_data: TestClient) -> None:
+    """两种来源共存时按来源各取一条序列，不把两条时间轴拼在一起。"""
+
+    proxy_opens = latest_opens(2)
+    upsert_candles(
+        [
+            Bar(
+                inst_id="XAAPL-USDT",
+                timeframe=Timeframe.parse("1d"),
+                open_time=open_time,
+                open=Decimal("350"),
+                high=Decimal("351"),
+                low=Decimal("349"),
+                close=Decimal("350.5"),
+                volume=Decimal("10"),
+                confirm=True,
+                source="us_equity_proxy",
+            )
+            for open_time in proxy_opens
+        ]
+    )
+
+    okx = market_data.get(
+        "/api/instruments/XAAPL-USDT/candles", params={"bar": "1d", "source": "okx"}
+    ).json()
+    proxy = market_data.get(
+        "/api/instruments/XAAPL-USDT/candles",
+        params={"bar": "1d", "source": "us_equity_proxy"},
+    ).json()
+
+    assert okx["data_source"] == "okx"
+    assert [candle["close"] for candle in okx["candles"]] == ["100", "110", "121"]
+    assert proxy["data_source"] == "us_equity_proxy"
+    assert [candle["close"] for candle in proxy["candles"]] == ["350.5", "350.5"]
+    assert {candle["data_source"] for candle in proxy["candles"]} == {"us_equity_proxy"}
+
+
 def test_candles_reject_out_of_range_limit(market_data: TestClient) -> None:
     """limit 上限 1000。"""
 
     response = market_data.get(
-        "/api/instruments/XAAPL-USDT/candles", params={"bar": "1d", "limit": 1001}
+        "/api/instruments/XAAPL-USDT/candles",
+        params={"bar": "1d", "source": "okx", "limit": 1001},
     )
 
     assert response.status_code == 422
@@ -200,7 +254,9 @@ def test_candles_reject_out_of_range_limit(market_data: TestClient) -> None:
 def test_candles_unknown_instrument_is_404(market_data: TestClient) -> None:
     """未同步的标的没有 K 线。"""
 
-    response = market_data.get("/api/instruments/NOPE-USDT/candles", params={"bar": "1d"})
+    response = market_data.get(
+        "/api/instruments/NOPE-USDT/candles", params={"bar": "1d", "source": "okx"}
+    )
 
     assert response.status_code == 404
     assert response.json()["detail"]

@@ -7066,7 +7066,7 @@
     },
     "/api/instruments/{inst_id}/candles": {
       "get": {
-        "description": "已落库 K 线的尾部窗口，附带库里真实的可用区间与缺口标记。",
+        "description": "某一来源的已落库 K 线尾部窗口，附带该来源真实的可用区间与缺口标记。\n\n`source` 必填、没有默认值：同一标的可能同时存有 OKX 行情与美股代理行情，两者\n的日界不同（OKX 是 16:00 UTC，代理是美东 09:30），静默挑一个就把两种来源拼成\n一条时间轴（Q5 / D3）。缺参会由参数校验直接拒绝，不会默认成 OKX。",
         "operationId": "get_instrument_candles_api_instruments__inst_id__candles_get",
         "parameters": [
           {
@@ -7092,6 +7092,21 @@
                 "1d"
               ],
               "title": "Bar",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": true,
+            "schema": {
+              "enum": [
+                "okx",
+                "okx_spot",
+                "okx_swap",
+                "us_equity_proxy"
+              ],
+              "title": "Source",
               "type": "string"
             }
           },

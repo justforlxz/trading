@@ -1,8 +1,11 @@
 """交易所适配层门面。
 
 本包是行情端口的**实现方**：端口与值对象定义在 `app.core`，这里只发布「怎么连
-交易所」——客户端、默认现货实现、装配函数，以及适配层自己的异常类型。
-业务模块依赖 `app.core` 的端口，不依赖本包的实现细节。
+上游」——客户端、各来源实现、装配函数，以及适配层自己的异常类型。业务模块依赖
+`app.core` 的端口，不依赖本包的实现细节。
+
+导入本包即完成来源登记（`app.exchange.providers` 在 import 期登记 `provider` 桶），
+因此装配方按名字取实现不会因为「没先 import 某个子模块」而落空。
 """
 
 from __future__ import annotations
@@ -13,13 +16,16 @@ from app.config import Settings
 from app.exchange.errors import ExchangeError, RateLimitedError
 from app.exchange.okx.client import OkxClient
 from app.exchange.okx.market import OkxMarketData
+from app.exchange.providers import UsEquityMarketData, create_us_equity_market_data
 
 __all__ = [
     "ExchangeError",
     "OkxClient",
     "OkxMarketData",
     "RateLimitedError",
+    "UsEquityMarketData",
     "create_market_data",
+    "create_us_equity_market_data",
 ]
 
 

@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     # 表落在哪个 schema。留空走连接的默认 search_path（public）；测试用它换独立临时 schema。
     database_schema: str | None = None
 
-    # 公共行情上游地址（只读公开 REST，不涉及下单）。
+    # 行情与私有接口共用同一个上游域名（模拟盘靠请求头区分，不是另一个域名）。
     okx_rest_base_url: str = "https://www.okx.com"
     okx_http_timeout_seconds: float = 10.0
     # 限流重试上限：命中上游限流后最多再试几次，用尽即报「限流」错误。
@@ -41,6 +41,15 @@ class Settings(BaseSettings):
     # 令牌桶容量与补充速率：按上游最紧的公共行情配额（20 次 / 2 秒）折算。
     okx_rate_limit_capacity: int = 20
     okx_rate_limit_refill_per_second: float = 10.0
+
+    # 私有交易接口凭据。密钥只经环境变量注入，没有内建默认值，也不进仓库；
+    # 未配置时私有客户端在构造阶段就报错，而不是发一次必然失败的请求。
+    okx_api_key: str = ""
+    okx_secret_key: str = ""
+    okx_passphrase: str = ""
+    # 请求头 `x-simulated-trading: 1`：模拟盘（demo trading）与实盘的唯一区别。
+    # 默认打开模拟盘，实盘必须由外部显式改配置。
+    okx_demo: bool = True
 
     # 美股代理行情上游（只读公开接口）：正常交易时段的参考价格来源。
     us_equity_rest_base_url: str = "https://query1.finance.yahoo.com"

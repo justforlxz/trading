@@ -22,7 +22,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core import InstrumentRef, ValidationError
 from app.db import Base, DecimalText, UtcDateTime
 
-__all__ = ["Instrument", "InstrumentPair", "unstorable_reason"]
+__all__ = ["Instrument", "InstrumentPair", "spot_currency", "unstorable_reason"]
 
 EXCHANGE = "okx"
 
@@ -32,8 +32,9 @@ INST_TYPES = frozenset({SPOT, SWAP})
 
 # OKX `instCategory`：3 = 代币化股票/ETF，1 = 加密资产，4 = 代币化商品。
 TOKENIZED_EQUITY_CATEGORY = "3"
+TOKENIZED_EQUITY = "tokenized_equity"
 _ASSET_TYPES: dict[str, str] = {
-    "3": "tokenized_equity",
+    "3": TOKENIZED_EQUITY,
     "1": "crypto",
     "4": "commodity_token",
 }
@@ -129,6 +130,21 @@ def build_instrument(ref: InstrumentRef) -> Instrument:
 
 def _asset_type(inst_category: str) -> str:
     return _ASSET_TYPES.get(inst_category.strip(), UNKNOWN_ASSET_TYPE)
+
+
+def spot_currency(row: Instrument) -> str:
+    """现货行的币种（上游 `baseCcy`），用来把账户余额的币种对回标的。
+
+    `base_currency` 列存的是产品键（`AAPL`），而余额与下单用的是币种（`XAAPL`）。
+    两者的换算只在标的模块定义一次：代币化股票的现货币种去掉 `X` 得到产品键，
+    反推就补回 `X`；其余类别两者同值。
+    """
+
+    if row.inst_type != SPOT:
+        raise ValidationError(f"标的 {row.symbol} 不是现货形态, 没有币种")
+    if row.asset_type == TOKENIZED_EQUITY:
+        return f"X{row.product_key}"
+    return row.product_key
 
 
 def unstorable_reason(ref: InstrumentRef) -> str | None:

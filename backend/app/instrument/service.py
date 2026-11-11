@@ -25,6 +25,7 @@ from app.instrument.model import (
 )
 
 __all__ = [
+    "DEFAULT_QUOTE_CURRENCY",
     "SyncReport",
     "SyncSkip",
     "get_instrument_pair",

@@ -15,8 +15,11 @@ dependencies = [
   "alembic>=1.14,<2.0",
   # PostgreSQL 驱动：psycopg 3 同步实现，二进制轮子自带 libpq。
   "psycopg[binary]>=3.2,<4.0",
-  # 外部 HTTP 只在交易所适配层使用（OKX 公共 REST）。
+  # 外部 HTTP 只在交易所适配层使用（OKX 公共 REST 与私有交易接口）。
   "httpx>=0.28,<1.0",
+  # OKX 私有 WebSocket 推送（订单/成交/持仓/账户）。uvicorn[standard] 也带它，
+  # 但本仓库直接 import，必须自己声明，不能依赖别处的传递依赖。
+  "websockets>=13,<19",
 ]
 
 [project.optional-dependencies]

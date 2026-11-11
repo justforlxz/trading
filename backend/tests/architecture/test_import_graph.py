@@ -62,7 +62,9 @@ ALLOWED_DEPS: dict[str, frozenset[str]] = {
     "core": frozenset(),
     "shared": frozenset(),
     "db": frozenset({"shared"}),
-    "exchange": frozenset({"shared", "instrument"}),
+    # `db` 是下单幂等键登记表（`order_submissions`）的落点：同一 `clientOrderId`
+    # 只允许产生一张上游单，判重必须落在库里而不是进程内存里。
+    "exchange": frozenset({"shared", "db", "instrument"}),
     "instrument": frozenset({"shared", "db"}),
     "market": frozenset({"shared", "db", "exchange", "instrument"}),
     "watchlist": frozenset({"shared", "db", "instrument", "market"}),

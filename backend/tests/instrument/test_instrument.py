@@ -15,7 +15,9 @@ from app.instrument import (
     InstrumentPair,
     get_instrument_pair,
     list_instruments,
+    spot_currency,
     sync_instruments,
+    trading_categories,
 )
 from tests.factories.instruments import SAMPLE_LIST_TIME, load_instruments, make_ref, make_swap_ref
 
@@ -75,6 +77,37 @@ def test_tokenized_spot_drops_the_x_marker_for_pairing() -> None:
     assert spot.base_currency == swap.base_currency == "AAPL"
     assert spot.inst_type == "SPOT"
     assert swap.inst_type == "SWAP"
+
+
+def test_trading_categories_lists_the_registered_ones() -> None:
+    """「有哪些类别」的真源是规则注册表，持仓查询按它遍历。"""
+
+    assert trading_categories() == ("SPOT", "SWAP")
+
+
+def test_spot_currency_is_the_upstream_base_ccy() -> None:
+    """余额里的币种要能对回标的：代币化股票补回 `X`，其余类别与产品键同值。"""
+
+    sync_instruments(
+        [
+            make_ref(),
+            make_ref(inst_id="XRP-USDT", base_ccy="XRP", inst_category="1"),
+        ]
+    )
+
+    rows = _by_symbol()
+
+    assert spot_currency(rows["XAAPL-USDT"]) == "XAAPL"
+    assert spot_currency(rows["XRP-USDT"]) == "XRP"
+
+
+def test_spot_currency_of_a_swap_row_is_rejected() -> None:
+    """永续没有「现货币种」这回事：拿它换算是调用方用错了地方。"""
+
+    sync_instruments([make_swap_ref()])
+
+    with pytest.raises(ValidationError):
+        spot_currency(_by_symbol()["AAPL-USDT-SWAP"])
 
 
 def test_sync_is_idempotent_and_updates_existing_rows() -> None:

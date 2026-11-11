@@ -12,6 +12,7 @@ from alembic import context
 from app.db import Base
 
 # 导入即注册表元数据（与 `app.main` 的装配顺序一致）。
+from app.exchange import OrderSubmission  # noqa: F401
 from app.instrument import Instrument  # noqa: F401
 from app.market import Candle, CorrelationSnapshot  # noqa: F401
 from app.strategy import StrategyInstanceRow, StrategyTemplateRow  # noqa: F401

@@ -1,14 +1,17 @@
-"""市场域对外编排：可用区间、完整性报告、两标的相关性、相关矩阵快照与当前有效行情。
+"""市场域对外编排：可用区间、完整性报告、两标的相关性、相关矩阵快照、市场总览与当前行情。
 
 读侧只读库，不做任何补齐或插值：缺多少根就报多少根，可用区间就是库里真实的首末。
 相关性在这里完成「按 open_time 对齐两条序列」的编排，系数仍由纯函数计算。
 矩阵快照在这里完成「矩阵标识 → 产品键」的换算与幂等写入，数值仍由矩阵模块算。
 「当前有效行情」在这里完成「查标的 → 判时段 → 选来源 → 取最新一根」的编排，
 时段与来源的选择本身仍是 `app.market.session` 的纯函数。
+市场总览在这里完成「取该类别可交易标的 → 逐个解析来源 → 各取最近若干根」的编排，
+涨跌家数与同向程度仍由 `app.market.breadth` 的纯函数算。
 """
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 
@@ -17,7 +20,8 @@ from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 
 from app.core import Bar, ValidationError
 from app.db import session_scope
-from app.instrument import Instrument, resolve_instrument
+from app.instrument import Instrument, list_tradable, resolve_instrument
+from app.market.breadth import Breadth, Resonance, advance_decline, resonance_strength
 from app.market.candles import duplicate_open_times, expected_open_times, find_gaps
 from app.market.correlation import METHODS, correlate, p_value
 from app.market.matrix import Matrix
@@ -29,6 +33,10 @@ from app.shared import bar_seconds
 # 快照单条 INSERT 的行数上限：PostgreSQL 单条语句最多 65535 个绑定参数，每行 7 个值，
 # 1000 行留足余量；全市场矩阵（上千个产品）也不会撞上参数上限。
 SNAPSHOT_BATCH_SIZE = 1000
+
+# 共振窗口的根数：契约里的 `/market/overview` 没有 window 参数，窗口只能是固定值，
+# 取了多少根就写进响应的 `resonance.window`，不隐瞒口径。
+RESONANCE_WINDOW = 20
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +74,21 @@ class PairCorrelation:
     sample_size: int
     coefficient: float | None
     p_value: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class MarketOverview:
+    """某一类别在某一时点的横截面总览：广度与共振。
+
+    `breadth` 与 `resonance` 用的是同一批参与标的（窗口内至少有 2 根 K 线的该类别
+    标的），因此两个 `participants` 恒相等；共振窗口固定为 `RESONANCE_WINDOW`。
+    """
+
+    inst_type: str
+    bar: str
+    as_of: datetime
+    breadth: Breadth
+    resonance: Resonance
 
 
 def integrity(symbol: str, bar: str, *, source: str | None = None) -> IntegrityReport:
@@ -364,3 +387,72 @@ def current_bar(
             instrument.asset_type, loaded.open_time, inst_type=instrument.inst_type
         ),
     )
+
+
+def market_overview(as_of: datetime | None, bar: str, inst_type: str) -> MarketOverview:
+    """一个类别（`SPOT` / `SWAP`）在 `as_of` 时点的横截面总览。
+
+    横截面只含该类别自己的可交易标的：两类标的的交易时段不同，混在一起数涨跌家数
+    没有意义，因此 `inst_type` 必填、没有默认值。每个标的按「资产时段 × 资产类别」
+    选来源（与 `current_bar` 同一条规则），代币化股票在美股交易时段读代理行情，
+    加密资产与休市时段读 OKX 行情——同一个横截面里允许不同标的走不同来源，但每个
+    标的只有一条自己此刻有效的序列。
+
+    `as_of` 缺省取当前时刻；给出时必须带时区。它算在窗口内（`open_time` 精确到秒，
+    上界取闭区间），之后的 K 线一根都不读。
+    """
+
+    canonical = normalize_bar_or_raise(bar)
+    moment = datetime.now(tz=UTC) if as_of is None else as_of
+    if moment.tzinfo is None:
+        raise ValidationError("市场总览的 as_of 必须带时区")
+    # K 线的 open_time 精确到秒，微秒在这里没有位置：截掉不改变任何一根是否落在窗口内，
+    # 但能让响应里的 `as_of` 与库里的时刻同一精度。
+    moment = moment.replace(microsecond=0)
+    instruments = list_tradable(inst_type)
+    bars_by_symbol = _recent_bars(instruments, canonical, moment, RESONANCE_WINDOW + 1)
+    return MarketOverview(
+        inst_type=inst_type,
+        bar=canonical,
+        as_of=moment,
+        breadth=advance_decline(bars_by_symbol),
+        resonance=resonance_strength(bars_by_symbol, RESONANCE_WINDOW),
+    )
+
+
+def _recent_bars(
+    instruments: Sequence[Instrument],
+    bar: str,
+    as_of: datetime,
+    count: int,
+) -> dict[str, list[Bar]]:
+    """每个标的在其有效来源下、`as_of`（含）之前最近 `count` 根 K 线。
+
+    按 `(symbol, bar, open_time, source)` 主键倒序取固定条数，不整段读历史：横截面要
+    的是窗口内的尾巴，读全量历史再把尾巴切掉只是把成本推到数据库。一个标的没有
+    K 线就不进结果，广度与共振都按「至少有 2 根」筛参与标的，缺数据不会被算成不变。
+    """
+
+    moment = to_epoch(as_of)
+    loaded: dict[str, list[Bar]] = {}
+    with session_scope() as session:
+        for instrument in instruments:
+            session_state = asset_session(
+                instrument.asset_type, as_of, inst_type=instrument.inst_type
+            )
+            source = primary_source(session_state, instrument.asset_type, instrument.inst_type)
+            statement = (
+                select(Candle)
+                .where(
+                    Candle.symbol == instrument.symbol,
+                    Candle.bar == bar,
+                    Candle.source == source,
+                    Candle.open_time <= moment,
+                )
+                .order_by(Candle.open_time.desc())
+                .limit(count)
+            )
+            rows = list(session.scalars(statement))
+            if rows:
+                loaded[instrument.symbol] = [row.to_bar() for row in reversed(rows)]
+    return loaded

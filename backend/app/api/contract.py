@@ -28,7 +28,6 @@ from app.api.schemas import (
     FillListResponse,
     JournalListResponse,
     LiveAuthorizationRequest,
-    MarketOverviewResponse,
     Opportunity,
     OpportunityListResponse,
     OpportunityMode,
@@ -61,7 +60,7 @@ from app.api.schemas import (
     StrategyPortfolioDetailResponse,
     StrategyPortfolioListResponse,
 )
-from app.api.schemas.common import Bar, DataSource, InstType
+from app.api.schemas.common import Bar, DataSource
 
 __all__ = ["contract_router"]
 
@@ -254,16 +253,6 @@ def get_correlation_series(
     window: int = Query(..., ge=2, le=250),
 ) -> CorrelationSeriesResponse:
     raise _stub("T2.3")
-
-
-# 横截面按类别分开统计，`inst_type` 必填：两类标的的交易时段不同，不能混在一起。
-@correlation_router.get("/market/overview", response_model=MarketOverviewResponse)
-def get_market_overview(
-    inst_type: InstType = Query(...),
-    bar: Bar = Query("1d"),
-    as_of: AwareDatetime | None = Query(None),
-) -> MarketOverviewResponse:
-    raise _stub("T2.5")
 
 
 # ---------------------------------------------------------------- relations

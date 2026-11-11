@@ -7159,6 +7159,7 @@
     },
     "/api/market/overview": {
       "get": {
+        "description": "该类别在 `as_of`（缺省为当前时刻）的涨跌家数与同向程度。",
         "operationId": "get_market_overview_api_market_overview_get",
         "parameters": [
           {
@@ -7234,7 +7235,7 @@
         },
         "summary": "Get Market Overview",
         "tags": [
-          "correlation"
+          "market"
         ]
       }
     },

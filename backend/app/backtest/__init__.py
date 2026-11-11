@@ -5,7 +5,9 @@
 - `costs`：手续费与滑点；
 - `metrics`：绩效指标；
 - `simulation`：把目标组合与当前持仓的差额换成增量订单再换成成交；
-- `engine`：按目标组合序列推进 bar 循环，产出净值曲线与逐腿成交。
+- `engine`：按目标组合序列推进 bar 循环，产出净值曲线与逐腿成交；
+- `margin`：逐仓保证金、杠杆档位与强平价；
+- `funding_cost`：按 8 小时结算点把资金费计入 PnL，并报告覆盖率缺口。
 """
 
 from app.backtest.costs import (
@@ -17,6 +19,28 @@ from app.backtest.costs import (
 )
 from app.backtest.engine import BacktestInput, BacktestResult, EquityPoint, run_backtest
 from app.backtest.errors import BacktestError, BarSeriesError, MissingInstrumentError
+from app.backtest.funding_cost import (
+    FundingReport,
+    FundingSettlement,
+    funding_points_between,
+    on_funding_grid,
+)
+from app.backtest.margin import (
+    DEFAULT_MAX_LEVERAGE,
+    HARD_MAX_LEVERAGE,
+    MarginTerms,
+    PositionTier,
+    effective_leverage,
+    initial_margin,
+    liquidated_in_bar,
+    liquidation_price,
+    maintenance_margin,
+    margin_terms,
+    margin_used,
+    max_loss,
+    parse_position_tiers,
+    tier_for,
+)
 from app.backtest.metrics import METRIC_NAMES, compute_metrics, default_annualization_factor
 from app.backtest.simulation import (
     ExecutionResult,
@@ -32,6 +56,8 @@ from app.backtest.simulation import (
 )
 
 __all__ = [
+    "DEFAULT_MAX_LEVERAGE",
+    "HARD_MAX_LEVERAGE",
     "METRIC_NAMES",
     "BacktestError",
     "BacktestInput",
@@ -40,21 +66,37 @@ __all__ = [
     "CostModel",
     "EquityPoint",
     "ExecutionResult",
+    "FundingReport",
+    "FundingSettlement",
     "LegCost",
     "LegExit",
     "LegFill",
     "LegOrder",
     "LegPosition",
+    "MarginTerms",
     "MissingInstrumentError",
+    "PositionTier",
     "Settlement",
     "compute_metrics",
     "default_annualization_factor",
+    "effective_leverage",
     "execute_orders",
     "execution_price",
     "execution_prices",
     "fee_cost",
+    "funding_points_between",
+    "initial_margin",
+    "liquidated_in_bar",
+    "liquidation_price",
+    "maintenance_margin",
+    "margin_terms",
+    "margin_used",
+    "max_loss",
+    "on_funding_grid",
+    "parse_position_tiers",
     "plan_orders",
     "resolve_exit",
     "run_backtest",
     "slippage_cost",
+    "tier_for",
 ]

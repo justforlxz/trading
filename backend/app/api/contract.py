@@ -27,7 +27,6 @@ from app.api.schemas import (
     ExposureOverviewResponse,
     FillListResponse,
     JournalListResponse,
-    LiveAuthorizationRequest,
     Order,
     OrderCreateRequest,
     OrderListResponse,
@@ -41,10 +40,6 @@ from app.api.schemas import (
     SettingsResponse,
     SettingsUpdateRequest,
     SignalListResponse,
-    StrategyApprovalDecisionRequest,
-    StrategyApprovalListResponse,
-    StrategyApprovalRequest,
-    StrategyApprovalTransition,
     StrategyPortfolioDetailResponse,
     StrategyPortfolioListResponse,
 )
@@ -251,44 +246,8 @@ def decide_portfolio_adjustment(
     raise _stub("T7.1")
 
 
-# ---------------------------------------------------------------- approval
-
-approval_router = APIRouter(tags=["approval"])
-
-
-@approval_router.get("/approvals", response_model=StrategyApprovalListResponse)
-def list_approvals() -> StrategyApprovalListResponse:
-    raise _stub("T3.6")
-
-
-@approval_router.post("/approvals", response_model=StrategyApprovalTransition, status_code=201)
-def submit_for_review(payload: StrategyApprovalRequest) -> StrategyApprovalTransition:
-    raise _stub("T3.6")
-
-
-@approval_router.post("/approvals/{instance_id}/approve", response_model=StrategyApprovalTransition)
-def approve_strategy(
-    instance_id: str, payload: StrategyApprovalDecisionRequest
-) -> StrategyApprovalTransition:
-    raise _stub("T3.6")
-
-
-@approval_router.post("/approvals/{instance_id}/reject", response_model=StrategyApprovalTransition)
-def reject_strategy(
-    instance_id: str, payload: StrategyApprovalDecisionRequest
-) -> StrategyApprovalTransition:
-    raise _stub("T3.6")
-
-
-@approval_router.post(
-    "/approvals/{instance_id}/live-authorization",
-    response_model=StrategyApprovalTransition,
-)
-def authorize_live_trading(
-    instance_id: str, payload: LiveAuthorizationRequest
-) -> StrategyApprovalTransition:
-    raise _stub("T3.6")
-
+# 审批域（`/api/approvals`）已由 `app/api/routes/approval.py` 实现，桩随之删除：
+# 契约里同一路径只允许一个处理函数。
 
 for _router in (
     backtest_router,
@@ -297,6 +256,5 @@ for _router in (
     overview_router,
     correlation_router,
     portfolio_router,
-    approval_router,
 ):
     contract_router.include_router(_router)

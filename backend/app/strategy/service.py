@@ -110,7 +110,12 @@ class TemplateDefinition:
 
 @dataclass(frozen=True, slots=True)
 class InstanceRecord:
-    """一条策略实例：参数已补齐为完整参数表，标的是交易所标识的有序去重序列。"""
+    """一条策略实例：参数已补齐为完整参数表，标的是交易所标识的有序去重序列。
+
+    后半段的四个字段是生命周期推进留下的凭据：审核通过的人与时刻、达标报告编号、实盘
+    授权时刻。它们由审批状态机（`app.strategy.approval`）写入，读回时原样报出；没发生
+    的推进是 `None`。
+    """
 
     instance_id: str
     strategy_id: str
@@ -119,12 +124,16 @@ class InstanceRecord:
     bar: str
     params: Mapping[str, ParamValue]
     inst_ids: tuple[str, ...]
-    status: str
+    lifecycle_status: str
     enabled: bool
     execution_mode: str
     latest_signal_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    approved_by: str | None = None
+    approved_at: datetime | None = None
+    validation_report_id: str | None = None
+    live_authorized_at: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -294,7 +303,7 @@ def create_instance(
         bar=_require_bar(bar),
         params=_params_json(resolved),
         inst_ids=_inst_ids_json(instruments),
-        status=DEFAULT_STATUS,
+        lifecycle_status=DEFAULT_STATUS,
         enabled=True,
         execution_mode=DEFAULT_EXECUTION_MODE,
         latest_signal_at=None,
@@ -793,7 +802,7 @@ def _instance_record(row: StrategyInstanceRow) -> InstanceRecord:
         bar=row.bar,
         params=MappingProxyType(_json_object(row.params)),
         inst_ids=tuple(json.loads(row.inst_ids)),
-        status=row.status,
+        lifecycle_status=row.lifecycle_status,
         enabled=row.enabled,
         execution_mode=row.execution_mode,
         latest_signal_at=(
@@ -801,6 +810,12 @@ def _instance_record(row: StrategyInstanceRow) -> InstanceRecord:
         ),
         created_at=_from_epoch(row.created_at),
         updated_at=_from_epoch(row.updated_at),
+        approved_by=row.approved_by,
+        approved_at=None if row.approved_at is None else _from_epoch(row.approved_at),
+        validation_report_id=row.validation_report_id,
+        live_authorized_at=(
+            None if row.live_authorized_at is None else _from_epoch(row.live_authorized_at)
+        ),
     )
 
 

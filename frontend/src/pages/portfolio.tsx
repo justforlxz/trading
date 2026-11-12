@@ -33,6 +33,7 @@ const STATUS_LABELS: Record<PortfolioAdjustment["status"], string> = {
   pending: "待批准",
   approved: "已批准",
   rejected: "已驳回",
+  superseded: "已被风险处置覆盖",
 };
 const WEIGHT_PATTERN = /^\d+(\.\d+)?$/;
 
@@ -87,6 +88,7 @@ function netWeight(legs: DraftLeg[]): string {
 function statusTone(status: PortfolioAdjustment["status"]): string {
   if (status === "approved") return "border-emerald-600/40 text-emerald-600 dark:text-emerald-400";
   if (status === "rejected") return "border-rose-600/40 text-rose-600 dark:text-rose-400";
+  if (status === "superseded") return "border-slate-500/40 text-slate-600 dark:text-slate-300";
   return "border-amber-600/40 text-amber-600 dark:text-amber-400";
 }
 

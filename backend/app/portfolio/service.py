@@ -60,6 +60,8 @@ from app.portfolio.model import (
 from app.strategy import InstanceRecord, get_instance, list_instances
 
 __all__ = [
+    "PENDING",
+    "SUPERSEDED",
     "AdjustmentRecord",
     "ExposureOverview",
     "StrategyPortfolio",
@@ -84,6 +86,7 @@ UNIT_BASE = "base"
 PENDING = "pending"
 APPROVED = "approved"
 REJECTED = "rejected"
+SUPERSEDED = "superseded"
 DECISIONS = frozenset({APPROVED, REJECTED})
 FILL_SIDES = frozenset({"buy", "sell"})
 DIRECTIONS = frozenset({SIDE_LONG, SIDE_SHORT})

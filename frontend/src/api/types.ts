@@ -617,6 +617,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/risk/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Risk Event Records */
+        get: operations["list_risk_event_records_api_risk_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/risk/events/{event_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Resolve Risk Event Record */
+        patch: operations["resolve_risk_event_record_api_risk_events__event_id__resolve_patch"];
+        trace?: never;
+    };
     "/api/settings": {
         parameters: {
             query?: never;
@@ -2788,7 +2822,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "pending" | "approved" | "rejected";
+            status: "pending" | "approved" | "rejected" | "superseded";
             target: components["schemas"]["TargetPortfolio"];
         };
         /**
@@ -3215,6 +3249,69 @@ export interface components {
             degree: number;
             /** Product Key */
             product_key: string;
+        };
+        /**
+         * RiskEvent
+         * @example {
+         *       "action": "warn",
+         *       "created_at": "2026-11-13T02:00:00Z",
+         *       "detail": "单笔金额 3000 超过组合权益的 0.20, 上限 2000",
+         *       "event_id": "re_3f2a9c1d",
+         *       "inst_id": "XAAPL-USDT",
+         *       "instance_id": "si_0001",
+         *       "rule": "order_amount_ratio",
+         *       "severity": "light",
+         *       "target_product_key": "AAPL"
+         *     }
+         */
+        RiskEvent: {
+            /** Action */
+            action?: string | null;
+            /** Created At */
+            created_at: string;
+            /** Detail */
+            detail: string;
+            /** Event Id */
+            event_id: string;
+            /** Inst Id */
+            inst_id?: string | null;
+            /** Instance Id */
+            instance_id?: string | null;
+            /** Overridden Approval Id */
+            overridden_approval_id?: string | null;
+            /** Resolved At */
+            resolved_at?: string | null;
+            /** Rule */
+            rule: string;
+            /** Severity */
+            severity?: string | null;
+            /** Target Product Key */
+            target_product_key?: string | null;
+        };
+        /**
+         * RiskEventListResponse
+         * @example {
+         *       "items": [
+         *         {
+         *           "action": "warn",
+         *           "created_at": "2026-11-13T02:00:00Z",
+         *           "detail": "单笔金额 3000 超过组合权益的 0.20, 上限 2000",
+         *           "event_id": "re_3f2a9c1d",
+         *           "inst_id": "XAAPL-USDT",
+         *           "instance_id": "si_0001",
+         *           "rule": "order_amount_ratio",
+         *           "severity": "light",
+         *           "target_product_key": "AAPL"
+         *         }
+         *       ],
+         *       "total": 1
+         *     }
+         */
+        RiskEventListResponse: {
+            /** Items */
+            items: components["schemas"]["RiskEvent"][];
+            /** Total */
+            total: number;
         };
         /**
          * RiskSettings
@@ -5288,6 +5385,71 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RelationNeighborsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_risk_event_records_api_risk_events_get: {
+        parameters: {
+            query?: {
+                instance_id?: string | null;
+                inst_id?: string | null;
+                rule?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiskEventListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_risk_event_record_api_risk_events__event_id__resolve_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiskEvent"];
                 };
             };
             /** @description Validation Error */

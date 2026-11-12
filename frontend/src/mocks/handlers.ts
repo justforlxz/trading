@@ -37,6 +37,8 @@ import getPortfolioStrategies from "./fixtures/portfolio/get-portfolio-strategie
 import getPortfolioStrategiesInstanceId from "./fixtures/portfolio/get-portfolio-strategies-instance_id.json";
 import getRelationsGraph from "./fixtures/relations/get-relations-graph.json";
 import getRelationsNeighbors from "./fixtures/relations/get-relations-neighbors.json";
+import getRiskEvents from "./fixtures/risk/get-risk-events.json";
+import patchRiskEventsEventIdResolve from "./fixtures/risk/patch-risk-events-event_id-resolve.json";
 import getSettings from "./fixtures/settings/get-settings.json";
 import putSettings from "./fixtures/settings/put-settings.json";
 import getSignals from "./fixtures/trades/get-signals.json";
@@ -94,6 +96,8 @@ export const handlers = [
   http.get("*/api/portfolio/strategies/:instance_id", () => HttpResponse.json(getPortfolioStrategiesInstanceId)),
   http.get("*/api/relations/graph", () => HttpResponse.json(getRelationsGraph)),
   http.get("*/api/relations/neighbors", () => HttpResponse.json(getRelationsNeighbors)),
+  http.get("*/api/risk/events", () => HttpResponse.json(getRiskEvents)),
+  http.patch("*/api/risk/events/:event_id/resolve", () => HttpResponse.json(patchRiskEventsEventIdResolve)),
   http.get("*/api/settings", () => HttpResponse.json(getSettings)),
   http.put("*/api/settings", () => HttpResponse.json(putSettings)),
   http.get("*/api/signals", () => HttpResponse.json(getSignals)),

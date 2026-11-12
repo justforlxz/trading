@@ -75,7 +75,9 @@ ALLOWED_DEPS: dict[str, frozenset[str]] = {
     "indicators": frozenset({"shared"}),
     "strategy": frozenset({"shared", "db", "instrument", "market", "indicators"}),
     "backtest": frozenset({"shared", "db", "instrument", "market", "strategy"}),
-    "risk": frozenset({"shared", "db", "instrument", "market", "strategy"}),
+    # 分级处置要覆盖同标的的待批准组合申请（`portfolio_adjustments`），这是
+    # T6.5 引入的唯一新增依赖边；覆盖规则只写在 `app/risk/actions.py`。
+    "risk": frozenset({"shared", "db", "instrument", "market", "strategy", "portfolio"}),
     "execution": frozenset(
         {"shared", "db", "instrument", "market", "strategy", "risk", "exchange"}
     ),

@@ -25,6 +25,8 @@ from app.portfolio.model import (
     VirtualPositionRow,
 )
 from app.portfolio.service import (
+    PENDING,
+    SUPERSEDED,
     AdjustmentRecord,
     ExposureOverview,
     StrategyPortfolio,
@@ -44,7 +46,9 @@ from app.portfolio.service import (
 
 __all__ = [
     "BUY",
+    "PENDING",
     "SELL",
+    "SUPERSEDED",
     "AdjustmentRecord",
     "AllocationRow",
     "ExposureLeg",

@@ -60,6 +60,22 @@ export type BacktestRequest = components["schemas"]["BacktestRequest"];
 export type BacktestTargets = components["schemas"]["BacktestTargets"];
 export type BacktestCosts = components["schemas"]["BacktestCosts"];
 export type BacktestMetrics = components["schemas"]["BacktestMetrics"];
+export type ExposureOverviewResponse = components["schemas"]["ExposureOverviewResponse"];
+export type PortfolioConflict = components["schemas"]["PortfolioConflict"];
+export type StrategyPortfolio = components["schemas"]["StrategyPortfolio"];
+export type StrategyPortfolioListResponse = components["schemas"]["StrategyPortfolioListResponse"];
+export type StrategyPortfolioDetailResponse =
+  components["schemas"]["StrategyPortfolioDetailResponse"];
+export type VirtualPosition = components["schemas"]["VirtualPosition"];
+export type TargetPortfolio = components["schemas"]["TargetPortfolio"];
+export type TargetLeg = components["schemas"]["TargetLeg"];
+export type PortfolioAdjustment = components["schemas"]["PortfolioAdjustment"];
+export type PortfolioAdjustmentListResponse =
+  components["schemas"]["PortfolioAdjustmentListResponse"];
+export type PortfolioAdjustmentCreateRequest =
+  components["schemas"]["PortfolioAdjustmentCreateRequest"];
+export type PortfolioAdjustmentDecisionRequest =
+  components["schemas"]["PortfolioAdjustmentDecisionRequest"];
 
 /** 后端错误体的形状：`detail` 是字符串，或 FastAPI 校验错误的条目数组。 */
 type ErrorBody = { detail?: string | Array<{ msg?: string }> };
@@ -235,4 +251,41 @@ export function fetchBacktest(runId: string): Promise<BacktestDetailResponse> {
 
 export function deleteBacktest(runId: string): Promise<void> {
   return request<void>(`/backtests/${encodeURIComponent(runId)}`, { method: "DELETE" });
+}
+
+export function fetchPortfolioExposure(): Promise<ExposureOverviewResponse> {
+  return request<ExposureOverviewResponse>("/portfolio/exposure");
+}
+
+export function fetchStrategyPortfolios(): Promise<StrategyPortfolioListResponse> {
+  return request<StrategyPortfolioListResponse>("/portfolio/strategies");
+}
+
+export function fetchStrategyPortfolio(
+  instanceId: string,
+): Promise<StrategyPortfolioDetailResponse> {
+  return request<StrategyPortfolioDetailResponse>(
+    `/portfolio/strategies/${encodeURIComponent(instanceId)}`,
+  );
+}
+
+export function fetchPortfolioAdjustments(): Promise<PortfolioAdjustmentListResponse> {
+  return request<PortfolioAdjustmentListResponse>("/portfolio/adjustments");
+}
+
+export function createPortfolioAdjustment(
+  body: PortfolioAdjustmentCreateRequest,
+): Promise<PortfolioAdjustment> {
+  return send<PortfolioAdjustment>("/portfolio/adjustments", "POST", body);
+}
+
+export function decidePortfolioAdjustment(
+  adjustmentId: string,
+  body: PortfolioAdjustmentDecisionRequest,
+): Promise<PortfolioAdjustment> {
+  return send<PortfolioAdjustment>(
+    `/portfolio/adjustments/${encodeURIComponent(adjustmentId)}`,
+    "PATCH",
+    body,
+  );
 }

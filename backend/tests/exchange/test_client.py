@@ -125,6 +125,21 @@ def test_upstream_rate_limit_code_exhausts_retries_into_rate_limited_error() -> 
     client.close()
 
 
+def test_http_400_with_a_rate_limit_code_is_treated_as_rate_limited() -> None:
+    """限流判定只看返回码：HTTP 4xx 里带 50011 与 HTTP 429 是同一件事，都要重试。"""
+
+    payload = httpx.Response(400, json={"code": "50011", "msg": "Too Many Requests"})
+    client, requests, sleeps = _client(lambda request: payload, max_retries=1)
+
+    with pytest.raises(RateLimitedError) as excinfo:
+        client.get("/api/v5/market/ticker")
+
+    assert excinfo.value.code == "50011"
+    assert len(requests) == 2
+    assert sleeps == [0.25]
+    client.close()
+
+
 def test_other_upstream_code_maps_to_exchange_error_without_retry() -> None:
     payload = httpx.Response(
         200, json={"code": "51001", "msg": "Instrument ID does not exist", "data": []}

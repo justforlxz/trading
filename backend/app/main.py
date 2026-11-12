@@ -21,6 +21,7 @@ from app.backtest import (  # noqa: F401
 )
 from app.config import get_settings
 from app.db import init_db
+from app.exchange import OrderSubmission  # noqa: F401
 from app.instrument import Instrument  # noqa: F401
 from app.market import Candle  # noqa: F401
 from app.strategy import (  # noqa: F401

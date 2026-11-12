@@ -16,7 +16,14 @@ from decimal import Decimal
 from app.core import ValidationError
 from app.instrument.model import SPOT, SWAP
 
-__all__ = ["SPOT_RULES", "SWAP_RULES", "TradingRules", "register_rules", "trading_rules"]
+__all__ = [
+    "SPOT_RULES",
+    "SWAP_RULES",
+    "TradingRules",
+    "register_rules",
+    "trading_categories",
+    "trading_rules",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +90,16 @@ def trading_rules(inst_type: str) -> TradingRules:
     if rules is None:
         raise ValidationError(f"标的类别 {name!r} 没有注册交易规则")
     return rules
+
+
+def trading_categories() -> tuple[str, ...]:
+    """已注册的全部类别，按注册顺序。
+
+    「有哪些类别」的真源是这张注册表，不是库里当前同步到哪些标的：用标的表推类别，
+    库里只同步到一类时会静默少查一类持仓，而这种缺失看起来就像「本来没有持仓」。
+    """
+
+    return tuple(_RULES)
 
 
 def register_rules(inst_type: str, rules: TradingRules) -> None:

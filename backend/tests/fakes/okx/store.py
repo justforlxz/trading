@@ -3,6 +3,9 @@
 标的清单默认来自全类别冻结快照（两类 `instType`、四类 `instCategory`）；K 线、
 资金费与行情快照按标的名确定性生成，无需预置数据。
 业务错误用 `OkxApiError` 表达（HTTP 200 + 非零 code），与限流/上游故障区分。
+
+交易域（余额、持仓、订单、成交、鉴权）在 `tests.fakes.okx.trade`，由本类持有
+一份 `book`：行情与交易是两套接口、同一份进程状态，用例只从一个入口取。
 """
 
 from __future__ import annotations
@@ -20,6 +23,7 @@ from tests.factories.candles import (
     make_ticker_row,
 )
 from tests.factories.instruments import load_all_instruments
+from tests.fakes.okx.trade import TradeBook
 
 UNKNOWN_INST_ID_CODE = "51001"
 INVALID_PARAMETER_CODE = "51000"
@@ -75,11 +79,14 @@ class OkxStore:
         *,
         instruments: Sequence[dict[str, Any]] | None = None,
         clock: Callable[[], float] = time.time,
+        book: TradeBook | None = None,
     ) -> None:
         rows = list(instruments) if instruments is not None else load_all_instruments()
         self._instruments = rows
         self._by_inst_id = {row["instId"]: row for row in rows}
         self._clock = clock
+        #: 交易域状态：私有接口的全部预置数据与鉴权凭据都在这里。
+        self.book = book if book is not None else TradeBook(clock=clock)
 
     def instruments(self, inst_type: str) -> list[dict[str, Any]]:
         """按产品类型返回标的元数据。"""
@@ -167,6 +174,12 @@ class OkxStore:
             make_funding_row(inst_id, latest - index * FUNDING_INTERVAL_SECONDS)
             for index in range(min(limit, count))
         ]
+
+    def inst_type(self, inst_id: str) -> str | None:
+        """标的的类别；不在清单里返回 `None`（由调用方决定错误码）。"""
+
+        row = self._by_inst_id.get(inst_id)
+        return None if row is None else str(row["instType"])
 
     def _require_inst_id(self, inst_id: str) -> dict[str, Any]:
         try:

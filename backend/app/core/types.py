@@ -31,6 +31,8 @@ _BAR_SECONDS: dict[str, int] = {
 _SIGNAL_SIDES = frozenset({"long", "short", "flat"})
 _ORDER_SIDES = frozenset({"buy", "sell"})
 _ORDER_TYPES = frozenset({"market", "limit"})
+#: 永续的持仓方向。`net` 是单向持仓模式，`long` / `short` 是双向持仓模式。
+_POS_SIDES = frozenset({"long", "short", "net"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,6 +178,10 @@ class OrderIntent:
 
     限价单必须给出 `price`，市价单不得给出 `price`——两者互斥，否则执行层要猜
     「以哪个为准」。`client_order_id` 供幂等使用，留空表示调用方不要求去重。
+
+    `pos_side` 与 `reduce_only` 只属于永续：现货没有持仓方向，也没有「只减仓」。
+    两个字段在意图层是可选的，由适配层按类别决定能不能用——把判断放在这里会让
+    `core` 认识类别语义，而类别规则只属于标的模块与交易所适配层。
     """
 
     inst_id: str
@@ -184,6 +190,8 @@ class OrderIntent:
     order_type: str
     price: Decimal | None = None
     client_order_id: str = ""
+    pos_side: str = ""
+    reduce_only: bool = False
 
     def __post_init__(self) -> None:
         if self.side not in _ORDER_SIDES:
@@ -198,3 +206,5 @@ class OrderIntent:
             raise ValidationError("限价单必须给出 price")
         if self.order_type == "market" and self.price is not None:
             raise ValidationError("市价单不能给出 price")
+        if self.pos_side and self.pos_side not in _POS_SIDES:
+            raise ValidationError(f"持仓方向必须是 {sorted(_POS_SIDES)}, 实际 {self.pos_side!r}")

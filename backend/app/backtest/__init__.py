@@ -8,9 +8,12 @@
 - `engine`：按目标组合序列推进 bar 循环，产出净值曲线与逐腿成交；
 - `margin`：逐仓保证金、杠杆档位与强平价；
 - `funding_cost`：按 8 小时结算点把资金费计入 PnL，并报告覆盖率缺口；
-- `model` / `service`：把一次回测落库并读回（含逐腿交易与逐 bar 净敞口）。
+- `model` / `service`：把一次回测落库并读回（含逐腿交易与逐 bar 净敞口）；
+- `batch`：批量结果的排序与交易次数过滤（只排序，不标「最优」）；
+- `sweep`：参数笛卡尔积、训练/验证/样本外三段切分与扫描行。
 """
 
+from app.backtest.batch import rank_rows
 from app.backtest.costs import (
     CostModel,
     execution_price,
@@ -72,6 +75,15 @@ from app.backtest.simulation import (
     plan_orders,
     resolve_exit,
 )
+from app.backtest.sweep import (
+    SplitWindow,
+    SweepCell,
+    SweepRow,
+    param_combinations,
+    rank_sweep,
+    split_window,
+    validate_splits,
+)
 
 __all__ = [
     "DEFAULT_MAX_LEVERAGE",
@@ -102,6 +114,9 @@ __all__ = [
     "MissingInstrumentError",
     "PositionTier",
     "Settlement",
+    "SplitWindow",
+    "SweepCell",
+    "SweepRow",
     "closed_trades",
     "compute_metrics",
     "data_fingerprint",
@@ -122,12 +137,17 @@ __all__ = [
     "margin_used",
     "max_loss",
     "on_funding_grid",
+    "param_combinations",
     "parse_position_tiers",
     "plan_orders",
     "portfolio_metrics",
+    "rank_rows",
+    "rank_sweep",
     "resolve_exit",
     "run_backtest",
     "save_run",
     "slippage_cost",
+    "split_window",
     "tier_for",
+    "validate_splits",
 ]

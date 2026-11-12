@@ -134,21 +134,19 @@ def resolve_instrument(query: str, inst_type: str) -> Instrument:
     return target
 
 
-def list_tradable(inst_type: str) -> list[Instrument]:
+def list_tradable(inst_type: str | None = None) -> list[Instrument]:
     """按类别返回可交易标的（`state == live`），不按资产类别过滤。
 
-    加密资产与代币化股票同属一个类别，这里不再按资产层筛选；顺序按 `symbol`
+    加密资产与代币化股票同属一个类别，这里不再按资产层筛选。不传类别时返回两类合起来
+    的清单——批量回测的「全部可交易」就是这个范围；传了就只取那一类。顺序按 `symbol`
     固定，同一份库两次调用得到同一序列。
     """
 
-    wanted = _normalize_inst_type(inst_type)
+    statement = select(Instrument).where(Instrument.trading_status == LIVE_STATUS)
+    if inst_type is not None:
+        statement = statement.where(Instrument.inst_type == _normalize_inst_type(inst_type))
     with session_scope() as session:
-        rows = session.scalars(
-            select(Instrument)
-            .where(Instrument.inst_type == wanted, Instrument.trading_status == LIVE_STATUS)
-            .order_by(Instrument.symbol)
-        )
-        return list(rows)
+        return list(session.scalars(statement.order_by(Instrument.symbol)))
 
 
 def _pick_spot(spots: list[Instrument], swap: Instrument | None) -> Instrument | None:

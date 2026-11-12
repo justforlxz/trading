@@ -5,18 +5,30 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
+from decimal import Decimal, getcontext, localcontext
 
 from app.api.schemas.common import InstrumentInfo, InstrumentRef
 from app.instrument import Instrument
 
 __all__ = ["decimal_str", "instrument_info", "instrument_ref"]
 
+#: 契约 `DecimalString` 允许的最多小数位数。
+_DECIMAL_PLACES = Decimal("1e-12")
+
 
 def decimal_str(value: Decimal) -> str:
-    """`Decimal` → 定点字符串：不带指数、不丢精度，符合契约的 Decimal 形状。"""
+    """`Decimal` → 定点字符串：不带指数，最多 12 位小数，符合契约的 Decimal 形状。
 
-    return format(value.normalize(), "f")
+    成交价与盈亏由价格、数量、费率连乘得到，有效数字可能超过契约允许的 12 位小数。
+    这里按 12 位就近舍入；量化所需的上下文精度按整数位放宽，避免很大的数值
+    （例如短样本年化收益）在默认精度下抛 `InvalidOperation`。
+    """
+
+    needed = value.adjusted() + 1 + abs(_DECIMAL_PLACES.as_tuple().exponent) + 2
+    with localcontext() as context:
+        context.prec = max(getcontext().prec, needed)
+        quantized = value.quantize(_DECIMAL_PLACES)
+    return format(quantized.normalize(), "f")
 
 
 def instrument_ref(row: Instrument) -> InstrumentRef:

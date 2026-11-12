@@ -7,10 +7,19 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Approvals */
+        /**
+         * List Approvals
+         * @description 全部审批记录，最近写入的在前。记录只增不改，实例删除时随之级联删除。
+         */
         get: operations["list_approvals_api_approvals_get"];
         put?: never;
-        /** Submit For Review */
+        /**
+         * Submit For Review
+         * @description 提交人工审核：草稿阶段（或被驳回之后）进入待审核。
+         *
+         *     机会发现阶段的实例不能直接提交：转移表要求先落到草稿（`strategy_generation`），
+         *     再由人工提交，否则「审核」这一步会跳过策略生成。
+         */
         post: operations["submit_for_review_api_approvals_post"];
         delete?: never;
         options?: never;
@@ -27,7 +36,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Approve Strategy */
+        /**
+         * Approve Strategy
+         * @description 审核通过：进入历史回测阶段，并记下审核人与时刻。
+         *
+         *     回测本身由回测域执行，本端点不跑回测；`validated` 也不是这一步——它必须由达标的
+         *     回测报告驱动，见 `app.strategy.approval.advance`。
+         */
         post: operations["approve_strategy_api_approvals__instance_id__approve_post"];
         delete?: never;
         options?: never;
@@ -44,7 +59,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Authorize Live Trading */
+        /**
+         * Authorize Live Trading
+         * @description 实盘授权：记录授权事实，不打开实盘开关（开关属于执行域）。
+         */
         post: operations["authorize_live_trading_api_approvals__instance_id__live_authorization_post"];
         delete?: never;
         options?: never;
@@ -61,7 +79,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Reject Strategy */
+        /**
+         * Reject Strategy
+         * @description 驳回：审核没通过或回测结论不可接受时落在这里，之后只能回到草稿重走流程。
+         */
         post: operations["reject_strategy_api_approvals__instance_id__reject_post"];
         delete?: never;
         options?: never;
@@ -93,10 +114,19 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Backtests */
+        /**
+         * List Backtests
+         * @description 按数据源列出历史回测（新到旧）。数据源必填，不做跨源聚合。
+         */
         get: operations["list_backtests_api_backtests_get"];
         put?: never;
-        /** Create Backtest */
+        /**
+         * Create Backtest
+         * @description 按请求跑一次批量回测，每个标的各落一条运行；返回其中第一条。
+         *
+         *     实例不存在返回 404，已停用返回 409（与目标组合回放同一口径）：静默跳过一个停用的
+         *     实例会让「没有信号」与「没跑」混成同一件事。
+         */
         post: operations["create_backtest_api_backtests_post"];
         delete?: never;
         options?: never;
@@ -111,7 +141,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Backtest Ranking */
+        /**
+         * Get Backtest Ranking
+         * @description 按一个指标给该数据源的历史回测排序。
+         *
+         *     只排序，不标「最优」：把历史收益最高的那一行标成最优，等于把「过去涨得好」写成
+         *     「以后也该选它」。`max_drawdown_pct` 是正数幅度，按它排序时最小的排在最前。
+         */
         get: operations["get_backtest_ranking_api_backtests_ranking_get"];
         put?: never;
         post?: never;
@@ -128,11 +164,17 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Backtest */
+        /**
+         * Get Backtest
+         * @description 一次回测的完整结果：组合级汇总、逐腿明细、逐笔成交与资金曲线。
+         */
         get: operations["get_backtest_api_backtests__run_id__get"];
         put?: never;
         post?: never;
-        /** Delete Backtest */
+        /**
+         * Delete Backtest
+         * @description 删除一次回测及其逐笔交易与资金曲线。
+         */
         delete: operations["delete_backtest_api_backtests__run_id__delete"];
         options?: never;
         head?: never;
@@ -901,6 +943,10 @@ export interface components {
         };
         /**
          * BacktestDetailResponse
+         * @description 一次回测的完整结果：组合级汇总在上，逐腿明细在下。
+         *
+         *     `trades` 是逐笔成交（每笔完整交易的开平仓时刻、价格、成本与盈亏），`legs` 是按
+         *     `product_key` 与方向汇总后的逐腿明细，`equity_curve` 是逐 bar 的资金曲线。
          * @example {
          *       "equity_curve": [
          *         {
@@ -912,6 +958,28 @@ export interface components {
          *           "time": "2026-11-01T00:00:00Z"
          *         }
          *       ],
+         *       "legs": [
+         *         {
+         *           "contribution_pct": "2.4055",
+         *           "entry_time": "2026-08-04T14:00:00Z",
+         *           "exit_time": "2026-10-28T06:00:00Z",
+         *           "fee": "18.40",
+         *           "inst_id": "XAAPL-USDT",
+         *           "inst_type": "SPOT",
+         *           "pnl": "240.55",
+         *           "product_key": "XAAPL",
+         *           "side": "long",
+         *           "trade_count": 37
+         *         }
+         *       ],
+         *       "portfolio": {
+         *         "leg_win_rate": {
+         *           "XAAPL": "0.54"
+         *         },
+         *         "long_pnl": "210.45",
+         *         "net_exposure": "0.5",
+         *         "short_pnl": "-18.20"
+         *       },
          *       "request": {
          *         "bar": "1h",
          *         "costs": {
@@ -943,6 +1011,8 @@ export interface components {
          *         "data_source": "okx",
          *         "end_date": "2026-11-01",
          *         "finished_at": "2026-11-10T01:21:30Z",
+         *         "inst_id": "XAAPL-USDT",
+         *         "inst_type": "SPOT",
          *         "is_proxy": false,
          *         "metrics": {
          *           "annualized_return_pct": "48.21",
@@ -962,6 +1032,11 @@ export interface components {
          *           "trade_count": 37,
          *           "win_rate": "0.54"
          *         },
+         *         "params": {
+         *           "pair_count": 1,
+         *           "reversion_window": 3,
+         *           "strength_window": 2
+         *         },
          *         "run_id": "bt_0001",
          *         "start_date": "2026-08-01",
          *         "status": "succeeded",
@@ -975,13 +1050,13 @@ export interface components {
          *           "exit_price": "232.44",
          *           "exit_time": "2026-08-05T06:00:00Z",
          *           "fee": "1.98",
-         *           "funding": "0",
          *           "inst_id": "XAAPL-USDT",
          *           "inst_type": "SPOT",
          *           "pnl": "35.24",
+         *           "product_key": "XAAPL",
          *           "qty": "8.63",
          *           "reason": "MA20 下穿 MA60",
-         *           "side": "buy",
+         *           "side": "long",
          *           "trade_id": "tr_0001"
          *         }
          *       ]
@@ -990,10 +1065,51 @@ export interface components {
         BacktestDetailResponse: {
             /** Equity Curve */
             equity_curve: components["schemas"]["EquityPoint"][];
+            /** Legs */
+            legs: components["schemas"]["BacktestLeg"][];
+            portfolio: components["schemas"]["BacktestPortfolio"];
             request: components["schemas"]["BacktestRequest"];
             run: components["schemas"]["BacktestRunSummary"];
             /** Trades */
             trades: components["schemas"]["BacktestTrade"][];
+        };
+        /**
+         * BacktestLeg
+         * @description 一条腿在本次回测里的汇总：方向、第一笔开仓到最后一笔平仓、成本与贡献。
+         *
+         *     `contribution_pct` 是这条腿的**已实现**盈亏占初始资金的百分比。回测结束时仍未
+         *     平掉的仓位只体现在资金曲线里，不在逐腿明细里，因此全部腿的贡献相加可能小于总收益率
+         *     ——差的正是未平仓部分的浮动盈亏。
+         */
+        BacktestLeg: {
+            /** Contribution Pct */
+            contribution_pct: string;
+            /** Entry Time */
+            entry_time: string;
+            /** Exit Time */
+            exit_time: string;
+            /** Fee */
+            fee: string;
+            /** Funding */
+            funding?: string | null;
+            /** Inst Id */
+            inst_id: string;
+            /**
+             * Inst Type
+             * @enum {string}
+             */
+            inst_type: "SPOT" | "SWAP";
+            /** Pnl */
+            pnl: string;
+            /** Product Key */
+            product_key: string;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "long" | "short";
+            /** Trade Count */
+            trade_count: number;
         };
         /** BacktestMetrics */
         BacktestMetrics: {
@@ -1031,6 +1147,25 @@ export interface components {
             win_rate: string;
         };
         /**
+         * BacktestPortfolio
+         * @description 组合级汇总：净敞口、每腿胜率、多腿与空腿的合计盈亏。
+         *
+         *     逐腿明细在 `BacktestDetailResponse.legs`：这里只回答「整个组合怎么样」，
+         *     单条腿各自赚了多少放在下面那张表里。
+         */
+        BacktestPortfolio: {
+            /** Leg Win Rate */
+            leg_win_rate: {
+                [key: string]: string;
+            };
+            /** Long Pnl */
+            long_pnl: string;
+            /** Net Exposure */
+            net_exposure: string;
+            /** Short Pnl */
+            short_pnl: string;
+        };
+        /**
          * BacktestRankingResponse
          * @example {
          *       "data_source": "okx",
@@ -1039,7 +1174,13 @@ export interface components {
          *           "inst_id": "XAAPL-USDT",
          *           "inst_type": "SPOT",
          *           "max_drawdown_pct": "-6.12",
+         *           "params": {
+         *             "pair_count": 1,
+         *             "reversion_window": 3,
+         *             "strength_window": 2
+         *           },
          *           "profit_factor": "1.95",
+         *           "run_id": "bt_0001",
          *           "sharpe": "1.31",
          *           "total_return_pct": "12.4055",
          *           "trade_count": 37
@@ -1073,8 +1214,14 @@ export interface components {
             inst_type: "SPOT" | "SWAP";
             /** Max Drawdown Pct */
             max_drawdown_pct: string;
+            /** Params */
+            params: {
+                [key: string]: number | string | boolean;
+            };
             /** Profit Factor */
             profit_factor: string;
+            /** Run Id */
+            run_id: string;
             /** Sharpe */
             sharpe: string;
             /** Total Return Pct */
@@ -1141,6 +1288,8 @@ export interface components {
          *           "data_source": "okx",
          *           "end_date": "2026-11-01",
          *           "finished_at": "2026-11-10T01:21:30Z",
+         *           "inst_id": "XAAPL-USDT",
+         *           "inst_type": "SPOT",
          *           "is_proxy": false,
          *           "metrics": {
          *             "annualized_return_pct": "48.21",
@@ -1159,6 +1308,11 @@ export interface components {
          *             "total_return_pct": "12.4055",
          *             "trade_count": 37,
          *             "win_rate": "0.54"
+         *           },
+         *           "params": {
+         *             "pair_count": 1,
+         *             "reversion_window": 3,
+         *             "strength_window": 2
          *           },
          *           "run_id": "bt_0001",
          *           "start_date": "2026-08-01",
@@ -1189,6 +1343,8 @@ export interface components {
          *       "data_source": "okx",
          *       "end_date": "2026-11-01",
          *       "finished_at": "2026-11-10T01:21:30Z",
+         *       "inst_id": "XAAPL-USDT",
+         *       "inst_type": "SPOT",
          *       "is_proxy": false,
          *       "metrics": {
          *         "annualized_return_pct": "48.21",
@@ -1207,6 +1363,11 @@ export interface components {
          *         "total_return_pct": "12.4055",
          *         "trade_count": 37,
          *         "win_rate": "0.54"
+         *       },
+         *       "params": {
+         *         "pair_count": 1,
+         *         "reversion_window": 3,
+         *         "strength_window": 2
          *       },
          *       "run_id": "bt_0001",
          *       "start_date": "2026-08-01",
@@ -1237,9 +1398,20 @@ export interface components {
             error_message?: string | null;
             /** Finished At */
             finished_at?: string | null;
+            /** Inst Id */
+            inst_id: string;
+            /**
+             * Inst Type
+             * @enum {string}
+             */
+            inst_type: "SPOT" | "SWAP";
             /** Is Proxy */
             is_proxy: boolean;
             metrics?: components["schemas"]["BacktestMetrics"] | null;
+            /** Params */
+            params: {
+                [key: string]: number | string | boolean;
+            };
             /** Run Id */
             run_id: string;
             /**
@@ -1355,7 +1527,7 @@ export interface components {
             /** Fee */
             fee: string;
             /** Funding */
-            funding: string;
+            funding?: string | null;
             /** Inst Id */
             inst_id: string;
             /**
@@ -1365,6 +1537,8 @@ export interface components {
             inst_type: "SPOT" | "SWAP";
             /** Pnl */
             pnl: string;
+            /** Product Key */
+            product_key: string;
             /** Qty */
             qty: string;
             /** Reason */
@@ -1373,7 +1547,7 @@ export interface components {
              * Side
              * @enum {string}
              */
-            side: "buy" | "sell";
+            side: "long" | "short";
             /** Trade Id */
             trade_id: string;
         };

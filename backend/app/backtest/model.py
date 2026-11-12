@@ -50,6 +50,12 @@ class BacktestRunRow(Base):
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date] = mapped_column(Date, nullable=False)
     data_source: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    # 这次回测只跑一个标的：批量回测按标的分成多条运行，排行榜与结果列表才有
+    # 可以比较的一行。`inst_type` 与标的表同值，用于区分现货与永续。
+    inst_id: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    inst_type: Mapped[str] = mapped_column(String(8), nullable=False)
+    # 发起这次回测的完整请求，原样存、原样读：详情接口要按它重放出同一份输入。
+    request_json: Mapped[str] = mapped_column(Text, nullable=False)
     data_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     execution_model: Mapped[str] = mapped_column(String(16), nullable=False)
     costs_json: Mapped[str] = mapped_column(Text, nullable=False)

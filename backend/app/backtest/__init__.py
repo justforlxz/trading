@@ -57,11 +57,16 @@ from app.backtest.metrics import (
 )
 from app.backtest.model import BacktestEquityRow, BacktestRunRow, BacktestTradeRow
 from app.backtest.service import (
+    BacktestRunHeader,
+    BacktestRunPlan,
     BacktestRunRecord,
     BacktestSpec,
     data_fingerprint,
+    delete_run,
     get_run,
+    list_runs,
     save_run,
+    save_runs,
 )
 from app.backtest.simulation import (
     ExecutionResult,
@@ -93,6 +98,8 @@ __all__ = [
     "BacktestError",
     "BacktestInput",
     "BacktestResult",
+    "BacktestRunHeader",
+    "BacktestRunPlan",
     "BacktestRunRecord",
     "BacktestRunRow",
     "BacktestSpec",
@@ -121,6 +128,7 @@ __all__ = [
     "compute_metrics",
     "data_fingerprint",
     "default_annualization_factor",
+    "delete_run",
     "effective_leverage",
     "execute_orders",
     "execution_price",
@@ -132,6 +140,7 @@ __all__ = [
     "initial_margin",
     "liquidated_in_bar",
     "liquidation_price",
+    "list_runs",
     "maintenance_margin",
     "margin_terms",
     "margin_used",
@@ -146,6 +155,7 @@ __all__ = [
     "resolve_exit",
     "run_backtest",
     "save_run",
+    "save_runs",
     "slippage_cost",
     "split_window",
     "tier_for",

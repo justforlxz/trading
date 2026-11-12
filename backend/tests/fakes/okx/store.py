@@ -1,7 +1,9 @@
 """假 OKX 的内存数据源。
 
 标的清单默认来自全类别冻结快照（两类 `instType`、四类 `instCategory`）；K 线、
-资金费与行情快照按标的名确定性生成，无需预置数据。
+资金费与行情快照按标的名确定性生成，无需预置数据。需要可控行情序列的用例
+（例如回测要覆盖「有信号」的路径）可以给 `candle_series` 传入按
+`inst_id → bar → 行` 组织的固定 K 线，其余端点仍走确定性生成。
 业务错误用 `OkxApiError` 表达（HTTP 200 + 非零 code），与限流/上游故障区分。
 
 交易域（余额、持仓、订单、成交、鉴权）在 `tests.fakes.okx.trade`，由本类持有
@@ -12,7 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from decimal import Decimal
 from typing import Any
 
@@ -80,6 +82,7 @@ class OkxStore:
         instruments: Sequence[dict[str, Any]] | None = None,
         clock: Callable[[], float] = time.time,
         book: TradeBook | None = None,
+        candle_series: Mapping[str, Mapping[str, Sequence[Sequence[str]]]] | None = None,
     ) -> None:
         rows = list(instruments) if instruments is not None else load_all_instruments()
         self._instruments = rows
@@ -87,6 +90,11 @@ class OkxStore:
         self._clock = clock
         #: 交易域状态：私有接口的全部预置数据与鉴权凭据都在这里。
         self.book = book if book is not None else TradeBook(clock=clock)
+        #: 固定 K 线：按键与上游一致（`inst_id` → `bar` → 按时间升序的行），只覆盖显式给出的组合。
+        self._candle_series = {
+            inst_id: {bar: tuple(tuple(row) for row in rows) for bar, rows in by_bar.items()}
+            for inst_id, by_bar in (candle_series or {}).items()
+        }
 
     def instruments(self, inst_type: str) -> list[dict[str, Any]]:
         """按产品类型返回标的元数据。"""
@@ -101,6 +109,9 @@ class OkxStore:
         row = self._require_inst_id(inst_id)
         self._validate_bar(bar)
         self._validate_limit(limit)
+        fixed = self._candle_series.get(inst_id, {}).get(bar)
+        if fixed is not None:
+            return [list(item) for item in reversed(fixed[-limit:])]
         return make_candle_rows(
             inst_id,
             bar,
@@ -126,6 +137,12 @@ class OkxStore:
         row = self._require_inst_id(inst_id)
         self._validate_bar(bar)
         self._validate_limit(limit)
+        fixed = self._candle_series.get(inst_id, {}).get(bar)
+        if fixed is not None:
+            if after is None:
+                return [list(item) for item in reversed(fixed[-limit:])]
+            earlier = [item for item in fixed if int(item[0]) < int(after) * 1000]
+            return [list(item) for item in reversed(earlier[-limit:])]
         if after is None:
             return self.candles(inst_id, bar, limit)
         newest = align_open_time(after, bar) - bar_seconds(bar)

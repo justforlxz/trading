@@ -13,11 +13,6 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import AwareDatetime
 
 from app.api.schemas import (
-    BacktestDetailResponse,
-    BacktestRankingResponse,
-    BacktestRequest,
-    BacktestRunListResponse,
-    BacktestRunSummary,
     BacktestSweepRequest,
     BacktestSweepResponse,
     CorrelationMatrixResponse,
@@ -36,14 +31,13 @@ from app.api.schemas import (
     PortfolioAdjustmentDecisionRequest,
     PortfolioAdjustmentListResponse,
     PositionListResponse,
-    RankingMetric,
     SettingsResponse,
     SettingsUpdateRequest,
     SignalListResponse,
     StrategyPortfolioDetailResponse,
     StrategyPortfolioListResponse,
 )
-from app.api.schemas.common import Bar, DataSource
+from app.api.schemas.common import Bar
 
 __all__ = ["contract_router"]
 
@@ -58,39 +52,11 @@ def _stub(node: str) -> HTTPException:
 
 # ---------------------------------------------------------------- backtest
 
+# 参数扫描端点仍是契约桩：T4.3 交付的是扫描的域实现与进程内队列（`app/backtest/sweep.py`、
+# `app/jobs/**`），没有落地 HTTP 端点。回测主链路（发起 / 列表 / 排行 / 明细 / 删除）由
+# T4.4 实现，见 `app.api.routes.backtest`；两者不共用一条路径，所以这里只留扫描这一条桩。
+
 backtest_router = APIRouter(tags=["backtest"])
-
-
-@backtest_router.get("/backtests/ranking", response_model=BacktestRankingResponse)
-def get_backtest_ranking(
-    data_source: DataSource = Query(...),
-    metric: RankingMetric = Query("total_return_pct"),
-    limit: int = Query(50, ge=1, le=500),
-) -> BacktestRankingResponse:
-    raise _stub("T4.3")
-
-
-@backtest_router.post("/backtests", response_model=BacktestRunSummary, status_code=202)
-def create_backtest(payload: BacktestRequest) -> BacktestRunSummary:
-    raise _stub("T4.4")
-
-
-@backtest_router.get("/backtests", response_model=BacktestRunListResponse)
-def list_backtests(
-    data_source: DataSource = Query(...),
-    limit: int = Query(50, ge=1, le=200),
-) -> BacktestRunListResponse:
-    raise _stub("T4.4")
-
-
-@backtest_router.get("/backtests/{run_id}", response_model=BacktestDetailResponse)
-def get_backtest(run_id: str) -> BacktestDetailResponse:
-    raise _stub("T4.4")
-
-
-@backtest_router.delete("/backtests/{run_id}", status_code=204, response_model=None)
-def delete_backtest(run_id: str) -> None:
-    raise _stub("T4.4")
 
 
 @backtest_router.post("/backtest-sweeps", response_model=BacktestSweepResponse, status_code=202)

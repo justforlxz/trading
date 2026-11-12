@@ -5,7 +5,13 @@
       "inst_id": "XAAPL-USDT",
       "inst_type": "SPOT",
       "max_drawdown_pct": "-6.12",
+      "params": {
+        "pair_count": 1,
+        "reversion_window": 3,
+        "strength_window": 2
+      },
       "profit_factor": "1.95",
+      "run_id": "bt_0001",
       "sharpe": "1.31",
       "total_return_pct": "12.4055",
       "trade_count": 37

@@ -2,8 +2,10 @@
 
 口径固定、可手算：
 
-- 成交价 = bar `close`；滑点按方向调整成交价（买入抬高、卖出压低），
+- 成交价 = bar `close`；滑点与买卖价差按方向调整成交价（买入抬高、卖出压低），
   同时把滑点金额单独记账用于成本归因，**不重复扣减**（已体现在成交价里）。
+- 买卖价差按「半价差过一次盘」计：买入付半价差、卖出让半价差，一次完整来回正好
+  付一个价差。它和滑点一样只影响成交价，不单独再从净值里扣一次。
 - 手续费按「角色」取一档费率（`taker_fee_bps` / `maker_fee_bps`），
   建仓与平仓各按成交名义金额计一次。
 """
@@ -28,7 +30,17 @@ class CostModel:
     taker_fee_bps: Decimal = Decimal(0)
     maker_fee_bps: Decimal = Decimal(0)
     slippage_bps: Decimal = Decimal(0)
+    spread_bps: Decimal = Decimal(0)
     fee_role: str = "taker"
+
+    def execution_bps(self) -> Decimal:
+        """一次成交对价格的调整幅度：滑点全额 + 半价差，单位 bps。
+
+        单笔成交只穿过半个价差（买付卖价、卖付买价），因此价差按一半计；一次完整
+        来回正好穿过两次，合计一个价差。
+        """
+
+        return self.slippage_bps + self.spread_bps / Decimal(2)
 
     def fee_bps(self) -> Decimal:
         if self.fee_role == "maker":
@@ -40,6 +52,7 @@ class CostModel:
             "taker_fee_bps": decimal_text(self.taker_fee_bps),
             "maker_fee_bps": decimal_text(self.maker_fee_bps),
             "slippage_bps": decimal_text(self.slippage_bps),
+            "spread_bps": decimal_text(self.spread_bps),
             "fee_role": self.fee_role,
         }
 

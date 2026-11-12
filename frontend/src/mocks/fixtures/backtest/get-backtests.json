@@ -7,6 +7,8 @@
       "data_source": "okx",
       "end_date": "2026-11-01",
       "finished_at": "2026-11-10T01:21:30Z",
+      "inst_id": "XAAPL-USDT",
+      "inst_type": "SPOT",
       "is_proxy": false,
       "metrics": {
         "annualized_return_pct": "48.21",
@@ -25,6 +27,11 @@
         "total_return_pct": "12.4055",
         "trade_count": 37,
         "win_rate": "0.54"
+      },
+      "params": {
+        "pair_count": 1,
+        "reversion_window": 3,
+        "strength_window": 2
       },
       "run_id": "bt_0001",
       "start_date": "2026-08-01",

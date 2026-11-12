@@ -1,14 +1,30 @@
-"""交易执行：订单状态机、账户实际持仓、paper 撮合与 Manual 模式编排（P3）。
+"""交易执行：订单状态机、账户实际持仓、paper 撮合、Manual 模式与自动执行（P3）。
 
 门面即出口：跨包只允许 `from app.execution import ...`。
 
 T5.2 提供订单状态机、账户实际持仓与 paper 撮合；T5.3 在它们之上提供交易计划、
 人工确认、下单编排与订单/持仓同步。策略级虚拟持仓（每个策略实例自己的成本与盈亏）
 属于全局组合管理（T7.1），不在这里建第二套账，也不做对账恢复（T6.3）。
+
+T6.2 提供自动执行：运行控制（默认关闭、可暂停）与「目标组合求差 → 风控 → 增量下单 →
+同步账户实际持仓」的循环。
 """
 
 from __future__ import annotations
 
+from app.execution.auto import (
+    AUTO_STATUS_DISABLED,
+    AUTO_STATUS_DUPLICATE,
+    AUTO_STATUS_EXECUTED,
+    AUTO_STATUS_PAUSED,
+    AutoExecutor,
+    AutoRunResult,
+    PositionDelta,
+    RebalancePlan,
+    SkipRecord,
+    reconcile_target,
+    target_key,
+)
 from app.execution.errors import PaperRejected
 from app.execution.manual import (
     build_plan,
@@ -55,6 +71,17 @@ from app.execution.positions import (
     PositionBook,
     from_venue_position,
 )
+from app.execution.runtime import (
+    ACTION_DISABLE,
+    ACTION_ENABLE,
+    ACTION_PAUSE,
+    ACTION_RESUME,
+    RUNTIME_PAUSED,
+    RUNTIME_RUNNING,
+    RUNTIME_STOPPED,
+    AutoRuntime,
+    RuntimeEvent,
+)
 from app.execution.service import (
     ExecutionService,
     OrderBackend,
@@ -65,9 +92,20 @@ from app.execution.service import (
 from app.execution.sync import sync_state
 
 __all__ = [
+    "ACTION_DISABLE",
+    "ACTION_ENABLE",
+    "ACTION_PAUSE",
+    "ACTION_RESUME",
+    "AUTO_STATUS_DISABLED",
+    "AUTO_STATUS_DUPLICATE",
+    "AUTO_STATUS_EXECUTED",
+    "AUTO_STATUS_PAUSED",
     "LEGAL_TRANSITIONS",
     "NET_POS_SIDE",
     "ORDER_STATUSES",
+    "RUNTIME_PAUSED",
+    "RUNTIME_RUNNING",
+    "RUNTIME_STOPPED",
     "SIDE_LONG",
     "SIDE_SHORT",
     "STATUS_CANCELLED",
@@ -78,6 +116,9 @@ __all__ = [
     "STATUS_PENDING",
     "TERMINAL_STATUSES",
     "AccountPosition",
+    "AutoExecutor",
+    "AutoRunResult",
+    "AutoRuntime",
     "ConfirmationRecord",
     "ExecutionService",
     "ExecutionState",
@@ -90,6 +131,10 @@ __all__ = [
     "PlacementResult",
     "PlanLeg",
     "PositionBook",
+    "PositionDelta",
+    "RebalancePlan",
+    "RuntimeEvent",
+    "SkipRecord",
     "SyncResult",
     "TradePlan",
     "TradePortBackend",
@@ -106,7 +151,9 @@ __all__ = [
     "new_order",
     "paper_snapshot",
     "plan_digest",
+    "reconcile_target",
     "require_confirmation",
     "require_transition",
     "sync_state",
+    "target_key",
 ]

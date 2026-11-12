@@ -83,6 +83,13 @@ export type JournalPosition = components["schemas"]["JournalPosition"];
 export type JournalOrder = components["schemas"]["JournalOrder"];
 export type JournalFill = components["schemas"]["JournalFill"];
 export type JournalSignal = components["schemas"]["JournalSignal"];
+export type OverviewResponse = components["schemas"]["OverviewResponse"];
+export type OverviewMarketState = OverviewResponse["market_states"][number];
+export type OverviewMarketSnapshot = OverviewResponse["market"][number];
+export type OverviewPortfolio = OverviewResponse["portfolio"];
+export type OverviewStrategyBrief = OverviewPortfolio["strategies"][number];
+export type OverviewOpportunity = OverviewResponse["recent_opportunities"][number];
+export type OverviewRiskEvent = OverviewResponse["risk_events"][number];
 
 /** 后端错误体的形状：`detail` 是字符串，或 FastAPI 校验错误的条目数组。 */
 type ErrorBody = { detail?: string | Array<{ msg?: string }> };
@@ -125,6 +132,12 @@ function send<T>(path: string, method: string, body: unknown): Promise<T> {
 
 export function fetchHealth(): Promise<Health> {
   return request<Health>("/health");
+}
+
+/** 市场驾驶舱聚合。`asOf` 用于回看同一时刻，缺省由后端取当前时刻。 */
+export function fetchOverview(asOf?: string): Promise<OverviewResponse> {
+  const query = asOf === undefined ? "" : `?as_of=${encodeURIComponent(asOf)}`;
+  return request<OverviewResponse>(`/overview${query}`);
 }
 
 export function fetchWatchlist(): Promise<WatchlistResponse> {

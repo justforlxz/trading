@@ -1,64 +1,93 @@
 {
-  "account": {
-    "available": "8160.00",
-    "currency": "USDT",
-    "equity": "10240.55",
-    "mode": "paper",
-    "today_pnl": "-12.30",
-    "unrealized_pnl": "28.64"
-  },
-  "active_strategies": [
+  "as_of": "2026-11-10T08:00:00Z",
+  "market": [
     {
+      "as_of": "2026-11-10T08:00:00Z",
+      "bar": "1d",
+      "breadth": {
+        "advancers": 8,
+        "decliners": 2,
+        "participants": 11,
+        "ratio": "4",
+        "unchanged": 1
+      },
+      "inst_type": "SPOT",
+      "resonance": {
+        "participants": 11,
+        "strength": "0.62",
+        "window": 20
+      }
+    },
+    {
+      "as_of": "2026-11-10T08:00:00Z",
+      "bar": "1d",
+      "breadth": {
+        "advancers": 5,
+        "decliners": 5,
+        "participants": 10,
+        "ratio": "1",
+        "unchanged": 0
+      },
+      "inst_type": "SWAP",
+      "resonance": {
+        "participants": 10,
+        "strength": "0",
+        "window": 20
+      }
+    }
+  ],
+  "market_states": [
+    {
+      "inst_type": "SPOT",
+      "primary_source": "okx_spot",
+      "session": "regular"
+    },
+    {
+      "inst_type": "SWAP",
+      "primary_source": "us_equity_proxy",
+      "session": "post"
+    }
+  ],
+  "portfolio": {
+    "gross_exposure": "3510.40",
+    "net_exposure": "1997.15",
+    "open_positions": 3,
+    "strategies": [
+      {
+        "instance_id": "si_0001",
+        "name": "AAPL 均线趋势",
+        "open_positions": 1
+      }
+    ]
+  },
+  "recent_opportunities": [
+    {
+      "anchor_product_key": "AAPL",
+      "as_of": "2026-11-10T00:00:00Z",
+      "evidence": "{\"correlation\":0.87,\"breadth\":0.8,\"resonance\":0.62}",
+      "legs": [
+        {
+          "direction": "long",
+          "inst_id": "MSFT-USDT-SWAP",
+          "inst_type": "SWAP",
+          "product_key": "MSFT",
+          "score": "0.82"
+        }
+      ],
+      "mode": "target",
+      "opportunity_id": "opp_0001",
+      "score": "0.78",
+      "status": "new"
+    }
+  ],
+  "risk_events": [
+    {
+      "created_at": "2026-11-10T07:00:00Z",
+      "detail": "杠杆 25 超过上限 20",
+      "event_id": "re_0001",
+      "inst_id": "AAPL-USDT-SWAP",
       "instance_id": "si_0001",
-      "latest_signal_at": "2026-11-10T07:00:00Z",
-      "name": "AAPL 均线趋势",
-      "status": "paper_trading",
-      "strategy_id": "ma_cross"
-    }
-  ],
-  "exposure": {
-    "gross_exposure": "1997.15",
-    "margin_used_pct": "19.5",
-    "net_exposure": "1997.15"
-  },
-  "generated_at": "2026-11-10T08:00:00Z",
-  "positions": [
-    {
-      "avg_entry_price": "228.10",
-      "inst_id": "XAAPL-USDT",
-      "inst_type": "SPOT",
-      "leverage": "1",
-      "mark_price": "231.42",
-      "mode": "paper",
-      "notional": "1997.15",
-      "opened_at": "2026-11-09T14:00:00Z",
-      "product_key": "AAPL",
-      "qty": "8.63",
-      "side": "long",
-      "strategy_instance_id": "si_0001",
-      "unrealized_pnl": "28.64"
-    }
-  ],
-  "recent_signals": [
-    {
-      "action": "BUY",
-      "bar": "1h",
-      "generated_at": "2026-11-10T07:00:00Z",
-      "inst_id": "XAAPL-USDT",
-      "inst_type": "SPOT",
-      "price": "231.42",
-      "reason": "MA20 上穿 MA60",
-      "signal_id": "sig_0001",
-      "strategy_instance_id": "si_0001",
-      "target_weight": "0.25"
-    }
-  ],
-  "watchlist_highlights": [
-    {
-      "change_pct_24h": "1.86",
-      "inst_id": "XAAPL-USDT",
-      "last_price": "231.42",
-      "product_key": "AAPL"
+      "rule": "max_leverage"
     }
   ]
 }

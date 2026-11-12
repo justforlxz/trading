@@ -22,7 +22,6 @@ from app.api.schemas import (
     Order,
     OrderCreateRequest,
     OrderListResponse,
-    OverviewResponse,
     PositionListResponse,
     RiskEvent,
     RiskEventListResponse,
@@ -123,16 +122,6 @@ def update_settings_document(payload: SettingsUpdateRequest) -> SettingsResponse
     raise _stub("T5.5")
 
 
-# ---------------------------------------------------------------- overview
-
-overview_router = APIRouter(tags=["overview"])
-
-
-@overview_router.get("/overview", response_model=OverviewResponse)
-def get_overview() -> OverviewResponse:
-    raise _stub("T6.4")
-
-
 # ---------------------------------------------------------------- risk
 
 # 风险事件列表与「标记已处置」。分级处置写入的事件字段随列表一起暴露，
@@ -229,7 +218,6 @@ for _router in (
     backtest_router,
     trades_router,
     settings_router,
-    overview_router,
     correlation_router,
     risk_router,
 ):

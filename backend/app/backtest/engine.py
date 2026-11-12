@@ -13,9 +13,9 @@
 
 顺序固定，不随调用方变化：
 
-1. 结算资金费与保证金（调用注入的结算入口；未注入时这一步恒为 0）；
-2. 撮合本 bar 触发的成交：先判退出价位，再按目标组合调仓；
-3. 记录本 bar 收盘时的净值。
+1. 结算资金费、保证金与强平（调用注入的结算入口；未注入时这一步恒为 0）；
+2. 撮合本 bar 触发的成交：先按强平价平掉被强平的腿、再判退出价位，最后按目标组合调仓；
+3. 记录本 bar 收盘时的净值与保证金占用。
 
 顺序反过来，同一根 bar 的结果就会依赖实现细节：调仓数量按结算后的可用资金换算，
 先调仓再结算会得到另一个数量。
@@ -27,13 +27,18 @@
 看到空仓并把这条腿又建回来，成交价取本 bar 的开盘价或收盘价——止损平掉敞口后立刻
 按原权重买回，止损等于没有生效，净值会因为「止损价与重建价之差 + 多付一次手续费」
 系统性偏低。跳过当根重建把口径说死：价位出场即结束这条腿，策略想继续持有就要在
-下一根 bar 重新给出目标。
+下一根 bar 重新给出目标。被强平的腿按同一口径处理：它在这根 bar 上就是被交易所平掉
+了，不会因为目标组合还指着它就原地重建。
+
+`margin_curve` 记的是结算步看到的保证金占用：占用额在调仓之前算，强平与调仓都发生在
+它之后。一根 bar 上刚建的仓位在下一次结算前不占用保证金，因此新仓位的占用额落在下一
+根 bar 上——这条口径与「结算先于调仓」的顺序出自同一处，不另开口径。
 
 ## 分工
 
-本模块不算指标、不读交易所、不写数据库。资金费与保证金的公式属于 T4.5，通过
-`settle` 参数注入；本节点只保证调用时刻与可用资金的计算正确。T4.5 的实现交付之前，
-调用方显式传 `settle=None`，此时结算一步恒为 0。
+本模块不算指标、不读交易所、不写数据库。资金费、保证金与强平的公式在 T4.5 的纯函数与
+`settlement.AccountSettlement` 里，通过 `settle` 参数注入；本节点只保证调用时刻、账本
+记账与强平后不再重建。调用方显式传 `settle=None` 时不结资金费、不占保证金、不判强平。
 """
 
 from __future__ import annotations
@@ -50,25 +55,29 @@ from app.backtest.costs import CostModel, decimal_text
 from app.backtest.errors import BarSeriesError
 from app.backtest.simulation import (
     ExecutionResult,
+    FundingReport,
     LegCost,
     LegExit,
     LegFill,
+    LegLiquidation,
     LegOrder,
     LegPosition,
     Settlement,
+    SettlementOutcome,
     execute_orders,
     instrument_for,
     plan_orders,
     require_positive,
     resolve_exit,
 )
-from app.core import Bar, InstrumentRef, ValidationError
+from app.core import Bar, InstrumentRef, InvariantViolation, ValidationError
 from app.strategy import TargetPortfolio
 
 __all__ = [
     "BacktestInput",
     "BacktestResult",
     "EquityPoint",
+    "MarginPoint",
     "run_backtest",
 ]
 
@@ -77,10 +86,13 @@ NEXT_OPEN = "next_open"
 NEXT_CLOSE = "next_close"
 EXECUTION_MODELS = (NEXT_OPEN, NEXT_CLOSE)
 
+#: 强平的成交原因；与止盈止损区分开，结果里能直接读出「这条腿是被强平掉的」。
+LIQUIDATION = "liquidation"
+
 ZERO = Decimal(0)
 
-#: 结算入口：接收本 bar 的结算状态，返回现金变动（负数表示从组合扣款）。
-SettleFn = Callable[[Settlement], Decimal]
+#: 结算入口：接收本 bar 的结算状态，返回现金、保证金占用与强平事实。
+SettleFn = Callable[[Settlement], SettlementOutcome]
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +101,31 @@ class EquityPoint:
 
     time: datetime
     equity: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class MarginPoint:
+    """一个 bar 收盘时的保证金占用与可用资金。
+
+    `equity` 与同一时刻的 `EquityPoint.equity` 相同，一起记下来才能让
+    「已占用保证金 + 可用资金 == 权益」直接在单条记录上核对。
+
+    `margin_used` 是这根 bar 的**结算步**认定的占用额：它在强平与调仓之前算，因此强平
+    那根 bar 上仍有值——那正是这条腿占着保证金、随后被强平的那一刻。
+
+    保证金不放在 `EquityPoint` 上：`EquityPoint` 同时用来读回落库的净值曲线，而
+    `backtest_equity` 没有保证金列；共用同一个类型会让读回的历史记录把占用额显示成 0。
+    """
+
+    time: datetime
+    equity: Decimal
+    margin_used: Decimal
+
+    @property
+    def available(self) -> Decimal:
+        """可用资金 = 权益 − 已占用保证金。"""
+
+        return self.equity - self.margin_used
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,6 +153,12 @@ class BacktestResult:
 
     `result_hash` 是上面这些字段的规范化摘要；同样的输入跑两次得到同一个值。
     `net_exposure` 取最后一次生效的目标组合的净敞口（多头权重之和减空头权重之和）。
+
+    `margin_curve` 与 `equity_curve` 逐 bar 对齐：一行是同一根 bar 的权益与保证金占用。
+    `liquidations` 是本段行情里真的发生的强平（哪一腿、哪根 bar、哪一价位）；
+    `funding_report` 是资金费账本的可读摘要（覆盖率与三个缺口计数器），没有资金费账本
+    时为 `None`——它让「上游费率全缺失」与「费率确实是 0」不再都只是
+    `funding_total=0`。
     """
 
     execution_model: str
@@ -126,6 +169,9 @@ class BacktestResult:
     funding_total: Decimal
     net_exposure: Decimal
     result_hash: str
+    margin_curve: tuple[MarginPoint, ...]
+    liquidations: tuple[LegLiquidation, ...]
+    funding_report: FundingReport | None
 
 
 @dataclass(slots=True)
@@ -175,6 +221,7 @@ def run_backtest(request: BacktestInput) -> BacktestResult:
         raise ValidationError(
             f"未知执行模型 {request.execution_model!r}; 可选 {list(EXECUTION_MODELS)}"
         )
+    _begin_run(request.settle)
 
     series = _series(request.bars)
     timeline = sorted({moment for rows in series.values() for moment in rows})
@@ -186,6 +233,9 @@ def run_backtest(request: BacktestInput) -> BacktestResult:
     book = _Book(capital=capital)
     last_price: dict[str, Decimal] = {}
     curve: list[EquityPoint] = []
+    margins: list[MarginPoint] = []
+    liquidations: list[LegLiquidation] = []
+    funding_report: FundingReport | None = None
     net_exposure = ZERO
 
     for index, moment in enumerate(timeline):
@@ -195,21 +245,53 @@ def run_backtest(request: BacktestInput) -> BacktestResult:
         executed = _reference_prices(here, request.execution_model)
         marked = {**last_price, **executed}
 
-        # ① 结算资金费与保证金：现金流先落地，后面的调仓按结算后的资金换算数量。
+        # ① 结算资金费、保证金与强平：现金流先落地，后面的调仓按结算后的资金换算数量。
+        #    被强平的腿在结算步就地平掉，并与价位退出一样不参与本 bar 的重建。
+        occupied = ZERO
+        liquidated: set[str] = set()
         if request.settle is not None and book.positions:
-            book.funding += _settle(request.settle, moment, book, marked)
+            outcome = _settle(request.settle, moment, book, marked, here)
+            book.funding += outcome.cash
+            occupied = outcome.margin_used
+            if outcome.funding_report is not None:
+                funding_report = outcome.funding_report
+            liquidations.extend(outcome.liquidated)
+            liquidated = _liquidate(request, book, outcome.liquidated, moment)
 
         # ② 撮合本 bar 触发的成交：先看退出价位，再按目标组合调仓。
-        exited = _exit_by_level(request, book, here, levels, executed, moment)
+        exited = liquidated | _exit_by_level(request, book, here, levels, executed, moment)
         target = due_at.get(timeline[index - 1]) if index > 0 else None
         if target is not None:
             _follow_target(request, book, target, executed, marked, exited, moment)
             net_exposure = target.net_exposure
 
-        # ③ 记录净值：按本 bar 收盘价计价。
-        curve.append(EquityPoint(time=moment, equity=book.equity(last_price)))
+        # ③ 记录净值与保证金占用：净值按本 bar 收盘价计价。
+        equity = book.equity(last_price)
+        curve.append(EquityPoint(time=moment, equity=equity))
+        margins.append(MarginPoint(time=moment, equity=equity, margin_used=occupied))
 
-    return _build_result(request, book, tuple(curve), net_exposure)
+    return _build_result(
+        request,
+        book,
+        tuple(curve),
+        tuple(margins),
+        tuple(liquidations),
+        funding_report,
+        net_exposure,
+    )
+
+
+def _begin_run(settle: SettleFn | None) -> None:
+    """进入 bar 循环前建立本次回测的显式边界：有累计状态的结算入口在此重置。
+
+    不按「结算时刻是否回退」推断复用：第二次回测的时间窗可以整体更晚，那样推断不出来。
+    结算入口实现 `begin_run()` 时调用它（`AccountSettlement` 转发给资金费账本）；没有
+    累计状态的普通回调不需要实现本方法。
+    """
+
+    begin = getattr(settle, "begin_run", None)
+    if callable(begin):
+        begin()
 
 
 def _reference_prices(here: Mapping[str, Bar], execution_model: str) -> dict[str, Decimal]:
@@ -225,19 +307,74 @@ def _settle(
     moment: datetime,
     book: _Book,
     prices: Mapping[str, Decimal],
-) -> Decimal:
-    """调用注入的结算入口；它返回的现金变动原样计入组合。"""
+    bars: Mapping[str, Bar],
+) -> SettlementOutcome:
+    """调用注入的结算入口，并确认它交回的确实是结算产出。
 
-    return Decimal(
-        settle(
-            Settlement(
-                moment=moment,
-                equity=book.equity(prices),
-                positions=tuple(book.positions.values()),
-                prices=prices,
-            )
+    结算入口必须返回 `SettlementOutcome`：它以前只回传一个现金数字，保证金与强平没有
+    通道；这里把「只回传现金」判成错误，而不是让 `Decimal` 走进账本再在别处炸开。
+    """
+
+    outcome = settle(
+        Settlement(
+            moment=moment,
+            equity=book.equity(prices),
+            positions=tuple(book.positions.values()),
+            prices=prices,
+            bars=bars,
         )
     )
+    if not isinstance(outcome, SettlementOutcome):
+        raise ValidationError(f"结算入口必须返回 SettlementOutcome, 实际 {type(outcome).__name__}")
+    return outcome
+
+
+def _liquidate(
+    request: BacktestInput,
+    book: _Book,
+    records: Sequence[LegLiquidation],
+    moment: datetime,
+) -> set[str]:
+    """把结算入口报告的被强平腿按强平价平掉，返回本 bar 已退出的产品键。
+
+    成交走与止盈止损同一条路径（`execute_orders`）：手续费与滑点照计，已实现盈亏并入
+    账户；强平价本身作为成交参考价，跳空时不模拟更差的成交价。
+    """
+
+    if not records:
+        return set()
+
+    orders: list[LegOrder] = []
+    prices: dict[str, Decimal] = {}
+    for record in records:
+        position = book.positions.get(record.product_key)
+        if position is None:
+            raise InvariantViolation(
+                f"结算入口报告了不存在的腿 {record.product_key} 的强平, 该腿当前没有持仓"
+            )
+        orders.append(
+            LegOrder(
+                product_key=record.product_key,
+                inst_id=instrument_for(request.instruments, record.product_key).inst_id,
+                side=position.side,
+                qty=position.qty,
+                opening=False,
+                multiplier=position.multiplier,
+                reason=LIQUIDATION,
+            )
+        )
+        prices[record.product_key] = record.price
+
+    book.apply(
+        execute_orders(
+            orders,
+            book.positions,
+            prices=prices,
+            costs=request.costs,
+            bar_open_time=moment,
+        )
+    )
+    return {order.product_key for order in orders}
 
 
 def _exit_by_level(
@@ -323,6 +460,9 @@ def _build_result(
     request: BacktestInput,
     book: _Book,
     curve: tuple[EquityPoint, ...],
+    margins: tuple[MarginPoint, ...],
+    liquidations: tuple[LegLiquidation, ...],
+    funding_report: FundingReport | None,
     net_exposure: Decimal,
 ) -> BacktestResult:
     costs = tuple(
@@ -350,8 +490,14 @@ def _build_result(
             fills=fills,
             costs=costs,
             funding_total=book.funding,
+            margins=margins,
+            liquidations=liquidations,
+            funding_report=funding_report,
             net_exposure=net_exposure,
         ),
+        margin_curve=margins,
+        liquidations=liquidations,
+        funding_report=funding_report,
     )
 
 
@@ -406,14 +552,43 @@ def _result_hash(
     fills: Sequence[LegFill],
     costs: Sequence[LegCost],
     funding_total: Decimal,
+    margins: Sequence[MarginPoint],
+    liquidations: Sequence[LegLiquidation],
+    funding_report: FundingReport | None,
     net_exposure: Decimal,
 ) -> str:
-    """把结果字段写成规范化 JSON 再取 sha256；同样的结果必然得到同一个值。"""
+    """把结果字段写成规范化 JSON 再取 sha256；同样的结果必然得到同一个值。
+
+    保证金占用、强平记录与资金费覆盖率也在摘要里：只差档位表或费率覆盖情况的两份输入
+    会给出不同的保证金与强平事实，摘要必须跟着变，否则「同参数重跑」看不出这两处差异。
+    """
 
     payload: dict[str, Any] = {
         "execution_model": execution_model,
         "initial_capital": decimal_text(initial_capital),
         "equity_curve": [[point.time.isoformat(), decimal_text(point.equity)] for point in curve],
+        "margin_curve": [
+            [point.time.isoformat(), decimal_text(point.equity), decimal_text(point.margin_used)]
+            for point in margins
+        ],
+        "liquidations": [
+            [
+                item.product_key,
+                item.side,
+                decimal_text(item.price),
+                item.bar_open_time.isoformat(),
+            ]
+            for item in liquidations
+        ],
+        "funding_report": None
+        if funding_report is None
+        else [
+            decimal_text(funding_report.total),
+            funding_report.expected_points,
+            funding_report.missing_points,
+            funding_report.funding_missing,
+            funding_report.rate_zero,
+        ],
         "fills": [
             [
                 fill.product_key,

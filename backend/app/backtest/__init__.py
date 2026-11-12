@@ -21,10 +21,15 @@ from app.backtest.costs import (
     fee_cost,
     slippage_cost,
 )
-from app.backtest.engine import BacktestInput, BacktestResult, EquityPoint, run_backtest
+from app.backtest.engine import (
+    BacktestInput,
+    BacktestResult,
+    EquityPoint,
+    MarginPoint,
+    run_backtest,
+)
 from app.backtest.errors import BacktestError, BarSeriesError, MissingInstrumentError
 from app.backtest.funding_cost import (
-    FundingReport,
     FundingSettlement,
     funding_points_between,
     on_funding_grid,
@@ -63,14 +68,18 @@ from app.backtest.service import (
     get_run,
     save_run,
 )
+from app.backtest.settlement import AccountSettlement
 from app.backtest.simulation import (
     ExecutionResult,
+    FundingReport,
     LegCost,
     LegExit,
     LegFill,
+    LegLiquidation,
     LegOrder,
     LegPosition,
     Settlement,
+    SettlementOutcome,
     execute_orders,
     plan_orders,
     resolve_exit,
@@ -89,6 +98,7 @@ __all__ = [
     "DEFAULT_MAX_LEVERAGE",
     "HARD_MAX_LEVERAGE",
     "METRIC_NAMES",
+    "AccountSettlement",
     "BacktestEquityRow",
     "BacktestError",
     "BacktestInput",
@@ -108,12 +118,15 @@ __all__ = [
     "LegCost",
     "LegExit",
     "LegFill",
+    "LegLiquidation",
     "LegOrder",
     "LegPosition",
+    "MarginPoint",
     "MarginTerms",
     "MissingInstrumentError",
     "PositionTier",
     "Settlement",
+    "SettlementOutcome",
     "SplitWindow",
     "SweepCell",
     "SweepRow",

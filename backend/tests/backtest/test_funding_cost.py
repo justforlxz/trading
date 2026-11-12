@@ -13,11 +13,13 @@ from decimal import Decimal
 import pytest
 
 from app.backtest import (
+    AccountSettlement,
     BacktestInput,
     CostModel,
     FundingReport,
     FundingSettlement,
     LegPosition,
+    PositionTier,
     Settlement,
     funding_points_between,
     margin_terms,
@@ -36,6 +38,16 @@ INST_ID = "AAPL-USDT-SWAP"
 SPOT_ID = "XAAPL-USDT"
 START = datetime(2026, 3, 2, tzinfo=UTC)  # UTC 零点，落在 8 小时结算网格上
 BAR = Timeframe.parse("4h")
+
+#: 一条覆盖用例规模的档位表：端到端用例只需要「有档位、不会被强平」。
+TIERS = (
+    PositionTier(
+        size_min=Decimal(0),
+        size_max=Decimal(1_000_000),
+        max_leverage=Decimal(20),
+        maintenance_margin_rate=Decimal("0.005"),
+    ),
+)
 
 
 def at(hours: int) -> datetime:
@@ -100,6 +112,24 @@ def position(
     )
 
 
+def flat_bar(moment: datetime, price: str) -> Bar:
+    """一根开高低收全等于给定价格的 K 线：结算单元用例只需要「这根 bar 没穿过任何价位」。"""
+
+    value = Decimal(price)
+    return Bar(
+        inst_id=INST_ID,
+        timeframe=BAR,
+        open_time=moment,
+        open=value,
+        high=value,
+        low=value,
+        close=value,
+        volume=Decimal(0),
+        confirm=True,
+        source="okx",
+    )
+
+
 def state(
     moment: datetime,
     *,
@@ -108,11 +138,13 @@ def state(
 ) -> Settlement:
     held = tuple(positions) if positions is not None else (position(),)
     prices = {"AAPL": Decimal(price)} if held else {}
+    bars = {"AAPL": flat_bar(moment, price)} if held else {}
     return Settlement(
         moment=moment,
         equity=Decimal("10000"),
         positions=held,
         prices=prices,
+        bars=bars,
     )
 
 
@@ -300,6 +332,13 @@ def target(hours: int, *, side: str = "long", weight: str = "0.5") -> TargetPort
     )
 
 
+def account(funding: FundingSettlement, instrument_ref: InstrumentRef) -> AccountSettlement:
+    """把资金费账本包进引擎的结算入口；现货不占保证金，不需要档位表。"""
+
+    tiers = {} if instrument_ref.inst_type == "SPOT" else {"AAPL": TIERS}
+    return AccountSettlement(instruments={"AAPL": instrument_ref}, tiers=tiers, funding=funding)
+
+
 def request(*, instrument_ref: InstrumentRef, settle: object) -> BacktestInput:
     return BacktestInput(
         bars={"AAPL": [candle(index, instrument_ref.inst_id) for index in range(7)]},
@@ -327,15 +366,22 @@ def test_swap_backtest_charges_funding_at_each_point() -> None:
             (at(24), "0.0002", None),
         ]
     )
-    result = run_backtest(request(instrument_ref=instrument(), settle=book))
+    result = run_backtest(request(instrument_ref=instrument(), settle=account(book, instrument())))
 
     assert result.funding_total == Decimal("-2.46")
     assert result.equity_curve[-1].equity == Decimal("9997.54")
-    report: FundingReport = book.report()
+
+    report: FundingReport | None = result.funding_report
+    assert report is not None
     assert report.total == Decimal("-2.46")
     assert report.expected_points == 3
     assert (report.missing_points, report.funding_missing, report.rate_zero) == (0, 0, 0)
     assert report.coverage_pct == Decimal("100.00")
+
+    # 保证金占用也真的接进了账本：08:00 结算时 50 张 × 100 = 5000，杠杆被本地上限 3 压住。
+    assert result.margin_curve[1].margin_used == Decimal(0)  # 04:00 建仓，结算时还没有仓
+    assert result.margin_curve[2].margin_used == Decimal("5000") / Decimal(3)
+    assert result.liquidations == ()
 
 
 def test_spot_backtest_has_no_funding_no_margin_and_no_liquidation() -> None:
@@ -349,11 +395,18 @@ def test_spot_backtest_has_no_funding_no_margin_and_no_liquidation() -> None:
         ],
         instruments={"AAPL": instrument("SPOT")},
     )
-    result = run_backtest(request(instrument_ref=instrument("SPOT"), settle=book))
+    result = run_backtest(
+        request(instrument_ref=instrument("SPOT"), settle=account(book, instrument("SPOT")))
+    )
 
     assert result.funding_total == Decimal(0)
     assert result.equity_curve[-1].equity == Decimal("10000")
-    assert book.report().expected_points == 0
+
+    # 现货整段行情都不占保证金、也没有任何强平。
+    assert result.liquidations == ()
+    assert [point.margin_used for point in result.margin_curve] == [Decimal(0)] * 7
+    assert result.funding_report is not None
+    assert result.funding_report.expected_points == 0
 
     terms = margin_terms(
         inst_type="SPOT", side="long", entry_price=Decimal("100"), size=Decimal(50)
@@ -394,10 +447,13 @@ def test_settlement_reads_the_category_table_instead_of_hardcoding_perp(
             (at(24), "0.0002", None),
         ]
     )
-    result = run_backtest(request(instrument_ref=instrument(), settle=book))
+    result = run_backtest(request(instrument_ref=instrument(), settle=account(book, instrument())))
 
     assert result.funding_total == Decimal(0)
-    assert book.report().expected_points == 0
+    assert result.liquidations == ()
+    assert [point.margin_used for point in result.margin_curve] == [Decimal(0)] * 7
+    assert result.funding_report is not None
+    assert result.funding_report.expected_points == 0
 
     terms = margin_terms(
         inst_type="SWAP", side="long", entry_price=Decimal("100"), size=Decimal("50")

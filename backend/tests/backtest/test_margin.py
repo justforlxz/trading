@@ -299,3 +299,78 @@ def test_swap_short_liquidation_is_above_the_entry() -> None:
 
 def test_maintenance_margin_scales_with_notional() -> None:
     assert maintenance_margin(Decimal("70000"), Decimal("0.295")) == Decimal("20650")
+
+
+# ------------------------------------------------------------------ 入参校验
+
+
+@pytest.mark.parametrize("inst_type", [SPOT, SWAP])
+@pytest.mark.parametrize(
+    ("side", "entry_price", "size", "match"),
+    [
+        ("bogus", ENTRY, Decimal(1), "方向必须是"),
+        ("long", ENTRY, Decimal(0), "持仓规模"),
+        ("long", Decimal("-5"), Decimal(1), "开仓价"),
+    ],
+)
+def test_invalid_arguments_are_rejected_before_the_category_branch(
+    inst_type: str,
+    side: str,
+    entry_price: Decimal,
+    size: Decimal,
+    match: str,
+) -> None:
+    """同一组非法参数在现货与永续上同样报错：校验发生在类别分支之前。
+
+    方向、开仓价、规模对两类是同一个含义；放在分支之后，现货会直接返回「杠杆 1」而放过
+    这些入参，同一份数据在两类上得到两种结论。
+    """
+
+    with pytest.raises(ValidationError, match=match):
+        margin_terms(
+            inst_type=inst_type,
+            side=side,
+            entry_price=entry_price,
+            size=size,
+            tiers=tiers(),
+        )
+
+
+def test_a_liquidation_price_at_zero_is_rejected_instead_of_returned() -> None:
+    """杠杆 1 且 `mmr` 为 0 的多仓强平价正好是 0：报错，不返回一个 0。
+
+    `liquidated_in_bar` 要求强平价是正数，若这里放 0 过去，两个函数对同一份数据会给出
+    相反的回答（一个说「强平价是 0」，一个说「0 不是强平价」）。
+    """
+
+    with pytest.raises(ValidationError, match="不高于 0"):
+        liquidation_price(
+            side="long",
+            entry_price=ENTRY,
+            leverage=Decimal(1),
+            maintenance_margin_rate=Decimal(0),
+        )
+
+    # 空仓镜像仍然是正价位（200），不能被一起拒掉。
+    assert liquidation_price(
+        side="short",
+        entry_price=ENTRY,
+        leverage=Decimal(1),
+        maintenance_margin_rate=Decimal(0),
+    ) == Decimal("200")
+
+
+def test_the_zero_liquidation_price_boundary_surfaces_through_margin_terms() -> None:
+    """同一份「杠杆 1、mmr 0」的档位经 `margin_terms` 也报错，0 不会漏给下游。"""
+
+    single = (PositionTier(Decimal(0), Decimal(1000), Decimal(1), Decimal(0)),)
+
+    with pytest.raises(ValidationError, match="不高于 0"):
+        margin_terms(
+            inst_type=SWAP,
+            side="long",
+            entry_price=ENTRY,
+            size=Decimal(650),
+            max_leverage=Decimal(1),
+            tiers=single,
+        )

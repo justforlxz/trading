@@ -492,7 +492,10 @@ export interface paths {
         /** List Portfolio Adjustments */
         get: operations["list_portfolio_adjustments_api_portfolio_adjustments_get"];
         put?: never;
-        /** Create Portfolio Adjustment */
+        /**
+         * Create Portfolio Adjustment
+         * @description 提交调整申请：只落 `pending`，不写生效目标。
+         */
         post: operations["create_portfolio_adjustment_api_portfolio_adjustments_post"];
         delete?: never;
         options?: never;
@@ -513,7 +516,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Decide Portfolio Adjustment */
+        /**
+         * Decide Portfolio Adjustment
+         * @description 批准或驳回；`approved` 才会把目标写进生效分配。
+         */
         patch: operations["decide_portfolio_adjustment_api_portfolio_adjustments__adjustment_id__patch"];
         trace?: never;
     };
@@ -1862,7 +1868,7 @@ export interface components {
         };
         /**
          * ExposureOverviewResponse
-         * @description 全局敞口总览。`largest_position_share` 是单一标的最大权重占组合权益的比例。
+         * @description 全局敞口总览。`largest_position_share` 是单一产品净名义价值除以各策略预算总和。
          * @example {
          *       "conflicts": [
          *         {
@@ -5059,7 +5065,9 @@ export interface operations {
     };
     list_portfolio_adjustments_api_portfolio_adjustments_get: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -5073,6 +5081,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PortfolioAdjustmentListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

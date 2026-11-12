@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Layers,
   LineChart,
+  PieChart,
   Settings2,
   Share2,
   Star,
@@ -26,6 +27,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/relations", label: "关系", icon: Share2 },
   { to: "/strategies", label: "策略", icon: Layers },
   { to: "/backtests", label: "回测", icon: LineChart },
+  { to: "/portfolio", label: "组合", icon: PieChart },
   { to: "/trades", label: "交易", icon: ArrowLeftRight },
   { to: "/settings", label: "设置", icon: Settings2 },
 ];

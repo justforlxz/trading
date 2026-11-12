@@ -19,23 +19,16 @@ from app.api.schemas import (
     CorrelationSeriesResponse,
     ExecutionModeRequest,
     ExecutionStateResponse,
-    ExposureOverviewResponse,
     FillListResponse,
     JournalListResponse,
     Order,
     OrderCreateRequest,
     OrderListResponse,
     OverviewResponse,
-    PortfolioAdjustment,
-    PortfolioAdjustmentCreateRequest,
-    PortfolioAdjustmentDecisionRequest,
-    PortfolioAdjustmentListResponse,
     PositionListResponse,
     SettingsResponse,
     SettingsUpdateRequest,
     SignalListResponse,
-    StrategyPortfolioDetailResponse,
-    StrategyPortfolioListResponse,
 )
 from app.api.schemas.common import Bar
 
@@ -167,51 +160,6 @@ def get_correlation_series(
     raise _stub("T2.3")
 
 
-# ---------------------------------------------------------------- portfolio
-
-portfolio_router = APIRouter(tags=["portfolio"])
-
-
-@portfolio_router.get("/portfolio/strategies", response_model=StrategyPortfolioListResponse)
-def list_strategy_portfolios() -> StrategyPortfolioListResponse:
-    raise _stub("T7.1")
-
-
-@portfolio_router.get(
-    "/portfolio/strategies/{instance_id}", response_model=StrategyPortfolioDetailResponse
-)
-def get_strategy_portfolio(instance_id: str) -> StrategyPortfolioDetailResponse:
-    raise _stub("T7.1")
-
-
-@portfolio_router.get("/portfolio/exposure", response_model=ExposureOverviewResponse)
-def get_portfolio_exposure() -> ExposureOverviewResponse:
-    raise _stub("T7.1")
-
-
-@portfolio_router.get("/portfolio/adjustments", response_model=PortfolioAdjustmentListResponse)
-def list_portfolio_adjustments() -> PortfolioAdjustmentListResponse:
-    raise _stub("T7.1")
-
-
-@portfolio_router.post(
-    "/portfolio/adjustments", response_model=PortfolioAdjustment, status_code=201
-)
-def create_portfolio_adjustment(
-    payload: PortfolioAdjustmentCreateRequest,
-) -> PortfolioAdjustment:
-    raise _stub("T7.1")
-
-
-@portfolio_router.patch(
-    "/portfolio/adjustments/{adjustment_id}", response_model=PortfolioAdjustment
-)
-def decide_portfolio_adjustment(
-    adjustment_id: str, payload: PortfolioAdjustmentDecisionRequest
-) -> PortfolioAdjustment:
-    raise _stub("T7.1")
-
-
 # 审批域（`/api/approvals`）已由 `app/api/routes/approval.py` 实现，桩随之删除：
 # 契约里同一路径只允许一个处理函数。
 
@@ -221,6 +169,5 @@ for _router in (
     settings_router,
     overview_router,
     correlation_router,
-    portfolio_router,
 ):
     contract_router.include_router(_router)

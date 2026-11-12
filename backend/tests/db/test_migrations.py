@@ -22,6 +22,12 @@ from app.db.init import alembic_config
 from app.exchange import OrderSubmission  # noqa: F401
 from app.instrument import Instrument  # noqa: F401
 from app.market import Candle  # noqa: F401
+from app.portfolio import (  # noqa: F401
+    AllocationRow,
+    PortfolioAdjustmentRow,
+    VirtualFillRow,
+    VirtualPositionRow,
+)
 from app.strategy import (  # noqa: F401
     StrategyApprovalRow,
     StrategyInstanceRow,
@@ -69,7 +75,7 @@ def test_init_db_is_idempotent() -> None:
     with session_scope() as session:
         versions = session.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
 
-    assert versions == ["0010"]
+    assert versions == ["0011"]
 
 
 def test_upgrade_removes_backtest_runs_that_cannot_describe_their_instrument() -> None:

@@ -158,7 +158,7 @@ class PortfolioConflict(BaseModel):
 
 
 class ExposureOverviewResponse(BaseModel):
-    """全局敞口总览。`largest_position_share` 是单一标的最大权重占组合权益的比例。"""
+    """全局敞口总览。`largest_position_share` 是单一产品净名义价值除以各策略预算总和。"""
 
     gross_exposure: DecimalString
     net_exposure: DecimalString

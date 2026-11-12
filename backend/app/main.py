@@ -24,6 +24,12 @@ from app.db import init_db
 from app.exchange import OrderSubmission  # noqa: F401
 from app.instrument import Instrument  # noqa: F401
 from app.market import Candle  # noqa: F401
+from app.portfolio import (  # noqa: F401
+    AllocationRow,
+    PortfolioAdjustmentRow,
+    VirtualFillRow,
+    VirtualPositionRow,
+)
 from app.strategy import (  # noqa: F401
     StrategyInstanceRow,
     StrategyReplayRow,

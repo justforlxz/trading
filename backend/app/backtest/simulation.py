@@ -17,22 +17,25 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from app.backtest.costs import BPS, CostModel, execution_price
 from app.backtest.errors import MissingInstrumentError
-from app.core import InstrumentRef, InvariantViolation, ValidationError
+from app.core import Bar, InstrumentRef, InvariantViolation, ValidationError
 from app.instrument import trading_rules
 from app.strategy import TargetPortfolio, target_quantity
 
 __all__ = [
     "ExecutionResult",
+    "FundingReport",
     "LegCost",
     "LegExit",
     "LegFill",
+    "LegLiquidation",
     "LegOrder",
     "LegPosition",
     "Settlement",
+    "SettlementOutcome",
     "execute_orders",
     "plan_orders",
     "resolve_exit",
@@ -44,6 +47,10 @@ SIDES = frozenset({LONG, SHORT})
 
 ONE = Decimal(1)
 ZERO = Decimal(0)
+HUNDRED = Decimal(100)
+
+#: 覆盖率保留两位小数；契约里的 `funding_coverage_pct` 是十进制文本。
+COVERAGE_SCALE = Decimal("0.01")
 
 #: 数量单位 → 名义金额乘数。`contract` 读标的自身的合约面值，`base` 直接相乘。
 _UNIT_CONTRACT = "contract"
@@ -169,17 +176,95 @@ class LegCost:
 
 
 @dataclass(frozen=True, slots=True)
-class Settlement:
-    """结算入口的输入：这一根 bar 上「资金费与保证金」需要的全部状态。
+class LegLiquidation:
+    """一根 bar 上被强平的一条腿：哪一腿、哪根 bar、哪一价位。
 
-    `prices` 是本次结算使用的参考价（与执行模型一致）。返回值是现金变动，负数表示
-    从组合扣款。T4.5 交付的实现接收本对象；本节点只负责在正确的时刻调用它。
+    `price` 是强平价，不是成交价：引擎按它平仓，成交价再按成本模型的滑点调整。
+    跳空穿过强平价时同样按强平价结算，不模拟更差的成交价（与 `margin.liquidated_in_bar`
+    的口径一致）。
+    """
+
+    product_key: str
+    side: str
+    price: Decimal
+    bar_open_time: datetime
+
+    def __post_init__(self) -> None:
+        if not self.product_key.strip():
+            raise ValidationError("强平记录的 product_key 不能为空")
+        if self.side not in SIDES:
+            raise ValidationError(f"强平记录的 side 必须是 {sorted(SIDES)}, 实际 {self.side!r}")
+        require_positive(self.price, "强平价")
+        if self.bar_open_time.tzinfo is None:
+            raise ValidationError("强平记录的 bar_open_time 必须带时区")
+
+
+@dataclass(frozen=True, slots=True)
+class Settlement:
+    """结算入口的输入：这一根 bar 上「资金费、保证金与强平」需要的全部状态。
+
+    `prices` 是本次结算使用的参考价（与执行模型一致）：资金费与保证金占用都按它折算
+    名义金额。`bars` 是本 bar 的完整行情，强平判定读它的高低价——只给参考价回答不了
+    「这根 bar 有没有穿过强平价」，因此两个都要给；持有保证金腿却缺本 bar 行情时，
+    结算入口直接报错，不静默跳过强平。
+
+    返回值是 `SettlementOutcome`：现金变动、保证金占用与被强平的腿。
     """
 
     moment: datetime
     equity: Decimal
     positions: tuple[LegPosition, ...]
     prices: Mapping[str, Decimal]
+    bars: Mapping[str, Bar]
+
+
+@dataclass(frozen=True, slots=True)
+class SettlementOutcome:
+    """一次结算的产出：现金变动、保证金占用与被强平的腿。
+
+    `cash` 是资金费现金流（负数表示从组合扣款）；保证金只占用不划转，占用额单独回传
+    给引擎记账，所以它不是 `cash` 的一部分。`funding_report` 是资金费账本截至本次调用
+    的累计覆盖率快照：没有资金费账本时为 `None`，与「有账本但一个结算点都没发生」区分开。
+    """
+
+    cash: Decimal = ZERO
+    margin_used: Decimal = ZERO
+    liquidated: tuple[LegLiquidation, ...] = ()
+    funding_report: FundingReport | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class FundingReport:
+    """一次回测的资金费结果与覆盖率。
+
+    `expected_points` 按「结算点 × 持仓腿」计数：同一结算点上持有两条永续腿就是两个
+    点。三个缺口计数器互不重叠，`covered_points = expected - missing - funding_missing`。
+
+    覆盖率与三个计数器必须随结果一起返回：只看 `total` 时，「上游费率全缺失」与
+    「费率确实是 0」都是 0，缺口只有从这里才读得出来。
+    """
+
+    total: Decimal
+    expected_points: int
+    missing_points: int
+    funding_missing: int
+    rate_zero: int
+
+    @property
+    def covered_points(self) -> int:
+        """拿到可用费率的结算点（含费率确实为 0 的那些）。"""
+
+        return self.expected_points - self.missing_points - self.funding_missing
+
+    @property
+    def coverage_pct(self) -> Decimal | None:
+        """费率覆盖率百分比；窗口内没有需要结算的点时为 `None`。"""
+
+        if self.expected_points == 0:
+            return None
+        return (Decimal(self.covered_points) / Decimal(self.expected_points) * HUNDRED).quantize(
+            COVERAGE_SCALE, rounding=ROUND_HALF_UP
+        )
 
 
 @dataclass(frozen=True, slots=True)

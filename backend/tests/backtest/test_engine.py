@@ -24,6 +24,7 @@ from app.backtest import (
     LegPosition,
     MissingInstrumentError,
     Settlement,
+    SettlementOutcome,
     execute_orders,
     execution_price,
     plan_orders,
@@ -241,11 +242,11 @@ def test_funding_settles_before_the_rebalance_on_the_same_bar() -> None:
     seen: list[tuple[datetime, Decimal]] = []
     notionals: list[Decimal] = []
 
-    def settle(state: Settlement) -> Decimal:
+    def settle(state: Settlement) -> SettlementOutcome:
         seen.append((state.moment, state.equity))
         for held in state.positions:
             notionals.append(held.notional(state.prices[held.product_key]))
-        return Decimal("-500")
+        return SettlementOutcome(cash=Decimal("-500"))
 
     costs = CostModel(taker_fee_bps=Decimal("10"), slippage_bps=Decimal("5"))
     result = run_backtest(
@@ -559,13 +560,13 @@ def test_resolve_exit_mirrors_the_short_side() -> None:
 
 
 def test_settle_hook_is_only_called_while_positions_are_open() -> None:
-    """结算入口是 T4.5 的注入点：空仓不调用，建仓后的每根 bar 调用一次。"""
+    """结算入口是注入点：空仓不调用，建仓后的每根 bar 调用一次。"""
 
     calls: list[datetime] = []
 
-    def settle(state: Settlement) -> Decimal:
+    def settle(state: Settlement) -> SettlementOutcome:
         calls.append(state.moment)
-        return Decimal(0)
+        return SettlementOutcome()
 
     run_backtest(request(settle=settle))
 

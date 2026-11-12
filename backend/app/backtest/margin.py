@@ -179,20 +179,30 @@ def liquidation_price(
 
     简化式的距离是精确式（权益 = 按强平价扣的维持保证金）的 `(1 − mmr)` 倍，因此更早
     判强平、方向偏保守。`1/lever ≤ mmr` 时距离不为正，这里直接报错而不是给假价位。
+
+    算出来的价位不高于 0 时同样报错，不返回 0 或负数：`1/杠杆 − mmr == 1`（杠杆 1 且
+    `mmr` 为 0）的多仓就会落到 0，而 0 不是可成交的价格——`liquidated_in_bar` 按
+    「强平价必须是正数」校验，放它过去会让两个函数对同一份数据给出相反的回答。
     """
 
     _require_side(side)
     entry = require_positive(entry_price, "开仓价")
-    distance = ONE / _require_leverage(leverage, "leverage") - _require_mmr(maintenance_margin_rate)
+    leverage_used = _require_leverage(leverage, "leverage")
+    mmr = _require_mmr(maintenance_margin_rate)
+    distance = ONE / leverage_used - mmr
     if distance <= ZERO:
         raise ValidationError(
             f"杠杆 {leverage} 下 1/杠杆 不大于维持保证金率 {maintenance_margin_rate},"
             "该组合没有强平价"
         )
     offset = entry * distance
-    if side == LONG:
-        return entry - offset
-    return entry + offset
+    level = entry - offset if side == LONG else entry + offset
+    if level <= ZERO:
+        raise ValidationError(
+            f"开仓价 {entry} 在杠杆 {leverage_used} 与维持保证金率 {mmr} 下的强平价是 {level},"
+            "不高于 0: 该组合没有可触及的强平价"
+        )
+    return level
 
 
 def liquidated_in_bar(
@@ -224,7 +234,15 @@ def margin_terms(
     max_leverage: Decimal = DEFAULT_MAX_LEVERAGE,
     tiers: Sequence[PositionTier] = (),
 ) -> MarginTerms:
-    """本类别、本腿的杠杆与保证金口径；类别差异只查 `trading_rules`，不写类别分支。"""
+    """本类别、本腿的杠杆与保证金口径；类别差异只查 `trading_rules`，不写类别分支。
+
+    方向、开仓价、持仓规模三类入参在**分类别之前**校验：它们对现货与永续是同一个含义，
+    放在类别分支之后会让同一组非法参数在现货上被放过、在永续上被拒绝。
+    """
+
+    _require_side(side)
+    require_positive(entry_price, "开仓价")
+    require_positive(size, "持仓规模")
 
     if not trading_rules(inst_type).has_margin:
         return MarginTerms(
@@ -234,7 +252,6 @@ def margin_terms(
             liquidation_price=None,
         )
 
-    _require_side(side)
     tier = tier_for(tiers, size)
     leverage = effective_leverage(max_leverage, tiers, size)
     return MarginTerms(

@@ -25,17 +25,15 @@ UTC 的 8 小时网格上（00:00 / 08:00 / 16:00），两次结算之间为 0�
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import Decimal
 
-from app.backtest.simulation import LONG, LegPosition, Settlement
+from app.backtest.simulation import LONG, FundingReport, LegPosition, Settlement
 from app.core import InstrumentRef, ValidationError
 from app.instrument import trading_rules
 from app.market import FundingPoint
 
 __all__ = [
-    "FundingReport",
     "FundingSettlement",
     "funding_points_between",
     "on_funding_grid",
@@ -43,44 +41,9 @@ __all__ = [
 
 ONE = Decimal(1)
 ZERO = Decimal(0)
-HUNDRED = Decimal(100)
 
 #: 结算网格的锚点：UTC 零点。所有结算点都是它的整数倍小时。
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
-
-#: 覆盖率保留两位小数；契约里的 `funding_coverage_pct` 是十进制文本。
-COVERAGE_SCALE = Decimal("0.01")
-
-
-@dataclass(frozen=True, slots=True)
-class FundingReport:
-    """一次回测的资金费结果与覆盖率。
-
-    `expected_points` 按「结算点 × 持仓腿」计数：同一结算点上持有两条永续腿就是两个
-    点。三个缺口计数器互不重叠，`covered_points = expected - missing - funding_missing`。
-    """
-
-    total: Decimal
-    expected_points: int
-    missing_points: int
-    funding_missing: int
-    rate_zero: int
-
-    @property
-    def covered_points(self) -> int:
-        """拿到可用费率的结算点（含费率确实为 0 的那些）。"""
-
-        return self.expected_points - self.missing_points - self.funding_missing
-
-    @property
-    def coverage_pct(self) -> Decimal | None:
-        """费率覆盖率百分比；窗口内没有需要结算的点时为 `None`。"""
-
-        if self.expected_points == 0:
-            return None
-        return (Decimal(self.covered_points) / Decimal(self.expected_points) * HUNDRED).quantize(
-            COVERAGE_SCALE, rounding=ROUND_HALF_UP
-        )
 
 
 def on_funding_grid(moment: datetime, interval_hours: int) -> bool:
@@ -119,7 +82,8 @@ def funding_points_between(
 
 
 class FundingSettlement:
-    """按类别结算资金费的入口：实例本身可调用，直接交给引擎的 `settle`。
+    """按类别结算资金费的账本：只算资金费，由 `settlement.AccountSettlement` 组合成引擎
+    的结算入口。
 
     - `instruments` 与 `BacktestInput.instruments` 同一份映射，用来判断每条腿的类别
       与结算步长；
@@ -128,6 +92,11 @@ class FundingSettlement:
 
     引擎在空仓时不会调用结算入口，因此账本在每次调用后记录本次时刻，只结算
     `(上次时刻, 本次时刻]` 之间的网格点；尚无上次时刻时从本次持仓的最早开仓时刻算起。
+
+    账本带累计状态，回测开始时由调用方显式建立边界（`begin_run`）：`run_backtest` 在
+    进入 bar 循环前调用结算入口的 `begin_run()`，把「上一次结算」与累计计数器清零。
+    因此同一个实例跑第二次回测时，`report()` 只描述第二次回测，不会把两次的计数器
+    加在一起。
     """
 
     def __init__(
@@ -155,6 +124,7 @@ class FundingSettlement:
 
         moment = state.moment
         _require_aware(moment, "结算时刻")
+        self._require_increasing(moment)
         holdings = self._holdings(state)
         if not self._enabled or not holdings:
             self._last = moment
@@ -184,6 +154,29 @@ class FundingSettlement:
             funding_missing=self._funding_missing,
             rate_zero=self._rate_zero,
         )
+
+    def begin_run(self) -> None:
+        """开始一次新的回测：清空上一次的结算边界与累计计数器。
+
+        复用与不复用因此得到同一个结果：`report()` 与现金流都只描述本次回测。调用方
+        不经过 `run_backtest` 直接驱动账本时，也要在每次回测开始时调用本方法。
+        """
+
+        self._last = None
+        self._total = ZERO
+        self._expected = 0
+        self._missing = 0
+        self._funding_missing = 0
+        self._rate_zero = 0
+
+    def _require_increasing(self, moment: datetime) -> None:
+        """一次回测的结算时刻必须严格递增，否则结算网格会把回退的一段静默跳过。"""
+
+        if self._last is not None and moment <= self._last:
+            raise ValidationError(
+                f"资金费结算实例已在 {self._last.isoformat()} 结过, 又收到 {moment.isoformat()}"
+                ": 同一次回测内的结算时刻必须严格递增"
+            )
 
     def _holdings(
         self, state: Settlement

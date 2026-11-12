@@ -1,4 +1,31 @@
-"""风控：单笔与组合风险限额、分级处置（P2）。"""
+"""风控：两层限额、按类别适用、紧急停止与风险事件（P2）。
 
-# 空壳阶段没有对外符号；后续节点落地时在此发布（门面唯一出口）。
-__all__: list[str] = []
+门面即出口：跨包只允许 `from app.risk import ...`。
+"""
+
+from app.risk.rules import (
+    Correlation,
+    PositionExposure,
+    RiskContext,
+    RiskLimits,
+    SignalRecord,
+    TradeRequest,
+    applicable_rule_names,
+    evaluate,
+    rule_applicability,
+)
+from app.risk.service import RiskEngine, list_risk_events
+
+__all__ = [
+    "Correlation",
+    "PositionExposure",
+    "RiskContext",
+    "RiskEngine",
+    "RiskLimits",
+    "SignalRecord",
+    "TradeRequest",
+    "applicable_rule_names",
+    "evaluate",
+    "list_risk_events",
+    "rule_applicability",
+]

@@ -1,10 +1,8 @@
-"""各业务域的 HTTP 契约桩。
+"""各业务域的 HTTP 契约。
 
-这里的每个端点只负责「路径 + 请求模型 + 响应模型」的绑定，函数体一律抛
-501，不含任何业务逻辑。它存在的唯一目的是把契约冻结进
-`contracts/openapi.json`，让前端可以对着 MSW 假后端独立开发。
-
-实现某个域的节点落地真实端点时，删除该域的桩，不允许两套并存。
+尚未实现的域只绑定「路径 + 请求模型 + 响应模型」，函数体抛 501；实现某个域的
+节点落地真实端点时，删除该域的桩，不允许两套并存。风险事件列表已实现：它只读
+`risk_events`，因此直接放在本模块，不再另建路由文件。
 """
 
 from __future__ import annotations
@@ -26,11 +24,14 @@ from app.api.schemas import (
     OrderListResponse,
     OverviewResponse,
     PositionListResponse,
+    RiskEvent,
+    RiskEventListResponse,
     SettingsResponse,
     SettingsUpdateRequest,
     SignalListResponse,
 )
 from app.api.schemas.common import Bar
+from app.risk import list_risk_events
 
 __all__ = ["contract_router"]
 
@@ -132,6 +133,42 @@ def get_overview() -> OverviewResponse:
     raise _stub("T6.4")
 
 
+# ---------------------------------------------------------------- risk
+
+# 风险事件只读列表。分级处置（T6.5）需要的标记动作不在本节点实现。
+risk_router = APIRouter(tags=["risk"])
+
+
+@risk_router.get("/risk/events", response_model=RiskEventListResponse)
+def list_risk_event_records(
+    instance_id: str | None = Query(None),
+    inst_id: str | None = Query(None),
+    rule: str | None = Query(None),
+    limit: int = Query(200, ge=1, le=500),
+) -> RiskEventListResponse:
+    records, total = list_risk_events(
+        instance_id=instance_id,
+        inst_id=inst_id,
+        rule=rule,
+        limit=limit,
+    )
+    return RiskEventListResponse(
+        items=[
+            RiskEvent(
+                event_id=record.event_id,
+                instance_id=record.instance_id,
+                inst_id=record.inst_id,
+                rule=record.rule,
+                detail=record.detail,
+                created_at=record.created_at,
+                resolved_at=record.resolved_at,
+            )
+            for record in records
+        ],
+        total=total,
+    )
+
+
 # ---------------------------------------------------------------- correlation
 
 # 三个只读端点的 `as_of` 缺省表示「最近一次快照」，给出时按该时刻回看。
@@ -169,5 +206,6 @@ for _router in (
     settings_router,
     overview_router,
     correlation_router,
+    risk_router,
 ):
     contract_router.include_router(_router)

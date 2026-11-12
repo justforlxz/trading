@@ -23,6 +23,7 @@ from app.exchange import OrderSubmission  # noqa: F401
 from app.instrument import Instrument  # noqa: F401
 from app.market import Candle  # noqa: F401
 from app.strategy import (  # noqa: F401
+    StrategyApprovalRow,
     StrategyInstanceRow,
     StrategyReplayRow,
     StrategyTemplateRow,
@@ -68,4 +69,4 @@ def test_init_db_is_idempotent() -> None:
     with session_scope() as session:
         versions = session.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
 
-    assert versions == ["0008"]
+    assert versions == ["0009"]

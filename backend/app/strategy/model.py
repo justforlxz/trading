@@ -12,10 +12,13 @@
 两表分开而不是合并成一张：模板是代码事实，实例是用户数据，塞进同一张表迟早会出现
 「改参数顺手改了模板」的写路径，而模板一旦能被用户改，「同版本可复现」就不成立了。
 
-实例的字段与对外契约 `app/api/schemas/strategy.py::StrategyInstance` 一一对应（含
-`strategy_version`），避免接口层再翻译一次。`strategy_version` 记的是**实例创建时**
-模板的版本，不是当前版本：模板升级后历史实例仍报自己那一版，回放才有依据。生命周期
-阶段（`status`）不在本表推进，只经审批状态机改。
+实例的字段与对外契约 `app/api/schemas/strategy.py::StrategyInstance` 基本一一对应
+（含 `strategy_version`），避免接口层再翻译一次；`strategy_version` 记的是**实例创建
+时**模板的版本，不是当前版本：模板升级后历史实例仍报自己那一版，回放才有依据。
+
+例外有两处：生命周期阶段的列名是 `lifecycle_status`，契约里叫 `status`，同一个事实
+只有一个列，且只能经审批状态机（`app/strategy/approval.py`）推进，通用的实例更新路径
+不写它；`approved_by` 等四个推进凭据只在域内使用，契约没有对应字段，接口层也不映射。
 
 时间列沿用 `candles` 的口径：存 epoch 秒（整数）；参数与标的是 JSON 文本，读回时
 由使用方解析——两张表都不做业务校验，校验在模板的参数 schema 里做一次。
@@ -23,12 +26,17 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, ForeignKey, Identity, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
 
-__all__ = ["StrategyInstanceRow", "StrategyReplayRow", "StrategyTemplateRow"]
+__all__ = [
+    "StrategyApprovalRow",
+    "StrategyInstanceRow",
+    "StrategyReplayRow",
+    "StrategyTemplateRow",
+]
 
 
 class StrategyTemplateRow(Base):
@@ -67,12 +75,19 @@ class StrategyInstanceRow(Base):
     bar: Mapped[str] = mapped_column(String(8), nullable=False)
     params: Mapped[str] = mapped_column(String(1024), nullable=False, default="{}")
     inst_ids: Mapped[str] = mapped_column(String(1024), nullable=False, default="[]")
-    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    lifecycle_status: Mapped[str] = mapped_column(String(32), nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     execution_mode: Mapped[str] = mapped_column(String(16), nullable=False)
     latest_signal_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[int] = mapped_column(Integer, nullable=False)
     updated_at: Mapped[int] = mapped_column(Integer, nullable=False)
+    # 生命周期的推进凭据：审核通过的人与时刻、达标报告编号、实盘授权时刻。四列都由
+    # 审批状态机按目标阶段写入（见 `app/strategy/approval.py`），实例表自己不推断。
+    # 未发生的推进留空——空值表达「还没发生」，不写空串或 0 冒充一个时刻。
+    approved_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    approved_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    validation_report_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    live_authorized_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class StrategyReplayRow(Base):
@@ -104,3 +119,37 @@ class StrategyReplayRow(Base):
     target_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     points_json: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class StrategyApprovalRow(Base):
+    """一次生命周期推进的记录：谁、在什么时刻、把哪个实例从哪个阶段推到哪个阶段。
+
+    记录是历史事实，只增不改：阶段推进被驳回或回退时，旧记录仍然说明「当初是谁批的、
+    依据是什么」，回退本身是另一条记录。`instance_id` 带 `ON DELETE CASCADE`：实例
+    删掉之后，它的审批记录没有独立意义。
+
+    `evidence` 存推进依据的引用：进入 `validated` 时是达标报告的编号，其余阶段是调用方
+    给的引用（例如审批单号），没有依据时留空。`from_status` 允许为空是为了容纳
+    「机会发现直接产出实例」这种没有前一阶段的情况；本模块的推进总会带上它。
+
+    `seq` 是写入顺序，由数据库序列发放，不复用也不回收。`at` 只有秒精度，同一秒内的
+    多条推进光看时间无法分出先后，而审批记录列表必须按「先发生先列」的顺序展示，
+    排序因此落在 `seq` 上。
+    """
+
+    __tablename__ = "strategy_approvals"
+
+    approval_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    seq: Mapped[int] = mapped_column(BigInteger, Identity(), nullable=False)
+    instance_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("strategy_instances.instance_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    from_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    to_status: Mapped[str] = mapped_column(String(32), nullable=False)
+    actor: Mapped[str] = mapped_column(String(128), nullable=False)
+    at: Mapped[int] = mapped_column(Integer, nullable=False)
+    note: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    evidence: Mapped[str | None] = mapped_column(String(256), nullable=True)

@@ -192,7 +192,7 @@ def _instance(record: InstanceRecord) -> StrategyInstance:
         bar=record.bar,
         params=dict(record.params),
         inst_ids=list(record.inst_ids),
-        status=record.status,
+        status=record.lifecycle_status,
         enabled=record.enabled,
         execution_mode=record.execution_mode,
         latest_signal_at=record.latest_signal_at,

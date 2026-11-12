@@ -431,17 +431,21 @@ def _relative(path: Path) -> str:
 def test_strategy_imports_no_io_layers() -> None:
     """`app/strategy` 的计算代码不导入数据库、HTTP 客户端与交易所适配层。
 
-    两个模块是 IO 与事务边界，不参与计算：
+    三个模块是 IO 与事务边界，不参与计算：
 
     - `model.py`：表定义必须声明在 `app.db.Base` 上（本域表结构的唯一来源）；
     - `service.py`：模板投影、实例读写与回放编排（T3.3），与 `app/opportunity/service.py`
       同一分工——取数、写库、事务边界都在这里，组合计算仍然只经组件与模板。
+    - `approval.py`：生命周期阶段的唯一写入口（T3.6）。它是命令而不是计算——「哪些转移
+      合法」「报告是否达标」这些规则本身是纯函数，`tests/strategy/test_approval.py` 的
+      全组合用例不碰库；落库的那一步（改阶段 + 写一条审批记录）必须在这里完成，否则
+      又可以绕开状态机直接改阶段。
 
     其余模块逐文件检查，因此把 IO 带进计算模块（含 components / templates / builtin）
     会红。
     """
 
-    io_boundary = frozenset({"model.py", "service.py"})
+    io_boundary = frozenset({"model.py", "service.py", "approval.py"})
     forbidden = ("app.db", "app.exchange", "session", "httpx")
     violations: list[str] = []
     for path in _strategy_sources():

@@ -11,6 +11,19 @@
 跨包调用一律走本门面，不允许 `from app.strategy.target import ...` 之类的子模块直连。
 """
 
+from app.strategy.approval import (
+    DRAFT,
+    LIFECYCLE_STAGES,
+    REJECTED,
+    TRANSITIONS,
+    ApprovalTransition,
+    ValidationGate,
+    ValidationReport,
+    advance,
+    check_transition,
+    latest_transition,
+    list_transitions,
+)
 from app.strategy.builtin import BollingerReversion, MacdMomentum, MaCross, RsiReversal
 from app.strategy.components import (
     Breadth,
@@ -21,7 +34,12 @@ from app.strategy.components import (
     Trend,
 )
 from app.strategy.constraints import PortfolioConstraints, check_constraints
-from app.strategy.model import StrategyInstanceRow, StrategyReplayRow, StrategyTemplateRow
+from app.strategy.model import (
+    StrategyApprovalRow,
+    StrategyInstanceRow,
+    StrategyReplayRow,
+    StrategyTemplateRow,
+)
 from app.strategy.params import resolve_params
 from app.strategy.protocol import (
     Component,
@@ -71,7 +89,12 @@ from app.strategy.templates import Directional, RelativeValue
 from app.strategy.view import MarketView
 
 __all__ = [
+    "DRAFT",
+    "LIFECYCLE_STAGES",
     "MAX_REPLAY_POINTS",
+    "REJECTED",
+    "TRANSITIONS",
+    "ApprovalTransition",
     "BollingerReversion",
     "Breadth",
     "Component",
@@ -92,6 +115,7 @@ __all__ = [
     "Requirements",
     "RsiReversal",
     "Strategy",
+    "StrategyApprovalRow",
     "StrategyInstanceRow",
     "StrategyMeta",
     "StrategyReplayRow",
@@ -102,8 +126,12 @@ __all__ = [
     "Template",
     "TemplateDefinition",
     "Trend",
+    "ValidationGate",
+    "ValidationReport",
+    "advance",
     "build_target",
     "check_constraints",
+    "check_transition",
     "create_instance",
     "delete_instance",
     "evaluate_replay",
@@ -111,11 +139,13 @@ __all__ = [
     "get_instance",
     "get_strategy",
     "get_template",
+    "latest_transition",
     "list_components",
     "list_instances",
     "list_replays",
     "list_strategies",
     "list_templates",
+    "list_transitions",
     "normalize_weights",
     "prepare_replay",
     "project_templates",

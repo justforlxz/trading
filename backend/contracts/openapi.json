@@ -6258,6 +6258,7 @@
   "paths": {
     "/api/approvals": {
       "get": {
+        "description": "全部审批记录，最近写入的在前。记录只增不改，实例删除时随之级联删除。",
         "operationId": "list_approvals_api_approvals_get",
         "responses": {
           "200": {
@@ -6277,6 +6278,7 @@
         ]
       },
       "post": {
+        "description": "提交人工审核：草稿阶段（或被驳回之后）进入待审核。\n\n机会发现阶段的实例不能直接提交：转移表要求先落到草稿（`strategy_generation`），\n再由人工提交，否则「审核」这一步会跳过策略生成。",
         "operationId": "submit_for_review_api_approvals_post",
         "requestBody": {
           "content": {
@@ -6318,6 +6320,7 @@
     },
     "/api/approvals/{instance_id}/approve": {
       "post": {
+        "description": "审核通过：进入历史回测阶段，并记下审核人与时刻。\n\n回测本身由回测域执行，本端点不跑回测；`validated` 也不是这一步——它必须由达标的\n回测报告驱动，见 `app.strategy.approval.advance`。",
         "operationId": "approve_strategy_api_approvals__instance_id__approve_post",
         "parameters": [
           {
@@ -6370,6 +6373,7 @@
     },
     "/api/approvals/{instance_id}/live-authorization": {
       "post": {
+        "description": "实盘授权：记录授权事实，不打开实盘开关（开关属于执行域）。",
         "operationId": "authorize_live_trading_api_approvals__instance_id__live_authorization_post",
         "parameters": [
           {
@@ -6422,6 +6426,7 @@
     },
     "/api/approvals/{instance_id}/reject": {
       "post": {
+        "description": "驳回：审核没通过或回测结论不可接受时落在这里，之后只能回到草稿重走流程。",
         "operationId": "reject_strategy_api_approvals__instance_id__reject_post",
         "parameters": [
           {

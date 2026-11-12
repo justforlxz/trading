@@ -1,13 +1,14 @@
-"""回测域：成本模型、绩效指标、撮合调仓与组合级 bar 循环。
+"""回测域：成本模型、绩效指标、撮合调仓、组合级 bar 循环与结果持久化。
 
-本域只做计算，不碰交易所、数据库与会话。跨包调用一律走本门面。
+跨包调用一律走本门面。
 
 - `costs`：手续费与滑点；
-- `metrics`：绩效指标；
+- `metrics`：绩效指标、逐腿完整交易与组合级口径；
 - `simulation`：把目标组合与当前持仓的差额换成增量订单再换成成交；
 - `engine`：按目标组合序列推进 bar 循环，产出净值曲线与逐腿成交；
 - `margin`：逐仓保证金、杠杆档位与强平价；
-- `funding_cost`：按 8 小时结算点把资金费计入 PnL，并报告覆盖率缺口。
+- `funding_cost`：按 8 小时结算点把资金费计入 PnL，并报告覆盖率缺口；
+- `model` / `service`：把一次回测落库并读回（含逐腿交易与逐 bar 净敞口）。
 """
 
 from app.backtest.costs import (
@@ -41,7 +42,24 @@ from app.backtest.margin import (
     parse_position_tiers,
     tier_for,
 )
-from app.backtest.metrics import METRIC_NAMES, compute_metrics, default_annualization_factor
+from app.backtest.metrics import (
+    METRIC_NAMES,
+    ClosedTrade,
+    ExposurePoint,
+    closed_trades,
+    compute_metrics,
+    default_annualization_factor,
+    exposure_series,
+    portfolio_metrics,
+)
+from app.backtest.model import BacktestEquityRow, BacktestRunRow, BacktestTradeRow
+from app.backtest.service import (
+    BacktestRunRecord,
+    BacktestSpec,
+    data_fingerprint,
+    get_run,
+    save_run,
+)
 from app.backtest.simulation import (
     ExecutionResult,
     LegCost,
@@ -59,13 +77,20 @@ __all__ = [
     "DEFAULT_MAX_LEVERAGE",
     "HARD_MAX_LEVERAGE",
     "METRIC_NAMES",
+    "BacktestEquityRow",
     "BacktestError",
     "BacktestInput",
     "BacktestResult",
+    "BacktestRunRecord",
+    "BacktestRunRow",
+    "BacktestSpec",
+    "BacktestTradeRow",
     "BarSeriesError",
+    "ClosedTrade",
     "CostModel",
     "EquityPoint",
     "ExecutionResult",
+    "ExposurePoint",
     "FundingReport",
     "FundingSettlement",
     "LegCost",
@@ -77,14 +102,18 @@ __all__ = [
     "MissingInstrumentError",
     "PositionTier",
     "Settlement",
+    "closed_trades",
     "compute_metrics",
+    "data_fingerprint",
     "default_annualization_factor",
     "effective_leverage",
     "execute_orders",
     "execution_price",
     "execution_prices",
+    "exposure_series",
     "fee_cost",
     "funding_points_between",
+    "get_run",
     "initial_margin",
     "liquidated_in_bar",
     "liquidation_price",
@@ -95,8 +124,10 @@ __all__ = [
     "on_funding_grid",
     "parse_position_tiers",
     "plan_orders",
+    "portfolio_metrics",
     "resolve_exit",
     "run_backtest",
+    "save_run",
     "slippage_cost",
     "tier_for",
 ]

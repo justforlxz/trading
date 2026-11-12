@@ -11,10 +11,14 @@ from __future__ import annotations
 from alembic import command
 from sqlalchemy import text
 
+# 导入即注册表元数据（与 `app.main` 的装配顺序一致），否则 `Base.metadata` 是空的。
+from app.backtest import (  # noqa: F401
+    BacktestEquityRow,
+    BacktestRunRow,
+    BacktestTradeRow,
+)
 from app.db import Base, init_db, session_scope
 from app.db.init import alembic_config
-
-# 导入即注册表元数据（与 `app.main` 的装配顺序一致），否则 `Base.metadata` 是空的。
 from app.instrument import Instrument  # noqa: F401
 from app.market import Candle  # noqa: F401
 from app.strategy import (  # noqa: F401
@@ -63,4 +67,4 @@ def test_init_db_is_idempotent() -> None:
     with session_scope() as session:
         versions = session.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
 
-    assert versions == ["0006"]
+    assert versions == ["0007"]

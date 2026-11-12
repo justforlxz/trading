@@ -9,6 +9,28 @@
       "time": "2026-11-01T00:00:00Z"
     }
   ],
+  "legs": [
+    {
+      "contribution_pct": "2.4055",
+      "entry_time": "2026-08-04T14:00:00Z",
+      "exit_time": "2026-10-28T06:00:00Z",
+      "fee": "18.40",
+      "inst_id": "XAAPL-USDT",
+      "inst_type": "SPOT",
+      "pnl": "240.55",
+      "product_key": "XAAPL",
+      "side": "long",
+      "trade_count": 37
+    }
+  ],
+  "portfolio": {
+    "leg_win_rate": {
+      "XAAPL": "0.54"
+    },
+    "long_pnl": "210.45",
+    "net_exposure": "0.5",
+    "short_pnl": "-18.20"
+  },
   "request": {
     "bar": "1h",
     "costs": {
@@ -40,6 +62,8 @@
     "data_source": "okx",
     "end_date": "2026-11-01",
     "finished_at": "2026-11-10T01:21:30Z",
+    "inst_id": "XAAPL-USDT",
+    "inst_type": "SPOT",
     "is_proxy": false,
     "metrics": {
       "annualized_return_pct": "48.21",
@@ -59,6 +83,11 @@
       "trade_count": 37,
       "win_rate": "0.54"
     },
+    "params": {
+      "pair_count": 1,
+      "reversion_window": 3,
+      "strength_window": 2
+    },
     "run_id": "bt_0001",
     "start_date": "2026-08-01",
     "status": "succeeded",
@@ -72,13 +101,13 @@
       "exit_price": "232.44",
       "exit_time": "2026-08-05T06:00:00Z",
       "fee": "1.98",
-      "funding": "0",
       "inst_id": "XAAPL-USDT",
       "inst_type": "SPOT",
       "pnl": "35.24",
+      "product_key": "XAAPL",
       "qty": "8.63",
       "reason": "MA20 下穿 MA60",
-      "side": "buy",
+      "side": "long",
       "trade_id": "tr_0001"
     }
   ]

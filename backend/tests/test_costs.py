@@ -56,6 +56,7 @@ def test_cost_model_serializes_without_funding_fields() -> None:
         taker_fee_bps=Decimal("5"),
         maker_fee_bps=Decimal("2"),
         slippage_bps=Decimal("1"),
+        spread_bps=Decimal("3"),
         fee_role="taker",
     )
     payload = model.as_dict()
@@ -63,5 +64,17 @@ def test_cost_model_serializes_without_funding_fields() -> None:
         "taker_fee_bps": "5",
         "maker_fee_bps": "2",
         "slippage_bps": "1",
+        "spread_bps": "3",
         "fee_role": "taker",
     }
+
+
+def test_spread_is_charged_half_per_side() -> None:
+    """买付半价差、卖让半价差：一次来回正好付一个价差，与滑点同口径加在成交价上。"""
+
+    model = CostModel(slippage_bps=Decimal("5"), spread_bps=Decimal("4"))
+    # 5 bps 滑点 + 2 bps 半价差 = 7 bps
+    assert model.execution_bps() == Decimal("7")
+    entry, exit_ = execution_prices("long", Decimal("100"), Decimal("110"), model.execution_bps())
+    assert entry == Decimal("100.07")
+    assert exit_ == Decimal("109.923")

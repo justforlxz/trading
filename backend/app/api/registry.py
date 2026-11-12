@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from app.api.contract import contract_router
 from app.api.health import router as health_router
 from app.api.routes.approval import approval_router
+from app.api.routes.backtest import backtest_router
 from app.api.routes.indicators import indicators_router
 from app.api.routes.instruments import instruments_router
 from app.api.routes.market import market_router
@@ -30,4 +31,5 @@ def include_routers(app: FastAPI) -> None:
     app.include_router(opportunity_router, prefix="/api")
     app.include_router(strategy_router, prefix="/api")
     app.include_router(approval_router, prefix="/api")
+    app.include_router(backtest_router, prefix="/api")
     app.include_router(contract_router, prefix="/api")

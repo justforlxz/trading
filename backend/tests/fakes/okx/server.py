@@ -59,12 +59,16 @@ def start_server(
     host: str = "127.0.0.1",
     port: int = 18080,
     scenarios: Scenarios | None = None,
+    store: OkxStore | None = None,
 ) -> FakeOkxServer:
-    """在后台线程启动假 OKX；`port=0` 由系统分配空闲端口。"""
+    """在后台线程启动假 OKX；`port=0` 由系统分配空闲端口。
+
+    `store` 供需要固定行情或预置交易状态的用例注入；留空时使用默认的确定性数据源。
+    """
 
     active = scenarios if scenarios is not None else Scenarios()
-    store = OkxStore()
-    app = create_app(store=store, scenarios=active)
+    active_store = store if store is not None else OkxStore()
+    app = create_app(store=active_store, scenarios=active)
     server = uvicorn.Server(uvicorn.Config(app, host=host, port=port, log_level="warning"))
     thread = threading.Thread(target=server.run, name="fake-okx", daemon=True)
     thread.start()
@@ -73,7 +77,7 @@ def start_server(
         host=host,
         port=_bound_port(server, fallback=port),
         app=app,
-        store=store,
+        store=active_store,
         scenarios=active,
         _server=server,
         _thread=thread,

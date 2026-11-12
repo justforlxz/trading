@@ -47,6 +47,19 @@ export type StrategyInstanceUpdateRequest = components["schemas"]["StrategyInsta
 export type StrategyReplay = components["schemas"]["StrategyReplay"];
 export type StrategyReplayListResponse = components["schemas"]["StrategyReplayListResponse"];
 export type StrategyReplayPoint = StrategyReplay["points"][number];
+export type BacktestRunSummary = components["schemas"]["BacktestRunSummary"];
+export type BacktestRunListResponse = components["schemas"]["BacktestRunListResponse"];
+export type BacktestRankingResponse = components["schemas"]["BacktestRankingResponse"];
+export type BacktestRankingRow = BacktestRankingResponse["items"][number];
+export type BacktestMetric = BacktestRankingResponse["metric"];
+export type BacktestDataSource = BacktestRunSummary["data_source"];
+export type BacktestDetailResponse = components["schemas"]["BacktestDetailResponse"];
+export type BacktestLeg = BacktestDetailResponse["legs"][number];
+export type BacktestTradeRow = BacktestDetailResponse["trades"][number];
+export type BacktestRequest = components["schemas"]["BacktestRequest"];
+export type BacktestTargets = components["schemas"]["BacktestTargets"];
+export type BacktestCosts = components["schemas"]["BacktestCosts"];
+export type BacktestMetrics = components["schemas"]["BacktestMetrics"];
 
 /** 后端错误体的形状：`detail` 是字符串，或 FastAPI 校验错误的条目数组。 */
 type ErrorBody = { detail?: string | Array<{ msg?: string }> };
@@ -195,4 +208,31 @@ export function fetchStrategyReplays(instanceId: string): Promise<StrategyReplay
   return request<StrategyReplayListResponse>(
     `/strategy-instances/${encodeURIComponent(instanceId)}/replays`,
   );
+}
+
+/** 发起一次批量回测：每个被选中的标的各落一条运行。 */
+export function createBacktest(body: BacktestRequest): Promise<BacktestRunSummary> {
+  return send<BacktestRunSummary>("/backtests", "POST", body);
+}
+
+/** 该数据源的历史回测，新到旧。数据源必填，不做跨源聚合。 */
+export function fetchBacktests(dataSource: BacktestDataSource): Promise<BacktestRunListResponse> {
+  return request<BacktestRunListResponse>(`/backtests?data_source=${dataSource}`);
+}
+
+export function fetchBacktestRanking(
+  dataSource: BacktestDataSource,
+  metric: BacktestMetric,
+): Promise<BacktestRankingResponse> {
+  return request<BacktestRankingResponse>(
+    `/backtests/ranking?data_source=${dataSource}&metric=${metric}`,
+  );
+}
+
+export function fetchBacktest(runId: string): Promise<BacktestDetailResponse> {
+  return request<BacktestDetailResponse>(`/backtests/${encodeURIComponent(runId)}`);
+}
+
+export function deleteBacktest(runId: string): Promise<void> {
+  return request<void>(`/backtests/${encodeURIComponent(runId)}`, { method: "DELETE" });
 }

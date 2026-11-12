@@ -162,13 +162,19 @@ class ReplayLeg:
 
 @dataclass(frozen=True, slots=True)
 class ReplayOutcome:
-    """一次回放的计算结果（尚未落库）：目标组合 + 逐点净敞口 + 规范化 JSON 与哈希。"""
+    """一次回放的计算结果（尚未落库）：目标组合 + 逐点净敞口 + 规范化 JSON 与哈希。
+
+    `targets` 是逐时点的完整目标组合序列，与 `points` 一一对应：回放本身就算出了每个
+    时点的组合，只保留末点会让下游（回测）不得不把视图与矩阵再拼一遍。它的顺序与
+    `points` 相同，`as_of` 逐项相等。
+    """
 
     legs: tuple[ReplayLeg, ...]
     net_exposure: Decimal
     canonical_json: str
     target_hash: str
     points: tuple[ReplayPoint, ...]
+    targets: tuple[TargetPortfolio, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -369,12 +375,16 @@ def evaluate_replay(
     *,
     start: datetime,
     end: datetime,
+    source: str | None = None,
 ) -> ReplayOutcome:
-    """在 `[start, end]` 上重算目标组合，返回目标组合与逐点净敞口（不写库）。
+    """在 `[start, end]` 上重算目标组合，返回逐时点目标组合与逐点净敞口（不写库）。
 
-    每个时点只喂该时点**及之前**的 K 线，因此没有前视偏差；来源按「资产时段 ×
-    资产类别」逐时点解析，不把不同来源的序列拼进同一次计算。K 线在进入循环之前
-    一次读好，循环内用只前进的游标取前缀，不在每个时点重新过滤整段序列。
+    每个时点只喂该时点**及之前**的 K 线，因此没有前视偏差；来源默认按「资产时段 ×
+    资产类别」逐时点解析，不把不同来源的序列拼进同一次计算。传 `source` 时全程固定
+    用这一条来源：回测一次只允许一个数据源，混源会让时间轴与净值失去意义。
+
+    K 线在进入循环之前一次读好，循环内用只前进的游标取前缀，不在每个时点重新过滤
+    整段序列。
 
     时点数超过 `MAX_REPLAY_POINTS` 直接报错：单个时点要重建一次视图与相关性矩阵，
     代价与该时点的历史长度成正比，放行下去会让同步端点长时间占住线程。
@@ -384,6 +394,13 @@ def evaluate_replay(
     template = _template(instance.strategy_id)
     instruments = _instruments(instance.inst_ids)
     loaded = _load_series(instruments, instance.bar, start=start, end=end)
+    if source is not None:
+        # 固定来源时只保留这一条序列：时间轴也只由它决定，否则会算出该来源根本没有
+        # 对应 K 线的时点。来源里没有行情时下面按「没有 K 线」报错，不静默换源。
+        loaded = {
+            symbol: {name: rows for name, rows in by_source.items() if name == source}
+            for symbol, by_source in loaded.items()
+        }
     timeline = sorted(
         {
             candle.open_time
@@ -407,8 +424,12 @@ def evaluate_replay(
     cursors: dict[tuple[str, str], _SeriesCursor] = {}
     portfolio: TargetPortfolio | None = None
     points: list[ReplayPoint] = []
+    targets: list[TargetPortfolio] = []
     for moment in timeline:
-        portfolio = builder.build(_view(moment, instruments, loaded, cursors, instance.bar))
+        portfolio = builder.build(
+            _view(moment, instruments, loaded, cursors, instance.bar, source=source)
+        )
+        targets.append(portfolio)
         points.append(
             ReplayPoint(
                 as_of=moment,
@@ -429,6 +450,7 @@ def evaluate_replay(
         canonical_json=canonical,
         target_hash=hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
         points=tuple(points),
+        targets=tuple(targets),
     )
 
 
@@ -437,6 +459,7 @@ def prepare_replay(
     *,
     start: datetime,
     end: datetime,
+    source: str | None = None,
 ) -> ReplayRecord | None:
     """算好一次回放并返回「待落库」的记录；实例不存在返回 `None`。
 
@@ -454,7 +477,7 @@ def prepare_replay(
     if not instance.enabled:
         raise Conflict(f"策略实例 {instance_id} 已停用, 不能回放")
 
-    outcome = evaluate_replay(instance, start=start, end=end)
+    outcome = evaluate_replay(instance, start=start, end=end, source=source)
     created = _now()
     moment_start = _moment(start)
     moment_end = _moment(end)
@@ -645,20 +668,24 @@ def _view(
     loaded: Mapping[str, Mapping[str, Sequence[Bar]]],
     cursors: dict[tuple[str, str], _SeriesCursor],
     bar: str,
+    *,
+    source: str | None = None,
 ) -> MarketView:
     """某个时点的只读视图：只用该时点及之前的 K 线，矩阵与视图同一时点。
 
     `moment` 就是当前这根 K 线的 `open_time`，视图里包含这根已收盘的 K 线：回放记录
     的 `as_of` 因此是「这根 K 线的开盘时刻」，不是决策时刻，下游不要拿它当成「此刻
     只知道之前的数据」。
+
+    给了 `source` 就全程只用那一条来源（回测一次只用一个数据源），否则按资产时段解析。
     """
 
     candles: dict[str, dict[str, Sequence[Bar]]] = {}
     closes: dict[str, list[tuple[datetime, float]]] = {}
     for instrument in instruments:
-        source = _source_at(instrument, moment)
-        key = (instrument.symbol, source)
-        series = loaded.get(instrument.symbol, {}).get(source, ())
+        series_source = source if source is not None else _source_at(instrument, moment)
+        key = (instrument.symbol, series_source)
+        series = loaded.get(instrument.symbol, {}).get(series_source, ())
         cursor = cursors.get(key)
         if cursor is None:
             cursor = cursors[key] = _SeriesCursor(series)

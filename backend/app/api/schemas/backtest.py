@@ -17,15 +17,17 @@ from app.api.schemas.common import (
     DecimalString,
     ExecutionModel,
     InstType,
-    OrderSide,
     ParamValue,
+    PositionSide,
     UtcDatetime,
 )
 
 __all__ = [
     "BacktestCosts",
     "BacktestDetailResponse",
+    "BacktestLeg",
     "BacktestMetrics",
+    "BacktestPortfolio",
     "BacktestRankingResponse",
     "BacktestRankingRow",
     "BacktestRequest",
@@ -123,7 +125,10 @@ _EXAMPLE_RUN = {
     "run_id": "bt_0001",
     "status": "succeeded",
     "strategy_instance_id": "si_0001",
+    "params": {"reversion_window": 3, "strength_window": 2, "pair_count": 1},
     "data_source": "okx",
+    "inst_id": "XAAPL-USDT",
+    "inst_type": "SPOT",
     "is_proxy": False,
     "bar": "1h",
     "start_date": "2026-08-01",
@@ -161,7 +166,12 @@ class BacktestRunSummary(BaseModel):
     run_id: str
     status: RunStatus
     strategy_instance_id: str
+    # 这次运行实际使用的策略参数：换参数重跑会得到新的一条，列表靠它区分不同组合。
+    params: dict[str, ParamValue]
     data_source: DataSource
+    # 一次回测只跑一个标的：批量回测按标的分成多条运行，列表与排行榜才有一行可比。
+    inst_id: str
+    inst_type: InstType
     is_proxy: bool
     bar: Bar
     start_date: date
@@ -189,16 +199,22 @@ class BacktestRunListResponse(BaseModel):
 
 class BacktestTrade(BaseModel):
     trade_id: str
+    # `product_key` 是同一产品两种形态的配对键，界面按它把现货与永续放在一起看。
+    product_key: str
     inst_id: str
     inst_type: InstType
-    side: OrderSide
+    # 方向是持仓方向（多/空），不是单笔委托的买卖方向：一笔完整交易说的是「这条腿
+    # 在多头上赚了多少」，不是「下了买单还是卖单」。
+    side: PositionSide
     qty: DecimalString
     entry_time: UtcDatetime
     entry_price: DecimalString
     exit_time: UtcDatetime
     exit_price: DecimalString
     fee: DecimalString
-    funding: DecimalString
+    # 资金费按组合记账（`BacktestMetrics.funding_total`），逐腿拆分由 T4.7 承接；
+    # 在那之前这里一律为 null，不用 `0` 假装「这条腿没有资金费」。
+    funding: DecimalString | None = None
     pnl: DecimalString
     reason: str
 
@@ -208,9 +224,51 @@ class EquityPoint(BaseModel):
     equity: DecimalString
 
 
+class BacktestPortfolio(BaseModel):
+    """组合级汇总：净敞口、每腿胜率、多腿与空腿的合计盈亏。
+
+    逐腿明细在 `BacktestDetailResponse.legs`：这里只回答「整个组合怎么样」，
+    单条腿各自赚了多少放在下面那张表里。
+    """
+
+    net_exposure: DecimalString
+    leg_win_rate: dict[str, DecimalString]
+    long_pnl: DecimalString
+    short_pnl: DecimalString
+
+
+class BacktestLeg(BaseModel):
+    """一条腿在本次回测里的汇总：方向、第一笔开仓到最后一笔平仓、成本与贡献。
+
+    `contribution_pct` 是这条腿的**已实现**盈亏占初始资金的百分比。回测结束时仍未
+    平掉的仓位只体现在资金曲线里，不在逐腿明细里，因此全部腿的贡献相加可能小于总收益率
+    ——差的正是未平仓部分的浮动盈亏。
+    """
+
+    product_key: str
+    inst_id: str
+    inst_type: InstType
+    side: PositionSide
+    trade_count: int
+    entry_time: UtcDatetime
+    exit_time: UtcDatetime
+    fee: DecimalString
+    funding: DecimalString | None = None
+    pnl: DecimalString
+    contribution_pct: DecimalString
+
+
 class BacktestDetailResponse(BaseModel):
+    """一次回测的完整结果：组合级汇总在上，逐腿明细在下。
+
+    `trades` 是逐笔成交（每笔完整交易的开平仓时刻、价格、成本与盈亏），`legs` 是按
+    `product_key` 与方向汇总后的逐腿明细，`equity_curve` 是逐 bar 的资金曲线。
+    """
+
     run: BacktestRunSummary
     request: BacktestRequest
+    portfolio: BacktestPortfolio
+    legs: list[BacktestLeg]
     trades: list[BacktestTrade]
     equity_curve: list[EquityPoint]
 
@@ -220,19 +278,41 @@ class BacktestDetailResponse(BaseModel):
                 {
                     "run": _EXAMPLE_RUN,
                     "request": _EXAMPLE_REQUEST,
+                    "portfolio": {
+                        "net_exposure": "0.5",
+                        "leg_win_rate": {"XAAPL": "0.54"},
+                        "long_pnl": "210.45",
+                        "short_pnl": "-18.20",
+                    },
+                    "legs": [
+                        {
+                            "product_key": "XAAPL",
+                            "inst_id": "XAAPL-USDT",
+                            "inst_type": "SPOT",
+                            "side": "long",
+                            "trade_count": 37,
+                            "entry_time": "2026-08-04T14:00:00Z",
+                            "exit_time": "2026-10-28T06:00:00Z",
+                            "fee": "18.40",
+                            "funding": None,
+                            "pnl": "240.55",
+                            "contribution_pct": "2.4055",
+                        }
+                    ],
                     "trades": [
                         {
                             "trade_id": "tr_0001",
+                            "product_key": "XAAPL",
                             "inst_id": "XAAPL-USDT",
                             "inst_type": "SPOT",
-                            "side": "buy",
+                            "side": "long",
                             "qty": "8.63",
                             "entry_time": "2026-08-04T14:00:00Z",
                             "entry_price": "228.10",
                             "exit_time": "2026-08-05T06:00:00Z",
                             "exit_price": "232.44",
                             "fee": "1.98",
-                            "funding": "0",
+                            "funding": None,
                             "pnl": "35.24",
                             "reason": "MA20 下穿 MA60",
                         }
@@ -248,8 +328,11 @@ class BacktestDetailResponse(BaseModel):
 
 
 class BacktestRankingRow(BaseModel):
+    # 同一标的不同参数组合会各占一行，`run_id` 是回到具体运行的身份。
+    run_id: str
     inst_id: str
     inst_type: InstType
+    params: dict[str, ParamValue]
     total_return_pct: DecimalString
     max_drawdown_pct: DecimalString
     sharpe: DecimalString
@@ -270,8 +353,14 @@ class BacktestRankingResponse(BaseModel):
                     "metric": "total_return_pct",
                     "items": [
                         {
+                            "run_id": "bt_0001",
                             "inst_id": "XAAPL-USDT",
                             "inst_type": "SPOT",
+                            "params": {
+                                "reversion_window": 3,
+                                "strength_window": 2,
+                                "pair_count": 1,
+                            },
                             "total_return_pct": "12.4055",
                             "max_drawdown_pct": "-6.12",
                             "sharpe": "1.31",

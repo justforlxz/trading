@@ -81,6 +81,7 @@
         "type": "object"
       },
       "BacktestDetailResponse": {
+        "description": "一次回测的完整结果：组合级汇总在上，逐腿明细在下。\n\n`trades` 是逐笔成交（每笔完整交易的开平仓时刻、价格、成本与盈亏），`legs` 是按\n`product_key` 与方向汇总后的逐腿明细，`equity_curve` 是逐 bar 的资金曲线。",
         "examples": [
           {
             "equity_curve": [
@@ -93,6 +94,28 @@
                 "time": "2026-11-01T00:00:00Z"
               }
             ],
+            "legs": [
+              {
+                "contribution_pct": "2.4055",
+                "entry_time": "2026-08-04T14:00:00Z",
+                "exit_time": "2026-10-28T06:00:00Z",
+                "fee": "18.40",
+                "inst_id": "XAAPL-USDT",
+                "inst_type": "SPOT",
+                "pnl": "240.55",
+                "product_key": "XAAPL",
+                "side": "long",
+                "trade_count": 37
+              }
+            ],
+            "portfolio": {
+              "leg_win_rate": {
+                "XAAPL": "0.54"
+              },
+              "long_pnl": "210.45",
+              "net_exposure": "0.5",
+              "short_pnl": "-18.20"
+            },
             "request": {
               "bar": "1h",
               "costs": {
@@ -124,6 +147,8 @@
               "data_source": "okx",
               "end_date": "2026-11-01",
               "finished_at": "2026-11-10T01:21:30Z",
+              "inst_id": "XAAPL-USDT",
+              "inst_type": "SPOT",
               "is_proxy": false,
               "metrics": {
                 "annualized_return_pct": "48.21",
@@ -143,6 +168,11 @@
                 "trade_count": 37,
                 "win_rate": "0.54"
               },
+              "params": {
+                "pair_count": 1,
+                "reversion_window": 3,
+                "strength_window": 2
+              },
               "run_id": "bt_0001",
               "start_date": "2026-08-01",
               "status": "succeeded",
@@ -156,13 +186,13 @@
                 "exit_price": "232.44",
                 "exit_time": "2026-08-05T06:00:00Z",
                 "fee": "1.98",
-                "funding": "0",
                 "inst_id": "XAAPL-USDT",
                 "inst_type": "SPOT",
                 "pnl": "35.24",
+                "product_key": "XAAPL",
                 "qty": "8.63",
                 "reason": "MA20 下穿 MA60",
-                "side": "buy",
+                "side": "long",
                 "trade_id": "tr_0001"
               }
             ]
@@ -175,6 +205,16 @@
             },
             "title": "Equity Curve",
             "type": "array"
+          },
+          "legs": {
+            "items": {
+              "$ref": "#/components/schemas/BacktestLeg"
+            },
+            "title": "Legs",
+            "type": "array"
+          },
+          "portfolio": {
+            "$ref": "#/components/schemas/BacktestPortfolio"
           },
           "request": {
             "$ref": "#/components/schemas/BacktestRequest"
@@ -193,10 +233,94 @@
         "required": [
           "run",
           "request",
+          "portfolio",
+          "legs",
           "trades",
           "equity_curve"
         ],
         "title": "BacktestDetailResponse",
+        "type": "object"
+      },
+      "BacktestLeg": {
+        "description": "一条腿在本次回测里的汇总：方向、第一笔开仓到最后一笔平仓、成本与贡献。\n\n`contribution_pct` 是这条腿的**已实现**盈亏占初始资金的百分比。回测结束时仍未\n平掉的仓位只体现在资金曲线里，不在逐腿明细里，因此全部腿的贡献相加可能小于总收益率\n——差的正是未平仓部分的浮动盈亏。",
+        "properties": {
+          "contribution_pct": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Contribution Pct",
+            "type": "string"
+          },
+          "entry_time": {
+            "title": "Entry Time",
+            "type": "string"
+          },
+          "exit_time": {
+            "title": "Exit Time",
+            "type": "string"
+          },
+          "fee": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Fee",
+            "type": "string"
+          },
+          "funding": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Funding"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "inst_type": {
+            "enum": [
+              "SPOT",
+              "SWAP"
+            ],
+            "title": "Inst Type",
+            "type": "string"
+          },
+          "pnl": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Pnl",
+            "type": "string"
+          },
+          "product_key": {
+            "title": "Product Key",
+            "type": "string"
+          },
+          "side": {
+            "enum": [
+              "long",
+              "short"
+            ],
+            "title": "Side",
+            "type": "string"
+          },
+          "trade_count": {
+            "title": "Trade Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "product_key",
+          "inst_id",
+          "inst_type",
+          "side",
+          "trade_count",
+          "entry_time",
+          "exit_time",
+          "fee",
+          "pnl",
+          "contribution_pct"
+        ],
+        "title": "BacktestLeg",
         "type": "object"
       },
       "BacktestMetrics": {
@@ -325,6 +449,42 @@
         "title": "BacktestMetrics",
         "type": "object"
       },
+      "BacktestPortfolio": {
+        "description": "组合级汇总：净敞口、每腿胜率、多腿与空腿的合计盈亏。\n\n逐腿明细在 `BacktestDetailResponse.legs`：这里只回答「整个组合怎么样」，\n单条腿各自赚了多少放在下面那张表里。",
+        "properties": {
+          "leg_win_rate": {
+            "additionalProperties": {
+              "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+              "type": "string"
+            },
+            "title": "Leg Win Rate",
+            "type": "object"
+          },
+          "long_pnl": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Long Pnl",
+            "type": "string"
+          },
+          "net_exposure": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Net Exposure",
+            "type": "string"
+          },
+          "short_pnl": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Short Pnl",
+            "type": "string"
+          }
+        },
+        "required": [
+          "net_exposure",
+          "leg_win_rate",
+          "long_pnl",
+          "short_pnl"
+        ],
+        "title": "BacktestPortfolio",
+        "type": "object"
+      },
       "BacktestRankingResponse": {
         "examples": [
           {
@@ -334,7 +494,13 @@
                 "inst_id": "XAAPL-USDT",
                 "inst_type": "SPOT",
                 "max_drawdown_pct": "-6.12",
+                "params": {
+                  "pair_count": 1,
+                  "reversion_window": 3,
+                  "strength_window": 2
+                },
                 "profit_factor": "1.95",
+                "run_id": "bt_0001",
                 "sharpe": "1.31",
                 "total_return_pct": "12.4055",
                 "trade_count": 37
@@ -399,9 +565,33 @@
             "title": "Max Drawdown Pct",
             "type": "string"
           },
+          "params": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "title": "Params",
+            "type": "object"
+          },
           "profit_factor": {
             "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
             "title": "Profit Factor",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
             "type": "string"
           },
           "sharpe": {
@@ -420,8 +610,10 @@
           }
         },
         "required": [
+          "run_id",
           "inst_id",
           "inst_type",
+          "params",
           "total_return_pct",
           "max_drawdown_pct",
           "sharpe",
@@ -537,6 +729,8 @@
                 "data_source": "okx",
                 "end_date": "2026-11-01",
                 "finished_at": "2026-11-10T01:21:30Z",
+                "inst_id": "XAAPL-USDT",
+                "inst_type": "SPOT",
                 "is_proxy": false,
                 "metrics": {
                   "annualized_return_pct": "48.21",
@@ -555,6 +749,11 @@
                   "total_return_pct": "12.4055",
                   "trade_count": 37,
                   "win_rate": "0.54"
+                },
+                "params": {
+                  "pair_count": 1,
+                  "reversion_window": 3,
+                  "strength_window": 2
                 },
                 "run_id": "bt_0001",
                 "start_date": "2026-08-01",
@@ -605,6 +804,8 @@
             "data_source": "okx",
             "end_date": "2026-11-01",
             "finished_at": "2026-11-10T01:21:30Z",
+            "inst_id": "XAAPL-USDT",
+            "inst_type": "SPOT",
             "is_proxy": false,
             "metrics": {
               "annualized_return_pct": "48.21",
@@ -623,6 +824,11 @@
               "total_return_pct": "12.4055",
               "trade_count": 37,
               "win_rate": "0.54"
+            },
+            "params": {
+              "pair_count": 1,
+              "reversion_window": 3,
+              "strength_window": 2
             },
             "run_id": "bt_0001",
             "start_date": "2026-08-01",
@@ -685,6 +891,18 @@
             ],
             "title": "Finished At"
           },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "inst_type": {
+            "enum": [
+              "SPOT",
+              "SWAP"
+            ],
+            "title": "Inst Type",
+            "type": "string"
+          },
           "is_proxy": {
             "title": "Is Proxy",
             "type": "boolean"
@@ -698,6 +916,26 @@
                 "type": "null"
               }
             ]
+          },
+          "params": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "title": "Params",
+            "type": "object"
           },
           "run_id": {
             "title": "Run Id",
@@ -731,7 +969,10 @@
           "run_id",
           "status",
           "strategy_instance_id",
+          "params",
           "data_source",
+          "inst_id",
+          "inst_type",
           "is_proxy",
           "bar",
           "start_date",
@@ -998,9 +1239,16 @@
             "type": "string"
           },
           "funding": {
-            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
-            "title": "Funding",
-            "type": "string"
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Funding"
           },
           "inst_id": {
             "title": "Inst Id",
@@ -1019,6 +1267,10 @@
             "title": "Pnl",
             "type": "string"
           },
+          "product_key": {
+            "title": "Product Key",
+            "type": "string"
+          },
           "qty": {
             "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
             "title": "Qty",
@@ -1030,8 +1282,8 @@
           },
           "side": {
             "enum": [
-              "buy",
-              "sell"
+              "long",
+              "short"
             ],
             "title": "Side",
             "type": "string"
@@ -1043,6 +1295,7 @@
         },
         "required": [
           "trade_id",
+          "product_key",
           "inst_id",
           "inst_type",
           "side",
@@ -1052,7 +1305,6 @@
           "exit_time",
           "exit_price",
           "fee",
-          "funding",
           "pnl",
           "reason"
         ],
@@ -6520,6 +6772,7 @@
     },
     "/api/backtests": {
       "get": {
+        "description": "按数据源列出历史回测（新到旧）。数据源必填，不做跨源聚合。",
         "operationId": "list_backtests_api_backtests_get",
         "parameters": [
           {
@@ -6578,6 +6831,7 @@
         ]
       },
       "post": {
+        "description": "按请求跑一次批量回测，每个标的各落一条运行；返回其中第一条。\n\n实例不存在返回 404，已停用返回 409（与目标组合回放同一口径）：静默跳过一个停用的\n实例会让「没有信号」与「没跑」混成同一件事。",
         "operationId": "create_backtest_api_backtests_post",
         "requestBody": {
           "content": {
@@ -6619,6 +6873,7 @@
     },
     "/api/backtests/ranking": {
       "get": {
+        "description": "按一个指标给该数据源的历史回测排序。\n\n只排序，不标「最优」：把历史收益最高的那一行标成最优，等于把「过去涨得好」写成\n「以后也该选它」。`max_drawdown_pct` 是正数幅度，按它排序时最小的排在最前。",
         "operationId": "get_backtest_ranking_api_backtests_ranking_get",
         "parameters": [
           {
@@ -6695,6 +6950,7 @@
     },
     "/api/backtests/{run_id}": {
       "delete": {
+        "description": "删除一次回测及其逐笔交易与资金曲线。",
         "operationId": "delete_backtest_api_backtests__run_id__delete",
         "parameters": [
           {
@@ -6728,6 +6984,7 @@
         ]
       },
       "get": {
+        "description": "一次回测的完整结果：组合级汇总、逐腿明细、逐笔成交与资金曲线。",
         "operationId": "get_backtest_api_backtests__run_id__get",
         "parameters": [
           {

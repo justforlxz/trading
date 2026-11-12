@@ -424,11 +424,13 @@ def execute_orders(
     realized = ZERO
     fees = ZERO
     fee_rate = abs(Decimal(costs.fee_bps())) / BPS
-    slippage_rate = abs(Decimal(costs.slippage_bps)) / BPS
+    # 成交价按「滑点 + 半价差」调整：买卖各穿半个价差，一次来回正好付一个价差。
+    slip_bps = costs.execution_bps()
+    slippage_rate = abs(Decimal(slip_bps)) / BPS
 
     for order in orders:
         reference = _price(prices, order.product_key)
-        trade_price = execution_price(order.trade_side, reference, costs.slippage_bps)
+        trade_price = execution_price(order.trade_side, reference, slip_bps)
         notional = order.qty * trade_price * order.multiplier
         fee = fee_rate * notional
         slippage = slippage_rate * order.qty * reference * order.multiplier

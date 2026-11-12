@@ -32,7 +32,7 @@ from types import MappingProxyType
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.backtest.costs import CostModel, decimal_text
 from app.backtest.engine import EXECUTION_MODELS, BacktestInput, BacktestResult, EquityPoint
@@ -53,11 +53,16 @@ from app.db import session_scope
 from app.shared import CANONICAL_BARS
 
 __all__ = [
+    "BacktestRunHeader",
+    "BacktestRunPlan",
     "BacktestRunRecord",
     "BacktestSpec",
     "data_fingerprint",
+    "delete_run",
     "get_run",
+    "list_runs",
     "save_run",
+    "save_runs",
 ]
 
 ZERO = Decimal(0)
@@ -79,6 +84,9 @@ class BacktestSpec:
     start_date: date
     end_date: date
     data_source: str
+    inst_id: str
+    inst_type: str
+    request: Mapping[str, Any]
     data_fingerprint: str
     execution_model: str
     initial_capital: Decimal
@@ -90,6 +98,8 @@ class BacktestSpec:
             "strategy_id",
             "strategy_version",
             "data_source",
+            "inst_id",
+            "inst_type",
             "data_fingerprint",
         ):
             value = getattr(self, name)
@@ -117,6 +127,12 @@ class BacktestSpec:
             json.dumps(self.params, sort_keys=True)
         except (TypeError, ValueError) as exc:
             raise ValidationError(f"策略参数必须可 JSON 序列化:{exc}") from exc
+        if not isinstance(self.request, Mapping):
+            raise ValidationError("回测请求必须是映射")
+        try:
+            json.dumps(self.request, sort_keys=True)
+        except (TypeError, ValueError) as exc:
+            raise ValidationError(f"回测请求必须可 JSON 序列化:{exc}") from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,6 +140,7 @@ class BacktestRunRecord:
     """一次已落库的回测：身份、汇总、逐腿交易与逐 bar 曲线。
 
     `equity` 与 `exposure` 一一对应（同一根 bar 的净值和该 bar 在用的净敞口）。
+    `request` 是发起这次回测的完整请求（原样存取），详情接口按它重放同一份输入。
     """
 
     run_id: str
@@ -135,6 +152,9 @@ class BacktestRunRecord:
     start_date: date
     end_date: date
     data_source: str
+    inst_id: str
+    inst_type: str
+    request: Mapping[str, Any]
     data_fingerprint: str
     execution_model: str
     costs: Mapping[str, Any]
@@ -187,19 +207,64 @@ def data_fingerprint(
     return _sha256(payload)
 
 
+@dataclass(frozen=True, slots=True)
+class BacktestRunPlan:
+    """一次已经跑完、尚未落库的回测：引擎输入 + 可复现输入 + 结果。
+
+    批量回测先把每个标的都算成一份计划，全部成功之后才一起落库：任何一步失败都不会
+    在库里留下「前几个标的已写入」的半批结果。
+    """
+
+    request: BacktestInput
+    spec: BacktestSpec
+    result: BacktestResult
+
+
 def save_run(
     request: BacktestInput,
     spec: BacktestSpec,
     result: BacktestResult,
 ) -> BacktestRunRecord:
-    """把一次已经跑完的回测算成指标并落库，返回可回放的记录。
+    """把一次已经跑完的回测算成指标并落库，返回可回放的记录。"""
 
-    `request` 提供目标组合序列（净敞口序列的来源）与标的静态信息（数量乘数与类别），
-    `result` 提供净值曲线、逐腿成交与资金费合计。三者描述的是同一次回测：执行模型与初始
-    资金必须一致，不一致说明调用方把两次回测的输入与结果拼在了一起，直接判错而不是写入
-    一行自相矛盾的记录。
+    return save_runs([BacktestRunPlan(request=request, spec=spec, result=result)])[0]
+
+
+def save_runs(plans: Sequence[BacktestRunPlan]) -> tuple[BacktestRunRecord, ...]:
+    """把一批回测写进**同一个事务**：要么全部落库，要么一行都不留。
+
+    指标、逐腿交易与逐 bar 曲线在动手写库之前算好：输入自相矛盾时还没有任何一行进入
+    数据库。写库阶段整批共用一个事务，最后一条失败会连同前面几条一起回滚，因此「接口
+    返回错误但库里多了几条」不会发生。
     """
 
+    if not plans:
+        raise ValidationError("回测批次不能为空")
+    prepared = [_prepare(plan) for plan in plans]
+    with session_scope() as session:
+        for item in prepared:
+            session.add(item.run_row)
+            # 先落运行行：交易与净值两表按 run_id 做外键，父子顺序不能靠数据库碰运气。
+            session.flush()
+            session.add_all(item.trade_rows)
+            session.add_all(item.equity_rows)
+    return tuple(item.record for item in prepared)
+
+
+@dataclass(frozen=True, slots=True)
+class _PreparedRun:
+    """一份计划算完后的待写行与读回记录：算与写分开，写库阶段只剩 insert。"""
+
+    run_row: BacktestRunRow
+    trade_rows: tuple[BacktestTradeRow, ...]
+    equity_rows: tuple[BacktestEquityRow, ...]
+    record: BacktestRunRecord
+
+
+def _prepare(plan: BacktestRunPlan) -> _PreparedRun:
+    """把一份计划算成三张表的待写行与读回记录；只计算，不碰数据库。"""
+
+    request, spec, result = plan.request, plan.spec, plan.result
     _require_same_run(request, spec, result)
     bar_times = [point.time for point in result.equity_curve]
     exposure = exposure_series(request.targets, bar_times)
@@ -216,65 +281,58 @@ def save_run(
     run_id = "bt_" + uuid4().hex[:24]
     created_at = datetime.now(UTC).replace(microsecond=0)
 
-    with session_scope() as session:
-        session.add(
-            BacktestRunRow(
-                run_id=run_id,
-                strategy_instance_id=spec.strategy_instance_id,
-                strategy_id=spec.strategy_id,
-                strategy_version=spec.strategy_version,
-                params_json=_json_text(spec.params),
-                bar=spec.bar,
-                start_date=spec.start_date,
-                end_date=spec.end_date,
-                data_source=spec.data_source,
-                data_fingerprint=spec.data_fingerprint,
-                execution_model=spec.execution_model,
-                costs_json=_json_text(spec.costs.as_dict()),
-                metrics_json=_metrics_json(metrics),
-                portfolio_json=_portfolio_json(portfolio),
-                funding_total=quantize_money(result.funding_total),
-                result_hash=result_hash,
-                created_at=_epoch(created_at),
-            )
+    run_row = BacktestRunRow(
+        run_id=run_id,
+        strategy_instance_id=spec.strategy_instance_id,
+        strategy_id=spec.strategy_id,
+        strategy_version=spec.strategy_version,
+        params_json=_json_text(spec.params),
+        bar=spec.bar,
+        start_date=spec.start_date,
+        end_date=spec.end_date,
+        data_source=spec.data_source,
+        inst_id=spec.inst_id,
+        inst_type=spec.inst_type,
+        request_json=_json_text(spec.request),
+        data_fingerprint=spec.data_fingerprint,
+        execution_model=spec.execution_model,
+        costs_json=_json_text(spec.costs.as_dict()),
+        metrics_json=_metrics_json(metrics),
+        portfolio_json=_portfolio_json(portfolio),
+        funding_total=quantize_money(result.funding_total),
+        result_hash=result_hash,
+        created_at=_epoch(created_at),
+    )
+    trade_rows = tuple(
+        BacktestTradeRow(
+            trade_id=f"{run_id}:{index:06d}",
+            run_id=run_id,
+            product_key=trade.product_key,
+            inst_id=trade.inst_id,
+            inst_type=trade.inst_type,
+            side=trade.side,
+            qty=quantize_money(trade.qty),
+            entry_time=_epoch(trade.entry_time),
+            entry_price=trade.entry_price,
+            exit_time=_epoch(trade.exit_time),
+            exit_price=trade.exit_price,
+            fee=trade.fee,
+            slippage=trade.slippage,
+            pnl=trade.pnl,
+            reason=trade.reason,
         )
-        # 先落运行行：交易与净值两表按 run_id 做外键，父子顺序不能靠数据库碰运气。
-        session.flush()
-        session.add_all(
-            [
-                BacktestTradeRow(
-                    trade_id=f"{run_id}:{index:06d}",
-                    run_id=run_id,
-                    product_key=trade.product_key,
-                    inst_id=trade.inst_id,
-                    inst_type=trade.inst_type,
-                    side=trade.side,
-                    qty=quantize_money(trade.qty),
-                    entry_time=_epoch(trade.entry_time),
-                    entry_price=trade.entry_price,
-                    exit_time=_epoch(trade.exit_time),
-                    exit_price=trade.exit_price,
-                    fee=trade.fee,
-                    slippage=trade.slippage,
-                    pnl=trade.pnl,
-                    reason=trade.reason,
-                )
-                for index, trade in enumerate(trades)
-            ]
+        for index, trade in enumerate(trades)
+    )
+    equity_rows = tuple(
+        BacktestEquityRow(
+            run_id=run_id,
+            time=_epoch(point.time),
+            equity=point.equity,
+            net_exposure=exposure[index].net_exposure,
         )
-        session.add_all(
-            [
-                BacktestEquityRow(
-                    run_id=run_id,
-                    time=_epoch(point.time),
-                    equity=point.equity,
-                    net_exposure=exposure[index].net_exposure,
-                )
-                for index, point in enumerate(result.equity_curve)
-            ]
-        )
-
-    return BacktestRunRecord(
+        for index, point in enumerate(result.equity_curve)
+    )
+    record = BacktestRunRecord(
         run_id=run_id,
         strategy_instance_id=spec.strategy_instance_id,
         strategy_id=spec.strategy_id,
@@ -284,6 +342,9 @@ def save_run(
         start_date=spec.start_date,
         end_date=spec.end_date,
         data_source=spec.data_source,
+        inst_id=spec.inst_id,
+        inst_type=spec.inst_type,
+        request=MappingProxyType(dict(spec.request)),
         data_fingerprint=spec.data_fingerprint,
         execution_model=spec.execution_model,
         costs=MappingProxyType(dict(spec.costs.as_dict())),
@@ -295,6 +356,12 @@ def save_run(
         trades=trades,
         equity=tuple(result.equity_curve),
         exposure=exposure,
+    )
+    return _PreparedRun(
+        run_row=run_row,
+        trade_rows=trade_rows,
+        equity_rows=equity_rows,
+        record=record,
     )
 
 
@@ -325,6 +392,73 @@ def get_run(run_id: str) -> BacktestRunRecord | None:
     return _record(row, trade_rows, equity_rows)
 
 
+@dataclass(frozen=True, slots=True)
+class BacktestRunHeader:
+    """列表与排行榜读的一行：身份、汇总与组合级指标。
+
+    逐笔交易、资金曲线与完整请求只有详情接口需要，列表不读它们：一页 50 条若都带上
+    逐 bar 曲线，一次翻阅就要读出几十万行。
+    """
+
+    run_id: str
+    strategy_instance_id: str
+    strategy_id: str
+    strategy_version: str
+    params: Mapping[str, Any]
+    inst_id: str
+    inst_type: str
+    bar: str
+    start_date: date
+    end_date: date
+    data_source: str
+    execution_model: str
+    metrics: Mapping[str, Decimal]
+    portfolio: PortfolioMetrics
+    funding_total: Decimal
+    created_at: datetime
+
+
+def list_runs(
+    data_source: str,
+    *,
+    limit: int = 50,
+) -> tuple[tuple[BacktestRunHeader, ...], int]:
+    """按数据源列出回测记录（新到旧），返回（本页，总条数）。
+
+    `data_source` 必填：代理数据与 OKX 实盘标的不可比，跨源聚合会给出错误的排序。
+    `limit` 由调用方保证为正（API 层用 `Query(ge=1)` 收口）。没有记录时返回空列表，
+    不报错——「还没跑过」与「库坏了」是两件事。
+    """
+
+    if not isinstance(data_source, str) or not data_source.strip():
+        raise ValidationError("回测列表的 data_source 不能为空")
+    condition = BacktestRunRow.data_source == data_source
+    statement = (
+        select(BacktestRunRow)
+        .where(condition)
+        .order_by(BacktestRunRow.created_at.desc(), BacktestRunRow.run_id)
+        .limit(limit)
+    )
+    with session_scope() as session:
+        rows = list(session.scalars(statement))
+        total = session.scalar(select(func.count()).select_from(BacktestRunRow).where(condition))
+    return tuple(_header(row) for row in rows), total or 0
+
+
+def delete_run(run_id: str) -> bool:
+    """删掉一次回测及其逐笔交易与资金曲线；不存在返回 `False`。
+
+    子表按外键 `ON DELETE CASCADE` 一并删除，删除语义只有迁移里那一处。
+    """
+
+    with session_scope() as session:
+        row = session.get(BacktestRunRow, run_id)
+        if row is None:
+            return False
+        session.delete(row)
+    return True
+
+
 def _require_same_run(
     request: BacktestInput,
     spec: BacktestSpec,
@@ -346,12 +480,18 @@ def _require_same_run(
 
 
 def _result_hash(spec: BacktestSpec) -> str:
-    """可复现输入的摘要：策略版本、参数、数据区间、数据指纹、执行模型、数据源与成本。"""
+    """可复现输入的摘要：策略版本、参数、标的、数据区间与指纹、执行模型、数据源、成本与请求。
+
+    `request` 一并纳入：仓位上限、每笔金额、标的集合这些只在请求里出现的输入同样会改变
+    结果，摘要必须跟着变，否则「改了仓位上限仍报同一个哈希」会让复现核对失效。
+    """
 
     payload: dict[str, Any] = {
         "strategy_id": spec.strategy_id,
         "strategy_version": spec.strategy_version,
         "params": spec.params,
+        "inst_id": spec.inst_id,
+        "inst_type": spec.inst_type,
         "bar": spec.bar,
         "start_date": spec.start_date.isoformat(),
         "end_date": spec.end_date.isoformat(),
@@ -360,6 +500,7 @@ def _result_hash(spec: BacktestSpec) -> str:
         "execution_model": spec.execution_model,
         "initial_capital": decimal_text(spec.initial_capital),
         "costs": spec.costs.as_dict(),
+        "request": dict(spec.request),
     }
     return _sha256(payload)
 
@@ -417,6 +558,9 @@ def _record(
         start_date=row.start_date,
         end_date=row.end_date,
         data_source=row.data_source,
+        inst_id=row.inst_id,
+        inst_type=row.inst_type,
+        request=MappingProxyType(json.loads(row.request_json)),
         data_fingerprint=row.data_fingerprint,
         execution_model=row.execution_model,
         costs=MappingProxyType(json.loads(row.costs_json)),
@@ -460,3 +604,36 @@ def _epoch(value: datetime) -> int:
 
 def _from_epoch(value: int) -> datetime:
     return datetime.fromtimestamp(value, tz=UTC)
+
+
+def _header(row: BacktestRunRow) -> BacktestRunHeader:
+    """运行行 → 列表项：指标与组合汇总从 JSON 文本还原成定点数。"""
+
+    portfolio_raw = json.loads(row.portfolio_json)
+    return BacktestRunHeader(
+        run_id=row.run_id,
+        strategy_instance_id=row.strategy_instance_id,
+        strategy_id=row.strategy_id,
+        strategy_version=row.strategy_version,
+        params=MappingProxyType(json.loads(row.params_json)),
+        inst_id=row.inst_id,
+        inst_type=row.inst_type,
+        bar=row.bar,
+        start_date=row.start_date,
+        end_date=row.end_date,
+        data_source=row.data_source,
+        execution_model=row.execution_model,
+        metrics=MappingProxyType(
+            {name: Decimal(value) for name, value in json.loads(row.metrics_json).items()}
+        ),
+        portfolio=PortfolioMetrics(
+            net_exposure=Decimal(portfolio_raw["net_exposure"]),
+            leg_win_rate=MappingProxyType(
+                {key: Decimal(value) for key, value in portfolio_raw["leg_win_rate"].items()}
+            ),
+            long_pnl=Decimal(portfolio_raw["long_pnl"]),
+            short_pnl=Decimal(portfolio_raw["short_pnl"]),
+        ),
+        funding_total=Decimal(row.funding_total),
+        created_at=_from_epoch(row.created_at),
+    )

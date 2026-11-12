@@ -69,4 +69,39 @@ def test_init_db_is_idempotent() -> None:
     with session_scope() as session:
         versions = session.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
 
-    assert versions == ["0009"]
+    assert versions == ["0010"]
+
+
+def test_upgrade_removes_backtest_runs_that_cannot_describe_their_instrument() -> None:
+    """0010 之前的回测行没有标的与完整请求，升级时必须删掉而不是塞空值。
+
+    这类行无法投影成 `BacktestRunSummary` / `BacktestRequest`：留着会让列表与详情
+    接口在存在历史数据时返回 500。升级完再插入新行仍然可行（新列是 NOT NULL 但不再
+    依赖数据库默认值）。
+    """
+
+    command.upgrade(alembic_config(), "0009")
+    with session_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO backtest_runs (
+                    run_id, strategy_instance_id, strategy_id, strategy_version,
+                    params_json, bar, start_date, end_date, data_source,
+                    data_fingerprint, execution_model, costs_json, metrics_json,
+                    portfolio_json, funding_total, result_hash, created_at
+                ) VALUES (
+                    'bt_legacy', 'si_legacy', 'relative_value', '1.0.0',
+                    '{}', '1d', '2026-11-01', '2026-11-02', 'okx',
+                    'fingerprint', 'next_open', '{}', '{}', '{}', '0', 'hash', 0
+                )
+                """
+            )
+        )
+
+    command.upgrade(alembic_config(), "0010")
+
+    with session_scope() as session:
+        remaining = session.execute(text("SELECT COUNT(*) FROM backtest_runs")).scalar_one()
+
+    assert remaining == 0

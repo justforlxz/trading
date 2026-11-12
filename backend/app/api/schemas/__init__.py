@@ -92,6 +92,10 @@ from app.api.schemas.relations import (
     RelationNeighborsResponse,
     RelationNode,
 )
+from app.api.schemas.risk import (
+    RiskEvent,
+    RiskEventListResponse,
+)
 from app.api.schemas.settings import (
     BacktestSettings,
     CostSettings,
@@ -223,6 +227,8 @@ __all__ = [
     "RelationNeighbor",
     "RelationNeighborsResponse",
     "RelationNode",
+    "RiskEvent",
+    "RiskEventListResponse",
     "RiskSettings",
     "SettingsResponse",
     "SettingsUpdateRequest",

@@ -4549,6 +4549,103 @@
         "title": "RelationNode",
         "type": "object"
       },
+      "RiskEvent": {
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "inst_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inst Id"
+          },
+          "instance_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instance Id"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "rule": {
+            "title": "Rule",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event_id",
+          "rule",
+          "detail",
+          "created_at"
+        ],
+        "title": "RiskEvent",
+        "type": "object"
+      },
+      "RiskEventListResponse": {
+        "examples": [
+          {
+            "items": [
+              {
+                "created_at": "2026-11-13T02:00:00Z",
+                "detail": "单笔金额 3000 超过组合权益的 0.20, 上限 2000",
+                "event_id": "re_3f2a9c1d",
+                "inst_id": "XAAPL-USDT",
+                "instance_id": "si_0001",
+                "rule": "order_amount_ratio"
+              }
+            ],
+            "total": 1
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RiskEvent"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "RiskEventListResponse",
+        "type": "object"
+      },
       "RiskSettings": {
         "description": "风控限额。`max_leverage` 的硬上限（10）不因配置抬高（decisions.md L1）。",
         "properties": {
@@ -8356,6 +8453,99 @@
         "summary": "Get Relation Neighbors",
         "tags": [
           "relations"
+        ]
+      }
+    },
+    "/api/risk/events": {
+      "get": {
+        "operationId": "list_risk_event_records_api_risk_events_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "instance_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Instance Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "inst_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Inst Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "rule",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Rule"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskEventListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Risk Event Records",
+        "tags": [
+          "risk"
         ]
       }
     },

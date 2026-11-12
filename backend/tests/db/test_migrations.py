@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 from alembic import command
+from alembic.script import ScriptDirectory
 from sqlalchemy import text
 
 # 导入即注册表元数据（与 `app.main` 的装配顺序一致），否则 `Base.metadata` 是空的。
@@ -37,6 +38,12 @@ from app.strategy import (  # noqa: F401
 from app.watchlist import WatchlistItemRow  # noqa: F401
 
 BOOKKEEPING = "alembic_version"
+
+
+def _migration_heads() -> list[str]:
+    """迁移目录里的 head 版本；断言头版本时以它为准，不在用例里写死序号。"""
+
+    return list(ScriptDirectory.from_config(alembic_config()).get_heads())
 
 
 def _tables() -> set[str]:
@@ -75,7 +82,13 @@ def test_init_db_is_idempotent() -> None:
     with session_scope() as session:
         versions = session.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
 
-    assert versions == ["0011"]
+    assert versions == _migration_heads()
+
+
+def test_migration_chain_has_exactly_one_head() -> None:
+    heads = _migration_heads()
+
+    assert len(heads) == 1, f"迁移链存在多个 head: {heads}"
 
 
 def test_upgrade_removes_backtest_runs_that_cannot_describe_their_instrument() -> None:

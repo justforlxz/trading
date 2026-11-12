@@ -23,6 +23,7 @@ from app.config import get_settings
 from app.db import init_db
 from app.exchange import OrderSubmission  # noqa: F401
 from app.instrument import Instrument  # noqa: F401
+from app.journal import ExecutionSnapshot
 from app.market import Candle  # noqa: F401
 from app.portfolio import (  # noqa: F401
     AllocationRow,
@@ -65,6 +66,9 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     register_error_handlers(app)
+    # Trades 页读取的执行事实。执行编排（T6.2）每完成一次下单或同步就替换这份快照；
+    # 还没有执行编排时保持空快照，页面如实显示空状态，不编造持仓、订单或成交。
+    app.state.execution_snapshot = ExecutionSnapshot()
     include_routers(app)
     return app
 

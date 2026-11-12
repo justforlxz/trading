@@ -2711,6 +2711,31 @@
         "title": "InstrumentSearchResponse",
         "type": "object"
       },
+      "JournalCashFlow": {
+        "description": "一笔成交引起的资金变化：买入为负、卖出为正，手续费已计入。",
+        "properties": {
+          "amount": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Amount",
+            "type": "string"
+          },
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "inst_id",
+          "amount"
+        ],
+        "title": "JournalCashFlow",
+        "type": "object"
+      },
       "JournalEntry": {
         "properties": {
           "category": {
@@ -2720,7 +2745,8 @@
               "fill",
               "mode_change",
               "risk_block",
-              "settings"
+              "settings",
+              "confirmation"
             ],
             "title": "Category",
             "type": "string"
@@ -2758,9 +2784,95 @@
         "title": "JournalEntry",
         "type": "object"
       },
+      "JournalFill": {
+        "properties": {
+          "fee": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Fee",
+            "type": "string"
+          },
+          "fee_currency": {
+            "title": "Fee Currency",
+            "type": "string"
+          },
+          "fill_id": {
+            "title": "Fill Id",
+            "type": "string"
+          },
+          "filled_at": {
+            "title": "Filled At",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "order_id": {
+            "title": "Order Id",
+            "type": "string"
+          },
+          "price": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Price",
+            "type": "string"
+          },
+          "qty": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Qty",
+            "type": "string"
+          },
+          "side": {
+            "enum": [
+              "buy",
+              "sell"
+            ],
+            "title": "Side",
+            "type": "string"
+          },
+          "strategy_instance_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategy Instance Id"
+          }
+        },
+        "required": [
+          "fill_id",
+          "order_id",
+          "inst_id",
+          "side",
+          "price",
+          "qty",
+          "fee",
+          "fee_currency",
+          "filled_at"
+        ],
+        "title": "JournalFill",
+        "type": "object"
+      },
       "JournalListResponse": {
+        "description": "Trades 页的只读聚合：策略对照、持仓、订单、成交、信号与日志条目。",
         "examples": [
           {
+            "fills": [
+              {
+                "fee": "0.98",
+                "fee_currency": "USDT",
+                "fill_id": "fill_0001",
+                "filled_at": "2026-11-09T14:00:02Z",
+                "inst_id": "XAAPL-USDT",
+                "order_id": "ord_0001",
+                "price": "228.10",
+                "qty": "8.63",
+                "side": "buy",
+                "strategy_instance_id": "si_0001"
+              }
+            ],
             "items": [
               {
                 "category": "mode_change",
@@ -2769,15 +2881,145 @@
                 "message": "执行模式 paper -> live, 已二次确认风险"
               }
             ],
+            "mode": "paper",
+            "orders": [
+              {
+                "avg_fill_price": "228.10",
+                "client_order_id": "cli_9f2a",
+                "created_at": "2026-11-09T13:59:40Z",
+                "filled_qty": "8.63",
+                "inst_id": "XAAPL-USDT",
+                "mode": "paper",
+                "order_id": "ord_0001",
+                "order_type": "limit",
+                "price": "228.10",
+                "qty": "8.63",
+                "reduce_only": false,
+                "side": "buy",
+                "status": "filled",
+                "strategy_instance_id": "si_0001",
+                "updated_at": "2026-11-09T14:00:02Z"
+              }
+            ],
+            "positions": [
+              {
+                "avg_cost": "228.10",
+                "inst_type": "SPOT",
+                "mode": "paper",
+                "product_key": "AAPL",
+                "qty": "8.63",
+                "side": "long"
+              }
+            ],
+            "signals": [
+              {
+                "generated_at": "2026-11-10T07:00:00Z",
+                "inst_id": "XAAPL-USDT",
+                "inst_type": "SPOT",
+                "instance_id": "si_0001",
+                "price": "231.42",
+                "reason": "MA20 上穿 MA60",
+                "side": "long",
+                "signal_id": "sig_0001",
+                "strength": 0.8,
+                "target_weight": "0.25"
+              }
+            ],
+            "strategies": [
+              {
+                "actual_curve": [
+                  {
+                    "at": "2026-11-10T06:10:00Z",
+                    "value": "0.0121"
+                  }
+                ],
+                "actual_return": "0.0121",
+                "actual_source": "execution:fills:2",
+                "bar": "1h",
+                "cash_flow": [
+                  {
+                    "amount": "-1968.92",
+                    "at": "2026-11-09T14:00:02Z",
+                    "inst_id": "XAAPL-USDT"
+                  }
+                ],
+                "execution_mode": "paper",
+                "expected_return": "0.0432",
+                "expected_source": "backtest:bt_0001:metrics.total_return",
+                "fill_count": 2,
+                "inst_ids": [
+                  "XAAPL-USDT"
+                ],
+                "instance_id": "si_0001",
+                "lifecycle_status": "paper_trading",
+                "name": "BTC/ETH 相对价值",
+                "net_cash_flow": "-1971.79",
+                "params": {
+                  "reversion_window": 20
+                },
+                "strategy_id": "relative_value",
+                "strategy_version": "1.0.0"
+              }
+            ],
             "total": 1
           }
         ],
         "properties": {
+          "fills": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/JournalFill"
+            },
+            "title": "Fills",
+            "type": "array"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/JournalEntry"
             },
             "title": "Items",
+            "type": "array"
+          },
+          "mode": {
+            "default": "manual",
+            "enum": [
+              "manual",
+              "paper",
+              "live"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "orders": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/JournalOrder"
+            },
+            "title": "Orders",
+            "type": "array"
+          },
+          "positions": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/JournalPosition"
+            },
+            "title": "Positions",
+            "type": "array"
+          },
+          "signals": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/JournalSignal"
+            },
+            "title": "Signals",
+            "type": "array"
+          },
+          "strategies": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/StrategyJournalSummary"
+            },
+            "title": "Strategies",
             "type": "array"
           },
           "total": {
@@ -2790,6 +3032,309 @@
           "total"
         ],
         "title": "JournalListResponse",
+        "type": "object"
+      },
+      "JournalOrder": {
+        "properties": {
+          "avg_fill_price": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Fill Price"
+          },
+          "client_order_id": {
+            "title": "Client Order Id",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "filled_qty": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Filled Qty",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "manual",
+              "paper",
+              "live"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "order_id": {
+            "title": "Order Id",
+            "type": "string"
+          },
+          "order_type": {
+            "enum": [
+              "market",
+              "limit"
+            ],
+            "title": "Order Type",
+            "type": "string"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "qty": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Qty",
+            "type": "string"
+          },
+          "reduce_only": {
+            "title": "Reduce Only",
+            "type": "boolean"
+          },
+          "side": {
+            "enum": [
+              "buy",
+              "sell"
+            ],
+            "title": "Side",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "open",
+              "partially_filled",
+              "filled",
+              "cancelled",
+              "rejected"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "strategy_instance_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategy Instance Id"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_order_id",
+          "order_id",
+          "inst_id",
+          "side",
+          "order_type",
+          "qty",
+          "filled_qty",
+          "status",
+          "reduce_only",
+          "mode",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "JournalOrder",
+        "type": "object"
+      },
+      "JournalPosition": {
+        "properties": {
+          "avg_cost": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Avg Cost",
+            "type": "string"
+          },
+          "inst_type": {
+            "enum": [
+              "SPOT",
+              "SWAP"
+            ],
+            "title": "Inst Type",
+            "type": "string"
+          },
+          "leverage": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leverage"
+          },
+          "liquidation_price": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Liquidation Price"
+          },
+          "mode": {
+            "enum": [
+              "manual",
+              "paper",
+              "live"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "product_key": {
+            "title": "Product Key",
+            "type": "string"
+          },
+          "qty": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Qty",
+            "type": "string"
+          },
+          "side": {
+            "enum": [
+              "long",
+              "short"
+            ],
+            "title": "Side",
+            "type": "string"
+          }
+        },
+        "required": [
+          "product_key",
+          "inst_type",
+          "side",
+          "qty",
+          "avg_cost",
+          "mode"
+        ],
+        "title": "JournalPosition",
+        "type": "object"
+      },
+      "JournalReturnPoint": {
+        "description": "平仓后的累计实际收益；没有平仓时曲线为空。",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "value": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "value"
+        ],
+        "title": "JournalReturnPoint",
+        "type": "object"
+      },
+      "JournalSignal": {
+        "properties": {
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "inst_type": {
+            "enum": [
+              "SPOT",
+              "SWAP"
+            ],
+            "title": "Inst Type",
+            "type": "string"
+          },
+          "instance_id": {
+            "title": "Instance Id",
+            "type": "string"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "side": {
+            "enum": [
+              "long",
+              "short"
+            ],
+            "title": "Side",
+            "type": "string"
+          },
+          "signal_id": {
+            "title": "Signal Id",
+            "type": "string"
+          },
+          "strength": {
+            "title": "Strength",
+            "type": "number"
+          },
+          "target_weight": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Weight"
+          }
+        },
+        "required": [
+          "signal_id",
+          "instance_id",
+          "inst_id",
+          "inst_type",
+          "side",
+          "strength",
+          "reason",
+          "generated_at"
+        ],
+        "title": "JournalSignal",
         "type": "object"
       },
       "LiveAuthorizationRequest": {
@@ -5603,6 +6148,143 @@
           }
         },
         "title": "StrategyInstanceUpdateRequest",
+        "type": "object"
+      },
+      "StrategyJournalSummary": {
+        "description": "一个策略实例的配置、回测预期与实际成交收益。\n\n两个收益各自带来源：`expected_source` 指向具体回测运行，`actual_source` 指向\n具体成交批次。它们是两条独立的读取路径，不是同一个值的两种名字。",
+        "properties": {
+          "actual_curve": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/JournalReturnPoint"
+            },
+            "title": "Actual Curve",
+            "type": "array"
+          },
+          "actual_return": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Actual Return",
+            "type": "string"
+          },
+          "actual_source": {
+            "title": "Actual Source",
+            "type": "string"
+          },
+          "bar": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Bar",
+            "type": "string"
+          },
+          "cash_flow": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/JournalCashFlow"
+            },
+            "title": "Cash Flow",
+            "type": "array"
+          },
+          "execution_mode": {
+            "enum": [
+              "manual",
+              "paper",
+              "live"
+            ],
+            "title": "Execution Mode",
+            "type": "string"
+          },
+          "expected_return": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Return"
+          },
+          "expected_source": {
+            "title": "Expected Source",
+            "type": "string"
+          },
+          "fill_count": {
+            "title": "Fill Count",
+            "type": "integer"
+          },
+          "inst_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Inst Ids",
+            "type": "array"
+          },
+          "instance_id": {
+            "title": "Instance Id",
+            "type": "string"
+          },
+          "lifecycle_status": {
+            "enum": [
+              "opportunity_discovery",
+              "strategy_generation",
+              "pending_review",
+              "backtested",
+              "validated",
+              "paper_trading",
+              "live_authorized",
+              "live_running",
+              "rejected"
+            ],
+            "title": "Lifecycle Status",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "net_cash_flow": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Net Cash Flow",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "strategy_id": {
+            "title": "Strategy Id",
+            "type": "string"
+          },
+          "strategy_version": {
+            "title": "Strategy Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instance_id",
+          "strategy_id",
+          "strategy_version",
+          "name",
+          "bar",
+          "lifecycle_status",
+          "execution_mode",
+          "params",
+          "inst_ids",
+          "expected_source",
+          "actual_return",
+          "actual_source",
+          "net_cash_flow",
+          "fill_count"
+        ],
+        "title": "StrategyJournalSummary",
         "type": "object"
       },
       "StrategyPortfolio": {

@@ -33,6 +33,9 @@ def _instrument(**overrides: object) -> Instrument:
         "exchange": "okx",
         "base_currency": PRODUCT_KEY,
         "quote_currency": QUOTE_CURRENCY,
+        "tick_size": Decimal("0.01"),
+        "lot_size": Decimal("0.001"),
+        "min_order_size": Decimal("0.001"),
         "trading_status": "live",
     }
     row.update(overrides)

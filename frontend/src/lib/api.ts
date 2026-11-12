@@ -76,6 +76,13 @@ export type PortfolioAdjustmentCreateRequest =
   components["schemas"]["PortfolioAdjustmentCreateRequest"];
 export type PortfolioAdjustmentDecisionRequest =
   components["schemas"]["PortfolioAdjustmentDecisionRequest"];
+export type JournalResponse = components["schemas"]["JournalListResponse"];
+export type JournalEntry = components["schemas"]["JournalEntry"];
+export type JournalStrategy = components["schemas"]["StrategyJournalSummary"];
+export type JournalPosition = components["schemas"]["JournalPosition"];
+export type JournalOrder = components["schemas"]["JournalOrder"];
+export type JournalFill = components["schemas"]["JournalFill"];
+export type JournalSignal = components["schemas"]["JournalSignal"];
 
 /** 后端错误体的形状：`detail` 是字符串，或 FastAPI 校验错误的条目数组。 */
 type ErrorBody = { detail?: string | Array<{ msg?: string }> };
@@ -288,4 +295,9 @@ export function decidePortfolioAdjustment(
     "PATCH",
     body,
   );
+}
+
+/** 交易历史：策略配置与版本、回测预期、实际成交、持仓、订单、信号与日志。 */
+export function fetchJournal(): Promise<JournalResponse> {
+  return request<JournalResponse>("/journal");
 }

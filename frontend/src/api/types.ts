@@ -2257,13 +2257,25 @@ export interface components {
             /** Items */
             items: components["schemas"]["InstrumentRef"][];
         };
+        /**
+         * JournalCashFlow
+         * @description 一笔成交引起的资金变化：买入为负、卖出为正，手续费已计入。
+         */
+        JournalCashFlow: {
+            /** Amount */
+            amount: string;
+            /** At */
+            at: string;
+            /** Inst Id */
+            inst_id: string;
+        };
         /** JournalEntry */
         JournalEntry: {
             /**
              * Category
              * @enum {string}
              */
-            category: "signal" | "order" | "fill" | "mode_change" | "risk_block" | "settings";
+            category: "signal" | "order" | "fill" | "mode_change" | "risk_block" | "settings" | "confirmation";
             /** Created At */
             created_at: string;
             /** Entry Id */
@@ -2273,9 +2285,50 @@ export interface components {
             /** Message */
             message: string;
         };
+        /** JournalFill */
+        JournalFill: {
+            /** Fee */
+            fee: string;
+            /** Fee Currency */
+            fee_currency: string;
+            /** Fill Id */
+            fill_id: string;
+            /** Filled At */
+            filled_at: string;
+            /** Inst Id */
+            inst_id: string;
+            /** Order Id */
+            order_id: string;
+            /** Price */
+            price: string;
+            /** Qty */
+            qty: string;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "buy" | "sell";
+            /** Strategy Instance Id */
+            strategy_instance_id?: string | null;
+        };
         /**
          * JournalListResponse
+         * @description Trades 页的只读聚合：策略对照、持仓、订单、成交、信号与日志条目。
          * @example {
+         *       "fills": [
+         *         {
+         *           "fee": "0.98",
+         *           "fee_currency": "USDT",
+         *           "fill_id": "fill_0001",
+         *           "filled_at": "2026-11-09T14:00:02Z",
+         *           "inst_id": "XAAPL-USDT",
+         *           "order_id": "ord_0001",
+         *           "price": "228.10",
+         *           "qty": "8.63",
+         *           "side": "buy",
+         *           "strategy_instance_id": "si_0001"
+         *         }
+         *       ],
          *       "items": [
          *         {
          *           "category": "mode_change",
@@ -2284,14 +2337,237 @@ export interface components {
          *           "message": "执行模式 paper -> live, 已二次确认风险"
          *         }
          *       ],
+         *       "mode": "paper",
+         *       "orders": [
+         *         {
+         *           "avg_fill_price": "228.10",
+         *           "client_order_id": "cli_9f2a",
+         *           "created_at": "2026-11-09T13:59:40Z",
+         *           "filled_qty": "8.63",
+         *           "inst_id": "XAAPL-USDT",
+         *           "mode": "paper",
+         *           "order_id": "ord_0001",
+         *           "order_type": "limit",
+         *           "price": "228.10",
+         *           "qty": "8.63",
+         *           "reduce_only": false,
+         *           "side": "buy",
+         *           "status": "filled",
+         *           "strategy_instance_id": "si_0001",
+         *           "updated_at": "2026-11-09T14:00:02Z"
+         *         }
+         *       ],
+         *       "positions": [
+         *         {
+         *           "avg_cost": "228.10",
+         *           "inst_type": "SPOT",
+         *           "mode": "paper",
+         *           "product_key": "AAPL",
+         *           "qty": "8.63",
+         *           "side": "long"
+         *         }
+         *       ],
+         *       "signals": [
+         *         {
+         *           "generated_at": "2026-11-10T07:00:00Z",
+         *           "inst_id": "XAAPL-USDT",
+         *           "inst_type": "SPOT",
+         *           "instance_id": "si_0001",
+         *           "price": "231.42",
+         *           "reason": "MA20 上穿 MA60",
+         *           "side": "long",
+         *           "signal_id": "sig_0001",
+         *           "strength": 0.8,
+         *           "target_weight": "0.25"
+         *         }
+         *       ],
+         *       "strategies": [
+         *         {
+         *           "actual_curve": [
+         *             {
+         *               "at": "2026-11-10T06:10:00Z",
+         *               "value": "0.0121"
+         *             }
+         *           ],
+         *           "actual_return": "0.0121",
+         *           "actual_source": "execution:fills:2",
+         *           "bar": "1h",
+         *           "cash_flow": [
+         *             {
+         *               "amount": "-1968.92",
+         *               "at": "2026-11-09T14:00:02Z",
+         *               "inst_id": "XAAPL-USDT"
+         *             }
+         *           ],
+         *           "execution_mode": "paper",
+         *           "expected_return": "0.0432",
+         *           "expected_source": "backtest:bt_0001:metrics.total_return",
+         *           "fill_count": 2,
+         *           "inst_ids": [
+         *             "XAAPL-USDT"
+         *           ],
+         *           "instance_id": "si_0001",
+         *           "lifecycle_status": "paper_trading",
+         *           "name": "BTC/ETH 相对价值",
+         *           "net_cash_flow": "-1971.79",
+         *           "params": {
+         *             "reversion_window": 20
+         *           },
+         *           "strategy_id": "relative_value",
+         *           "strategy_version": "1.0.0"
+         *         }
+         *       ],
          *       "total": 1
          *     }
          */
         JournalListResponse: {
+            /**
+             * Fills
+             * @default []
+             */
+            fills: components["schemas"]["JournalFill"][];
             /** Items */
             items: components["schemas"]["JournalEntry"][];
+            /**
+             * Mode
+             * @default manual
+             * @enum {string}
+             */
+            mode: "manual" | "paper" | "live";
+            /**
+             * Orders
+             * @default []
+             */
+            orders: components["schemas"]["JournalOrder"][];
+            /**
+             * Positions
+             * @default []
+             */
+            positions: components["schemas"]["JournalPosition"][];
+            /**
+             * Signals
+             * @default []
+             */
+            signals: components["schemas"]["JournalSignal"][];
+            /**
+             * Strategies
+             * @default []
+             */
+            strategies: components["schemas"]["StrategyJournalSummary"][];
             /** Total */
             total: number;
+        };
+        /** JournalOrder */
+        JournalOrder: {
+            /** Avg Fill Price */
+            avg_fill_price?: string | null;
+            /** Client Order Id */
+            client_order_id: string;
+            /** Created At */
+            created_at: string;
+            /** Filled Qty */
+            filled_qty: string;
+            /** Inst Id */
+            inst_id: string;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "manual" | "paper" | "live";
+            /** Order Id */
+            order_id: string;
+            /**
+             * Order Type
+             * @enum {string}
+             */
+            order_type: "market" | "limit";
+            /** Price */
+            price?: string | null;
+            /** Qty */
+            qty: string;
+            /** Reduce Only */
+            reduce_only: boolean;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "buy" | "sell";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "open" | "partially_filled" | "filled" | "cancelled" | "rejected";
+            /** Strategy Instance Id */
+            strategy_instance_id?: string | null;
+            /** Updated At */
+            updated_at: string;
+        };
+        /** JournalPosition */
+        JournalPosition: {
+            /** Avg Cost */
+            avg_cost: string;
+            /**
+             * Inst Type
+             * @enum {string}
+             */
+            inst_type: "SPOT" | "SWAP";
+            /** Leverage */
+            leverage?: string | null;
+            /** Liquidation Price */
+            liquidation_price?: string | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "manual" | "paper" | "live";
+            /** Product Key */
+            product_key: string;
+            /** Qty */
+            qty: string;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "long" | "short";
+        };
+        /**
+         * JournalReturnPoint
+         * @description 平仓后的累计实际收益；没有平仓时曲线为空。
+         */
+        JournalReturnPoint: {
+            /** At */
+            at: string;
+            /** Value */
+            value: string;
+        };
+        /** JournalSignal */
+        JournalSignal: {
+            /** Generated At */
+            generated_at: string;
+            /** Inst Id */
+            inst_id: string;
+            /**
+             * Inst Type
+             * @enum {string}
+             */
+            inst_type: "SPOT" | "SWAP";
+            /** Instance Id */
+            instance_id: string;
+            /** Price */
+            price?: string | null;
+            /** Reason */
+            reason: string;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "long" | "short";
+            /** Signal Id */
+            signal_id: string;
+            /** Strength */
+            strength: number;
+            /** Target Weight */
+            target_weight?: string | null;
         };
         /**
          * LiveAuthorizationRequest
@@ -3686,6 +3962,66 @@ export interface components {
             params?: {
                 [key: string]: number | string | boolean;
             } | null;
+        };
+        /**
+         * StrategyJournalSummary
+         * @description 一个策略实例的配置、回测预期与实际成交收益。
+         *
+         *     两个收益各自带来源：`expected_source` 指向具体回测运行，`actual_source` 指向
+         *     具体成交批次。它们是两条独立的读取路径，不是同一个值的两种名字。
+         */
+        StrategyJournalSummary: {
+            /**
+             * Actual Curve
+             * @default []
+             */
+            actual_curve: components["schemas"]["JournalReturnPoint"][];
+            /** Actual Return */
+            actual_return: string;
+            /** Actual Source */
+            actual_source: string;
+            /**
+             * Bar
+             * @enum {string}
+             */
+            bar: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+            /**
+             * Cash Flow
+             * @default []
+             */
+            cash_flow: components["schemas"]["JournalCashFlow"][];
+            /**
+             * Execution Mode
+             * @enum {string}
+             */
+            execution_mode: "manual" | "paper" | "live";
+            /** Expected Return */
+            expected_return?: string | null;
+            /** Expected Source */
+            expected_source: string;
+            /** Fill Count */
+            fill_count: number;
+            /** Inst Ids */
+            inst_ids: string[];
+            /** Instance Id */
+            instance_id: string;
+            /**
+             * Lifecycle Status
+             * @enum {string}
+             */
+            lifecycle_status: "opportunity_discovery" | "strategy_generation" | "pending_review" | "backtested" | "validated" | "paper_trading" | "live_authorized" | "live_running" | "rejected";
+            /** Name */
+            name: string;
+            /** Net Cash Flow */
+            net_cash_flow: string;
+            /** Params */
+            params: {
+                [key: string]: unknown;
+            };
+            /** Strategy Id */
+            strategy_id: string;
+            /** Strategy Version */
+            strategy_version: string;
         };
         /**
          * StrategyPortfolio

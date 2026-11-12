@@ -152,17 +152,20 @@ def list_groups() -> list[str]:
         )
 
 
-def tracked_instruments() -> list[Instrument]:
+def tracked_instruments(group: str | None = None) -> list[Instrument]:
     """自选里跟踪的标的，不取行情、不读提醒；按 `symbol` 固定顺序返回。
 
     只回答「用户在跟踪哪些标的」，不参与行情计算：入口页的行情快照由
-    `list_entries` 负责，这里给分析层（关系网络）一个不依赖 K 线是否齐全的标的集合。
+    `list_entries` 负责，这里给分析层（关系网络）与批量回测一个不依赖 K 线是否齐全的
+    标的集合。传 `group` 时只取该分组的条目；分组不存在与分组为空都返回空列表，
+    由调用方决定这算不算错。
     """
 
     with session_scope() as session:
-        ids = list(
-            session.scalars(select(WatchlistItemRow.inst_id).order_by(WatchlistItemRow.inst_id))
-        )
+        statement = select(WatchlistItemRow.inst_id).order_by(WatchlistItemRow.inst_id)
+        if group is not None:
+            statement = statement.where(WatchlistItemRow.group_name == group)
+        ids = list(session.scalars(statement))
         if not ids:
             return []
         return list(

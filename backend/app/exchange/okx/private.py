@@ -62,6 +62,7 @@ from app.exchange.okx.ledger import (
     reopen_submission,
 )
 from app.exchange.okx.sign import iso_timestamp, require_credentials, sign_headers
+from app.exchange.okx.snapshots import parse_exchange_position_row
 from app.instrument import (
     DEFAULT_QUOTE_CURRENCY,
     Instrument,
@@ -393,24 +394,7 @@ class OkxPrivateClient(TradePort):
             pos = _decimal(row.get("pos") or "0")
             if pos == 0:
                 continue
-            side = _position_side(row, pos)
-            inst_id = str(row["instId"])
-            held.append(
-                ExchangePosition(
-                    pos_id=str(row.get("posId") or f"{inst_id}:{side}"),
-                    inst_id=inst_id,
-                    pos_side=side,
-                    size=abs(pos),
-                    avg_px=_decimal(row.get("avgPx") or "0"),
-                    mark_px=_decimal_or_none(row.get("markPx")),
-                    upl=_decimal_or_none(row.get("upl")),
-                    upl_ratio=_decimal_or_none(row.get("uplRatio")),
-                    lever=_decimal_or_none(row.get("lever")),
-                    mgn_mode=_text_or_none(row.get("mgnMode")),
-                    liq_px=_decimal_or_none(row.get("liqPx")),
-                    margin=_decimal_or_none(row.get("margin")),
-                )
-            )
+            held.append(parse_exchange_position_row(row))
         return held
 
     def _balance_position_snapshots(
@@ -614,19 +598,6 @@ def _currency_detail(rows: list[Any], currency: str) -> dict[str, Any]:
     return details[0] if details else {}
 
 
-def _position_side(row: dict[str, Any], pos: Decimal) -> str:
-    """把上游 `posSide` 归一化为 `long` / `short`。
-
-    双向持仓模式直接给 `long` / `short`；单向持仓模式给 `net`，只能按数量符号
-    拆分。数量为 0 的持仓在调用前已经被过滤掉。
-    """
-
-    side = str(row.get("posSide") or "").strip().lower()
-    if side in {"long", "short"}:
-        return side
-    return "long" if pos > 0 else "short"
-
-
 def _margin_usage_ratio(
     used_margin: Decimal,
     available_margin: Decimal,
@@ -762,12 +733,3 @@ def _decimal_or_zero(*values: Any) -> Decimal:
         if parsed is not None:
             return parsed
     return Decimal(0)
-
-
-def _text_or_none(value: Any) -> str | None:
-    """空字符串是「上游没给」，不是有效的文本值。"""
-
-    if value is None:
-        return None
-    text = str(value).strip()
-    return text or None

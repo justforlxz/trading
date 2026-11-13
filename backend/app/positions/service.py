@@ -14,22 +14,24 @@
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.core import (
+    AccountSnapshot,
     Clock,
     Conflict,
+    ExchangePosition,
     SystemClock,
     UnprocessableEntity,
     ValidationError,
@@ -49,6 +51,7 @@ from app.positions.model import (
 )
 
 __all__ = [
+    "DEFAULT_ACCOUNT_ID",
     "PRICE_SOURCES",
     "AccountSyncView",
     "AccountView",
@@ -60,9 +63,11 @@ __all__ = [
     "add_manual_trade",
     "create_manual_position",
     "delete_manual_position",
+    "exchange_position_view_from_snapshot",
     "exchange_positions",
     "list_manual_positions",
     "list_manual_trades",
+    "record_exchange_snapshot",
     "sync_account",
     "update_manual_position",
 ]
@@ -212,30 +217,56 @@ def sync_account(*, clock: Clock | None = None) -> AccountSyncView:
     finally:
         port.close()
 
-    payload_ref = _payload_digest(snapshot)
+    summary = record_exchange_snapshot(
+        captured_at=moment,
+        source=SOURCE_REST,
+        snapshot=snapshot,
+        positions=positions,
+    )
+    assert summary is not None  # 刚刚写入或同一时刻已存在
+    return AccountSyncView(summary, len(positions))
+
+
+def record_exchange_snapshot(
+    *,
+    captured_at: datetime,
+    source: str,
+    snapshot: AccountSnapshot | None = None,
+    positions: Sequence[ExchangePosition] | None = None,
+) -> AccountView | None:
+    """把一次账户与持仓快照写进 B2 的表；只写传入的部分，不补造缺失数据。
+
+    `positions` 为空集合表示这一批没有持仓，会删除该时刻的旧行；传 `None` 表示
+    这次调用不涉及持仓。传非空集合时按 `(account_id, pos_id, captured_at)` 更新，
+    并删除该时刻不在集合里的旧行，保证同一时刻的账户与持仓是同一批状态。私有频道
+    推送与 REST 同步共用本函数，保证两边落库字段一致。返回账户视图，没有账户快照
+    时返回 `None`。
+    """
+
     with session_scope() as session:
-        session.execute(
-            postgresql_insert(AccountSnapshotRow)
-            .values(
-                account_id=DEFAULT_ACCOUNT_ID,
-                currency=snapshot.currency,
-                equity=snapshot.equity,
-                available_equity=snapshot.available_equity,
-                cash_balance=snapshot.cash_balance,
-                unrealized_pnl=snapshot.unrealized_pnl,
-                used_margin=snapshot.used_margin,
-                available_margin=snapshot.available_margin,
-                margin_ratio=snapshot.margin_ratio,
-                captured_at=moment,
-                source=SOURCE_REST,
-                raw_payload_ref=payload_ref,
-            )
-            .on_conflict_do_nothing(index_elements=["account_id", "captured_at", "source"])
-        )
-        if positions:
+        if snapshot is not None:
+            payload_ref = _payload_digest(snapshot)
             session.execute(
-                postgresql_insert(ExchangePositionSnapshotRow)
+                postgresql_insert(AccountSnapshotRow)
                 .values(
+                    account_id=DEFAULT_ACCOUNT_ID,
+                    currency=snapshot.currency,
+                    equity=snapshot.equity,
+                    available_equity=snapshot.available_equity,
+                    cash_balance=snapshot.cash_balance,
+                    unrealized_pnl=snapshot.unrealized_pnl,
+                    used_margin=snapshot.used_margin,
+                    available_margin=snapshot.available_margin,
+                    margin_ratio=snapshot.margin_ratio,
+                    captured_at=captured_at,
+                    source=source,
+                    raw_payload_ref=payload_ref,
+                )
+                .on_conflict_do_nothing(index_elements=["account_id", "captured_at", "source"])
+            )
+        if positions is not None:
+            if positions:
+                insert_positions = postgresql_insert(ExchangePositionSnapshotRow).values(
                     [
                         {
                             "account_id": DEFAULT_ACCOUNT_ID,
@@ -251,22 +282,72 @@ def sync_account(*, clock: Clock | None = None) -> AccountSyncView:
                             "mgn_mode": item.mgn_mode,
                             "liq_px": item.liq_px,
                             "margin": item.margin,
-                            "captured_at": moment,
-                            "source": SOURCE_REST,
+                            "captured_at": captured_at,
+                            "source": source,
                         }
                         for item in positions
                     ]
                 )
-                .on_conflict_do_nothing(index_elements=["account_id", "pos_id", "captured_at"])
+                session.execute(
+                    insert_positions.on_conflict_do_update(
+                        index_elements=["account_id", "pos_id", "captured_at"],
+                        set_={
+                            "inst_id": insert_positions.excluded.inst_id,
+                            "pos_side": insert_positions.excluded.pos_side,
+                            "size": insert_positions.excluded.size,
+                            "avg_px": insert_positions.excluded.avg_px,
+                            "mark_px": insert_positions.excluded.mark_px,
+                            "upl": insert_positions.excluded.upl,
+                            "upl_ratio": insert_positions.excluded.upl_ratio,
+                            "lever": insert_positions.excluded.lever,
+                            "mgn_mode": insert_positions.excluded.mgn_mode,
+                            "liq_px": insert_positions.excluded.liq_px,
+                            "margin": insert_positions.excluded.margin,
+                            "source": insert_positions.excluded.source,
+                        },
+                    )
+                )
+            stale = delete(ExchangePositionSnapshotRow).where(
+                ExchangePositionSnapshotRow.account_id == DEFAULT_ACCOUNT_ID,
+                ExchangePositionSnapshotRow.captured_at == captured_at,
             )
+            if positions:
+                stale = stale.where(
+                    ExchangePositionSnapshotRow.pos_id.notin_([item.pos_id for item in positions])
+                )
+            session.execute(stale)
+        if snapshot is None:
+            return None
         latest = _latest_account_row(session)
         assert latest is not None  # 刚写入或在同一时刻已存在
-        summary = _account_view(
+        return _account_view(
             latest,
-            day_pnl=_day_pnl(session, latest, moment),
+            day_pnl=_day_pnl(session, latest, captured_at),
             status=_configured_status(),
         )
-    return AccountSyncView(summary, len(positions))
+
+
+def exchange_position_view_from_snapshot(item: ExchangePosition) -> ExchangePositionView:
+    """推送用的持仓视图：与 `GET /api/positions/exchange` 的条目字段一致。"""
+
+    instrument = get_instrument(item.inst_id)
+    return ExchangePositionView(
+        pos_id=item.pos_id,
+        inst_id=item.inst_id,
+        display_symbol=_display_symbol(instrument, item.inst_id),
+        name=_name(instrument, item.inst_id),
+        asset_class=_asset_class(instrument),
+        pos_side=item.pos_side,
+        size=item.size,
+        avg_px=item.avg_px,
+        mark_px=item.mark_px,
+        upl=item.upl,
+        upl_ratio=item.upl_ratio,
+        lever=item.lever,
+        mgn_mode=item.mgn_mode,
+        liq_px=item.liq_px,
+        margin=item.margin,
+    )
 
 
 def exchange_positions() -> ExchangePositionsView:

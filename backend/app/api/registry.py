@@ -17,6 +17,7 @@ from app.api.routes.positions import positions_router
 from app.api.routes.risk import risk_exposure_router
 from app.api.routes.settings import settings_router
 from app.api.routes.strategy import strategy_router
+from app.api.routes.stream import stream_router
 from app.api.routes.watchlist import watchlist_router
 
 __all__ = ["include_routers"]
@@ -38,4 +39,5 @@ def include_routers(app: FastAPI) -> None:
     app.include_router(positions_router, prefix="/api")
     app.include_router(risk_exposure_router, prefix="/api")
     app.include_router(settings_router, prefix="/api")
+    app.include_router(stream_router, prefix="/api")
     app.include_router(contract_router, prefix="/api")

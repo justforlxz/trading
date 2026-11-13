@@ -19,12 +19,10 @@ import {
 } from "../lib/api";
 import { closePoints } from "../lib/chart";
 import { instTypeLabel, signalTone, signedTone, signedValue } from "../lib/display";
+import { coverageLabel, resolveDefaultBar } from "../lib/instrument";
 import { cn } from "../lib/utils";
 
 const BAR_OPTIONS: CandleBar[] = ["1m", "5m", "15m", "1h", "4h", "1d"];
-
-/** 默认周期与契约默认值一致；切换形态时页面不重建，周期因此保持不变。 */
-const DEFAULT_BAR: CandleBar = "1h";
 
 /** 详情页展示的四张指标卡片；参数写在这里，卡片标题里的期数由此而来。 */
 const INDICATOR_CARDS = [
@@ -107,7 +105,7 @@ export default function InstrumentDetailPage() {
   const { instId = "" } = useParams<{ instId: string }>();
   const [detail, setDetail] = useState<InstrumentDetailResponse | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
-  const [bar, setBar] = useState<CandleBar>(DEFAULT_BAR);
+  const [bar, setBar] = useState<CandleBar | null>(null);
   const [candles, setCandles] = useState<CandleSeriesResponse | null>(null);
   const [candleError, setCandleError] = useState<string | null>(null);
   const [indicators, setIndicators] = useState<IndicatorSeriesResponse | null>(null);
@@ -134,6 +132,29 @@ export default function InstrumentDetailPage() {
     const instType = detail?.instrument.inst_type;
     if (!instId || !instType) return;
     let active = true;
+    setBar(null);
+    setCandles(null);
+    setCandleError(null);
+    setIndicators(null);
+    setIndicatorError(null);
+    resolveDefaultBar((candidate) =>
+      fetchCandles(instId, candidate, okxCandleSource(instType), 1),
+    )
+      .then((value) => {
+        if (active) setBar(value);
+      })
+      .catch((reason: unknown) => {
+        if (active) setCandleError(reason instanceof Error ? reason.message : "K 线加载失败");
+      });
+    return () => {
+      active = false;
+    };
+  }, [instId, detail]);
+
+  useEffect(() => {
+    const instType = detail?.instrument.inst_type;
+    if (!instId || !instType || !bar) return;
+    let active = true;
     setCandles(null);
     setCandleError(null);
     fetchCandles(instId, bar, okxCandleSource(instType))
@@ -149,10 +170,10 @@ export default function InstrumentDetailPage() {
   }, [instId, bar, detail]);
 
   useEffect(() => {
-    if (!instId) return;
-    let active = true;
     setIndicators(null);
     setIndicatorError(null);
+    if (!instId || !bar) return;
+    let active = true;
     fetchIndicatorSeries(instId, bar, INDICATOR_NAMES, INDICATOR_PARAMS)
       .then((value) => {
         if (active) setIndicators(value);
@@ -167,6 +188,11 @@ export default function InstrumentDetailPage() {
 
   const instrument = detail?.instrument;
   const signal = detail?.latest_signal ?? null;
+  const coverage = candles
+    ? coverageLabel(candles.available_from, candles.available_to)
+    : null;
+  // 默认周期探测完成前禁用周期按钮，避免用户的选择被探测结果覆盖。
+  const barLocked = bar === null && candleError === null;
 
   const meta = instrument
     ? [
@@ -262,6 +288,7 @@ export default function InstrumentDetailPage() {
                     key={option}
                     type="button"
                     size="sm"
+                    disabled={barLocked}
                     variant={option === bar ? "default" : "outline"}
                     aria-pressed={option === bar}
                     onClick={() => setBar(option)}
@@ -285,20 +312,33 @@ export default function InstrumentDetailPage() {
 
             {candles ? (
               <>
-                <LineChart points={closePoints(candles.candles)} />
+                {candles.candles.length > 0 ? (
+                  <LineChart points={closePoints(candles.candles)} />
+                ) : (
+                  <p className="py-10 text-center text-sm text-muted-foreground">尚未同步行情</p>
+                )}
 
                 <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span className="rounded-full border px-2 py-0.5">
-                    数据源 {candles.data_source}
-                  </span>
-                  <span className="rounded-full border px-2 py-0.5">周期 {candles.bar}</span>
-                  <span className="rounded-full border px-2 py-0.5">
-                    {candles.candles.length} 个收盘价
-                  </span>
-                  {candles.has_gap ? (
-                    <span className="rounded-full border border-amber-600/40 px-2 py-0.5 text-amber-600 dark:text-amber-400">
-                      存在缺口
+                  <span className="rounded-full border px-2 py-0.5">当前周期 {candles.bar}</span>
+                  {coverage ? (
+                    <span className="rounded-full border px-2 py-0.5">
+                      覆盖区间 {coverage}
                     </span>
+                  ) : null}
+                  {candles.candles.length > 0 ? (
+                    <>
+                      <span className="rounded-full border px-2 py-0.5">
+                        数据源 {candles.data_source}
+                      </span>
+                      <span className="rounded-full border px-2 py-0.5">
+                        {candles.candles.length} 个收盘价
+                      </span>
+                      {candles.has_gap ? (
+                        <span className="rounded-full border border-amber-600/40 px-2 py-0.5 text-amber-600 dark:text-amber-400">
+                          存在缺口
+                        </span>
+                      ) : null}
+                    </>
                   ) : null}
                 </div>
               </>

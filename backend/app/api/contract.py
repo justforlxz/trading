@@ -25,8 +25,6 @@ from app.api.schemas import (
     PositionListResponse,
     RiskEvent,
     RiskEventListResponse,
-    SettingsResponse,
-    SettingsUpdateRequest,
     SignalListResponse,
 )
 from app.api.schemas.common import Bar
@@ -105,21 +103,6 @@ def get_execution_state() -> ExecutionStateResponse:
 @trades_router.put("/execution/mode", response_model=ExecutionStateResponse)
 def set_execution_mode(payload: ExecutionModeRequest) -> ExecutionStateResponse:
     raise _stub("T5.3")
-
-
-# ---------------------------------------------------------------- settings
-
-settings_router = APIRouter(tags=["settings"])
-
-
-@settings_router.get("/settings", response_model=SettingsResponse)
-def get_settings_document() -> SettingsResponse:
-    raise _stub("T5.5")
-
-
-@settings_router.put("/settings", response_model=SettingsResponse)
-def update_settings_document(payload: SettingsUpdateRequest) -> SettingsResponse:
-    raise _stub("T5.5")
 
 
 # ---------------------------------------------------------------- risk
@@ -217,7 +200,6 @@ def get_correlation_series(
 for _router in (
     backtest_router,
     trades_router,
-    settings_router,
     correlation_router,
     risk_router,
 ):

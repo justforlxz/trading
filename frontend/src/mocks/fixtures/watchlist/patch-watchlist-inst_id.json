@@ -15,7 +15,7 @@
     "trading_status": "live"
   },
   "last_price": "231.42",
-  "latest_signal": {
+  "last_signal": {
     "action": "BUY",
     "bar": "1h",
     "generated_at": "2026-11-10T07:00:00Z",
@@ -27,8 +27,12 @@
     "strategy_instance_id": "si_0001",
     "target_weight": "0.25"
   },
-  "linked_strategy_instance_ids": [
-    "si_0001"
-  ],
+  "strategy": {
+    "enabled": true,
+    "execution_mode": "paper",
+    "instance_id": "si_0001",
+    "name": "AAPL 趋势",
+    "status": "live_running"
+  },
   "volume_24h_quote": "4821334.55"
 }

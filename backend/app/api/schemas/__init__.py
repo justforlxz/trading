@@ -100,6 +100,7 @@ from app.api.schemas.settings import (
     CostSettings,
     DataSettings,
     ExchangeSettings,
+    ExchangeSettingsUpdate,
     ExecutionSettings,
     RiskSettings,
     SettingsResponse,
@@ -150,6 +151,7 @@ from app.api.schemas.watchlist import (
     WatchlistAddRequest,
     WatchlistItem,
     WatchlistResponse,
+    WatchlistStrategy,
     WatchlistUpdateRequest,
 )
 
@@ -180,6 +182,7 @@ __all__ = [
     "DataSettings",
     "EquityPoint",
     "ExchangeSettings",
+    "ExchangeSettingsUpdate",
     "ExecutionModeRequest",
     "ExecutionSettings",
     "ExecutionStateResponse",
@@ -273,5 +276,6 @@ __all__ = [
     "WatchlistAddRequest",
     "WatchlistItem",
     "WatchlistResponse",
+    "WatchlistStrategy",
     "WatchlistUpdateRequest",
 ]

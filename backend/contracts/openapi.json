@@ -1771,6 +1771,17 @@
             "title": "Api Configured",
             "type": "boolean"
           },
+          "api_key_masked": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key Masked"
+          },
           "demo_trading": {
             "title": "Demo Trading",
             "type": "boolean"
@@ -1781,6 +1792,27 @@
           "api_configured"
         ],
         "title": "ExchangeSettings",
+        "type": "object"
+      },
+      "ExchangeSettingsUpdate": {
+        "description": "只写字段：提交后服务端只保存，不读回明文。",
+        "properties": {
+          "api_key": {
+            "anyOf": [
+              {
+                "format": "password",
+                "minLength": 1,
+                "type": "string",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          }
+        },
+        "title": "ExchangeSettingsUpdate",
         "type": "object"
       },
       "ExecutionModeRequest": {
@@ -5435,8 +5467,14 @@
         "type": "object"
       },
       "SettingsUpdateRequest": {
-        "description": "分组级部分更新；交易所凭据不在可写范围。",
+        "additionalProperties": false,
+        "description": "分组级部分更新；交易所凭据只接受 API Key 写入，Secret 与 Passphrase 仍走环境变量。",
         "properties": {
+          "acknowledge_risk": {
+            "default": false,
+            "title": "Acknowledge Risk",
+            "type": "boolean"
+          },
           "backtest": {
             "anyOf": [
               {
@@ -5461,6 +5499,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/DataSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "exchange": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExchangeSettingsUpdate"
               },
               {
                 "type": "null"
@@ -7150,7 +7198,7 @@
               "trading_status": "live"
             },
             "last_price": "231.42",
-            "latest_signal": {
+            "last_signal": {
               "action": "BUY",
               "bar": "1h",
               "generated_at": "2026-11-10T07:00:00Z",
@@ -7162,9 +7210,13 @@
               "strategy_instance_id": "si_0001",
               "target_weight": "0.25"
             },
-            "linked_strategy_instance_ids": [
-              "si_0001"
-            ],
+            "strategy": {
+              "enabled": true,
+              "execution_mode": "paper",
+              "instance_id": "si_0001",
+              "name": "AAPL 趋势",
+              "status": "live_running"
+            },
             "volume_24h_quote": "4821334.55"
           }
         ],
@@ -7196,7 +7248,7 @@
             "title": "Last Price",
             "type": "string"
           },
-          "latest_signal": {
+          "last_signal": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/Signal"
@@ -7206,12 +7258,15 @@
               }
             ]
           },
-          "linked_strategy_instance_ids": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Linked Strategy Instance Ids",
-            "type": "array"
+          "strategy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WatchlistStrategy"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "volume_24h_quote": {
             "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
@@ -7254,7 +7309,7 @@
                   "trading_status": "live"
                 },
                 "last_price": "231.42",
-                "latest_signal": {
+                "last_signal": {
                   "action": "BUY",
                   "bar": "1h",
                   "generated_at": "2026-11-10T07:00:00Z",
@@ -7266,9 +7321,13 @@
                   "strategy_instance_id": "si_0001",
                   "target_weight": "0.25"
                 },
-                "linked_strategy_instance_ids": [
-                  "si_0001"
-                ],
+                "strategy": {
+                  "enabled": true,
+                  "execution_mode": "paper",
+                  "instance_id": "si_0001",
+                  "name": "AAPL 趋势",
+                  "status": "live_running"
+                },
                 "volume_24h_quote": "4821334.55"
               }
             ]
@@ -7295,6 +7354,56 @@
           "groups"
         ],
         "title": "WatchlistResponse",
+        "type": "object"
+      },
+      "WatchlistStrategy": {
+        "description": "自选行关联的运行策略；一个标的可能被多个实例引用，这里只显示最近建立的一个。",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "execution_mode": {
+            "enum": [
+              "manual",
+              "paper",
+              "live"
+            ],
+            "title": "Execution Mode",
+            "type": "string"
+          },
+          "instance_id": {
+            "title": "Instance Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "opportunity_discovery",
+              "strategy_generation",
+              "pending_review",
+              "backtested",
+              "validated",
+              "paper_trading",
+              "live_authorized",
+              "live_running",
+              "rejected"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instance_id",
+          "name",
+          "status",
+          "execution_mode",
+          "enabled"
+        ],
+        "title": "WatchlistStrategy",
         "type": "object"
       },
       "WatchlistUpdateRequest": {
@@ -9337,6 +9446,7 @@
     },
     "/api/settings": {
       "get": {
+        "description": "当前设置：分组配置、凭证状态与执行模式。",
         "operationId": "get_settings_document_api_settings_get",
         "responses": {
           "200": {
@@ -9356,6 +9466,7 @@
         ]
       },
       "put": {
+        "description": "按分组部分更新；未提交的分组保持原值。",
         "operationId": "update_settings_document_api_settings_put",
         "requestBody": {
           "content": {
@@ -9928,7 +10039,7 @@
     },
     "/api/watchlist": {
       "get": {
-        "description": "按加入顺序返回全部自选条目，以及当前存在的分组名。",
+        "description": "按加入顺序返回全部自选条目、分组名，以及关联策略与最近信号。\n\n策略与信号由本层从 `strategy` / `execution` 门面组合：`watchlist` 域本身不依赖\n这两个模块，列表行的行情口径仍由 `app.watchlist` 单独负责。",
         "operationId": "list_watchlist_api_watchlist_get",
         "responses": {
           "200": {

@@ -31,6 +31,7 @@ from app.portfolio import (  # noqa: F401
     VirtualFillRow,
     VirtualPositionRow,
 )
+from app.settings import SettingsRow, apply_saved_settings  # noqa: F401
 from app.strategy import (  # noqa: F401
     StrategyInstanceRow,
     StrategyReplayRow,
@@ -46,6 +47,7 @@ async def lifespan(_app: FastAPI) -> Iterator[None]:
     """启动时把库结构推进到最新版本；退出无需清理（连接池随进程关闭）。"""
 
     init_db()
+    apply_saved_settings()
     logger.info("trading api ready: version=%s", __version__)
     yield
 

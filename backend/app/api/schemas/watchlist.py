@@ -6,7 +6,7 @@ fixture 的唯一来源；页面不得另造数据。
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from app.api.schemas.common import (
     AlertDirection,
@@ -15,10 +15,12 @@ from app.api.schemas.common import (
     Candle,
     DataSource,
     DecimalString,
+    ExecutionMode,
     InstrumentInfo,
     InstrumentRef,
     SiblingQuote,
     Signal,
+    StrategyStatus,
     UtcDatetime,
 )
 
@@ -34,6 +36,7 @@ __all__ = [
     "WatchlistAddRequest",
     "WatchlistItem",
     "WatchlistResponse",
+    "WatchlistStrategy",
     "WatchlistUpdateRequest",
 ]
 
@@ -97,10 +100,26 @@ _EXAMPLE_ITEM = {
     "last_price": "231.42",
     "change_pct_24h": "1.86",
     "volume_24h_quote": "4821334.55",
-    "linked_strategy_instance_ids": ["si_0001"],
-    "latest_signal": _EXAMPLE_SIGNAL,
+    "strategy": {
+        "instance_id": "si_0001",
+        "name": "AAPL 趋势",
+        "status": "live_running",
+        "execution_mode": "paper",
+        "enabled": True,
+    },
+    "last_signal": _EXAMPLE_SIGNAL,
     "alert": None,
 }
+
+
+class WatchlistStrategy(BaseModel):
+    """自选行关联的运行策略；一个标的可能被多个实例引用，这里只显示最近建立的一个。"""
+
+    instance_id: str
+    name: str
+    status: StrategyStatus
+    execution_mode: ExecutionMode
+    enabled: bool
 
 
 class WatchlistItem(BaseModel):
@@ -111,8 +130,8 @@ class WatchlistItem(BaseModel):
     last_price: DecimalString
     change_pct_24h: DecimalString
     volume_24h_quote: DecimalString
-    linked_strategy_instance_ids: list[str] = Field(default_factory=list)
-    latest_signal: Signal | None = None
+    strategy: WatchlistStrategy | None = None
+    last_signal: Signal | None = None
     alert: PriceAlert | None = None
 
     model_config = ConfigDict(json_schema_extra={"examples": [_EXAMPLE_ITEM]})

@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import re
+from datetime import UTC, datetime
+from decimal import Decimal
 
 from fastapi.testclient import TestClient
 
+from app.journal import ExecutionSnapshot, RecordedSignal
 from tests.api.conftest import seed_daily, seed_instruments
 from tests.factories.instruments import make_ref
 
@@ -41,8 +44,8 @@ def test_add_item_returns_quote_and_registers_group(market_data: TestClient) -> 
         assert isinstance(body[field], str)
         assert DECIMAL.match(body[field]) is not None
     assert UTC_ZULU.match(body["instrument"]["listing_time"]) is not None
-    assert body["linked_strategy_instance_ids"] == []
-    assert body["latest_signal"] is None
+    assert body["strategy"] is None
+    assert body["last_signal"] is None
     assert body["alert"] is None
 
     listed = market_data.get("/api/watchlist").json()
@@ -260,3 +263,73 @@ def test_patch_group_requires_group_field(market_data: TestClient) -> None:
 
     assert response.status_code == 422
     assert response.json()["detail"]
+
+
+def test_watchlist_rows_compose_running_strategy_and_latest_signal(client: TestClient) -> None:
+    """列表行带运行策略与最近信号；没有关联的标的如实返回空值。"""
+
+    seed_instruments(make_ref(), make_ref(inst_id="XETH-USDT", base_ccy="XETH"))
+    seed_daily("XAAPL-USDT", ["100", "110", "121"])
+    seed_daily("XETH-USDT", ["50", "51", "52"])
+    for inst_id in ("XAAPL-USDT", "XETH-USDT"):
+        assert client.post("/api/watchlist", json={"inst_id": inst_id}).status_code == 201
+
+    created = client.post(
+        "/api/strategy-instances",
+        json={
+            "strategy_id": "directional",
+            "name": "AAPL 方向",
+            "bar": "1d",
+            "params": {"trend_window": 2, "momentum_window": 1, "leg_count": 2},
+            "inst_ids": ["XAAPL-USDT"],
+        },
+    )
+    assert created.status_code == 201, created.text
+    instance_id = created.json()["instance_id"]
+
+    client.app.state.execution_snapshot = ExecutionSnapshot(
+        signals=(
+            RecordedSignal(
+                signal_id="sig-1",
+                instance_id=instance_id,
+                inst_id="XAAPL-USDT",
+                inst_type="SPOT",
+                side="long",
+                strength=0.8,
+                price=Decimal("121"),
+                reason="趋势向上",
+                generated_at=datetime(2026, 11, 10, 7, tzinfo=UTC),
+            ),
+        )
+    )
+    try:
+        response = client.get("/api/watchlist")
+    finally:
+        client.app.state.execution_snapshot = ExecutionSnapshot()
+
+    assert response.status_code == 200, response.text
+    items = {item["instrument"]["inst_id"]: item for item in response.json()["items"]}
+
+    aapl = items["XAAPL-USDT"]
+    assert aapl["strategy"] == {
+        "instance_id": instance_id,
+        "name": "AAPL 方向",
+        "status": "strategy_generation",
+        "execution_mode": "manual",
+        "enabled": True,
+    }
+    assert aapl["last_signal"] == {
+        "signal_id": "sig-1",
+        "strategy_instance_id": instance_id,
+        "inst_id": "XAAPL-USDT",
+        "inst_type": "SPOT",
+        "action": "BUY",
+        "bar": "1d",
+        "price": "121",
+        "reason": "趋势向上",
+        "generated_at": "2026-11-10T07:00:00Z",
+        "target_weight": None,
+    }
+
+    assert items["XETH-USDT"]["strategy"] is None
+    assert items["XETH-USDT"]["last_signal"] is None

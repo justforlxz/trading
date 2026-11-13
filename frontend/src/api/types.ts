@@ -661,9 +661,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Settings Document */
+        /**
+         * Get Settings Document
+         * @description 当前设置：分组配置、凭证状态与执行模式。
+         */
         get: operations["get_settings_document_api_settings_get"];
-        /** Update Settings Document */
+        /**
+         * Update Settings Document
+         * @description 按分组部分更新；未提交的分组保持原值。
+         */
         put: operations["update_settings_document_api_settings_put"];
         post?: never;
         delete?: never;
@@ -868,7 +874,10 @@ export interface paths {
         };
         /**
          * List Watchlist
-         * @description 按加入顺序返回全部自选条目，以及当前存在的分组名。
+         * @description 按加入顺序返回全部自选条目、分组名，以及关联策略与最近信号。
+         *
+         *     策略与信号由本层从 `strategy` / `execution` 门面组合：`watchlist` 域本身不依赖
+         *     这两个模块，列表行的行情口径仍由 `app.watchlist` 单独负责。
          */
         get: operations["list_watchlist_api_watchlist_get"];
         put?: never;
@@ -1836,8 +1845,18 @@ export interface components {
         ExchangeSettings: {
             /** Api Configured */
             api_configured: boolean;
+            /** Api Key Masked */
+            api_key_masked?: string | null;
             /** Demo Trading */
             demo_trading: boolean;
+        };
+        /**
+         * ExchangeSettingsUpdate
+         * @description 只写字段：提交后服务端只保存，不读回明文。
+         */
+        ExchangeSettingsUpdate: {
+            /** Api Key */
+            api_key?: string | null;
         };
         /** ExecutionModeRequest */
         ExecutionModeRequest: {
@@ -3718,12 +3737,18 @@ export interface components {
         };
         /**
          * SettingsUpdateRequest
-         * @description 分组级部分更新；交易所凭据不在可写范围。
+         * @description 分组级部分更新；交易所凭据只接受 API Key 写入，Secret 与 Passphrase 仍走环境变量。
          */
         SettingsUpdateRequest: {
+            /**
+             * Acknowledge Risk
+             * @default false
+             */
+            acknowledge_risk: boolean;
             backtest?: components["schemas"]["BacktestSettings"] | null;
             costs?: components["schemas"]["CostSettings"] | null;
             data?: components["schemas"]["DataSettings"] | null;
+            exchange?: components["schemas"]["ExchangeSettingsUpdate"] | null;
             execution?: components["schemas"]["ExecutionSettings"] | null;
             risk?: components["schemas"]["RiskSettings"] | null;
         };
@@ -4577,7 +4602,7 @@ export interface components {
          *         "trading_status": "live"
          *       },
          *       "last_price": "231.42",
-         *       "latest_signal": {
+         *       "last_signal": {
          *         "action": "BUY",
          *         "bar": "1h",
          *         "generated_at": "2026-11-10T07:00:00Z",
@@ -4589,9 +4614,13 @@ export interface components {
          *         "strategy_instance_id": "si_0001",
          *         "target_weight": "0.25"
          *       },
-         *       "linked_strategy_instance_ids": [
-         *         "si_0001"
-         *       ],
+         *       "strategy": {
+         *         "enabled": true,
+         *         "execution_mode": "paper",
+         *         "instance_id": "si_0001",
+         *         "name": "AAPL 趋势",
+         *         "status": "live_running"
+         *       },
          *       "volume_24h_quote": "4821334.55"
          *     }
          */
@@ -4604,9 +4633,8 @@ export interface components {
             instrument: components["schemas"]["InstrumentInfo"];
             /** Last Price */
             last_price: string;
-            latest_signal?: components["schemas"]["Signal"] | null;
-            /** Linked Strategy Instance Ids */
-            linked_strategy_instance_ids?: string[];
+            last_signal?: components["schemas"]["Signal"] | null;
+            strategy?: components["schemas"]["WatchlistStrategy"] | null;
             /** Volume 24H Quote */
             volume_24h_quote: string;
         };
@@ -4635,7 +4663,7 @@ export interface components {
          *             "trading_status": "live"
          *           },
          *           "last_price": "231.42",
-         *           "latest_signal": {
+         *           "last_signal": {
          *             "action": "BUY",
          *             "bar": "1h",
          *             "generated_at": "2026-11-10T07:00:00Z",
@@ -4647,9 +4675,13 @@ export interface components {
          *             "strategy_instance_id": "si_0001",
          *             "target_weight": "0.25"
          *           },
-         *           "linked_strategy_instance_ids": [
-         *             "si_0001"
-         *           ],
+         *           "strategy": {
+         *             "enabled": true,
+         *             "execution_mode": "paper",
+         *             "instance_id": "si_0001",
+         *             "name": "AAPL 趋势",
+         *             "status": "live_running"
+         *           },
          *           "volume_24h_quote": "4821334.55"
          *         }
          *       ]
@@ -4660,6 +4692,28 @@ export interface components {
             groups: string[];
             /** Items */
             items: components["schemas"]["WatchlistItem"][];
+        };
+        /**
+         * WatchlistStrategy
+         * @description 自选行关联的运行策略；一个标的可能被多个实例引用，这里只显示最近建立的一个。
+         */
+        WatchlistStrategy: {
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Execution Mode
+             * @enum {string}
+             */
+            execution_mode: "manual" | "paper" | "live";
+            /** Instance Id */
+            instance_id: string;
+            /** Name */
+            name: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "opportunity_discovery" | "strategy_generation" | "pending_review" | "backtested" | "validated" | "paper_trading" | "live_authorized" | "live_running" | "rejected";
         };
         /** WatchlistUpdateRequest */
         WatchlistUpdateRequest: {

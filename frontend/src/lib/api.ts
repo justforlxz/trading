@@ -27,6 +27,7 @@ export type Health = {
 
 export type WatchlistResponse = components["schemas"]["WatchlistResponse"];
 export type WatchlistItem = components["schemas"]["WatchlistItem"];
+export type WatchlistStrategy = components["schemas"]["WatchlistStrategy"];
 export type InstrumentDetailResponse = components["schemas"]["InstrumentDetailResponse"];
 export type CandleSeriesResponse = components["schemas"]["CandleSeriesResponse"];
 export type CandleBar = CandleSeriesResponse["bar"];
@@ -77,6 +78,14 @@ export type PortfolioAdjustmentCreateRequest =
 export type PortfolioAdjustmentDecisionRequest =
   components["schemas"]["PortfolioAdjustmentDecisionRequest"];
 export type JournalResponse = components["schemas"]["JournalListResponse"];
+export type SettingsResponse = components["schemas"]["SettingsResponse"];
+export type SettingsUpdateRequest = components["schemas"]["SettingsUpdateRequest"];
+export type ExecutionSettings = SettingsResponse["execution"];
+export type RiskSettings = SettingsResponse["risk"];
+export type CostSettings = SettingsResponse["costs"];
+export type BacktestSettings = SettingsResponse["backtest"];
+export type DataSettings = SettingsResponse["data"];
+export type ExchangeSettings = SettingsResponse["exchange"];
 export type JournalEntry = components["schemas"]["JournalEntry"];
 export type JournalStrategy = components["schemas"]["StrategyJournalSummary"];
 export type JournalPosition = components["schemas"]["JournalPosition"];
@@ -313,4 +322,13 @@ export function decidePortfolioAdjustment(
 /** 交易历史：策略配置与版本、回测预期、实际成交、持仓、订单、信号与日志。 */
 export function fetchJournal(): Promise<JournalResponse> {
   return request<JournalResponse>("/journal");
+}
+
+/** 设置文档：分组配置、凭证状态与执行模式。API Key 只写不读。 */
+export function fetchSettings(): Promise<SettingsResponse> {
+  return request<SettingsResponse>("/settings");
+}
+
+export function updateSettings(body: SettingsUpdateRequest): Promise<SettingsResponse> {
+  return send<SettingsResponse>("/settings", "PUT", body);
 }

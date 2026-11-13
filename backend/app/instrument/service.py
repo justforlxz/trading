@@ -28,6 +28,8 @@ __all__ = [
     "DEFAULT_QUOTE_CURRENCY",
     "SyncReport",
     "SyncSkip",
+    "display_symbol",
+    "get_instrument",
     "get_instrument_pair",
     "list_instruments",
     "list_tradable",
@@ -94,6 +96,26 @@ def list_instruments() -> list[Instrument]:
 
     with session_scope() as session:
         return list(session.scalars(select(Instrument).order_by(Instrument.symbol)))
+
+
+def get_instrument(symbol: str) -> Instrument | None:
+    """按交易所 `instId` 取一行标的；没有时返回 `None`，由调用方决定错误措辞。"""
+
+    raw = symbol.strip().upper()
+    if not raw:
+        return None
+    with session_scope() as session:
+        return session.scalar(select(Instrument).where(Instrument.symbol == raw))
+
+
+def display_symbol(row: Instrument) -> str:
+    """给人看的标的名：`产品键-报价币`，例如 `AAPL-USDT`。
+
+    两种形态（`XAAPL-USDT` 与 `AAPL-USDT-SWAP`）在这里统一成同一个展示名，
+    与产品键和报价币的配对关系只由标的模块维护，其他模块不拼字符串。
+    """
+
+    return f"{row.product_key}-{row.quote_currency}"
 
 
 def get_instrument_pair(product_key: str) -> InstrumentPair:

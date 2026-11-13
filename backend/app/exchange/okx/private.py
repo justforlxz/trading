@@ -37,8 +37,10 @@ import httpx
 
 from app.config import Settings, get_settings
 from app.core import (
+    AccountSnapshot,
     Clock,
     DataUnavailable,
+    ExchangePosition,
     ExecutionRejected,
     Fill,
     Money,
@@ -150,6 +152,64 @@ class OkxPrivateClient(TradePort):
                 held += self._endpoint_positions(inst_type)
             else:
                 held += self._balance_positions(products_by_category.get(inst_type, {}))
+        return held
+
+    def account_snapshot(self, currency: str = SETTLE_CURRENCY) -> AccountSnapshot:
+        """账户权益只读快照；不涉及任何下单、撤单或平仓接口。
+
+        上游在 `/account/balance` 同时给出账户级字段（`totalEq` / `imr` / `upl`）
+        与币种明细（`cashBal` / `availEq`）。保证金使用率不直接采用 `mgnRatio`
+        （那是维持保证金率），而是按项目统一口径
+        `已用保证金 / (已用保证金 + 可用保证金)` 计算；只有在上游没有给出
+        `imr` 与可用权益时，才把 0 到 1 之间的 `mgnRatio` 当作兜底。
+        """
+
+        rows = self._get(_BALANCE_PATH, {"ccy": currency})
+        top = _first_row(rows, action="账户余额")
+        detail = _currency_detail(rows, currency)
+
+        equity = _decimal_or_zero(top.get("totalEq"), top.get("adjEq"))
+        used_margin = _decimal_or_zero(top.get("imr"))
+        available_equity = _decimal_or_none(top.get("availEq"))
+        if available_equity is None:
+            available_equity = _decimal_or_none(detail.get("availEq"))
+        if available_equity is None:
+            available_equity = equity - used_margin
+        cash_balance = _decimal_or_zero(detail.get("cashBal"))
+        unrealized_pnl = _decimal_or_zero(top.get("upl"), detail.get("upl"))
+        fallback_ratio = _decimal_or_none(top.get("mgnRatio"))
+        margin_ratio = _margin_usage_ratio(used_margin, available_equity, fallback_ratio)
+
+        return AccountSnapshot(
+            currency=currency,
+            equity=equity,
+            available_equity=available_equity,
+            cash_balance=cash_balance,
+            unrealized_pnl=unrealized_pnl,
+            used_margin=used_margin,
+            available_margin=available_equity,
+            margin_ratio=margin_ratio,
+        )
+
+    def position_snapshots(self) -> list[ExchangePosition]:
+        """交易所侧持仓的只读快照：永续读 `/account/positions`，现货由余额推导。
+
+        类别差异仍由标的模块的 `TradingRules.has_position_endpoint` 决定，本方法
+        不自行判断 `SPOT` / `SWAP`。现货没有上游 `posId`，用
+        `inst_id + ":" + side` 生成稳定值；杠杆、标记价、强平价与保证金对现货均为
+        `None`，不填 0 冒充。
+        """
+
+        instruments = list_instruments()
+        if not instruments:
+            raise DataUnavailable("标的表为空, 先同步标的再查持仓")
+        products_by_category = _products_by_category(instruments)
+        held: list[ExchangePosition] = []
+        for inst_type in trading_categories():
+            if trading_rules(inst_type).has_position_endpoint:
+                held += self._endpoint_position_snapshots(inst_type)
+            else:
+                held += self._balance_position_snapshots(products_by_category.get(inst_type, {}))
         return held
 
     # -------------------------------------------------------------------- 交易
@@ -325,6 +385,66 @@ class OkxPrivateClient(TradePort):
             )
         return held
 
+    def _endpoint_position_snapshots(self, inst_type: str) -> list[ExchangePosition]:
+        """有持仓接口的类别：把上游整行映射成只读快照。"""
+
+        held: list[ExchangePosition] = []
+        for row in self._get(_POSITIONS_PATH, {"instType": inst_type}):
+            pos = _decimal(row.get("pos") or "0")
+            if pos == 0:
+                continue
+            side = _position_side(row, pos)
+            inst_id = str(row["instId"])
+            held.append(
+                ExchangePosition(
+                    pos_id=str(row.get("posId") or f"{inst_id}:{side}"),
+                    inst_id=inst_id,
+                    pos_side=side,
+                    size=abs(pos),
+                    avg_px=_decimal(row.get("avgPx") or "0"),
+                    mark_px=_decimal_or_none(row.get("markPx")),
+                    upl=_decimal_or_none(row.get("upl")),
+                    upl_ratio=_decimal_or_none(row.get("uplRatio")),
+                    lever=_decimal_or_none(row.get("lever")),
+                    mgn_mode=_text_or_none(row.get("mgnMode")),
+                    liq_px=_decimal_or_none(row.get("liqPx")),
+                    margin=_decimal_or_none(row.get("margin")),
+                )
+            )
+        return held
+
+    def _balance_position_snapshots(
+        self, products: dict[str, tuple[str, str]]
+    ) -> list[ExchangePosition]:
+        """没有持仓接口的类别：由余额明细推导，缺失字段如实留空。"""
+
+        held: list[ExchangePosition] = []
+        for detail in _details(self._get(_BALANCE_PATH, None)):
+            product = products.get(str(detail.get("ccy") or ""))
+            if product is None:
+                continue
+            inst_id, _quote_ccy = product
+            qty = _decimal(detail.get("availBal") or "0") + _decimal(detail.get("frozenBal") or "0")
+            if qty == 0:
+                continue
+            held.append(
+                ExchangePosition(
+                    pos_id=f"{inst_id}:long",
+                    inst_id=inst_id,
+                    pos_side="long",
+                    size=qty,
+                    avg_px=_decimal(detail.get("avgPx") or "0"),
+                    mark_px=None,
+                    upl=_decimal_or_none(detail.get("upl")),
+                    upl_ratio=None,
+                    lever=None,
+                    mgn_mode=None,
+                    liq_px=None,
+                    margin=None,
+                )
+            )
+        return held
+
     def _inst_type(self, inst_id: str) -> str:
         """实例 → 类别；只查标的表，不拆 `instId` 字符串。"""
 
@@ -484,6 +604,44 @@ def _details(rows: list[Any]) -> list[dict[str, Any]]:
     return [row for row in details if isinstance(row, dict)]
 
 
+def _currency_detail(rows: list[Any], currency: str) -> dict[str, Any]:
+    """取指定币种的明细；没有该币种时退回第一条，仍没有就是空映射。"""
+
+    details = _details(rows)
+    for row in details:
+        if str(row.get("ccy") or "") == currency:
+            return row
+    return details[0] if details else {}
+
+
+def _position_side(row: dict[str, Any], pos: Decimal) -> str:
+    """把上游 `posSide` 归一化为 `long` / `short`。
+
+    双向持仓模式直接给 `long` / `short`；单向持仓模式给 `net`，只能按数量符号
+    拆分。数量为 0 的持仓在调用前已经被过滤掉。
+    """
+
+    side = str(row.get("posSide") or "").strip().lower()
+    if side in {"long", "short"}:
+        return side
+    return "long" if pos > 0 else "short"
+
+
+def _margin_usage_ratio(
+    used_margin: Decimal,
+    available_margin: Decimal,
+    fallback: Decimal | None,
+) -> Decimal:
+    """保证金使用率：0 到 1。上游没有足够字段时用 `mgnRatio` 兜底。"""
+
+    denominator = used_margin + available_margin
+    if denominator > 0:
+        return used_margin / denominator
+    if fallback is not None and Decimal(0) <= fallback <= Decimal(1):
+        return fallback
+    return Decimal(0)
+
+
 def _products_by_category(
     instruments: Iterable[Instrument],
 ) -> dict[str, dict[str, tuple[str, str]]]:
@@ -594,3 +752,22 @@ def _decimal_or_none(value: Any) -> Decimal | None:
     if value is None or str(value).strip() == "":
         return None
     return _decimal(value)
+
+
+def _decimal_or_zero(*values: Any) -> Decimal:
+    """取第一个有值的十进制字段；都没有就是 0（上游确实没给，但账目字段不能空）。"""
+
+    for value in values:
+        parsed = _decimal_or_none(value)
+        if parsed is not None:
+            return parsed
+    return Decimal(0)
+
+
+def _text_or_none(value: Any) -> str | None:
+    """空字符串是「上游没给」，不是有效的文本值。"""
+
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None

@@ -1,0 +1,15 @@
+{
+  "account_id": "okx-main",
+  "available_equity": "682.30",
+  "available_margin": "682.30",
+  "captured_at": "2026-11-13T09:00:00Z",
+  "cash_balance": "0",
+  "currency": "USDT",
+  "day_pnl_basis": "equity_only",
+  "equity": "1248.60",
+  "margin_usage_pct": "45.36",
+  "source": "okx_rest",
+  "status": "ok",
+  "unrealized_pnl": "31.84",
+  "used_margin": "566.30"
+}

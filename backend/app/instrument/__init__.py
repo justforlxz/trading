@@ -8,6 +8,8 @@ from app.instrument.rules import TradingRules, trading_categories, trading_rules
 from app.instrument.service import (
     DEFAULT_QUOTE_CURRENCY,
     SyncReport,
+    display_symbol,
+    get_instrument,
     get_instrument_pair,
     list_instruments,
     list_tradable,
@@ -21,6 +23,8 @@ __all__ = [
     "InstrumentPair",
     "SyncReport",
     "TradingRules",
+    "display_symbol",
+    "get_instrument",
     "get_instrument_pair",
     "list_instruments",
     "list_tradable",

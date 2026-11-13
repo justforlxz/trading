@@ -1,0 +1,25 @@
+{
+  "items": [
+    {
+      "asset_class": "tokenized_equity",
+      "avg_cost": "226.80",
+      "created_at": "2026-11-13T09:00:00Z",
+      "display_symbol": "AAPL-USDT",
+      "id": "0f6f6f0e-5b6f-4f0c-9b7a-7e5f8a1d2c34",
+      "inst_id": "AAPL-USDT-SWAP",
+      "leverage": "3",
+      "market_value": "1851.36",
+      "name": "AAPL",
+      "note": "手动记账",
+      "price": "231.42",
+      "price_source": "okx_swap",
+      "price_status": "ok",
+      "quantity": "8",
+      "side": "long",
+      "status": "open",
+      "stop_px": "200.00",
+      "unrealized_pnl": "36.96",
+      "updated_at": "2026-11-13T09:00:00Z"
+    }
+  ]
+}

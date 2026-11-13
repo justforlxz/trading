@@ -16,7 +16,14 @@ from typing import Protocol, runtime_checkable
 
 from app.core.types import Money, OrderIntent
 
-__all__ = ["Fill", "Order", "Position", "TradePort"]
+__all__ = [
+    "AccountSnapshot",
+    "ExchangePosition",
+    "Fill",
+    "Order",
+    "Position",
+    "TradePort",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +64,47 @@ class Position:
     qty: Decimal
     avg_price: Decimal
     unrealized_pnl: Money
+
+
+@dataclass(frozen=True, slots=True)
+class AccountSnapshot:
+    """OKX 账户权益的只读快照，不进入交易意图。
+
+    `margin_ratio` 是保证金使用率（0 到 1），口径为
+    `used_margin / (used_margin + available_margin)`；四个金额字段都可能为 0，
+    0 表示上游确实给了 0，不是缺失。
+    """
+
+    currency: str
+    equity: Decimal
+    available_equity: Decimal
+    cash_balance: Decimal
+    unrealized_pnl: Decimal
+    used_margin: Decimal
+    available_margin: Decimal
+    margin_ratio: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class ExchangePosition:
+    """交易所侧持仓的只读快照。
+
+    `pos_side` 归一化为 `long` / `short`；上游单向持仓模式的 `net` 按数量符号
+    拆分。可空字段表示上游没有下发该值，不用 0 冒充。
+    """
+
+    pos_id: str
+    inst_id: str
+    pos_side: str
+    size: Decimal
+    avg_px: Decimal
+    mark_px: Decimal | None
+    upl: Decimal | None
+    upl_ratio: Decimal | None
+    lever: Decimal | None
+    mgn_mode: str | None
+    liq_px: Decimal | None
+    margin: Decimal | None
 
 
 @runtime_checkable

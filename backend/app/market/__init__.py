@@ -67,7 +67,7 @@ from app.market.session import (
     is_trading_day,
     primary_source,
 )
-from app.market.sync import data_range, load_candles, sync_candles, upsert_candles
+from app.market.sync import data_range, latest_candle, load_candles, sync_candles, upsert_candles
 
 __all__ = [
     "COMMODITY_TOKEN",
@@ -108,6 +108,7 @@ __all__ = [
     "integrity",
     "is_trading_day",
     "lagged_correlation",
+    "latest_candle",
     "load_candles",
     "load_funding",
     "load_snapshot",

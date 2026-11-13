@@ -72,6 +72,8 @@ class Instrument(Base):
     ct_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
     max_lever: Mapped[Decimal | None] = mapped_column(DecimalText, nullable=True)
     settle_ccy: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    #: 行业或类别，供风险域计算行业敞口；手工维护，本阶段不提供编辑接口。
+    sector: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
 @dataclass(frozen=True, slots=True)

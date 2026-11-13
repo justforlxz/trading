@@ -14,6 +14,7 @@ from app.api.routes.market import market_router
 from app.api.routes.opportunity import opportunity_router
 from app.api.routes.overview import overview_router
 from app.api.routes.portfolio import portfolio_router
+from app.api.routes.positions import positions_router
 from app.api.routes.relations import relations_router
 from app.api.routes.settings import settings_router
 from app.api.routes.strategy import strategy_router
@@ -38,6 +39,7 @@ def include_routers(app: FastAPI) -> None:
     app.include_router(approval_router, prefix="/api")
     app.include_router(backtest_router, prefix="/api")
     app.include_router(portfolio_router, prefix="/api")
+    app.include_router(positions_router, prefix="/api")
     app.include_router(trades_router, prefix="/api")
     app.include_router(settings_router, prefix="/api")
     app.include_router(contract_router, prefix="/api")

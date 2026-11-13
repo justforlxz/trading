@@ -41,8 +41,10 @@ from app.market.funding import (
 )
 from app.market.matrix import Matrix, build_matrix, correlation_matrix
 from app.market.model import Candle, CorrelationSnapshot
-from app.market.rolling import relative_strength_ratio, rolling_correlation
+from app.market.rolling import aligned_pairs, relative_strength_ratio, rolling_correlation
 from app.market.service import (
+    CandleGap,
+    IntegrityReport,
     correlation,
     current_bar,
     integrity,
@@ -67,7 +69,14 @@ from app.market.session import (
     is_trading_day,
     primary_source,
 )
-from app.market.sync import data_range, latest_candle, load_candles, sync_candles, upsert_candles
+from app.market.sync import (
+    candle_sources,
+    data_range,
+    latest_candle,
+    load_candles,
+    sync_candles,
+    upsert_candles,
+)
 
 __all__ = [
     "COMMODITY_TOKEN",
@@ -84,15 +93,19 @@ __all__ = [
     "TOKENIZED_EQUITY",
     "UNKNOWN_ASSET",
     "Candle",
+    "CandleGap",
     "CorrelationSnapshot",
     "DivergenceAlert",
     "FundingPoint",
+    "IntegrityReport",
     "Matrix",
     "Quote",
     "advance_decline",
+    "aligned_pairs",
     "asset_session",
     "backfill_funding",
     "build_matrix",
+    "candle_sources",
     "correlate",
     "correlation",
     "correlation_matrix",

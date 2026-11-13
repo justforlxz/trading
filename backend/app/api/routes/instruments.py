@@ -11,15 +11,41 @@ from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, Query
 
+from app.analysis import (
+    Analysis,
+    PricePoint,
+    instrument_analysis,
+)
+from app.analysis import (
+    AnalysisCandles as AnalysisCandleData,
+)
 from app.api.mapping import decimal_str, instrument_info, instrument_ref
-from app.api.schemas import Candle as CandlePayload
 from app.api.schemas import (
+    AnalysisBar,
+    AnalysisCandles,
+    AnalysisCoverage,
+    AnalysisGap,
+    AnalysisIndicators,
+    AnalysisLevels,
+    AnalysisOverlay,
+    AnalysisOverlayPoint,
+    AnalysisPrice,
+    AnalysisQuote,
     CandleSeriesResponse,
+    CorrelationReading,
+    InstrumentAnalysisResponse,
     InstrumentDetailResponse,
     InstrumentListResponse,
     InstrumentSearchResponse,
+    LinkedBacktest,
+    MomentumIndicators,
+    RelativeStrengthIndicators,
     SiblingQuote,
+    TrendIndicators,
+    VolatilityIndicators,
+    VolumeIndicators,
 )
+from app.api.schemas import Candle as CandlePayload
 from app.api.schemas.common import Bar, DataSource, InstType
 from app.instrument import Instrument, get_instrument_pair, list_instruments, list_tradable
 from app.market import data_range, integrity, load_candles
@@ -111,6 +137,177 @@ def get_instrument_candles(
             for candle in candles
         ],
     )
+
+
+@instruments_router.get("/instruments/{inst_id}/analysis")
+def get_instrument_analysis(
+    inst_id: str,
+    bar: AnalysisBar = Query("1d"),
+) -> InstrumentAnalysisResponse:
+    """详情页聚合：报价、K 线、指标、关键价位、相关性、关联回测与数据覆盖。
+
+    业务计算全部在 `app.analysis`；这里只把值对象转换成 HTTP 契约。
+    """
+
+    result = instrument_analysis(inst_id, bar)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"未找到标的 {inst_id}")
+    return _analysis_payload(result)
+
+
+def _analysis_payload(result: Analysis) -> InstrumentAnalysisResponse:
+    return InstrumentAnalysisResponse(
+        instrument=instrument_info(result.instrument),
+        bar=result.bar,
+        quote=AnalysisQuote(
+            last=_price(result.quote.last),
+            mark=_price(result.quote.mark),
+            index=_price(result.quote.index),
+        ),
+        candles=_analysis_candles(result.candles),
+        indicators=AnalysisIndicators(
+            trend=TrendIndicators(
+                close=_decimal_or_none(result.indicators.trend.close),
+                ma20=_decimal_or_none(result.indicators.trend.ma20),
+                ma60=_decimal_or_none(result.indicators.trend.ma60),
+                price_vs_ma20_pct=_decimal_or_none(result.indicators.trend.price_vs_ma20_pct),
+                price_vs_ma60_pct=_decimal_or_none(result.indicators.trend.price_vs_ma60_pct),
+                ma20_slope_pct=_decimal_or_none(result.indicators.trend.ma20_slope_pct),
+                ma60_slope_pct=_decimal_or_none(result.indicators.trend.ma60_slope_pct),
+                slope_window=result.indicators.trend.slope_window,
+            ),
+            momentum=MomentumIndicators(
+                rsi14=_decimal_or_none(result.indicators.momentum.rsi14),
+                macd=_decimal_or_none(result.indicators.momentum.macd),
+                macd_signal=_decimal_or_none(result.indicators.momentum.macd_signal),
+                macd_hist=_decimal_or_none(result.indicators.momentum.macd_hist),
+            ),
+            volatility=VolatilityIndicators(
+                atr14=_decimal_or_none(result.indicators.volatility.atr14),
+                atr_pct=_decimal_or_none(result.indicators.volatility.atr_pct),
+                atr_pct_avg20=_decimal_or_none(result.indicators.volatility.atr_pct_avg20),
+            ),
+            volume=VolumeIndicators(
+                current=_decimal_or_none(result.indicators.volume.current),
+                average20=_decimal_or_none(result.indicators.volume.average20),
+                relative=_decimal_or_none(result.indicators.volume.relative),
+            ),
+            relative_strength=RelativeStrengthIndicators(
+                benchmark_inst_id=result.indicators.relative_strength.benchmark_inst_id,
+                window=result.indicators.relative_strength.window,
+                symbol_return_pct=_decimal_or_none(
+                    result.indicators.relative_strength.symbol_return_pct
+                ),
+                benchmark_return_pct=_decimal_or_none(
+                    result.indicators.relative_strength.benchmark_return_pct
+                ),
+                excess_return_pct=_decimal_or_none(
+                    result.indicators.relative_strength.excess_return_pct
+                ),
+            ),
+            readings=list(result.indicators.readings),
+        ),
+        levels=AnalysisLevels(
+            window=result.levels.window,
+            high20=_decimal_or_none(result.levels.high20),
+            low20=_decimal_or_none(result.levels.low20),
+            high_distance_pct=_decimal_or_none(result.levels.high_distance_pct),
+            low_distance_pct=_decimal_or_none(result.levels.low_distance_pct),
+        ),
+        correlations=[
+            CorrelationReading(
+                inst_id=row.inst_id,
+                product_key=row.product_key,
+                role=row.role,
+                coefficient=_decimal_or_none(row.coefficient),
+                sample_size=row.sample_size,
+                window=row.window,
+                window_start=row.window_start,
+                window_end=row.window_end,
+            )
+            for row in result.correlations
+        ],
+        linked_strategies=[
+            LinkedBacktest(
+                run_id=row.run_id,
+                strategy_instance_id=row.strategy_instance_id,
+                strategy_name=row.strategy_name,
+                strategy_id=row.strategy_id,
+                data_source=row.data_source,
+                total_return_pct=decimal_str(row.total_return_pct),
+                max_drawdown_pct=decimal_str(row.max_drawdown_pct),
+                trade_count=row.trade_count,
+                backtest_start_date=row.backtest_start_date,
+                backtest_end_date=row.backtest_end_date,
+                created_at=row.created_at,
+            )
+            for row in result.linked_strategies
+        ],
+        coverage=[
+            AnalysisCoverage(
+                bar=row.bar,
+                data_source=row.data_source,
+                available=row.available,
+                unavailable_reason=row.unavailable_reason,
+                available_from=row.available_from,
+                available_to=row.available_to,
+                candle_count=row.candle_count,
+                gap_count=row.gap_count,
+                last_synced_at=row.last_synced_at,
+            )
+            for row in result.coverage
+        ],
+    )
+
+
+def _analysis_candles(result: AnalysisCandleData) -> AnalysisCandles:
+    return AnalysisCandles(
+        data_source=result.data_source,
+        available_from=result.available_from,
+        available_to=result.available_to,
+        gaps=[
+            AnalysisGap(start=gap.start, end=gap.end, missing=gap.missing) for gap in result.gaps
+        ],
+        candles=[
+            CandlePayload(
+                open_time=candle.open_time,
+                open=decimal_str(candle.open),
+                high=decimal_str(candle.high),
+                low=decimal_str(candle.low),
+                close=decimal_str(candle.close),
+                volume=decimal_str(candle.volume),
+                is_closed=candle.confirm,
+                data_source=candle.source,
+            )
+            for candle in result.candles
+        ],
+        overlays=[
+            AnalysisOverlay(
+                name=overlay.name,
+                points=[
+                    AnalysisOverlayPoint(time=point.time, value=decimal_str(point.value))
+                    for point in overlay.points
+                ],
+            )
+            for overlay in result.overlays
+        ],
+    )
+
+
+def _price(point: PricePoint | None) -> AnalysisPrice | None:
+    if point is None:
+        return None
+    return AnalysisPrice(
+        price=decimal_str(point.price),
+        as_of=point.as_of,
+        source=point.source,
+        change=_decimal_or_none(point.change),
+        change_pct=_decimal_or_none(point.change_pct),
+    )
+
+
+def _decimal_or_none(value: Decimal | None) -> str | None:
+    return None if value is None else decimal_str(value)
 
 
 def _require_instrument(inst_id: str) -> Instrument:

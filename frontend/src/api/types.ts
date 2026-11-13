@@ -409,6 +409,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/instruments/{inst_id}/analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Instrument Analysis
+         * @description 详情页聚合：报价、K 线、指标、关键价位、相关性、关联回测与数据覆盖。
+         *
+         *     业务计算全部在 `app.analysis`；这里只把值对象转换成 HTTP 契约。
+         */
+        get: operations["get_instrument_analysis_api_instruments__inst_id__analysis_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/instruments/{inst_id}/candles": {
         parameters: {
             query?: never;
@@ -1207,6 +1229,122 @@ export interface components {
             unrealized_pnl?: string | null;
             /** Used Margin */
             used_margin?: string | null;
+        };
+        /** AnalysisCandles */
+        AnalysisCandles: {
+            /** Available From */
+            available_from?: string | null;
+            /** Available To */
+            available_to?: string | null;
+            /** Candles */
+            candles: components["schemas"]["Candle"][];
+            /**
+             * Data Source
+             * @enum {string}
+             */
+            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+            /** Gaps */
+            gaps: components["schemas"]["AnalysisGap"][];
+            /** Overlays */
+            overlays: components["schemas"]["AnalysisOverlay"][];
+        };
+        /** AnalysisCoverage */
+        AnalysisCoverage: {
+            /** Available */
+            available: boolean;
+            /** Available From */
+            available_from?: string | null;
+            /** Available To */
+            available_to?: string | null;
+            /**
+             * Bar
+             * @enum {string}
+             */
+            bar: "1d" | "4h" | "1h";
+            /** Candle Count */
+            candle_count: number;
+            /**
+             * Data Source
+             * @enum {string}
+             */
+            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+            /** Gap Count */
+            gap_count: number;
+            /** Last Synced At */
+            last_synced_at?: string | null;
+            /** Unavailable Reason */
+            unavailable_reason?: string | null;
+        };
+        /** AnalysisGap */
+        AnalysisGap: {
+            /** End */
+            end: string;
+            /** Missing */
+            missing: number;
+            /** Start */
+            start: string;
+        };
+        /** AnalysisIndicators */
+        AnalysisIndicators: {
+            momentum: components["schemas"]["MomentumIndicators"];
+            /** Readings */
+            readings: string[];
+            relative_strength: components["schemas"]["RelativeStrengthIndicators"];
+            trend: components["schemas"]["TrendIndicators"];
+            volatility: components["schemas"]["VolatilityIndicators"];
+            volume: components["schemas"]["VolumeIndicators"];
+        };
+        /** AnalysisLevels */
+        AnalysisLevels: {
+            /** High20 */
+            high20?: string | null;
+            /** High Distance Pct */
+            high_distance_pct?: string | null;
+            /** Low20 */
+            low20?: string | null;
+            /** Low Distance Pct */
+            low_distance_pct?: string | null;
+            /** Window */
+            window: number;
+        };
+        /** AnalysisOverlay */
+        AnalysisOverlay: {
+            /** Name */
+            name: string;
+            /** Points */
+            points: components["schemas"]["AnalysisOverlayPoint"][];
+        };
+        /** AnalysisOverlayPoint */
+        AnalysisOverlayPoint: {
+            /** Time */
+            time: string;
+            /** Value */
+            value: string;
+        };
+        /**
+         * AnalysisPrice
+         * @description 一种价格语义；`last` / `mark` / `index` 各自独立，缺失时整个对象为 null。
+         */
+        AnalysisPrice: {
+            /** As Of */
+            as_of: string;
+            /** Change */
+            change?: string | null;
+            /** Change Pct */
+            change_pct?: string | null;
+            /** Price */
+            price: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+        };
+        /** AnalysisQuote */
+        AnalysisQuote: {
+            index?: components["schemas"]["AnalysisPrice"] | null;
+            last?: components["schemas"]["AnalysisPrice"] | null;
+            mark?: components["schemas"]["AnalysisPrice"] | null;
         };
         /** BacktestCosts */
         BacktestCosts: {
@@ -2012,6 +2150,28 @@ export interface components {
             /** Samples */
             samples: number;
         };
+        /** CorrelationReading */
+        CorrelationReading: {
+            /** Coefficient */
+            coefficient?: string | null;
+            /** Inst Id */
+            inst_id: string;
+            /** Product Key */
+            product_key: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "benchmark" | "related";
+            /** Sample Size */
+            sample_size: number;
+            /** Window */
+            window: number;
+            /** Window End */
+            window_end?: string | null;
+            /** Window Start */
+            window_start?: string | null;
+        };
         /**
          * CorrelationSeriesResponse
          * @description 两个标的在滚动窗口上的相关性随时间的变化。
@@ -2447,6 +2607,192 @@ export interface components {
             inst_type: "SPOT" | "SWAP";
             /** Series */
             series: components["schemas"]["IndicatorSeries"][];
+        };
+        /**
+         * InstrumentAnalysisResponse
+         * @example {
+         *       "bar": "1d",
+         *       "candles": {
+         *         "available_from": "2023-05-01T16:00:00Z",
+         *         "available_to": "2026-11-12T16:00:00Z",
+         *         "candles": [
+         *           {
+         *             "close": "231.42",
+         *             "data_source": "okx_spot",
+         *             "high": "232.10",
+         *             "is_closed": true,
+         *             "low": "229.44",
+         *             "open": "229.80",
+         *             "open_time": "2026-11-12T16:00:00Z",
+         *             "volume": "1520.335"
+         *           }
+         *         ],
+         *         "data_source": "okx_spot",
+         *         "gaps": [],
+         *         "overlays": [
+         *           {
+         *             "name": "MA20",
+         *             "points": [
+         *               {
+         *                 "time": "2026-11-12T16:00:00Z",
+         *                 "value": "226.51"
+         *               }
+         *             ]
+         *           },
+         *           {
+         *             "name": "MA60",
+         *             "points": [
+         *               {
+         *                 "time": "2026-11-12T16:00:00Z",
+         *                 "value": "219.08"
+         *               }
+         *             ]
+         *           }
+         *         ]
+         *       },
+         *       "correlations": [
+         *         {
+         *           "coefficient": "0.68",
+         *           "inst_id": "XQQQ-USDT",
+         *           "product_key": "QQQ",
+         *           "role": "benchmark",
+         *           "sample_size": 60,
+         *           "window": 60,
+         *           "window_end": "2026-11-12T16:00:00Z",
+         *           "window_start": "2026-08-20T16:00:00Z"
+         *         }
+         *       ],
+         *       "coverage": [
+         *         {
+         *           "available": true,
+         *           "available_from": "2023-05-01T16:00:00Z",
+         *           "available_to": "2026-11-12T16:00:00Z",
+         *           "bar": "1d",
+         *           "candle_count": 846,
+         *           "data_source": "okx_spot",
+         *           "gap_count": 0,
+         *           "last_synced_at": "2026-11-13T01:00:00Z"
+         *         },
+         *         {
+         *           "available": false,
+         *           "bar": "4h",
+         *           "candle_count": 0,
+         *           "data_source": "okx_spot",
+         *           "gap_count": 0,
+         *           "unavailable_reason": "尚未同步"
+         *         },
+         *         {
+         *           "available": false,
+         *           "bar": "1h",
+         *           "candle_count": 0,
+         *           "data_source": "okx_spot",
+         *           "gap_count": 0,
+         *           "unavailable_reason": "尚未同步"
+         *         }
+         *       ],
+         *       "indicators": {
+         *         "momentum": {
+         *           "macd": "1.28",
+         *           "macd_hist": "0.34",
+         *           "macd_signal": "0.94",
+         *           "rsi14": "61.4"
+         *         },
+         *         "readings": [
+         *           "收盘价 231.42，MA20 为 226.51，价格位于 MA20 上方 2.17%；MA20 的 5 根斜率是 1.42%。",
+         *           "RSI(14) 为 61.40，MACD 为 1.2800，信号线为 0.9400，柱状值为 0.3400。",
+         *           "当前成交量是 20 根均量的 1.32 倍，近 20 根相对 XQQQ-USDT 的超额收益为 4.60 个百分点。"
+         *         ],
+         *         "relative_strength": {
+         *           "benchmark_inst_id": "XQQQ-USDT",
+         *           "benchmark_return_pct": "3.20",
+         *           "excess_return_pct": "4.60",
+         *           "symbol_return_pct": "7.80",
+         *           "window": 20
+         *         },
+         *         "trend": {
+         *           "close": "231.42",
+         *           "ma20": "226.51",
+         *           "ma20_slope_pct": "1.42",
+         *           "ma60": "219.08",
+         *           "ma60_slope_pct": "0.86",
+         *           "price_vs_ma20_pct": "2.17",
+         *           "price_vs_ma60_pct": "5.63",
+         *           "slope_window": 5
+         *         },
+         *         "volatility": {
+         *           "atr14": "5.32",
+         *           "atr_pct": "2.30",
+         *           "atr_pct_avg20": "1.90"
+         *         },
+         *         "volume": {
+         *           "average20": "1151.78",
+         *           "current": "1520.335",
+         *           "relative": "1.32"
+         *         }
+         *       },
+         *       "instrument": {
+         *         "asset_type": "tokenized_equity",
+         *         "base_currency": "XAAPL",
+         *         "inst_id": "XAAPL-USDT",
+         *         "inst_type": "SPOT",
+         *         "listing_time": "2026-07-01T00:00:00Z",
+         *         "lot_size": "0.001",
+         *         "min_order_size": "0.001",
+         *         "product_key": "AAPL",
+         *         "quote_currency": "USDT",
+         *         "tick_size": "0.01",
+         *         "trading_status": "live"
+         *       },
+         *       "levels": {
+         *         "high20": "238.90",
+         *         "high_distance_pct": "3.23",
+         *         "low20": "214.10",
+         *         "low_distance_pct": "-7.48",
+         *         "window": 20
+         *       },
+         *       "linked_strategies": [
+         *         {
+         *           "backtest_end_date": "2026-11-01",
+         *           "backtest_start_date": "2026-10-01",
+         *           "created_at": "2026-11-10T01:20:00Z",
+         *           "data_source": "okx_spot",
+         *           "max_drawdown_pct": "6.12",
+         *           "run_id": "bt_0001",
+         *           "strategy_id": "ma_cross",
+         *           "strategy_instance_id": "si_0001",
+         *           "strategy_name": "AAPL 趋势",
+         *           "total_return_pct": "12.4055",
+         *           "trade_count": 37
+         *         }
+         *       ],
+         *       "quote": {
+         *         "last": {
+         *           "as_of": "2026-11-13T16:00:00Z",
+         *           "change": "2.84",
+         *           "change_pct": "1.24",
+         *           "price": "231.42",
+         *           "source": "okx_spot"
+         *         }
+         *       }
+         *     }
+         */
+        InstrumentAnalysisResponse: {
+            /**
+             * Bar
+             * @enum {string}
+             */
+            bar: "1d" | "4h" | "1h";
+            candles: components["schemas"]["AnalysisCandles"];
+            /** Correlations */
+            correlations: components["schemas"]["CorrelationReading"][];
+            /** Coverage */
+            coverage: components["schemas"]["AnalysisCoverage"][];
+            indicators: components["schemas"]["AnalysisIndicators"];
+            instrument: components["schemas"]["InstrumentInfo"];
+            levels: components["schemas"]["AnalysisLevels"];
+            /** Linked Strategies */
+            linked_strategies: components["schemas"]["LinkedBacktest"][];
+            quote: components["schemas"]["AnalysisQuote"];
         };
         /**
          * InstrumentDetailResponse
@@ -2915,6 +3261,40 @@ export interface components {
             /** Target Weight */
             target_weight?: string | null;
         };
+        /** LinkedBacktest */
+        LinkedBacktest: {
+            /**
+             * Backtest End Date
+             * Format: date
+             */
+            backtest_end_date: string;
+            /**
+             * Backtest Start Date
+             * Format: date
+             */
+            backtest_start_date: string;
+            /** Created At */
+            created_at: string;
+            /**
+             * Data Source
+             * @enum {string}
+             */
+            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+            /** Max Drawdown Pct */
+            max_drawdown_pct: string;
+            /** Run Id */
+            run_id: string;
+            /** Strategy Id */
+            strategy_id: string;
+            /** Strategy Instance Id */
+            strategy_instance_id: string;
+            /** Strategy Name */
+            strategy_name: string;
+            /** Total Return Pct */
+            total_return_pct: string;
+            /** Trade Count */
+            trade_count: number;
+        };
         /**
          * LiveAuthorizationRequest
          * @description 申请实盘授权：记录授权人与已批准的资金预算，不打开实盘开关。
@@ -3269,6 +3649,17 @@ export interface components {
              * @enum {string}
              */
             session: "pre" | "regular" | "post" | "closed";
+        };
+        /** MomentumIndicators */
+        MomentumIndicators: {
+            /** Macd */
+            macd?: string | null;
+            /** Macd Hist */
+            macd_hist?: string | null;
+            /** Macd Signal */
+            macd_signal?: string | null;
+            /** Rsi14 */
+            rsi14?: string | null;
         };
         /**
          * Opportunity
@@ -4162,6 +4553,19 @@ export interface components {
             degree: number;
             /** Product Key */
             product_key: string;
+        };
+        /** RelativeStrengthIndicators */
+        RelativeStrengthIndicators: {
+            /** Benchmark Inst Id */
+            benchmark_inst_id?: string | null;
+            /** Benchmark Return Pct */
+            benchmark_return_pct?: string | null;
+            /** Excess Return Pct */
+            excess_return_pct?: string | null;
+            /** Symbol Return Pct */
+            symbol_return_pct?: string | null;
+            /** Window */
+            window: number;
         };
         /**
          * RiskEvent
@@ -5085,6 +5489,25 @@ export interface components {
              */
             start_date: string;
         };
+        /** TrendIndicators */
+        TrendIndicators: {
+            /** Close */
+            close?: string | null;
+            /** Ma20 */
+            ma20?: string | null;
+            /** Ma20 Slope Pct */
+            ma20_slope_pct?: string | null;
+            /** Ma60 */
+            ma60?: string | null;
+            /** Ma60 Slope Pct */
+            ma60_slope_pct?: string | null;
+            /** Price Vs Ma20 Pct */
+            price_vs_ma20_pct?: string | null;
+            /** Price Vs Ma60 Pct */
+            price_vs_ma60_pct?: string | null;
+            /** Slope Window */
+            slope_window: number;
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -5134,6 +5557,24 @@ export interface components {
             unit: "base" | "contract";
             /** Unrealized Pnl */
             unrealized_pnl: string;
+        };
+        /** VolatilityIndicators */
+        VolatilityIndicators: {
+            /** Atr14 */
+            atr14?: string | null;
+            /** Atr Pct */
+            atr_pct?: string | null;
+            /** Atr Pct Avg20 */
+            atr_pct_avg20?: string | null;
+        };
+        /** VolumeIndicators */
+        VolumeIndicators: {
+            /** Average20 */
+            average20?: string | null;
+            /** Current */
+            current?: string | null;
+            /** Relative */
+            relative?: string | null;
         };
         /** WatchlistAddRequest */
         WatchlistAddRequest: {
@@ -5990,6 +6431,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InstrumentDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_instrument_analysis_api_instruments__inst_id__analysis_get: {
+        parameters: {
+            query?: {
+                bar?: "1d" | "4h" | "1h";
+            };
+            header?: never;
+            path: {
+                inst_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstrumentAnalysisResponse"];
                 };
             };
             /** @description Validation Error */

@@ -347,6 +347,410 @@
         "title": "AccountSyncResponse",
         "type": "object"
       },
+      "AnalysisCandles": {
+        "properties": {
+          "available_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available From"
+          },
+          "available_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available To"
+          },
+          "candles": {
+            "items": {
+              "$ref": "#/components/schemas/Candle"
+            },
+            "title": "Candles",
+            "type": "array"
+          },
+          "data_source": {
+            "enum": [
+              "okx",
+              "okx_spot",
+              "okx_swap",
+              "us_equity_proxy"
+            ],
+            "title": "Data Source",
+            "type": "string"
+          },
+          "gaps": {
+            "items": {
+              "$ref": "#/components/schemas/AnalysisGap"
+            },
+            "title": "Gaps",
+            "type": "array"
+          },
+          "overlays": {
+            "items": {
+              "$ref": "#/components/schemas/AnalysisOverlay"
+            },
+            "title": "Overlays",
+            "type": "array"
+          }
+        },
+        "required": [
+          "data_source",
+          "gaps",
+          "candles",
+          "overlays"
+        ],
+        "title": "AnalysisCandles",
+        "type": "object"
+      },
+      "AnalysisCoverage": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "available_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available From"
+          },
+          "available_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available To"
+          },
+          "bar": {
+            "enum": [
+              "1d",
+              "4h",
+              "1h"
+            ],
+            "title": "Bar",
+            "type": "string"
+          },
+          "candle_count": {
+            "title": "Candle Count",
+            "type": "integer"
+          },
+          "data_source": {
+            "enum": [
+              "okx",
+              "okx_spot",
+              "okx_swap",
+              "us_equity_proxy"
+            ],
+            "title": "Data Source",
+            "type": "string"
+          },
+          "gap_count": {
+            "title": "Gap Count",
+            "type": "integer"
+          },
+          "last_synced_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Synced At"
+          },
+          "unavailable_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable Reason"
+          }
+        },
+        "required": [
+          "bar",
+          "data_source",
+          "available",
+          "candle_count",
+          "gap_count"
+        ],
+        "title": "AnalysisCoverage",
+        "type": "object"
+      },
+      "AnalysisGap": {
+        "properties": {
+          "end": {
+            "title": "End",
+            "type": "string"
+          },
+          "missing": {
+            "title": "Missing",
+            "type": "integer"
+          },
+          "start": {
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "missing"
+        ],
+        "title": "AnalysisGap",
+        "type": "object"
+      },
+      "AnalysisIndicators": {
+        "properties": {
+          "momentum": {
+            "$ref": "#/components/schemas/MomentumIndicators"
+          },
+          "readings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Readings",
+            "type": "array"
+          },
+          "relative_strength": {
+            "$ref": "#/components/schemas/RelativeStrengthIndicators"
+          },
+          "trend": {
+            "$ref": "#/components/schemas/TrendIndicators"
+          },
+          "volatility": {
+            "$ref": "#/components/schemas/VolatilityIndicators"
+          },
+          "volume": {
+            "$ref": "#/components/schemas/VolumeIndicators"
+          }
+        },
+        "required": [
+          "trend",
+          "momentum",
+          "volatility",
+          "volume",
+          "relative_strength",
+          "readings"
+        ],
+        "title": "AnalysisIndicators",
+        "type": "object"
+      },
+      "AnalysisLevels": {
+        "properties": {
+          "high20": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High20"
+          },
+          "high_distance_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High Distance Pct"
+          },
+          "low20": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low20"
+          },
+          "low_distance_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low Distance Pct"
+          },
+          "window": {
+            "title": "Window",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "window"
+        ],
+        "title": "AnalysisLevels",
+        "type": "object"
+      },
+      "AnalysisOverlay": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/AnalysisOverlayPoint"
+            },
+            "title": "Points",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "points"
+        ],
+        "title": "AnalysisOverlay",
+        "type": "object"
+      },
+      "AnalysisOverlayPoint": {
+        "properties": {
+          "time": {
+            "title": "Time",
+            "type": "string"
+          },
+          "value": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "time",
+          "value"
+        ],
+        "title": "AnalysisOverlayPoint",
+        "type": "object"
+      },
+      "AnalysisPrice": {
+        "description": "一种价格语义；`last` / `mark` / `index` 各自独立，缺失时整个对象为 null。",
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "change": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          },
+          "price": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Price",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "okx",
+              "okx_spot",
+              "okx_swap",
+              "us_equity_proxy"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "price",
+          "as_of",
+          "source"
+        ],
+        "title": "AnalysisPrice",
+        "type": "object"
+      },
+      "AnalysisQuote": {
+        "properties": {
+          "index": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisPrice"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisPrice"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mark": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisPrice"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "AnalysisQuote",
+        "type": "object"
+      },
       "BacktestCosts": {
         "properties": {
           "maker_fee_bps": {
@@ -1948,6 +2352,77 @@
         "title": "CorrelationPoint",
         "type": "object"
       },
+      "CorrelationReading": {
+        "properties": {
+          "coefficient": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coefficient"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "product_key": {
+            "title": "Product Key",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "benchmark",
+              "related"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "sample_size": {
+            "title": "Sample Size",
+            "type": "integer"
+          },
+          "window": {
+            "title": "Window",
+            "type": "integer"
+          },
+          "window_end": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window End"
+          },
+          "window_start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Start"
+          }
+        },
+        "required": [
+          "inst_id",
+          "product_key",
+          "role",
+          "sample_size",
+          "window"
+        ],
+        "title": "CorrelationReading",
+        "type": "object"
+      },
       "CorrelationSeriesResponse": {
         "description": "两个标的在滚动窗口上的相关性随时间的变化。",
         "examples": [
@@ -2909,6 +3384,235 @@
         "title": "IndicatorSeriesResponse",
         "type": "object"
       },
+      "InstrumentAnalysisResponse": {
+        "examples": [
+          {
+            "bar": "1d",
+            "candles": {
+              "available_from": "2023-05-01T16:00:00Z",
+              "available_to": "2026-11-12T16:00:00Z",
+              "candles": [
+                {
+                  "close": "231.42",
+                  "data_source": "okx_spot",
+                  "high": "232.10",
+                  "is_closed": true,
+                  "low": "229.44",
+                  "open": "229.80",
+                  "open_time": "2026-11-12T16:00:00Z",
+                  "volume": "1520.335"
+                }
+              ],
+              "data_source": "okx_spot",
+              "gaps": [],
+              "overlays": [
+                {
+                  "name": "MA20",
+                  "points": [
+                    {
+                      "time": "2026-11-12T16:00:00Z",
+                      "value": "226.51"
+                    }
+                  ]
+                },
+                {
+                  "name": "MA60",
+                  "points": [
+                    {
+                      "time": "2026-11-12T16:00:00Z",
+                      "value": "219.08"
+                    }
+                  ]
+                }
+              ]
+            },
+            "correlations": [
+              {
+                "coefficient": "0.68",
+                "inst_id": "XQQQ-USDT",
+                "product_key": "QQQ",
+                "role": "benchmark",
+                "sample_size": 60,
+                "window": 60,
+                "window_end": "2026-11-12T16:00:00Z",
+                "window_start": "2026-08-20T16:00:00Z"
+              }
+            ],
+            "coverage": [
+              {
+                "available": true,
+                "available_from": "2023-05-01T16:00:00Z",
+                "available_to": "2026-11-12T16:00:00Z",
+                "bar": "1d",
+                "candle_count": 846,
+                "data_source": "okx_spot",
+                "gap_count": 0,
+                "last_synced_at": "2026-11-13T01:00:00Z"
+              },
+              {
+                "available": false,
+                "bar": "4h",
+                "candle_count": 0,
+                "data_source": "okx_spot",
+                "gap_count": 0,
+                "unavailable_reason": "尚未同步"
+              },
+              {
+                "available": false,
+                "bar": "1h",
+                "candle_count": 0,
+                "data_source": "okx_spot",
+                "gap_count": 0,
+                "unavailable_reason": "尚未同步"
+              }
+            ],
+            "indicators": {
+              "momentum": {
+                "macd": "1.28",
+                "macd_hist": "0.34",
+                "macd_signal": "0.94",
+                "rsi14": "61.4"
+              },
+              "readings": [
+                "收盘价 231.42，MA20 为 226.51，价格位于 MA20 上方 2.17%；MA20 的 5 根斜率是 1.42%。",
+                "RSI(14) 为 61.40，MACD 为 1.2800，信号线为 0.9400，柱状值为 0.3400。",
+                "当前成交量是 20 根均量的 1.32 倍，近 20 根相对 XQQQ-USDT 的超额收益为 4.60 个百分点。"
+              ],
+              "relative_strength": {
+                "benchmark_inst_id": "XQQQ-USDT",
+                "benchmark_return_pct": "3.20",
+                "excess_return_pct": "4.60",
+                "symbol_return_pct": "7.80",
+                "window": 20
+              },
+              "trend": {
+                "close": "231.42",
+                "ma20": "226.51",
+                "ma20_slope_pct": "1.42",
+                "ma60": "219.08",
+                "ma60_slope_pct": "0.86",
+                "price_vs_ma20_pct": "2.17",
+                "price_vs_ma60_pct": "5.63",
+                "slope_window": 5
+              },
+              "volatility": {
+                "atr14": "5.32",
+                "atr_pct": "2.30",
+                "atr_pct_avg20": "1.90"
+              },
+              "volume": {
+                "average20": "1151.78",
+                "current": "1520.335",
+                "relative": "1.32"
+              }
+            },
+            "instrument": {
+              "asset_type": "tokenized_equity",
+              "base_currency": "XAAPL",
+              "inst_id": "XAAPL-USDT",
+              "inst_type": "SPOT",
+              "listing_time": "2026-07-01T00:00:00Z",
+              "lot_size": "0.001",
+              "min_order_size": "0.001",
+              "product_key": "AAPL",
+              "quote_currency": "USDT",
+              "tick_size": "0.01",
+              "trading_status": "live"
+            },
+            "levels": {
+              "high20": "238.90",
+              "high_distance_pct": "3.23",
+              "low20": "214.10",
+              "low_distance_pct": "-7.48",
+              "window": 20
+            },
+            "linked_strategies": [
+              {
+                "backtest_end_date": "2026-11-01",
+                "backtest_start_date": "2026-10-01",
+                "created_at": "2026-11-10T01:20:00Z",
+                "data_source": "okx_spot",
+                "max_drawdown_pct": "6.12",
+                "run_id": "bt_0001",
+                "strategy_id": "ma_cross",
+                "strategy_instance_id": "si_0001",
+                "strategy_name": "AAPL 趋势",
+                "total_return_pct": "12.4055",
+                "trade_count": 37
+              }
+            ],
+            "quote": {
+              "last": {
+                "as_of": "2026-11-13T16:00:00Z",
+                "change": "2.84",
+                "change_pct": "1.24",
+                "price": "231.42",
+                "source": "okx_spot"
+              }
+            }
+          }
+        ],
+        "properties": {
+          "bar": {
+            "enum": [
+              "1d",
+              "4h",
+              "1h"
+            ],
+            "title": "Bar",
+            "type": "string"
+          },
+          "candles": {
+            "$ref": "#/components/schemas/AnalysisCandles"
+          },
+          "correlations": {
+            "items": {
+              "$ref": "#/components/schemas/CorrelationReading"
+            },
+            "title": "Correlations",
+            "type": "array"
+          },
+          "coverage": {
+            "items": {
+              "$ref": "#/components/schemas/AnalysisCoverage"
+            },
+            "title": "Coverage",
+            "type": "array"
+          },
+          "indicators": {
+            "$ref": "#/components/schemas/AnalysisIndicators"
+          },
+          "instrument": {
+            "$ref": "#/components/schemas/InstrumentInfo"
+          },
+          "levels": {
+            "$ref": "#/components/schemas/AnalysisLevels"
+          },
+          "linked_strategies": {
+            "items": {
+              "$ref": "#/components/schemas/LinkedBacktest"
+            },
+            "title": "Linked Strategies",
+            "type": "array"
+          },
+          "quote": {
+            "$ref": "#/components/schemas/AnalysisQuote"
+          }
+        },
+        "required": [
+          "instrument",
+          "bar",
+          "quote",
+          "candles",
+          "indicators",
+          "levels",
+          "correlations",
+          "linked_strategies",
+          "coverage"
+        ],
+        "title": "InstrumentAnalysisResponse",
+        "type": "object"
+      },
       "InstrumentDetailResponse": {
         "examples": [
           {
@@ -3841,6 +4545,79 @@
         "title": "JournalSignal",
         "type": "object"
       },
+      "LinkedBacktest": {
+        "properties": {
+          "backtest_end_date": {
+            "format": "date",
+            "title": "Backtest End Date",
+            "type": "string"
+          },
+          "backtest_start_date": {
+            "format": "date",
+            "title": "Backtest Start Date",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "data_source": {
+            "enum": [
+              "okx",
+              "okx_spot",
+              "okx_swap",
+              "us_equity_proxy"
+            ],
+            "title": "Data Source",
+            "type": "string"
+          },
+          "max_drawdown_pct": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Max Drawdown Pct",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "strategy_id": {
+            "title": "Strategy Id",
+            "type": "string"
+          },
+          "strategy_instance_id": {
+            "title": "Strategy Instance Id",
+            "type": "string"
+          },
+          "strategy_name": {
+            "title": "Strategy Name",
+            "type": "string"
+          },
+          "total_return_pct": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Total Return Pct",
+            "type": "string"
+          },
+          "trade_count": {
+            "title": "Trade Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "run_id",
+          "strategy_instance_id",
+          "strategy_name",
+          "strategy_id",
+          "data_source",
+          "total_return_pct",
+          "max_drawdown_pct",
+          "trade_count",
+          "backtest_start_date",
+          "backtest_end_date",
+          "created_at"
+        ],
+        "title": "LinkedBacktest",
+        "type": "object"
+      },
       "LiveAuthorizationRequest": {
         "description": "申请实盘授权：记录授权人与已批准的资金预算，不打开实盘开关。",
         "properties": {
@@ -4637,6 +5414,60 @@
           "primary_source"
         ],
         "title": "MarketState",
+        "type": "object"
+      },
+      "MomentumIndicators": {
+        "properties": {
+          "macd": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Macd"
+          },
+          "macd_hist": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Macd Hist"
+          },
+          "macd_signal": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Macd Signal"
+          },
+          "rsi14": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rsi14"
+          }
+        },
+        "title": "MomentumIndicators",
         "type": "object"
       },
       "Opportunity": {
@@ -6300,6 +7131,66 @@
           "centrality"
         ],
         "title": "RelationNode",
+        "type": "object"
+      },
+      "RelativeStrengthIndicators": {
+        "properties": {
+          "benchmark_inst_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Inst Id"
+          },
+          "benchmark_return_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Return Pct"
+          },
+          "excess_return_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excess Return Pct"
+          },
+          "symbol_return_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol Return Pct"
+          },
+          "window": {
+            "title": "Window",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "window"
+        ],
+        "title": "RelativeStrengthIndicators",
         "type": "object"
       },
       "RiskEvent": {
@@ -8163,6 +9054,103 @@
         "title": "TimeSplit",
         "type": "object"
       },
+      "TrendIndicators": {
+        "properties": {
+          "close": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close"
+          },
+          "ma20": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ma20"
+          },
+          "ma20_slope_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ma20 Slope Pct"
+          },
+          "ma60": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ma60"
+          },
+          "ma60_slope_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ma60 Slope Pct"
+          },
+          "price_vs_ma20_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Vs Ma20 Pct"
+          },
+          "price_vs_ma60_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Vs Ma60 Pct"
+          },
+          "slope_window": {
+            "title": "Slope Window",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "slope_window"
+        ],
+        "title": "TrendIndicators",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -8282,6 +9270,90 @@
           "opened_at"
         ],
         "title": "VirtualPosition",
+        "type": "object"
+      },
+      "VolatilityIndicators": {
+        "properties": {
+          "atr14": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Atr14"
+          },
+          "atr_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Atr Pct"
+          },
+          "atr_pct_avg20": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Atr Pct Avg20"
+          }
+        },
+        "title": "VolatilityIndicators",
+        "type": "object"
+      },
+      "VolumeIndicators": {
+        "properties": {
+          "average20": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average20"
+          },
+          "current": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current"
+          },
+          "relative": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relative"
+          }
+        },
+        "title": "VolumeIndicators",
         "type": "object"
       },
       "WatchlistAddRequest": {
@@ -9742,6 +10814,64 @@
           }
         },
         "summary": "Get Instrument",
+        "tags": [
+          "instruments"
+        ]
+      }
+    },
+    "/api/instruments/{inst_id}/analysis": {
+      "get": {
+        "description": "详情页聚合：报价、K 线、指标、关键价位、相关性、关联回测与数据覆盖。\n\n业务计算全部在 `app.analysis`；这里只把值对象转换成 HTTP 契约。",
+        "operationId": "get_instrument_analysis_api_instruments__inst_id__analysis_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "inst_id",
+            "required": true,
+            "schema": {
+              "title": "Inst Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "bar",
+            "required": false,
+            "schema": {
+              "default": "1d",
+              "enum": [
+                "1d",
+                "4h",
+                "1h"
+              ],
+              "title": "Bar",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstrumentAnalysisResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Instrument Analysis",
         "tags": [
           "instruments"
         ]

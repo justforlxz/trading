@@ -135,6 +135,15 @@ def list_groups() -> list[str]:
         )
 
 
+def group_of(inst_id: str) -> str | None:
+    """标的所在的自选分组；不在自选里返回 `None`，不把它归到默认组。"""
+
+    symbol = inst_id.strip()
+    with session_scope() as session:
+        row = session.get(WatchlistItemRow, symbol)
+        return None if row is None else row.group_name
+
+
 def tracked_instruments(group: str | None = None) -> list[Instrument]:
     """自选里跟踪的标的，不取行情、不读提醒；按 `symbol` 固定顺序返回。
 

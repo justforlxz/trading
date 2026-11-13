@@ -20,6 +20,7 @@ __all__ = [
     "SPOT_RULES",
     "SWAP_RULES",
     "TradingRules",
+    "okx_source",
     "register_rules",
     "trading_categories",
     "trading_rules",
@@ -100,6 +101,12 @@ def trading_categories() -> tuple[str, ...]:
     """
 
     return tuple(_RULES)
+
+
+def okx_source(inst_type: str) -> str:
+    """该类别在 OKX 一侧的行情来源；现货与永续各自一行，不能混用。"""
+
+    return "okx_swap" if trading_rules(inst_type).has_margin else "okx_spot"
 
 
 def register_rules(inst_type: str, rules: TradingRules) -> None:

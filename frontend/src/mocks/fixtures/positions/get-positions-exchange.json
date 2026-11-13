@@ -1,0 +1,23 @@
+{
+  "as_of": "2026-11-13T09:00:00Z",
+  "items": [
+    {
+      "asset_class": "tokenized_equity",
+      "avg_px": "226.80",
+      "display_symbol": "AAPL-USDT",
+      "inst_id": "AAPL-USDT-SWAP",
+      "lever": "3",
+      "liq_px": "151.20",
+      "margin": "604.80",
+      "mark_px": "231.42",
+      "mgn_mode": "cross",
+      "name": "AAPL",
+      "pos_id": "123456",
+      "pos_side": "long",
+      "size": "8",
+      "upl": "36.96",
+      "upl_ratio": "0.0204"
+    }
+  ],
+  "status": "ok"
+}

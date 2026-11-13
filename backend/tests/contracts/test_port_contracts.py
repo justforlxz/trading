@@ -41,6 +41,7 @@ from app.core import (
     Timeframe,
     TradePort,
     TradingError,
+    UnprocessableEntity,
     UpstreamError,
     ValidationError,
     get,
@@ -426,6 +427,7 @@ def test_error_hierarchy_is_closed() -> None:
         Conflict,
         RiskBlocked,
         ExecutionRejected,
+        UnprocessableEntity,
         InvariantViolation,
     }
 
@@ -439,6 +441,7 @@ def test_error_hierarchy_is_closed() -> None:
         (Conflict, 409),
         (RiskBlocked, 409),
         (ExecutionRejected, 422),
+        (UnprocessableEntity, 422),
         (InvariantViolation, 500),
     ],
 )

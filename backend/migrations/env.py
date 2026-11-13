@@ -15,6 +15,13 @@ from app.db import Base
 from app.exchange import OrderSubmission  # noqa: F401
 from app.instrument import Instrument  # noqa: F401
 from app.market import Candle, CorrelationSnapshot  # noqa: F401
+from app.positions import (  # noqa: F401
+    AccountSnapshotRow,
+    ExchangePositionSnapshotRow,
+    ManualPositionRow,
+    ManualTradeRow,
+    PositionRiskConfigRow,
+)
 from app.strategy import StrategyInstanceRow, StrategyTemplateRow  # noqa: F401
 from app.watchlist import WatchlistItemRow  # noqa: F401
 

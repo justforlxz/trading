@@ -151,6 +151,7 @@ class TradeBook:
         self._clock = clock
         self._balances: dict[str, dict[str, str]] = {}
         self._positions: list[dict[str, str]] = []
+        self._account: dict[str, str] = {}
         self._orders: dict[str, dict[str, str]] = {}
         self._order_ids: dict[tuple[str, str], str] = {}
         self._fills: list[dict[str, str]] = []
@@ -188,17 +189,49 @@ class TradeBook:
         pos_side: str,
         avg_price: str,
         upl: str = "0",
+        pos_id: str | None = None,
+        mark_px: str | None = None,
+        upl_ratio: str = "0",
+        lever: str = "3",
+        mgn_mode: str = "cross",
+        liq_px: str = "",
+        margin: str = "",
     ) -> None:
         self._positions.append(
             {
+                "posId": pos_id or f"pos-{len(self._positions) + 1}",
                 "instId": inst_id,
                 "pos": qty,
                 "posSide": pos_side,
                 "avgPx": avg_price,
                 "upl": upl,
-                "mgnMode": "cross",
+                "uplRatio": upl_ratio,
+                "markPx": mark_px if mark_px is not None else avg_price,
+                "lever": lever,
+                "mgnMode": mgn_mode,
+                "liqPx": liq_px,
+                "margin": margin,
             }
         )
+
+    def set_account(
+        self,
+        *,
+        equity: str,
+        available_equity: str,
+        used_margin: str = "0",
+        unrealized_pnl: str = "0",
+        margin_ratio: str = "0",
+    ) -> None:
+        """预置账户级字段；余额明细仍由 `set_balance` 提供。"""
+
+        self._account = {
+            "totalEq": equity,
+            "availEq": available_equity,
+            "imr": used_margin,
+            "upl": unrealized_pnl,
+            "mgnRatio": margin_ratio,
+        }
 
     def set_mark_price(self, inst_id: str, price: str) -> None:
         """预置成交价：市价单按这个价格成交，限价单永远挂着等撤单。"""
@@ -283,7 +316,29 @@ class TradeBook:
         details = [
             detail for name, detail in sorted(self._balances.items()) if not ccy or name == ccy
         ]
-        return {"details": [dict(detail) for detail in details], "totalEq": "0"}
+        derived_equity = sum(
+            Decimal(detail.get("availBal", "0")) + Decimal(detail.get("frozenBal", "0"))
+            for detail in details
+        )
+        derived_upl = sum(Decimal(detail.get("upl", "0")) for detail in details)
+        payload = {
+            "totalEq": str(self._account.get("totalEq", derived_equity)),
+            "availEq": str(self._account.get("availEq", derived_equity)),
+            "imr": self._account.get("imr", "0"),
+            "upl": self._account.get("upl", str(derived_upl)),
+            "mgnRatio": self._account.get("mgnRatio", "0"),
+            "details": [
+                {
+                    **detail,
+                    "cashBal": str(
+                        Decimal(detail.get("availBal", "0")) + Decimal(detail.get("frozenBal", "0"))
+                    ),
+                    "availEq": detail.get("availBal", "0"),
+                }
+                for detail in details
+            ],
+        }
+        return payload
 
     def positions(self, inst_type: str) -> list[dict[str, str]]:
         if inst_type not in SUPPORTED_TD_MODES:

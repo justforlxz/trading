@@ -21,6 +21,7 @@ __all__ = [
     "InvariantViolation",
     "RiskBlocked",
     "TradingError",
+    "UnprocessableEntity",
     "UpstreamError",
     "ValidationError",
 ]
@@ -80,6 +81,16 @@ class RiskBlocked(TradingError):
 
 class ExecutionRejected(TradingError):
     """交易所明确拒绝了订单（余额不足、标的下架、参数被拒等）。"""
+
+    http_status: ClassVar[int] = 422
+
+
+class UnprocessableEntity(TradingError):
+    """请求参数合法，但当前数据状态不允许这次变更。
+
+    例如减仓数量超过当前持仓。它与 `ValidationError`（请求本身不合法）和
+    `Conflict`（资源状态冲突）都不是同一类：调用方修正数量后可以重试。
+    """
 
     http_status: ClassVar[int] = 422
 

@@ -83,6 +83,21 @@ from app.api.schemas.portfolio import (
     StrategyPortfolioListResponse,
     VirtualPosition,
 )
+from app.api.schemas.positions import (
+    AccountStatus,
+    AccountSummaryResponse,
+    AccountSyncResponse,
+    ExchangePositionItem,
+    ExchangePositionsResponse,
+    ManualPositionCreateRequest,
+    ManualPositionItem,
+    ManualPositionListResponse,
+    ManualPositionUpdateRequest,
+    ManualTradeAction,
+    ManualTradeItem,
+    ManualTradeListResponse,
+    ManualTradeRequest,
+)
 from app.api.schemas.relations import (
     RelationCommunity,
     RelationEdge,
@@ -156,6 +171,9 @@ from app.api.schemas.watchlist import (
 )
 
 __all__ = [
+    "AccountStatus",
+    "AccountSummaryResponse",
+    "AccountSyncResponse",
     "BacktestCosts",
     "BacktestDetailResponse",
     "BacktestLeg",
@@ -181,6 +199,8 @@ __all__ = [
     "CostSettings",
     "DataSettings",
     "EquityPoint",
+    "ExchangePositionItem",
+    "ExchangePositionsResponse",
     "ExchangeSettings",
     "ExchangeSettingsUpdate",
     "ExecutionModeRequest",
@@ -208,6 +228,14 @@ __all__ = [
     "JournalReturnPoint",
     "JournalSignal",
     "LiveAuthorizationRequest",
+    "ManualPositionCreateRequest",
+    "ManualPositionItem",
+    "ManualPositionListResponse",
+    "ManualPositionUpdateRequest",
+    "ManualTradeAction",
+    "ManualTradeItem",
+    "ManualTradeListResponse",
+    "ManualTradeRequest",
     "MarketBreadth",
     "MarketOverviewResponse",
     "MarketResonance",

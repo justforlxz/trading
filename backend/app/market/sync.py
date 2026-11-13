@@ -226,6 +226,23 @@ def load_candles(
         return [row.to_bar() for row in session.scalars(statement)]
 
 
+def latest_candle(symbol: str, *, source: str | None = None) -> Bar | None:
+    """该标的最近一根已收盘 K 线；表里只有已收盘数据，没有就是 `None`。
+
+    不限定周期：手动持仓要的是「最近一个可信价格」，而不是某一条固定周期的序列。
+    同一来源有多个周期时按 `open_time` 取最新；来源由调用方指定，本函数不替调用方
+    选择数据来源。
+    """
+
+    statement = select(Candle).where(Candle.symbol == symbol)
+    if source is not None:
+        statement = statement.where(Candle.source == source)
+    statement = statement.order_by(Candle.open_time.desc(), Candle.updated_at.desc()).limit(1)
+    with session_scope() as session:
+        row = session.scalar(statement)
+    return None if row is None else row.to_bar()
+
+
 def candle_sources(symbols: Sequence[str], bar: str) -> dict[str, set[str]]:
     """每个标的在该周期落过的来源集合；没有 K 线的标的不出现在结果里。
 

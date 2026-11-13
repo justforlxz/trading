@@ -6,6 +6,8 @@ fixture 的唯一来源；页面不得另造数据。
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict
 
 from app.api.schemas.common import (
@@ -100,6 +102,12 @@ _EXAMPLE_ITEM = {
     "last_price": "231.42",
     "change_pct_24h": "1.86",
     "volume_24h_quote": "4821334.55",
+    "trend": "bullish",
+    "rsi_14": "61.4",
+    "atr_pct_14": "2.3",
+    "candle_count": 846,
+    "last_candle_at": "2026-11-12T16:00:00Z",
+    "data_status": "ok",
     "strategy": {
         "instance_id": "si_0001",
         "name": "AAPL 趋势",
@@ -110,6 +118,10 @@ _EXAMPLE_ITEM = {
     "last_signal": _EXAMPLE_SIGNAL,
     "alert": None,
 }
+
+
+TrendStatus = Literal["bullish", "bearish", "neutral"]
+DataStatus = Literal["ok", "partial", "missing"]
 
 
 class WatchlistStrategy(BaseModel):
@@ -123,13 +135,23 @@ class WatchlistStrategy(BaseModel):
 
 
 class WatchlistItem(BaseModel):
-    """自选列表一行：行情快照 + 关联运行态。"""
+    """自选列表一行：日线快照、技术指标、数据覆盖与关联运行态。
+
+    价格与派生指标都可能为 `null`：该行没有日线时如实留空，不补 0。
+    `data_status` 区分「没有 K 线」与「有 K 线但指标历史不足」。
+    """
 
     instrument: InstrumentInfo
     group: str
-    last_price: DecimalString
-    change_pct_24h: DecimalString
-    volume_24h_quote: DecimalString
+    last_price: DecimalString | None
+    change_pct_24h: DecimalString | None
+    volume_24h_quote: DecimalString | None
+    trend: TrendStatus | None
+    rsi_14: DecimalString | None
+    atr_pct_14: DecimalString | None
+    candle_count: int
+    last_candle_at: UtcDatetime | None
+    data_status: DataStatus
     strategy: WatchlistStrategy | None = None
     last_signal: Signal | None = None
     alert: PriceAlert | None = None

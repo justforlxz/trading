@@ -5,7 +5,10 @@
   ],
   "items": [
     {
+      "atr_pct_14": "2.3",
+      "candle_count": 846,
       "change_pct_24h": "1.86",
+      "data_status": "ok",
       "group": "美股",
       "instrument": {
         "asset_type": "tokenized_equity",
@@ -20,6 +23,7 @@
         "tick_size": "0.01",
         "trading_status": "live"
       },
+      "last_candle_at": "2026-11-12T16:00:00Z",
       "last_price": "231.42",
       "last_signal": {
         "action": "BUY",
@@ -33,6 +37,7 @@
         "strategy_instance_id": "si_0001",
         "target_weight": "0.25"
       },
+      "rsi_14": "61.4",
       "strategy": {
         "enabled": true,
         "execution_mode": "paper",
@@ -40,6 +45,7 @@
         "name": "AAPL 趋势",
         "status": "live_running"
       },
+      "trend": "bullish",
       "volume_24h_quote": "4821334.55"
     }
   ]

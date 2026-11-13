@@ -9,7 +9,7 @@
  * 校验（任一不满足即非 0 退出）：
  *   - 每个 path 都出现在生成的 types.ts 里；
  *   - 每个 2xx JSON 响应都有 example（否则 MSW 无从取值）；
- *   - 十二个业务域都至少生成了一条 handler。
+ *   - 九个业务域都至少生成了一条 handler。
  *
  * 生成物禁止手改：契约只改后端 schema，再跑一次本脚本。
  * 用法：`pnpm --dir frontend api:sync`（或 `make api`）。
@@ -35,15 +35,15 @@ const DOMAINS = [
   "indicators",
   "strategy",
   "backtest",
-  "trades",
   "settings",
   "overview",
   "correlation",
-  "relations",
   "opportunity",
-  "portfolio",
   "approval",
 ];
+
+/** v6 删除的旧页面所属业务域，不再生成前端 MSW handler 与 fixture。 */
+const REMOVED_DOMAINS = new Set(["trades", "relations", "portfolio"]);
 
 const contract = JSON.parse(await readFile(CONTRACT_PATH, "utf8"));
 
@@ -92,6 +92,7 @@ for (const [route, item] of Object.entries(contract.paths)) {
 
     const domain = operation.tags?.[0];
     if (!domain) throw new Error(`${method.toUpperCase()} ${route} 缺少 tags，无法归域`);
+    if (REMOVED_DOMAINS.has(domain)) continue;
 
     const statuses = Object.keys(operation.responses ?? {})
       .filter((status) => status.startsWith("2"))

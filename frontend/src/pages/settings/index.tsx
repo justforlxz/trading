@@ -196,15 +196,18 @@ export default function SettingsPage() {
         eyebrow="Settings"
         title="设置"
         description="凭证与执行模式的唯一出口。API Key 只写不读，界面只显示是否已配置与掩码。"
+        actions={
+          <>
+            {notice ? (
+              <span className="text-sm text-emerald-600 dark:text-emerald-400">{notice}</span>
+            ) : null}
+            {error ? <span className="text-sm text-destructive">{error}</span> : null}
+            <Button onClick={save} disabled={!draft || busy}>
+              {busy ? "保存中…" : "保存设置"}
+            </Button>
+          </>
+        }
       />
-
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <Button onClick={save} disabled={!draft || busy}>
-          {busy ? "保存中…" : "保存设置"}
-        </Button>
-        {notice ? <span className="text-sm text-emerald-600 dark:text-emerald-400">{notice}</span> : null}
-        {error ? <span className="text-sm text-destructive">{error}</span> : null}
-      </div>
 
       {!draft || !settings ? (
         <p className="text-sm text-muted-foreground">加载中…</p>

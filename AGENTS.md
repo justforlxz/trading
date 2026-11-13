@@ -115,3 +115,11 @@ make verify-live            # 起真实 uvicorn 进程并请求 /api/health
 
 后端以 `backend/` 为 cwd 启动（`uvicorn app.main:app`）；数据库地址来自 `DATABASE_URL`，
 与 cwd 无关。部署方式不在项目范围，本地数据库只用 `podman run` 起容器。
+
+## 8. 文档与 issue 的关系
+
+- 需求与计划只写在项目文档里：产品范围与功能状态在 `docs/prd/v6.md`，交付计划、阶段、依赖、接口契约和删除规则在 `docs/prd/v6-delivery.md`，已确认规格在 `docs/prd/v6-data-spec.md`。
+- issue 只写本次执行范围、依赖、验收和状态，不复制文档正文，也不另建第二份状态表。
+- 接口、依赖或计划变更时，先改文档并合并，再修改或创建 issue；PR 中写明受影响的 issue。
+- 文档与 issue 冲突时以文档为准；文档与 `docs/prd/v6-data-spec.md` 冲突时以规格为准。
+- 每次执行 issue 完成时，在同一个 PR 更新 `docs/prd/v6.md` 中自己负责的行。

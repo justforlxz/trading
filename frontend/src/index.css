@@ -56,4 +56,14 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
   }
+
+  /* 窄屏表格自己横向滚动，避免把整页撑出横向溢出。 */
+  @media (max-width: 640px) {
+    main table {
+      display: block;
+      max-width: 100%;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+  }
 }

@@ -1,10 +1,11 @@
-"""自选域：分组、条目、价格提醒，以及基于已落库日线的行情快照。
+"""自选域：分组、条目、价格提醒，以及基于已落库日线的行情与技术指标快照。
 
 行情口径（本域唯一出处）：取该标的已落库的 **日线**，`last_price` 是最新一根
 收盘价，`change_pct_24h` 是它与前一根收盘价的涨跌幅，`volume_24h_quote` 是
 `最新收盘价 × 最新成交量`。库里的成交量是基础币种的成交量，没有单独的报价
 成交量列，所以这里按收盘价折算成近似成交额，口径写在响应字段之外，不做伪
-装。日线不足两根时明确报缺数据（`DataUnavailable`），不补造历史。
+装。趋势、RSI 与 ATR 复用 `app.indicators` 的计算，历史不足时如实留空；
+加入自选仍要求至少两根日线，列表读取则允许某一行缺数据（显式标记 `missing`）。
 
 提醒只存规则：触发时间留给后续节点的任务回填，本域不主动扫描行情。
 """
@@ -22,13 +23,13 @@ from app.core import DataUnavailable, InvariantViolation, ValidationError
 from app.db import session_scope
 from app.instrument import Instrument
 from app.market import correlation, load_candles
+from app.watchlist.metrics import DailySnapshot, summarize_daily
 from app.watchlist.model import PriceAlertRow, WatchlistGroup, WatchlistItemRow
 
 __all__ = [
     "DEFAULT_GROUP",
     "QUOTE_BAR",
     "AlertSnapshot",
-    "Quote",
     "RelatedCandidate",
     "WatchlistEntry",
     "add_item",
@@ -45,18 +46,7 @@ __all__ = [
 DEFAULT_GROUP = "默认"
 QUOTE_BAR = "1d"
 
-_CHANGE_PLACES = Decimal("0.000001")
-_TURNOVER_PLACES = Decimal("0.01")
 _CORRELATION_PLACES = Decimal("0.0001")
-
-
-@dataclass(frozen=True, slots=True)
-class Quote:
-    """自选条目的一次行情快照，三列都来自同一根最新日线。"""
-
-    last_price: Decimal
-    change_pct_24h: Decimal
-    volume_24h_quote: Decimal
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,12 +62,12 @@ class AlertSnapshot:
 
 @dataclass(frozen=True, slots=True)
 class WatchlistEntry:
-    """一条自选：标的元数据 + 分组 + 行情快照 + 可选提醒。"""
+    """一条自选：标的元数据 + 分组 + 日线快照 + 可选提醒。"""
 
     instrument: Instrument
     group: str
     added_at: datetime
-    quote: Quote
+    quote: DailySnapshot
     alert: AlertSnapshot | None
 
 
@@ -91,27 +81,20 @@ class RelatedCandidate:
     correlation: Decimal
 
 
-def quote(inst_id: str) -> Quote:
+def quote(inst_id: str) -> DailySnapshot:
     """按已落库日线算行情快照；数据不够两根就报缺数据，不补造。"""
 
-    candles = load_candles(inst_id, QUOTE_BAR)
-    if len(candles) < 2:
+    snapshot = summarize_daily(load_candles(inst_id, QUOTE_BAR))
+    if snapshot.candle_count < 2:
         raise DataUnavailable(f"标的 {inst_id} 的日线不足 2 根无法计算 24 小时涨跌幅")
+    if snapshot.change_pct_24h is None:
+        raise DataUnavailable(f"标的 {inst_id} 的日线无法计算 24 小时涨跌幅")
 
-    previous, latest = candles[-2], candles[-1]
-    if previous.close == 0:
-        raise DataUnavailable(f"标的 {inst_id} 的前一根日线收盘价为 0 无法计算涨跌幅")
-
-    change = (latest.close - previous.close) / previous.close * Decimal(100)
-    return Quote(
-        last_price=latest.close,
-        change_pct_24h=change.quantize(_CHANGE_PLACES),
-        volume_24h_quote=(latest.close * latest.volume).quantize(_TURNOVER_PLACES),
-    )
+    return snapshot
 
 
 def list_entries() -> list[WatchlistEntry]:
-    """按加入顺序列出全部自选条目；行情缺失直接报错，不静默跳过。"""
+    """按加入顺序列出全部自选条目；某一行缺行情时保留该行并标记数据状态。"""
 
     with session_scope() as session:
         rows = list(
@@ -134,7 +117,7 @@ def list_entries() -> list[WatchlistEntry]:
                     instrument=instrument,
                     group=row.group_name,
                     added_at=row.added_at,
-                    quote=quote(row.inst_id),
+                    quote=summarize_daily(load_candles(row.inst_id, QUOTE_BAR)),
                     alert=alerts.get(row.inst_id),
                 )
             )
@@ -216,7 +199,8 @@ def move_item(inst_id: str, group: str) -> WatchlistEntry | None:
         if instrument is None:
             raise InvariantViolation(f"自选标的 {symbol} 在标的表里不存在")
 
-        entry_quote = quote(symbol)
+        # 换分组只改归属，不要求行情还在：数据被清空的条目也要能移回其他分组。
+        entry_quote = summarize_daily(load_candles(symbol, QUOTE_BAR))
         previous = row.group_name
         _ensure_group(session, name, datetime.now(UTC))
         row.group_name = name

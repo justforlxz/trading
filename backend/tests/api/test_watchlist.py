@@ -7,9 +7,13 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
+from app.core import Bar, Timeframe
+from app.db import session_scope
 from app.journal import ExecutionSnapshot, RecordedSignal
-from tests.api.conftest import seed_daily, seed_instruments
+from app.market import upsert_candles
+from tests.api.conftest import latest_opens, seed_daily, seed_instruments
 from tests.factories.instruments import make_ref
 
 DECIMAL = re.compile(r"^-?\d{1,20}(\.\d{1,12})?$")
@@ -47,6 +51,12 @@ def test_add_item_returns_quote_and_registers_group(market_data: TestClient) -> 
     assert body["strategy"] is None
     assert body["last_signal"] is None
     assert body["alert"] is None
+    assert body["candle_count"] == 3
+    assert body["data_status"] == "partial"
+    assert body["trend"] is None
+    assert body["rsi_14"] is None
+    assert body["atr_pct_14"] is None
+    assert UTC_ZULU.match(body["last_candle_at"]) is not None
 
     listed = market_data.get("/api/watchlist").json()
     assert listed["groups"] == ["默认"]
@@ -333,3 +343,76 @@ def test_watchlist_rows_compose_running_strategy_and_latest_signal(client: TestC
 
     assert items["XETH-USDT"]["strategy"] is None
     assert items["XETH-USDT"]["last_signal"] is None
+
+
+def _seed_ranged_daily(inst_id: str, closes: list[str], *, half_range: str = "0.5") -> None:
+    """写入带真实高低差的日线，让 ATR 有非零值。"""
+
+    spread = Decimal(half_range)
+    rows = [
+        Bar(
+            inst_id=inst_id,
+            timeframe=Timeframe.parse("1d"),
+            open_time=open_time,
+            open=Decimal(close),
+            high=Decimal(close) + spread,
+            low=Decimal(close) - spread,
+            close=Decimal(close),
+            volume=Decimal("10"),
+            confirm=True,
+            source="okx",
+        )
+        for open_time, close in zip(latest_opens(len(closes)), closes, strict=True)
+    ]
+    upsert_candles(rows)
+
+
+def test_watchlist_rows_expose_trend_momentum_and_coverage(client: TestClient) -> None:
+    """60 根上涨日线：趋势偏多、RSI 与 ATR 有值，覆盖与更新时间来自真实日线。"""
+
+    seed_instruments(make_ref())
+    closes = [str(100 + index) for index in range(60)]
+    _seed_ranged_daily("XAAPL-USDT", closes)
+
+    created = client.post("/api/watchlist", json={"inst_id": "XAAPL-USDT"})
+
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["last_price"] == "159"
+    assert body["trend"] == "bullish"
+    assert body["rsi_14"] == "100"
+    assert body["atr_pct_14"] == "0.94"
+    assert body["candle_count"] == 60
+    assert body["data_status"] == "ok"
+    assert UTC_ZULU.match(body["last_candle_at"]) is not None
+
+
+def test_watchlist_row_keeps_missing_data_explicit(client: TestClient) -> None:
+    """加入后日线被清空：列表仍可读，价格与指标为 null，不把 0 当真实值。"""
+
+    seed_instruments(make_ref())
+    seed_daily("XAAPL-USDT", ["100", "110", "121"])
+    assert client.post("/api/watchlist", json={"inst_id": "XAAPL-USDT"}).status_code == 201
+    with session_scope() as session:
+        session.execute(
+            text("delete from candles where symbol = :symbol"), {"symbol": "XAAPL-USDT"}
+        )
+
+    response = client.get("/api/watchlist")
+
+    assert response.status_code == 200, response.text
+    item = response.json()["items"][0]
+    assert item["last_price"] is None
+    assert item["change_pct_24h"] is None
+    assert item["volume_24h_quote"] is None
+    assert item["trend"] is None
+    assert item["rsi_14"] is None
+    assert item["atr_pct_14"] is None
+    assert item["candle_count"] == 0
+    assert item["last_candle_at"] is None
+    assert item["data_status"] == "missing"
+
+    moved = client.patch("/api/watchlist/XAAPL-USDT", json={"group": "科技"})
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["group"] == "科技"
+    assert moved.json()["data_status"] == "missing"

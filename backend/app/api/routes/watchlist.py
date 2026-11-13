@@ -149,16 +149,29 @@ def _item(
     signal: RecordedSignal | None,
     instances: dict[str, InstanceRecord],
 ) -> WatchlistItem:
+    snapshot = entry.quote
     return WatchlistItem(
         instrument=instrument_info(entry.instrument),
         group=entry.group,
-        last_price=decimal_str(entry.quote.last_price),
-        change_pct_24h=decimal_str(entry.quote.change_pct_24h),
-        volume_24h_quote=decimal_str(entry.quote.volume_24h_quote),
+        last_price=_optional_decimal(snapshot.last_price),
+        change_pct_24h=_optional_decimal(snapshot.change_pct_24h),
+        volume_24h_quote=_optional_decimal(snapshot.volume_24h_quote),
+        trend=snapshot.trend,
+        rsi_14=_optional_decimal(snapshot.rsi_14),
+        atr_pct_14=_optional_decimal(snapshot.atr_pct_14),
+        candle_count=snapshot.candle_count,
+        last_candle_at=snapshot.last_candle_at,
+        data_status=snapshot.data_status,
         strategy=None if strategy is None else _strategy(strategy),
-        last_signal=_signal(signal, instances, entry.quote.last_price),
+        last_signal=_signal(signal, instances, snapshot.last_price),
         alert=_alert(entry.alert),
     )
+
+
+def _optional_decimal(value: Decimal | None) -> str | None:
+    """缺数据时给 `null`，不把 0 当成真实值写进响应。"""
+
+    return None if value is None else decimal_str(value)
 
 
 def _strategy_by_instrument(instances: tuple[InstanceRecord, ...]) -> dict[str, InstanceRecord]:
@@ -212,7 +225,7 @@ def _strategy(record: InstanceRecord) -> WatchlistStrategy:
 def _signal(
     record: RecordedSignal | None,
     instances: dict[str, InstanceRecord],
-    fallback_price: Decimal,
+    fallback_price: Decimal | None,
 ) -> Signal | None:
     """执行事实 → 契约信号；策略实例缺失时无法确定周期，宁可不显示也不编造。"""
 
@@ -221,6 +234,9 @@ def _signal(
     instance = instances.get(record.instance_id)
     if instance is None:
         return None
+    price = record.price if record.price is not None else fallback_price
+    if price is None:
+        return None
     return Signal(
         signal_id=record.signal_id,
         strategy_instance_id=record.instance_id,
@@ -228,7 +244,7 @@ def _signal(
         inst_type=record.inst_type,
         action="BUY" if record.side == "long" else "SELL",
         bar=instance.bar,
-        price=decimal_str(record.price if record.price is not None else fallback_price),
+        price=decimal_str(price),
         reason=record.reason,
         generated_at=record.generated_at,
         target_weight=(None if record.target_weight is None else decimal_str(record.target_weight)),

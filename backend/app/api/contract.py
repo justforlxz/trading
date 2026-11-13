@@ -31,7 +31,7 @@ from app.api.schemas import (
     SignalListResponse,
 )
 from app.api.schemas.common import Bar
-from app.risk import list_risk_events
+from app.risk import list_risk_events, resolve_risk_event
 
 __all__ = ["contract_router"]
 
@@ -135,7 +135,8 @@ def get_overview() -> OverviewResponse:
 
 # ---------------------------------------------------------------- risk
 
-# 风险事件只读列表。分级处置（T6.5）需要的标记动作不在本节点实现。
+# 风险事件列表与「标记已处置」。分级处置写入的事件字段随列表一起暴露，
+# 标记动作只改 `resolved_at`，不删除事件。
 risk_router = APIRouter(tags=["risk"])
 
 
@@ -162,10 +163,34 @@ def list_risk_event_records(
                 detail=record.detail,
                 created_at=record.created_at,
                 resolved_at=record.resolved_at,
+                severity=record.severity,
+                action=record.action,
+                target_product_key=record.target_product_key,
+                overridden_approval_id=record.overridden_approval_id,
             )
             for record in records
         ],
         total=total,
+    )
+
+
+@risk_router.patch("/risk/events/{event_id}/resolve", response_model=RiskEvent)
+def resolve_risk_event_record(event_id: str) -> RiskEvent:
+    record = resolve_risk_event(event_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"未找到风险事件 {event_id}")
+    return RiskEvent(
+        event_id=record.event_id,
+        instance_id=record.instance_id,
+        inst_id=record.inst_id,
+        rule=record.rule,
+        detail=record.detail,
+        created_at=record.created_at,
+        resolved_at=record.resolved_at,
+        severity=record.severity,
+        action=record.action,
+        target_product_key=record.target_product_key,
+        overridden_approval_id=record.overridden_approval_id,
     )
 
 

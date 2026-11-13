@@ -4270,7 +4270,8 @@
             "enum": [
               "pending",
               "approved",
-              "rejected"
+              "rejected",
+              "superseded"
             ],
             "title": "Status",
             "type": "string"
@@ -5095,7 +5096,31 @@
         "type": "object"
       },
       "RiskEvent": {
+        "examples": [
+          {
+            "action": "warn",
+            "created_at": "2026-11-13T02:00:00Z",
+            "detail": "单笔金额 3000 超过组合权益的 0.20, 上限 2000",
+            "event_id": "re_3f2a9c1d",
+            "inst_id": "XAAPL-USDT",
+            "instance_id": "si_0001",
+            "rule": "order_amount_ratio",
+            "severity": "light",
+            "target_product_key": "AAPL"
+          }
+        ],
         "properties": {
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          },
           "created_at": {
             "title": "Created At",
             "type": "string"
@@ -5130,6 +5155,17 @@
             ],
             "title": "Instance Id"
           },
+          "overridden_approval_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overridden Approval Id"
+          },
           "resolved_at": {
             "anyOf": [
               {
@@ -5144,6 +5180,28 @@
           "rule": {
             "title": "Rule",
             "type": "string"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          },
+          "target_product_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Product Key"
           }
         },
         "required": [
@@ -5160,12 +5218,15 @@
           {
             "items": [
               {
+                "action": "warn",
                 "created_at": "2026-11-13T02:00:00Z",
                 "detail": "单笔金额 3000 超过组合权益的 0.20, 上限 2000",
                 "event_id": "re_3f2a9c1d",
                 "inst_id": "XAAPL-USDT",
                 "instance_id": "si_0001",
-                "rule": "order_amount_ratio"
+                "rule": "order_amount_ratio",
+                "severity": "light",
+                "target_product_key": "AAPL"
               }
             ],
             "total": 1
@@ -9226,6 +9287,48 @@
           }
         },
         "summary": "List Risk Event Records",
+        "tags": [
+          "risk"
+        ]
+      }
+    },
+    "/api/risk/events/{event_id}/resolve": {
+      "patch": {
+        "operationId": "resolve_risk_event_record_api_risk_events__event_id__resolve_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "title": "Event Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskEvent"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resolve Risk Event Record",
         "tags": [
           "risk"
         ]

@@ -38,7 +38,7 @@ __all__ = [
     "VirtualPosition",
 ]
 
-AdjustmentStatus = Literal["pending", "approved", "rejected"]
+AdjustmentStatus = Literal["pending", "approved", "rejected", "superseded"]
 AdjustmentDecision = Literal["approved", "rejected"]
 
 

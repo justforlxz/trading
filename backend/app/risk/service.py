@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy import func, select
@@ -31,6 +31,7 @@ __all__ = [
     "RiskEngine",
     "RiskEventRecord",
     "list_risk_events",
+    "resolve_risk_event",
 ]
 
 MAX_LIMIT = 500
@@ -47,6 +48,10 @@ class RiskEventRecord:
     detail: str
     created_at: datetime
     resolved_at: datetime | None
+    severity: str | None = None
+    action: str | None = None
+    target_product_key: str | None = None
+    overridden_approval_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -186,7 +191,43 @@ def list_risk_events(
             detail=row.detail,
             created_at=row.created_at,
             resolved_at=row.resolved_at,
+            severity=row.severity,
+            action=row.action,
+            target_product_key=row.target_product_key,
+            overridden_approval_id=row.overridden_approval_id,
         )
         for row in rows
     )
     return records, total
+
+
+def resolve_risk_event(event_id: str, *, at: datetime | None = None) -> RiskEventRecord | None:
+    """把一条风险事件标记为已处置；不存在返回 `None`，重复标记保持第一次的时间。"""
+
+    moment = _now() if at is None else at
+    if moment.tzinfo is None:
+        raise ValidationError("处置时刻必须带时区")
+    with session_scope() as session:
+        row = session.get(RiskEventRow, event_id)
+        if row is None:
+            return None
+        if row.resolved_at is None:
+            row.resolved_at = moment
+            session.flush()
+        return RiskEventRecord(
+            event_id=row.event_id,
+            instance_id=row.instance_id,
+            inst_id=row.inst_id,
+            rule=row.rule,
+            detail=row.detail,
+            created_at=row.created_at,
+            resolved_at=row.resolved_at,
+            severity=row.severity,
+            action=row.action,
+            target_product_key=row.target_product_key,
+            overridden_approval_id=row.overridden_approval_id,
+        )
+
+
+def _now() -> datetime:
+    return datetime.now(UTC)

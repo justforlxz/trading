@@ -1,10 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { PageHeading } from "../../components/layout/page-parts";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { Button } from "../../components/ui/button";
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../../components/ui/card";
+import {
+  addWatchlistItem,
   fetchWatchlist,
+  removeWatchlistItem,
+  searchInstruments,
+  updateWatchlistItem,
+  type InstrumentRef,
   type WatchlistItem,
   type WatchlistResponse,
   type WatchlistStrategy,
@@ -12,6 +24,11 @@ import {
 import { instTypeLabel, signalTone, signedTone, signedValue } from "../../lib/display";
 import { cn } from "../../lib/utils";
 
+const DEFAULT_GROUP = "默认";
+const INPUT_CLASS =
+  "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
+type InstType = InstrumentRef["inst_type"];
 type Group = { name: string; items: WatchlistItem[] };
 
 const STATUS_LABELS: Record<WatchlistStrategy["status"], string> = {
@@ -32,6 +49,10 @@ const MODE_LABELS: Record<WatchlistStrategy["execution_mode"], string> = {
   live: "实盘",
 };
 
+function messageOf(reason: unknown, fallback: string): string {
+  return reason instanceof Error ? reason.message : fallback;
+}
+
 /** 按接口返回的分组顺序分组；接口未列出的分组追加在后，避免静默丢行。 */
 function groupItems(response: WatchlistResponse): Group[] {
   const names = [...response.groups];
@@ -46,7 +67,17 @@ function groupItems(response: WatchlistResponse): Group[] {
 export default function WatchlistPage() {
   const navigate = useNavigate();
   const [data, setData] = useState<WatchlistResponse | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [groupResetToken, setGroupResetToken] = useState(0);
+
+  const [query, setQuery] = useState("");
+  const [instType, setInstType] = useState<InstType | "">("");
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [results, setResults] = useState<InstrumentRef[] | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -55,24 +86,210 @@ export default function WatchlistPage() {
         if (active) setData(value);
       })
       .catch((reason: unknown) => {
-        if (active) setError(reason instanceof Error ? reason.message : "自选列表加载失败");
+        if (active) setError(messageOf(reason, "自选列表加载失败"));
       });
     return () => {
       active = false;
     };
-  }, []);
+  }, [reloadToken]);
+
+  function reload(): void {
+    setError(null);
+    setReloadToken((token) => token + 1);
+  }
+
+  async function handleSearch(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    const keyword = query.trim();
+    if (keyword === "") {
+      setResults(null);
+      setSearchError(null);
+      return;
+    }
+
+    setSearching(true);
+    setSearchError(null);
+    try {
+      const response = await searchInstruments(
+        keyword,
+        instType === "" ? undefined : instType,
+      );
+      setResults(response.items);
+    } catch (reason: unknown) {
+      setResults(null);
+      setSearchError(messageOf(reason, "搜索失败"));
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  async function handleAdd(instId: string): Promise<void> {
+    setBusy(instId);
+    setActionError(null);
+    try {
+      await addWatchlistItem(instId, DEFAULT_GROUP);
+      reload();
+    } catch (reason: unknown) {
+      setActionError(messageOf(reason, "加入自选失败"));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleRemove(instId: string): Promise<void> {
+    setBusy(instId);
+    setActionError(null);
+    try {
+      await removeWatchlistItem(instId);
+      reload();
+    } catch (reason: unknown) {
+      setActionError(messageOf(reason, "移出自选失败"));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleMove(instId: string, group: string): Promise<void> {
+    setBusy(instId);
+    setActionError(null);
+    try {
+      await updateWatchlistItem(instId, group);
+      reload();
+    } catch (reason: unknown) {
+      setActionError(messageOf(reason, "切换分组失败"));
+      // 分组没有保存成功时让输入框重新挂载，恢复成列表里的实际分组。
+      setGroupResetToken((token) => token + 1);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const tracked = new Set(data?.items.map((item) => item.instrument.inst_id) ?? []);
+  const groupNames = [...new Set([DEFAULT_GROUP, ...(data?.groups ?? [])])];
 
   return (
     <>
       <PageHeading
         eyebrow="Watchlist"
         title="自选"
-        description="按分组展示关注标的的行情、当前运行策略与最近信号；点击任意一行进入标的详情。"
+        description="搜索已同步的标的加入自选，按分组查看行情、当前运行策略与最近信号；点击任意一行进入标的详情。"
       />
+
+      <datalist id="watchlist-groups">
+        {groupNames.map((name) => (
+          <option key={name} value={name} />
+        ))}
+      </datalist>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>搜索标的</CardTitle>
+          <CardDescription>
+            按代码或产品键搜索已同步的标的；加入自选后可直接进入详情。
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={(event) => void handleSearch(event)} className="flex flex-wrap items-center gap-2">
+            <input
+              aria-label="搜索关键字"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="例如 AAPL"
+              className={cn(INPUT_CLASS, "max-w-xs")}
+            />
+            <select
+              aria-label="形态"
+              value={instType}
+              onChange={(event) => {
+                setInstType(event.target.value as InstType | "");
+                setResults(null);
+                setSearchError(null);
+              }}
+              className={cn(INPUT_CLASS, "w-auto")}
+            >
+              <option value="">全部形态</option>
+              <option value="SPOT">现货（SPOT）</option>
+              <option value="SWAP">永续（SWAP）</option>
+            </select>
+            <Button type="submit" disabled={searching}>
+              {searching ? "搜索中…" : "搜索"}
+            </Button>
+          </form>
+
+          {searchError ? (
+            <p className="mt-3 rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive">
+              {searchError}
+            </p>
+          ) : null}
+
+          {results === null ? null : results.length === 0 ? (
+            <p className="mt-4 text-sm text-muted-foreground">没有匹配标的</p>
+          ) : (
+            <table className="mt-4 w-full text-sm">
+              <thead>
+                <tr className="border-b text-xs text-muted-foreground">
+                  <th className="py-2 text-left font-medium">标的</th>
+                  <th className="py-2 text-left font-medium">产品</th>
+                  <th className="py-2 text-left font-medium">形态</th>
+                  <th className="py-2 text-right font-medium">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {results.map((instrument) => {
+                  const alreadyTracked = tracked.has(instrument.inst_id);
+                  return (
+                    <tr key={instrument.inst_id} className="border-b last:border-0">
+                      <td className="py-3">
+                        <Link
+                          to={`/watchlist/${instrument.inst_id}`}
+                          className="font-mono text-sm underline-offset-4 hover:underline"
+                        >
+                          {instrument.inst_id}
+                        </Link>
+                      </td>
+                      <td className="py-3">{instrument.product_key}</td>
+                      <td className="py-3">
+                        <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
+                          {instTypeLabel(instrument.inst_type)}
+                        </span>
+                      </td>
+                      <td className="py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={alreadyTracked || busy === instrument.inst_id}
+                            onClick={() => void handleAdd(instrument.inst_id)}
+                          >
+                            {alreadyTracked ? "已加入" : busy === instrument.inst_id ? "加入中…" : "加入自选"}
+                          </Button>
+                          <Link
+                            to={`/watchlist/${instrument.inst_id}`}
+                            className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                          >
+                            详情
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
 
       {error ? (
         <p className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive">
           {error}
+        </p>
+      ) : null}
+
+      {actionError ? (
+        <p className="mb-4 rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive">
+          {actionError}
         </p>
       ) : null}
 
@@ -84,6 +301,7 @@ export default function WatchlistPage() {
         <Card>
           <CardHeader>
             <CardTitle>暂无自选标的</CardTitle>
+            <CardDescription>在上方搜索框输入代码或产品键，把标的加入自选。</CardDescription>
           </CardHeader>
         </Card>
       ) : null}
@@ -104,11 +322,13 @@ export default function WatchlistPage() {
                     <tr className="border-b text-xs text-muted-foreground">
                       <th className="py-2 text-left font-medium">标的</th>
                       <th className="py-2 text-left font-medium">形态</th>
+                      <th className="py-2 text-left font-medium">分组</th>
                       <th className="py-2 text-left font-medium">策略</th>
                       <th className="py-2 text-right font-medium">最新价</th>
                       <th className="py-2 text-right font-medium">24h 涨跌</th>
                       <th className="py-2 text-right font-medium">24h 成交额</th>
                       <th className="py-2 pl-6 text-left font-medium">信号</th>
+                      <th className="py-2 pl-6 text-right font-medium">操作</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -136,6 +356,27 @@ export default function WatchlistPage() {
                             <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
                               {instTypeLabel(instrument.inst_type)}
                             </span>
+                          </td>
+                          <td className="py-3">
+                            <input
+                              key={`${instrument.inst_id}:${item.group}:${groupResetToken}`}
+                              list="watchlist-groups"
+                              defaultValue={item.group}
+                              aria-label={`${instrument.inst_id} 的分组`}
+                              disabled={busy === instrument.inst_id}
+                              onClick={(event) => event.stopPropagation()}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                  event.preventDefault();
+                                  event.currentTarget.blur();
+                                }
+                              }}
+                              onBlur={(event) => {
+                                const next = event.currentTarget.value.trim() || DEFAULT_GROUP;
+                                if (next !== item.group) void handleMove(instrument.inst_id, next);
+                              }}
+                              className={cn(INPUT_CLASS, "h-8 w-28 px-2 text-xs")}
+                            />
                           </td>
                           <td className="py-3">
                             {strategy ? (
@@ -185,6 +426,21 @@ export default function WatchlistPage() {
                             ) : (
                               <span className="text-muted-foreground">暂无</span>
                             )}
+                          </td>
+                          <td className="py-3 pl-6 text-right">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              aria-label={`移出 ${instrument.inst_id}`}
+                              disabled={busy === instrument.inst_id}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void handleRemove(instrument.inst_id);
+                              }}
+                            >
+                              {busy === instrument.inst_id ? "处理中…" : "移出"}
+                            </Button>
                           </td>
                         </tr>
                       );

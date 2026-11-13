@@ -28,6 +28,8 @@ export type Health = {
 export type WatchlistResponse = components["schemas"]["WatchlistResponse"];
 export type WatchlistItem = components["schemas"]["WatchlistItem"];
 export type WatchlistStrategy = components["schemas"]["WatchlistStrategy"];
+export type InstrumentRef = components["schemas"]["InstrumentRef"];
+export type InstrumentSearchResponse = components["schemas"]["InstrumentSearchResponse"];
 export type InstrumentDetailResponse = components["schemas"]["InstrumentDetailResponse"];
 export type CandleSeriesResponse = components["schemas"]["CandleSeriesResponse"];
 export type CandleBar = CandleSeriesResponse["bar"];
@@ -151,6 +153,28 @@ export function fetchOverview(asOf?: string): Promise<OverviewResponse> {
 
 export function fetchWatchlist(): Promise<WatchlistResponse> {
   return request<WatchlistResponse>("/watchlist");
+}
+
+/** 按代码或产品键搜索已同步的标的；不传形态时两类一起返回。 */
+export function searchInstruments(
+  query: string,
+  instType?: "SPOT" | "SWAP",
+): Promise<InstrumentSearchResponse> {
+  const params = new URLSearchParams({ q: query });
+  if (instType !== undefined) params.set("inst_type", instType);
+  return request<InstrumentSearchResponse>(`/instruments/search?${params.toString()}`);
+}
+
+export function addWatchlistItem(instId: string, group = "默认"): Promise<WatchlistItem> {
+  return send<WatchlistItem>("/watchlist", "POST", { inst_id: instId, group });
+}
+
+export function updateWatchlistItem(instId: string, group: string): Promise<WatchlistItem> {
+  return send<WatchlistItem>(`/watchlist/${encodeURIComponent(instId)}`, "PATCH", { group });
+}
+
+export function removeWatchlistItem(instId: string): Promise<void> {
+  return request<void>(`/watchlist/${encodeURIComponent(instId)}`, { method: "DELETE" });
 }
 
 export function fetchInstrumentDetail(instId: string): Promise<InstrumentDetailResponse> {

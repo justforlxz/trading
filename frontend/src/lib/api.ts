@@ -33,9 +33,6 @@ export type InstrumentSearchResponse = components["schemas"]["InstrumentSearchRe
 export type InstrumentDetailResponse = components["schemas"]["InstrumentDetailResponse"];
 export type CandleSeriesResponse = components["schemas"]["CandleSeriesResponse"];
 export type CandleBar = CandleSeriesResponse["bar"];
-export type RelationGraphResponse = components["schemas"]["RelationGraphResponse"];
-export type RelationNode = components["schemas"]["RelationNode"];
-export type RelationEdge = components["schemas"]["RelationEdge"];
 export type IndicatorSeries = components["schemas"]["IndicatorSeries"];
 export type IndicatorSeriesResponse = components["schemas"]["IndicatorSeriesResponse"];
 export type IndicatorParamValue = IndicatorSeries["params"][string];
@@ -63,23 +60,6 @@ export type BacktestRequest = components["schemas"]["BacktestRequest"];
 export type BacktestTargets = components["schemas"]["BacktestTargets"];
 export type BacktestCosts = components["schemas"]["BacktestCosts"];
 export type BacktestMetrics = components["schemas"]["BacktestMetrics"];
-export type ExposureOverviewResponse = components["schemas"]["ExposureOverviewResponse"];
-export type PortfolioConflict = components["schemas"]["PortfolioConflict"];
-export type StrategyPortfolio = components["schemas"]["StrategyPortfolio"];
-export type StrategyPortfolioListResponse = components["schemas"]["StrategyPortfolioListResponse"];
-export type StrategyPortfolioDetailResponse =
-  components["schemas"]["StrategyPortfolioDetailResponse"];
-export type VirtualPosition = components["schemas"]["VirtualPosition"];
-export type TargetPortfolio = components["schemas"]["TargetPortfolio"];
-export type TargetLeg = components["schemas"]["TargetLeg"];
-export type PortfolioAdjustment = components["schemas"]["PortfolioAdjustment"];
-export type PortfolioAdjustmentListResponse =
-  components["schemas"]["PortfolioAdjustmentListResponse"];
-export type PortfolioAdjustmentCreateRequest =
-  components["schemas"]["PortfolioAdjustmentCreateRequest"];
-export type PortfolioAdjustmentDecisionRequest =
-  components["schemas"]["PortfolioAdjustmentDecisionRequest"];
-export type JournalResponse = components["schemas"]["JournalListResponse"];
 export type SettingsResponse = components["schemas"]["SettingsResponse"];
 export type SettingsUpdateRequest = components["schemas"]["SettingsUpdateRequest"];
 export type ExecutionSettings = SettingsResponse["execution"];
@@ -88,12 +68,6 @@ export type CostSettings = SettingsResponse["costs"];
 export type BacktestSettings = SettingsResponse["backtest"];
 export type DataSettings = SettingsResponse["data"];
 export type ExchangeSettings = SettingsResponse["exchange"];
-export type JournalEntry = components["schemas"]["JournalEntry"];
-export type JournalStrategy = components["schemas"]["StrategyJournalSummary"];
-export type JournalPosition = components["schemas"]["JournalPosition"];
-export type JournalOrder = components["schemas"]["JournalOrder"];
-export type JournalFill = components["schemas"]["JournalFill"];
-export type JournalSignal = components["schemas"]["JournalSignal"];
 export type OverviewResponse = components["schemas"]["OverviewResponse"];
 export type OverviewMarketState = OverviewResponse["market_states"][number];
 export type OverviewMarketSnapshot = OverviewResponse["market"][number];
@@ -215,20 +189,6 @@ export function fetchIndicatorSeries(
   return request<IndicatorSeriesResponse>(`/indicators/series?${query.toString()}`);
 }
 
-export function fetchRelationGraph(
-  bar: CandleBar,
-  window: number,
-  minAbsCorr: number,
-): Promise<RelationGraphResponse> {
-  const query = new URLSearchParams({
-    bar,
-    window: String(window),
-    min_abs_corr: String(minAbsCorr),
-  });
-  return request<RelationGraphResponse>(`/relations/graph?${query.toString()}`);
-}
-
-
 export function fetchStrategies(): Promise<StrategyCatalogResponse> {
   return request<StrategyCatalogResponse>("/strategies");
 }
@@ -304,48 +264,6 @@ export function fetchBacktest(runId: string): Promise<BacktestDetailResponse> {
 
 export function deleteBacktest(runId: string): Promise<void> {
   return request<void>(`/backtests/${encodeURIComponent(runId)}`, { method: "DELETE" });
-}
-
-export function fetchPortfolioExposure(): Promise<ExposureOverviewResponse> {
-  return request<ExposureOverviewResponse>("/portfolio/exposure");
-}
-
-export function fetchStrategyPortfolios(): Promise<StrategyPortfolioListResponse> {
-  return request<StrategyPortfolioListResponse>("/portfolio/strategies");
-}
-
-export function fetchStrategyPortfolio(
-  instanceId: string,
-): Promise<StrategyPortfolioDetailResponse> {
-  return request<StrategyPortfolioDetailResponse>(
-    `/portfolio/strategies/${encodeURIComponent(instanceId)}`,
-  );
-}
-
-export function fetchPortfolioAdjustments(): Promise<PortfolioAdjustmentListResponse> {
-  return request<PortfolioAdjustmentListResponse>("/portfolio/adjustments");
-}
-
-export function createPortfolioAdjustment(
-  body: PortfolioAdjustmentCreateRequest,
-): Promise<PortfolioAdjustment> {
-  return send<PortfolioAdjustment>("/portfolio/adjustments", "POST", body);
-}
-
-export function decidePortfolioAdjustment(
-  adjustmentId: string,
-  body: PortfolioAdjustmentDecisionRequest,
-): Promise<PortfolioAdjustment> {
-  return send<PortfolioAdjustment>(
-    `/portfolio/adjustments/${encodeURIComponent(adjustmentId)}`,
-    "PATCH",
-    body,
-  );
-}
-
-/** 交易历史：策略配置与版本、回测预期、实际成交、持仓、订单、信号与日志。 */
-export function fetchJournal(): Promise<JournalResponse> {
-  return request<JournalResponse>("/journal");
 }
 
 /** 设置文档：分组配置、凭证状态与执行模式。API Key 只写不读。 */

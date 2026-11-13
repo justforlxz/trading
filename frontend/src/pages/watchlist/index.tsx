@@ -307,9 +307,9 @@ export default function WatchlistPage() {
       ) : null}
 
       {data ? (
-        <div className="grid gap-6">
+        <div className="grid min-w-0 gap-6">
           {groupItems(data).map((group) => (
-            <Card key={group.name}>
+            <Card key={group.name} className="min-w-0">
               <CardHeader>
                 <div className="flex items-baseline justify-between gap-4">
                   <CardTitle>{group.name}</CardTitle>

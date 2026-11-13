@@ -18,7 +18,6 @@ from app.api.schemas import (
     ExecutionModeRequest,
     ExecutionStateResponse,
     FillListResponse,
-    JournalListResponse,
     Order,
     OrderCreateRequest,
     OrderListResponse,
@@ -57,50 +56,45 @@ def create_backtest_sweep(payload: BacktestSweepRequest) -> BacktestSweepRespons
 
 # ---------------------------------------------------------------- trades
 
-trades_router = APIRouter(tags=["trades"])
+trade_contract_router = APIRouter(tags=["trades"])
 
 
-@trades_router.get("/trades/positions", response_model=PositionListResponse)
+@trade_contract_router.get("/trades/positions", response_model=PositionListResponse)
 def list_positions() -> PositionListResponse:
     raise _stub("T5.2")
 
 
-@trades_router.get("/trades/orders", response_model=OrderListResponse)
+@trade_contract_router.get("/trades/orders", response_model=OrderListResponse)
 def list_orders() -> OrderListResponse:
     raise _stub("T5.2")
 
 
-@trades_router.post("/trades/orders", response_model=Order, status_code=201)
+@trade_contract_router.post("/trades/orders", response_model=Order, status_code=201)
 def create_order(payload: OrderCreateRequest) -> Order:
     raise _stub("T5.3")
 
 
-@trades_router.delete("/trades/orders/{order_id}", status_code=204, response_model=None)
+@trade_contract_router.delete("/trades/orders/{order_id}", status_code=204, response_model=None)
 def cancel_order(order_id: str) -> None:
     raise _stub("T5.3")
 
 
-@trades_router.get("/trades/fills", response_model=FillListResponse)
+@trade_contract_router.get("/trades/fills", response_model=FillListResponse)
 def list_fills() -> FillListResponse:
     raise _stub("T5.2")
 
 
-@trades_router.get("/signals", response_model=SignalListResponse)
+@trade_contract_router.get("/signals", response_model=SignalListResponse)
 def list_signals() -> SignalListResponse:
     raise _stub("T5.4")
 
 
-@trades_router.get("/journal", response_model=JournalListResponse)
-def list_journal() -> JournalListResponse:
-    raise _stub("T5.4")
-
-
-@trades_router.get("/execution", response_model=ExecutionStateResponse)
+@trade_contract_router.get("/execution", response_model=ExecutionStateResponse)
 def get_execution_state() -> ExecutionStateResponse:
     raise _stub("T5.3")
 
 
-@trades_router.put("/execution/mode", response_model=ExecutionStateResponse)
+@trade_contract_router.put("/execution/mode", response_model=ExecutionStateResponse)
 def set_execution_mode(payload: ExecutionModeRequest) -> ExecutionStateResponse:
     raise _stub("T5.3")
 
@@ -199,7 +193,7 @@ def get_correlation_series(
 
 for _router in (
     backtest_router,
-    trades_router,
+    trade_contract_router,
     correlation_router,
     risk_router,
 ):

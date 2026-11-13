@@ -8,12 +8,11 @@
 from __future__ import annotations
 
 from app.journal.aggregate import build_journal, build_strategy_journal, realized_summary
-from app.journal.model import ExecutionSnapshot, JournalView, RecordedSignal
+from app.journal.model import ExecutionSnapshot, RecordedSignal
 from app.journal.service import latest_expectations, load_journal
 
 __all__ = [
     "ExecutionSnapshot",
-    "JournalView",
     "RecordedSignal",
     "build_journal",
     "build_strategy_journal",

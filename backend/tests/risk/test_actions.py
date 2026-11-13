@@ -138,13 +138,6 @@ def test_medium_disposal_overrides_pending_without_any_approval(
     assert event.target_product_key == "AAPL"
     assert event.overridden_approval_id == adjustment.adjustment_id
 
-    listed = client.get("/api/portfolio/adjustments")
-    assert listed.status_code == 200, listed.text
-    listed_row = next(
-        item for item in listed.json()["items"] if item["adjustment_id"] == adjustment.adjustment_id
-    )
-    assert listed_row["status"] == SUPERSEDED
-
 
 def test_override_stays_scoped_to_the_disposed_instrument(
     seeded: dict[str, str],

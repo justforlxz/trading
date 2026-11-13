@@ -1,6 +1,352 @@
 {
   "components": {
     "schemas": {
+      "AccountSummaryResponse": {
+        "description": "账户卡：最近一条账户快照，以及只在北京时间日初有基准时给出的今日盈亏。",
+        "examples": [
+          {
+            "account_id": "okx-main",
+            "available_equity": "682.30",
+            "available_margin": "682.30",
+            "captured_at": "2026-11-13T09:00:00Z",
+            "cash_balance": "0",
+            "currency": "USDT",
+            "day_pnl_basis": "equity_only",
+            "equity": "1248.60",
+            "margin_usage_pct": "45.36",
+            "source": "okx_rest",
+            "status": "ok",
+            "unrealized_pnl": "31.84",
+            "used_margin": "566.30"
+          }
+        ],
+        "properties": {
+          "account_id": {
+            "title": "Account Id",
+            "type": "string"
+          },
+          "available_equity": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Equity"
+          },
+          "available_margin": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Margin"
+          },
+          "captured_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured At"
+          },
+          "cash_balance": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Balance"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "day_pnl": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Pnl"
+          },
+          "day_pnl_basis": {
+            "const": "equity_only",
+            "default": "equity_only",
+            "title": "Day Pnl Basis",
+            "type": "string"
+          },
+          "equity": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Equity"
+          },
+          "margin_usage_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin Usage Pct"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "stale",
+              "unconfigured"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "unrealized_pnl": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unrealized Pnl"
+          },
+          "used_margin": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Used Margin"
+          }
+        },
+        "required": [
+          "status",
+          "account_id",
+          "currency"
+        ],
+        "title": "AccountSummaryResponse",
+        "type": "object"
+      },
+      "AccountSyncResponse": {
+        "description": "一次同步的结果：账户卡 + 本次写入的持仓条数。",
+        "examples": [
+          {
+            "account_id": "okx-main",
+            "available_equity": "682.30",
+            "available_margin": "682.30",
+            "captured_at": "2026-11-13T09:00:00Z",
+            "cash_balance": "0",
+            "currency": "USDT",
+            "day_pnl_basis": "equity_only",
+            "equity": "1248.60",
+            "margin_usage_pct": "45.36",
+            "positions_synced": 1,
+            "source": "okx_rest",
+            "status": "ok",
+            "unrealized_pnl": "31.84",
+            "used_margin": "566.30"
+          }
+        ],
+        "properties": {
+          "account_id": {
+            "title": "Account Id",
+            "type": "string"
+          },
+          "available_equity": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Equity"
+          },
+          "available_margin": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Margin"
+          },
+          "captured_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured At"
+          },
+          "cash_balance": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Balance"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "day_pnl": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Pnl"
+          },
+          "day_pnl_basis": {
+            "const": "equity_only",
+            "default": "equity_only",
+            "title": "Day Pnl Basis",
+            "type": "string"
+          },
+          "equity": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Equity"
+          },
+          "margin_usage_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin Usage Pct"
+          },
+          "positions_synced": {
+            "title": "Positions Synced",
+            "type": "integer"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "stale",
+              "unconfigured"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "unrealized_pnl": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unrealized Pnl"
+          },
+          "used_margin": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Used Margin"
+          }
+        },
+        "required": [
+          "status",
+          "account_id",
+          "currency",
+          "positions_synced"
+        ],
+        "title": "AccountSyncResponse",
+        "type": "object"
+      },
       "BacktestCosts": {
         "properties": {
           "maker_fee_bps": {
@@ -1765,6 +2111,205 @@
         "title": "EquityPoint",
         "type": "object"
       },
+      "ExchangePositionItem": {
+        "properties": {
+          "asset_class": {
+            "title": "Asset Class",
+            "type": "string"
+          },
+          "avg_px": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Avg Px",
+            "type": "string"
+          },
+          "display_symbol": {
+            "title": "Display Symbol",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "lever": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lever"
+          },
+          "liq_px": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Liq Px"
+          },
+          "margin": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin"
+          },
+          "mark_px": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mark Px"
+          },
+          "mgn_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mgn Mode"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "pos_id": {
+            "title": "Pos Id",
+            "type": "string"
+          },
+          "pos_side": {
+            "enum": [
+              "long",
+              "short"
+            ],
+            "title": "Pos Side",
+            "type": "string"
+          },
+          "size": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Size",
+            "type": "string"
+          },
+          "upl": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upl"
+          },
+          "upl_ratio": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upl Ratio"
+          }
+        },
+        "required": [
+          "pos_id",
+          "inst_id",
+          "display_symbol",
+          "name",
+          "asset_class",
+          "pos_side",
+          "size",
+          "avg_px"
+        ],
+        "title": "ExchangePositionItem",
+        "type": "object"
+      },
+      "ExchangePositionsResponse": {
+        "examples": [
+          {
+            "as_of": "2026-11-13T09:00:00Z",
+            "items": [
+              {
+                "asset_class": "tokenized_equity",
+                "avg_px": "226.80",
+                "display_symbol": "AAPL-USDT",
+                "inst_id": "AAPL-USDT-SWAP",
+                "lever": "3",
+                "liq_px": "151.20",
+                "margin": "604.80",
+                "mark_px": "231.42",
+                "mgn_mode": "cross",
+                "name": "AAPL",
+                "pos_id": "123456",
+                "pos_side": "long",
+                "size": "8",
+                "upl": "36.96",
+                "upl_ratio": "0.0204"
+              }
+            ],
+            "status": "ok"
+          }
+        ],
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ExchangePositionItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "stale",
+              "unconfigured"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "items"
+        ],
+        "title": "ExchangePositionsResponse",
+        "type": "object"
+      },
       "ExchangeSettings": {
         "properties": {
           "api_configured": {
@@ -3336,6 +3881,585 @@
           "capital_budget"
         ],
         "title": "LiveAuthorizationRequest",
+        "type": "object"
+      },
+      "ManualPositionCreateRequest": {
+        "additionalProperties": false,
+        "description": "创建手动持仓；`idempotency_key` 由客户端提供，重复提交不重复入账。",
+        "properties": {
+          "avg_cost": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Avg Cost",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "inst_id": {
+            "minLength": 1,
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "leverage": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leverage"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "quantity": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Quantity",
+            "type": "string"
+          },
+          "side": {
+            "enum": [
+              "long",
+              "short"
+            ],
+            "title": "Side",
+            "type": "string"
+          },
+          "stop_px": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Px"
+          }
+        },
+        "required": [
+          "inst_id",
+          "side",
+          "quantity",
+          "avg_cost",
+          "idempotency_key"
+        ],
+        "title": "ManualPositionCreateRequest",
+        "type": "object"
+      },
+      "ManualPositionItem": {
+        "examples": [
+          {
+            "asset_class": "tokenized_equity",
+            "avg_cost": "226.80",
+            "created_at": "2026-11-13T09:00:00Z",
+            "display_symbol": "AAPL-USDT",
+            "id": "0f6f6f0e-5b6f-4f0c-9b7a-7e5f8a1d2c34",
+            "inst_id": "AAPL-USDT-SWAP",
+            "leverage": "3",
+            "market_value": "1851.36",
+            "name": "AAPL",
+            "note": "手动记账",
+            "price": "231.42",
+            "price_source": "okx_swap",
+            "price_status": "ok",
+            "quantity": "8",
+            "side": "long",
+            "status": "open",
+            "stop_px": "200.00",
+            "unrealized_pnl": "36.96",
+            "updated_at": "2026-11-13T09:00:00Z"
+          }
+        ],
+        "properties": {
+          "asset_class": {
+            "title": "Asset Class",
+            "type": "string"
+          },
+          "avg_cost": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Avg Cost",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "display_symbol": {
+            "title": "Display Symbol",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "leverage": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leverage"
+          },
+          "market_value": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Value"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "price_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "okx",
+                  "okx_spot",
+                  "okx_swap",
+                  "us_equity_proxy"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Source"
+          },
+          "price_status": {
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "title": "Price Status",
+            "type": "string"
+          },
+          "quantity": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Quantity",
+            "type": "string"
+          },
+          "side": {
+            "enum": [
+              "long",
+              "short"
+            ],
+            "title": "Side",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "closed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "stop_px": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Px"
+          },
+          "unrealized_pnl": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unrealized Pnl"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "inst_id",
+          "display_symbol",
+          "name",
+          "asset_class",
+          "side",
+          "quantity",
+          "avg_cost",
+          "status",
+          "price_status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ManualPositionItem",
+        "type": "object"
+      },
+      "ManualPositionListResponse": {
+        "examples": [
+          {
+            "items": [
+              {
+                "asset_class": "tokenized_equity",
+                "avg_cost": "226.80",
+                "created_at": "2026-11-13T09:00:00Z",
+                "display_symbol": "AAPL-USDT",
+                "id": "0f6f6f0e-5b6f-4f0c-9b7a-7e5f8a1d2c34",
+                "inst_id": "AAPL-USDT-SWAP",
+                "leverage": "3",
+                "market_value": "1851.36",
+                "name": "AAPL",
+                "note": "手动记账",
+                "price": "231.42",
+                "price_source": "okx_swap",
+                "price_status": "ok",
+                "quantity": "8",
+                "side": "long",
+                "status": "open",
+                "stop_px": "200.00",
+                "unrealized_pnl": "36.96",
+                "updated_at": "2026-11-13T09:00:00Z"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ManualPositionItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ManualPositionListResponse",
+        "type": "object"
+      },
+      "ManualPositionUpdateRequest": {
+        "additionalProperties": false,
+        "description": "只允许改止损价、杠杆与备注；数量和成本只能通过流水改变。",
+        "properties": {
+          "leverage": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leverage"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "stop_px": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Px"
+          }
+        },
+        "title": "ManualPositionUpdateRequest",
+        "type": "object"
+      },
+      "ManualTradeItem": {
+        "examples": [
+          {
+            "action": "reduce",
+            "created_at": "2026-11-13T10:00:00Z",
+            "fee": "0.10",
+            "id": "e2a3d4c5-b6f7-4a89-8b0c-1d2e3f4a5b6c",
+            "note": "部分卖出",
+            "occurred_at": "2026-11-13T10:00:00Z",
+            "position_avg_cost_after": "226.80",
+            "position_id": "0f6f6f0e-5b6f-4f0c-9b7a-7e5f8a1d2c34",
+            "position_quantity_after": "5",
+            "position_status_after": "open",
+            "price": "240.00",
+            "quantity": "3",
+            "realized_pnl": "39.50"
+          }
+        ],
+        "properties": {
+          "action": {
+            "enum": [
+              "open",
+              "add",
+              "reduce",
+              "close",
+              "correct"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "fee": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Fee",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "occurred_at": {
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "position_avg_cost_after": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Position Avg Cost After",
+            "type": "string"
+          },
+          "position_id": {
+            "title": "Position Id",
+            "type": "string"
+          },
+          "position_quantity_after": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Position Quantity After",
+            "type": "string"
+          },
+          "position_status_after": {
+            "enum": [
+              "open",
+              "closed"
+            ],
+            "title": "Position Status After",
+            "type": "string"
+          },
+          "price": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Price",
+            "type": "string"
+          },
+          "quantity": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Quantity",
+            "type": "string"
+          },
+          "realized_pnl": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Realized Pnl"
+          }
+        },
+        "required": [
+          "id",
+          "position_id",
+          "action",
+          "quantity",
+          "price",
+          "fee",
+          "position_quantity_after",
+          "position_avg_cost_after",
+          "position_status_after",
+          "occurred_at",
+          "created_at"
+        ],
+        "title": "ManualTradeItem",
+        "type": "object"
+      },
+      "ManualTradeListResponse": {
+        "examples": [
+          {
+            "items": [
+              {
+                "action": "reduce",
+                "created_at": "2026-11-13T10:00:00Z",
+                "fee": "0.10",
+                "id": "e2a3d4c5-b6f7-4a89-8b0c-1d2e3f4a5b6c",
+                "note": "部分卖出",
+                "occurred_at": "2026-11-13T10:00:00Z",
+                "position_avg_cost_after": "226.80",
+                "position_id": "0f6f6f0e-5b6f-4f0c-9b7a-7e5f8a1d2c34",
+                "position_quantity_after": "5",
+                "position_status_after": "open",
+                "price": "240.00",
+                "quantity": "3",
+                "realized_pnl": "39.50"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ManualTradeItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ManualTradeListResponse",
+        "type": "object"
+      },
+      "ManualTradeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "add",
+              "reduce",
+              "close",
+              "correct"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "fee": {
+            "default": "0",
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Fee",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "price": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Price",
+            "type": "string"
+          },
+          "quantity": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Quantity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "quantity",
+          "price",
+          "occurred_at",
+          "idempotency_key"
+        ],
+        "title": "ManualTradeRequest",
         "type": "object"
       },
       "MarketBreadth": {
@@ -7428,6 +8552,50 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/account/summary": {
+      "get": {
+        "description": "最近一条账户快照；没有配置或没有快照时返回 200 与明确状态。",
+        "operationId": "get_account_summary_api_account_summary_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountSummaryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Account Summary",
+        "tags": [
+          "positions"
+        ]
+      }
+    },
+    "/api/account/sync": {
+      "post": {
+        "description": "采集一次 OKX 只读快照；上游故障返回 502，且不写半套数据。",
+        "operationId": "sync_account_snapshot_api_account_sync_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountSyncResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Sync Account Snapshot",
+        "tags": [
+          "positions"
+        ]
+      }
+    },
     "/api/approvals": {
       "get": {
         "description": "全部审批记录，最近写入的在前。记录只增不改，实例删除时随之级联删除。",
@@ -8584,6 +9752,248 @@
         ]
       }
     },
+    "/api/manual-positions": {
+      "get": {
+        "operationId": "get_manual_positions_api_manual_positions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManualPositionListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Manual Positions",
+        "tags": [
+          "positions"
+        ]
+      },
+      "post": {
+        "description": "创建手动持仓并写入一条 `open` 流水；重复幂等键返回原持仓。",
+        "operationId": "create_manual_position_endpoint_api_manual_positions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualPositionCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManualPositionItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Manual Position Endpoint",
+        "tags": [
+          "positions"
+        ]
+      }
+    },
+    "/api/manual-positions/{position_id}": {
+      "delete": {
+        "description": "只允许删除没有任何流水的持仓；已有流水返回 409。",
+        "operationId": "delete_manual_position_endpoint_api_manual_positions__position_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "position_id",
+            "required": true,
+            "schema": {
+              "title": "Position Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Manual Position Endpoint",
+        "tags": [
+          "positions"
+        ]
+      },
+      "patch": {
+        "description": "只改止损价、杠杆与备注；数量和成本只能通过流水改变。",
+        "operationId": "update_manual_position_endpoint_api_manual_positions__position_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "position_id",
+            "required": true,
+            "schema": {
+              "title": "Position Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualPositionUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManualPositionItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Manual Position Endpoint",
+        "tags": [
+          "positions"
+        ]
+      }
+    },
+    "/api/manual-positions/{position_id}/trades": {
+      "get": {
+        "description": "按发生时刻倒序返回流水，带每条流水之后的持仓数量和成本。",
+        "operationId": "get_manual_trades_api_manual_positions__position_id__trades_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "position_id",
+            "required": true,
+            "schema": {
+              "title": "Position Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManualTradeListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Manual Trades",
+        "tags": [
+          "positions"
+        ]
+      },
+      "post": {
+        "description": "写入手动流水；数量和成本在同一事务内更新，重复幂等键返回原流水。",
+        "operationId": "add_manual_trade_endpoint_api_manual_positions__position_id__trades_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "position_id",
+            "required": true,
+            "schema": {
+              "title": "Position Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualTradeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManualTradeItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Manual Trade Endpoint",
+        "tags": [
+          "positions"
+        ]
+      }
+    },
     "/api/market/overview": {
       "get": {
         "description": "该类别在 `as_of`（缺省为当前时刻）的涨跌家数与同向程度。",
@@ -9132,6 +10542,28 @@
         "summary": "Get Strategy Portfolio",
         "tags": [
           "portfolio"
+        ]
+      }
+    },
+    "/api/positions/exchange": {
+      "get": {
+        "description": "最近一次同步的交易所持仓，`as_of` 与该次账户快照相同。",
+        "operationId": "get_exchange_positions_api_positions_exchange_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExchangePositionsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Exchange Positions",
+        "tags": [
+          "positions"
         ]
       }
     },

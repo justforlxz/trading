@@ -1,0 +1,19 @@
+{
+  "items": [
+    {
+      "action": "reduce",
+      "created_at": "2026-11-13T10:00:00Z",
+      "fee": "0.10",
+      "id": "e2a3d4c5-b6f7-4a89-8b0c-1d2e3f4a5b6c",
+      "note": "部分卖出",
+      "occurred_at": "2026-11-13T10:00:00Z",
+      "position_avg_cost_after": "226.80",
+      "position_id": "0f6f6f0e-5b6f-4f0c-9b7a-7e5f8a1d2c34",
+      "position_quantity_after": "5",
+      "position_status_after": "open",
+      "price": "240.00",
+      "quantity": "3",
+      "realized_pnl": "39.50"
+    }
+  ]
+}

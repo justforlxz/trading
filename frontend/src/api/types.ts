@@ -1,5 +1,45 @@
 // 由 `pnpm --dir frontend api:sync` 生成，勿手改。契约源：backend/contracts/openapi.json
 export interface paths {
+    "/api/account/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Account Summary
+         * @description 最近一条账户快照；没有配置或没有快照时返回 200 与明确状态。
+         */
+        get: operations["get_account_summary_api_account_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sync Account Snapshot
+         * @description 采集一次 OKX 只读快照；上游故障返回 502，且不写半套数据。
+         */
+        post: operations["sync_account_snapshot_api_account_sync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/approvals": {
         parameters: {
             query?: never;
@@ -410,6 +450,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/manual-positions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Manual Positions */
+        get: operations["get_manual_positions_api_manual_positions_get"];
+        put?: never;
+        /**
+         * Create Manual Position Endpoint
+         * @description 创建手动持仓并写入一条 `open` 流水；重复幂等键返回原持仓。
+         */
+        post: operations["create_manual_position_endpoint_api_manual_positions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/manual-positions/{position_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Manual Position Endpoint
+         * @description 只允许删除没有任何流水的持仓；已有流水返回 409。
+         */
+        delete: operations["delete_manual_position_endpoint_api_manual_positions__position_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Manual Position Endpoint
+         * @description 只改止损价、杠杆与备注；数量和成本只能通过流水改变。
+         */
+        patch: operations["update_manual_position_endpoint_api_manual_positions__position_id__patch"];
+        trace?: never;
+    };
+    "/api/manual-positions/{position_id}/trades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Manual Trades
+         * @description 按发生时刻倒序返回流水，带每条流水之后的持仓数量和成本。
+         */
+        get: operations["get_manual_trades_api_manual_positions__position_id__trades_get"];
+        put?: never;
+        /**
+         * Add Manual Trade Endpoint
+         * @description 写入手动流水；数量和成本在同一事务内更新，重复幂等键返回原流水。
+         */
+        post: operations["add_manual_trade_endpoint_api_manual_positions__position_id__trades_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/market/overview": {
         parameters: {
             query?: never;
@@ -569,6 +678,26 @@ export interface paths {
         };
         /** Get Strategy Portfolio */
         get: operations["get_strategy_portfolio_api_portfolio_strategies__instance_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/positions/exchange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Exchange Positions
+         * @description 最近一次同步的交易所持仓，`as_of` 与该次账户快照相同。
+         */
+        get: operations["get_exchange_positions_api_positions_exchange_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -964,6 +1093,121 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AccountSummaryResponse
+         * @description 账户卡：最近一条账户快照，以及只在北京时间日初有基准时给出的今日盈亏。
+         * @example {
+         *       "account_id": "okx-main",
+         *       "available_equity": "682.30",
+         *       "available_margin": "682.30",
+         *       "captured_at": "2026-11-13T09:00:00Z",
+         *       "cash_balance": "0",
+         *       "currency": "USDT",
+         *       "day_pnl_basis": "equity_only",
+         *       "equity": "1248.60",
+         *       "margin_usage_pct": "45.36",
+         *       "source": "okx_rest",
+         *       "status": "ok",
+         *       "unrealized_pnl": "31.84",
+         *       "used_margin": "566.30"
+         *     }
+         */
+        AccountSummaryResponse: {
+            /** Account Id */
+            account_id: string;
+            /** Available Equity */
+            available_equity?: string | null;
+            /** Available Margin */
+            available_margin?: string | null;
+            /** Captured At */
+            captured_at?: string | null;
+            /** Cash Balance */
+            cash_balance?: string | null;
+            /** Currency */
+            currency: string;
+            /** Day Pnl */
+            day_pnl?: string | null;
+            /**
+             * Day Pnl Basis
+             * @default equity_only
+             * @constant
+             */
+            day_pnl_basis: "equity_only";
+            /** Equity */
+            equity?: string | null;
+            /** Margin Usage Pct */
+            margin_usage_pct?: string | null;
+            /** Source */
+            source?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "stale" | "unconfigured";
+            /** Unrealized Pnl */
+            unrealized_pnl?: string | null;
+            /** Used Margin */
+            used_margin?: string | null;
+        };
+        /**
+         * AccountSyncResponse
+         * @description 一次同步的结果：账户卡 + 本次写入的持仓条数。
+         * @example {
+         *       "account_id": "okx-main",
+         *       "available_equity": "682.30",
+         *       "available_margin": "682.30",
+         *       "captured_at": "2026-11-13T09:00:00Z",
+         *       "cash_balance": "0",
+         *       "currency": "USDT",
+         *       "day_pnl_basis": "equity_only",
+         *       "equity": "1248.60",
+         *       "margin_usage_pct": "45.36",
+         *       "positions_synced": 1,
+         *       "source": "okx_rest",
+         *       "status": "ok",
+         *       "unrealized_pnl": "31.84",
+         *       "used_margin": "566.30"
+         *     }
+         */
+        AccountSyncResponse: {
+            /** Account Id */
+            account_id: string;
+            /** Available Equity */
+            available_equity?: string | null;
+            /** Available Margin */
+            available_margin?: string | null;
+            /** Captured At */
+            captured_at?: string | null;
+            /** Cash Balance */
+            cash_balance?: string | null;
+            /** Currency */
+            currency: string;
+            /** Day Pnl */
+            day_pnl?: string | null;
+            /**
+             * Day Pnl Basis
+             * @default equity_only
+             * @constant
+             */
+            day_pnl_basis: "equity_only";
+            /** Equity */
+            equity?: string | null;
+            /** Margin Usage Pct */
+            margin_usage_pct?: string | null;
+            /** Positions Synced */
+            positions_synced: number;
+            /** Source */
+            source?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "stale" | "unconfigured";
+            /** Unrealized Pnl */
+            unrealized_pnl?: string | null;
+            /** Used Margin */
+            used_margin?: string | null;
+        };
         /** BacktestCosts */
         BacktestCosts: {
             /** Maker Fee Bps */
@@ -1841,6 +2085,79 @@ export interface components {
             /** Time */
             time: string;
         };
+        /** ExchangePositionItem */
+        ExchangePositionItem: {
+            /** Asset Class */
+            asset_class: string;
+            /** Avg Px */
+            avg_px: string;
+            /** Display Symbol */
+            display_symbol: string;
+            /** Inst Id */
+            inst_id: string;
+            /** Lever */
+            lever?: string | null;
+            /** Liq Px */
+            liq_px?: string | null;
+            /** Margin */
+            margin?: string | null;
+            /** Mark Px */
+            mark_px?: string | null;
+            /** Mgn Mode */
+            mgn_mode?: string | null;
+            /** Name */
+            name: string;
+            /** Pos Id */
+            pos_id: string;
+            /**
+             * Pos Side
+             * @enum {string}
+             */
+            pos_side: "long" | "short";
+            /** Size */
+            size: string;
+            /** Upl */
+            upl?: string | null;
+            /** Upl Ratio */
+            upl_ratio?: string | null;
+        };
+        /**
+         * ExchangePositionsResponse
+         * @example {
+         *       "as_of": "2026-11-13T09:00:00Z",
+         *       "items": [
+         *         {
+         *           "asset_class": "tokenized_equity",
+         *           "avg_px": "226.80",
+         *           "display_symbol": "AAPL-USDT",
+         *           "inst_id": "AAPL-USDT-SWAP",
+         *           "lever": "3",
+         *           "liq_px": "151.20",
+         *           "margin": "604.80",
+         *           "mark_px": "231.42",
+         *           "mgn_mode": "cross",
+         *           "name": "AAPL",
+         *           "pos_id": "123456",
+         *           "pos_side": "long",
+         *           "size": "8",
+         *           "upl": "36.96",
+         *           "upl_ratio": "0.0204"
+         *         }
+         *       ],
+         *       "status": "ok"
+         *     }
+         */
+        ExchangePositionsResponse: {
+            /** As Of */
+            as_of?: string | null;
+            /** Items */
+            items: components["schemas"]["ExchangePositionItem"][];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "stale" | "unconfigured";
+        };
         /** ExchangeSettings */
         ExchangeSettings: {
             /** Api Configured */
@@ -2611,6 +2928,252 @@ export interface components {
             evidence?: string | null;
             /** Note */
             note?: string | null;
+        };
+        /**
+         * ManualPositionCreateRequest
+         * @description 创建手动持仓；`idempotency_key` 由客户端提供，重复提交不重复入账。
+         */
+        ManualPositionCreateRequest: {
+            /** Avg Cost */
+            avg_cost: string;
+            /** Idempotency Key */
+            idempotency_key: string;
+            /** Inst Id */
+            inst_id: string;
+            /** Leverage */
+            leverage?: string | null;
+            /** Note */
+            note?: string | null;
+            /** Quantity */
+            quantity: string;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "long" | "short";
+            /** Stop Px */
+            stop_px?: string | null;
+        };
+        /**
+         * ManualPositionItem
+         * @example {
+         *       "asset_class": "tokenized_equity",
+         *       "avg_cost": "226.80",
+         *       "created_at": "2026-11-13T09:00:00Z",
+         *       "display_symbol": "AAPL-USDT",
+         *       "id": "0f6f6f0e-5b6f-4f0c-9b7a-7e5f8a1d2c34",
+         *       "inst_id": "AAPL-USDT-SWAP",
+         *       "leverage": "3",
+         *       "market_value": "1851.36",
+         *       "name": "AAPL",
+         *       "note": "手动记账",
+         *       "price": "231.42",
+         *       "price_source": "okx_swap",
+         *       "price_status": "ok",
+         *       "quantity": "8",
+         *       "side": "long",
+         *       "status": "open",
+         *       "stop_px": "200.00",
+         *       "unrealized_pnl": "36.96",
+         *       "updated_at": "2026-11-13T09:00:00Z"
+         *     }
+         */
+        ManualPositionItem: {
+            /** Asset Class */
+            asset_class: string;
+            /** Avg Cost */
+            avg_cost: string;
+            /** Created At */
+            created_at: string;
+            /** Display Symbol */
+            display_symbol: string;
+            /** Id */
+            id: string;
+            /** Inst Id */
+            inst_id: string;
+            /** Leverage */
+            leverage?: string | null;
+            /** Market Value */
+            market_value?: string | null;
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+            /** Price */
+            price?: string | null;
+            /** Price Source */
+            price_source?: ("okx" | "okx_spot" | "okx_swap" | "us_equity_proxy") | null;
+            /**
+             * Price Status
+             * @enum {string}
+             */
+            price_status: "ok" | "unavailable";
+            /** Quantity */
+            quantity: string;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "long" | "short";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "closed";
+            /** Stop Px */
+            stop_px?: string | null;
+            /** Unrealized Pnl */
+            unrealized_pnl?: string | null;
+            /** Updated At */
+            updated_at: string;
+        };
+        /**
+         * ManualPositionListResponse
+         * @example {
+         *       "items": [
+         *         {
+         *           "asset_class": "tokenized_equity",
+         *           "avg_cost": "226.80",
+         *           "created_at": "2026-11-13T09:00:00Z",
+         *           "display_symbol": "AAPL-USDT",
+         *           "id": "0f6f6f0e-5b6f-4f0c-9b7a-7e5f8a1d2c34",
+         *           "inst_id": "AAPL-USDT-SWAP",
+         *           "leverage": "3",
+         *           "market_value": "1851.36",
+         *           "name": "AAPL",
+         *           "note": "手动记账",
+         *           "price": "231.42",
+         *           "price_source": "okx_swap",
+         *           "price_status": "ok",
+         *           "quantity": "8",
+         *           "side": "long",
+         *           "status": "open",
+         *           "stop_px": "200.00",
+         *           "unrealized_pnl": "36.96",
+         *           "updated_at": "2026-11-13T09:00:00Z"
+         *         }
+         *       ]
+         *     }
+         */
+        ManualPositionListResponse: {
+            /** Items */
+            items: components["schemas"]["ManualPositionItem"][];
+        };
+        /**
+         * ManualPositionUpdateRequest
+         * @description 只允许改止损价、杠杆与备注；数量和成本只能通过流水改变。
+         */
+        ManualPositionUpdateRequest: {
+            /** Leverage */
+            leverage?: string | null;
+            /** Note */
+            note?: string | null;
+            /** Stop Px */
+            stop_px?: string | null;
+        };
+        /**
+         * ManualTradeItem
+         * @example {
+         *       "action": "reduce",
+         *       "created_at": "2026-11-13T10:00:00Z",
+         *       "fee": "0.10",
+         *       "id": "e2a3d4c5-b6f7-4a89-8b0c-1d2e3f4a5b6c",
+         *       "note": "部分卖出",
+         *       "occurred_at": "2026-11-13T10:00:00Z",
+         *       "position_avg_cost_after": "226.80",
+         *       "position_id": "0f6f6f0e-5b6f-4f0c-9b7a-7e5f8a1d2c34",
+         *       "position_quantity_after": "5",
+         *       "position_status_after": "open",
+         *       "price": "240.00",
+         *       "quantity": "3",
+         *       "realized_pnl": "39.50"
+         *     }
+         */
+        ManualTradeItem: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "open" | "add" | "reduce" | "close" | "correct";
+            /** Created At */
+            created_at: string;
+            /** Fee */
+            fee: string;
+            /** Id */
+            id: string;
+            /** Note */
+            note?: string | null;
+            /** Occurred At */
+            occurred_at: string;
+            /** Position Avg Cost After */
+            position_avg_cost_after: string;
+            /** Position Id */
+            position_id: string;
+            /** Position Quantity After */
+            position_quantity_after: string;
+            /**
+             * Position Status After
+             * @enum {string}
+             */
+            position_status_after: "open" | "closed";
+            /** Price */
+            price: string;
+            /** Quantity */
+            quantity: string;
+            /** Realized Pnl */
+            realized_pnl?: string | null;
+        };
+        /**
+         * ManualTradeListResponse
+         * @example {
+         *       "items": [
+         *         {
+         *           "action": "reduce",
+         *           "created_at": "2026-11-13T10:00:00Z",
+         *           "fee": "0.10",
+         *           "id": "e2a3d4c5-b6f7-4a89-8b0c-1d2e3f4a5b6c",
+         *           "note": "部分卖出",
+         *           "occurred_at": "2026-11-13T10:00:00Z",
+         *           "position_avg_cost_after": "226.80",
+         *           "position_id": "0f6f6f0e-5b6f-4f0c-9b7a-7e5f8a1d2c34",
+         *           "position_quantity_after": "5",
+         *           "position_status_after": "open",
+         *           "price": "240.00",
+         *           "quantity": "3",
+         *           "realized_pnl": "39.50"
+         *         }
+         *       ]
+         *     }
+         */
+        ManualTradeListResponse: {
+            /** Items */
+            items: components["schemas"]["ManualTradeItem"][];
+        };
+        /** ManualTradeRequest */
+        ManualTradeRequest: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "add" | "reduce" | "close" | "correct";
+            /**
+             * Fee
+             * @default 0
+             */
+            fee: string;
+            /** Idempotency Key */
+            idempotency_key: string;
+            /** Note */
+            note?: string | null;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Price */
+            price: string;
+            /** Quantity */
+            quantity: string;
         };
         /**
          * MarketBreadth
@@ -4729,6 +5292,46 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    get_account_summary_api_account_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountSummaryResponse"];
+                };
+            };
+        };
+    };
+    sync_account_snapshot_api_account_sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountSyncResponse"];
+                };
+            };
+        };
+    };
     list_approvals_api_approvals_get: {
         parameters: {
             query?: never;
@@ -5425,6 +6028,189 @@ export interface operations {
             };
         };
     };
+    get_manual_positions_api_manual_positions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualPositionListResponse"];
+                };
+            };
+        };
+    };
+    create_manual_position_endpoint_api_manual_positions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualPositionCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualPositionItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_manual_position_endpoint_api_manual_positions__position_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                position_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_manual_position_endpoint_api_manual_positions__position_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                position_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualPositionUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualPositionItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_manual_trades_api_manual_positions__position_id__trades_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                position_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualTradeListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_manual_trade_endpoint_api_manual_positions__position_id__trades_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                position_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualTradeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualTradeItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_market_overview_api_market_overview_get: {
         parameters: {
             query: {
@@ -5755,6 +6541,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_exchange_positions_api_positions_exchange_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExchangePositionsResponse"];
                 };
             };
         };

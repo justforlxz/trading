@@ -7,6 +7,7 @@ v2 是单进程同步栈：一个 uvicorn 进程、一个 PostgreSQL 库、没�
 import logging
 from collections.abc import Iterator
 from contextlib import asynccontextmanager
+from threading import Event
 
 from fastapi import FastAPI
 
@@ -23,6 +24,7 @@ from app.config import get_settings
 from app.db import init_db
 from app.exchange import OrderSubmission  # noqa: F401
 from app.instrument import Instrument  # noqa: F401
+from app.jobs import start_equity_snapshot_scheduler
 from app.journal import ExecutionSnapshot
 from app.market import Candle  # noqa: F401
 from app.portfolio import (  # noqa: F401
@@ -30,6 +32,13 @@ from app.portfolio import (  # noqa: F401
     PortfolioAdjustmentRow,
     VirtualFillRow,
     VirtualPositionRow,
+)
+from app.positions import (  # noqa: F401
+    AccountSnapshotRow,
+    ExchangePositionSnapshotRow,
+    ManualPositionRow,
+    ManualTradeRow,
+    PositionRiskConfigRow,
 )
 from app.settings import SettingsRow, apply_saved_settings  # noqa: F401
 from app.strategy import (  # noqa: F401
@@ -48,8 +57,14 @@ async def lifespan(_app: FastAPI) -> Iterator[None]:
 
     init_db()
     apply_saved_settings()
+    stop_scheduler = Event()
+    scheduler = start_equity_snapshot_scheduler(stop_scheduler)
     logger.info("trading api ready: version=%s", __version__)
-    yield
+    try:
+        yield
+    finally:
+        stop_scheduler.set()
+        scheduler.join(timeout=5.0)
 
 
 def create_app() -> FastAPI:

@@ -10,6 +10,10 @@
 - `sweep`：标的 × 参数组合 × 三段区间展开成任务，交给队列跑完并装回扫描行。
 """
 
+from app.jobs.equity import (
+    next_beijing_midnight,
+    start_equity_snapshot_scheduler,
+)
 from app.jobs.queue import (
     DEFAULT_MAX_CONCURRENCY,
     QueueOutcome,
@@ -27,8 +31,10 @@ __all__ = [
     "SweepOutcome",
     "SweepPlan",
     "TargetScope",
+    "next_beijing_midnight",
     "plan_sweep",
     "resolve_scope",
     "run_sweep",
     "run_tasks",
+    "start_equity_snapshot_scheduler",
 ]

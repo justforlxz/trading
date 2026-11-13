@@ -42,6 +42,7 @@ PACKAGES: tuple[str, ...] = (
     "market",
     "opportunity",
     "portfolio",
+    "positions",
     "relations",
     "risk",
     "settings",
@@ -73,6 +74,8 @@ ALLOWED_DEPS: dict[str, frozenset[str]] = {
     "relations": frozenset({"instrument", "market", "watchlist"}),
     "opportunity": frozenset({"db", "instrument", "market"}),
     "portfolio": frozenset({"db", "instrument", "strategy"}),
+    # 持仓域读取 OKX 只读快照与已落库行情；不把账户字段塞进交易端口。
+    "positions": frozenset({"shared", "db", "instrument", "market", "exchange"}),
     "indicators": frozenset({"shared"}),
     "strategy": frozenset({"shared", "db", "instrument", "market", "indicators"}),
     "backtest": frozenset({"shared", "db", "instrument", "market", "strategy"}),

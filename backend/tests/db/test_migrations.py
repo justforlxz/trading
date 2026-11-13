@@ -29,6 +29,13 @@ from app.portfolio import (  # noqa: F401
     VirtualFillRow,
     VirtualPositionRow,
 )
+from app.positions import (  # noqa: F401
+    AccountSnapshotRow,
+    ExchangePositionSnapshotRow,
+    ManualPositionRow,
+    ManualTradeRow,
+    PositionRiskConfigRow,
+)
 from app.strategy import (  # noqa: F401
     StrategyApprovalRow,
     StrategyInstanceRow,
@@ -124,3 +131,26 @@ def test_upgrade_removes_backtest_runs_that_cannot_describe_their_instrument() -
         remaining = session.execute(text("SELECT COUNT(*) FROM backtest_runs")).scalar_one()
 
     assert remaining == 0
+
+
+def test_positions_migration_creates_snapshot_and_manual_tables() -> None:
+    """0015 建出账户、持仓、手动流水表，并给 `instruments` 加上 `sector` 列。"""
+
+    init_db()
+
+    assert {
+        "account_snapshots",
+        "exchange_position_snapshots",
+        "manual_positions",
+        "manual_trades",
+        "position_risk_config",
+    } <= _tables()
+    with session_scope() as session:
+        sector = session.execute(
+            text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = current_schema() "
+                "AND table_name = 'instruments' AND column_name = 'sector'"
+            )
+        ).scalar_one_or_none()
+    assert sector == "sector"

@@ -71,6 +71,12 @@ from app.execution.positions import (
     PositionBook,
     from_venue_position,
 )
+from app.execution.reconcile import (
+    ReconcileHolding,
+    fetch_actual_positions,
+    reconcile_positions,
+)
+from app.execution.recovery import recover_state
 from app.execution.runtime import (
     ACTION_DISABLE,
     ACTION_ENABLE,
@@ -133,6 +139,7 @@ __all__ = [
     "PositionBook",
     "PositionDelta",
     "RebalancePlan",
+    "ReconcileHolding",
     "RuntimeEvent",
     "SkipRecord",
     "SyncResult",
@@ -146,12 +153,15 @@ __all__ = [
     "client_order_id",
     "confirm",
     "fail",
+    "fetch_actual_positions",
     "from_venue_order",
     "from_venue_position",
     "new_order",
     "paper_snapshot",
     "plan_digest",
+    "reconcile_positions",
     "reconcile_target",
+    "recover_state",
     "require_confirmation",
     "require_transition",
     "sync_state",

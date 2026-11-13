@@ -25,6 +25,7 @@ import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any
 
 UNKNOWN_INST_ID_CODE = "51001"
@@ -203,6 +204,47 @@ class TradeBook:
         """预置成交价：市价单按这个价格成交，限价单永远挂着等撤单。"""
 
         self._marks[inst_id] = price
+
+    def fill_order(self, order_id: str, *, qty: str, price: str) -> None:
+        """给一张挂单补一笔成交；可以多次调用，成交量逐笔累加。
+
+        真实上游的限价单不会「一挂就全成」，部分成交后状态是 `partially_filled`，
+        剩下一部分继续挂着。这里按同样的口径更新 `accFillSz` / `state` / `avgPx`
+        并写入一条成交记录，供恢复与对账用例走完整链路。
+        """
+
+        order = self._orders.get(order_id)
+        if order is None:
+            raise OkxOrderError(ORDER_NOT_FOUND_CODE, f"Order does not exist: {order_id}")
+        if order["state"] not in {"live", "partially_filled"}:
+            raise OkxOrderError(
+                ORDER_CANNOT_BE_CANCELED_CODE,
+                f"Order is already {order['state']}: {order_id}",
+            )
+        remaining = Decimal(order["sz"]) - Decimal(order["accFillSz"])
+        fill_qty = Decimal(qty)
+        if fill_qty <= 0 or fill_qty > remaining:
+            raise OkxOrderError(
+                INVALID_PARAMETER_CODE,
+                f"Parameter fill size error: {qty} (remaining {remaining})",
+            )
+        filled = Decimal(order["accFillSz"]) + fill_qty
+        previous = [row for row in self._fills if row["ordId"] == order_id]
+        total_cost = sum(
+            (Decimal(row["fillSz"]) * Decimal(row["fillPx"]) for row in previous),
+            Decimal(0),
+        ) + fill_qty * Decimal(price)
+        order["accFillSz"] = format(filled, "f")
+        order["avgPx"] = format(total_cost / filled, "f")
+        order["state"] = "filled" if filled == Decimal(order["sz"]) else "partially_filled"
+        order["uTime"] = self._now_millis()
+        self.add_fill(
+            inst_id=order["instId"],
+            order_id=order_id,
+            qty=qty,
+            price=price,
+            side=order["side"],
+        )
 
     def add_fill(
         self,

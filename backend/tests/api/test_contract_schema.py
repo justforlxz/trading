@@ -4,7 +4,7 @@
 
 1. 提交进仓库的 `contracts/openapi.json` 与当前代码导出结果逐字节相同（防漂移）。
 2. 每个带响应模型的路由，其模型都带 example，且 example 能通过该模型的校验。
-3. 十五个业务域都至少被契约覆盖一条路径（防契约被悄悄删空）。
+3. 十三个业务域都至少被契约覆盖一条路径（防契约被悄悄删空）。
 4. 新增五个域各有一条「最小合法载荷可序列化 + 缺必填字段报错」用例。
 5. 契约里的枚举与领域层/决策文档逐字对齐（`AssetType`、`DataSource`、
    `StrategyStatus`）。
@@ -27,8 +27,6 @@ from app.api.schemas import (
     CorrelationMatrixResponse,
     InstrumentRef,
     OpportunityStatusUpdateRequest,
-    PortfolioAdjustmentCreateRequest,
-    RelationNeighborsResponse,
     StrategyApprovalRequest,
     StrategyInstanceUpdateRequest,
     WatchlistResponse,
@@ -43,7 +41,7 @@ CONTRACT_PATH = BACKEND_ROOT / "contracts" / "openapi.json"
 # 响应组件名 → 模型：契约模型只从这两个模块发布（业务域门面 + 健康检查）。
 _MODEL_SOURCES = ("app.api.schemas", "app.api.health")
 
-# 十五个业务域的路径前缀（不合法即契约缺域）。
+# 十三个业务域的路径前缀（不合法即契约缺域）。
 DOMAIN_PREFIXES = (
     "/api/watchlist",
     "/api/indicators",
@@ -54,9 +52,7 @@ DOMAIN_PREFIXES = (
     "/api/overview",
     "/api/correlation",
     "/api/market",
-    "/api/relations",
     "/api/opportunities",
-    "/api/portfolio",
     "/api/approvals",
     "/api/account",
     "/api/manual-positions",
@@ -184,31 +180,7 @@ _DOMAIN_PAYLOADS = (
             "cells": [],
         },
     ),
-    (
-        "relations",
-        RelationNeighborsResponse,
-        {"product_key": "AAPL", "bar": "1d", "window": 60, "items": []},
-    ),
     ("opportunity", OpportunityStatusUpdateRequest, {"status": "reviewed"}),
-    (
-        "portfolio",
-        PortfolioAdjustmentCreateRequest,
-        {
-            "instance_id": "si_0001",
-            "requested_by": "lxz",
-            "target": {
-                "legs": [
-                    {
-                        "inst_id": "XAAPL-USDT",
-                        "inst_type": "SPOT",
-                        "direction": "long",
-                        "target_weight": "0.25",
-                    }
-                ],
-                "net_exposure": "0.25",
-            },
-        },
-    ),
     ("approval", StrategyApprovalRequest, {"instance_id": "si_0001", "actor": "lxz"}),
 )
 

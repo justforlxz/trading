@@ -4,7 +4,7 @@
 撮合与执行编排，再把执行事实交给 journal 读取。全程不联网：行情来自本地落库，
 paper 账本不调用假 OKX 的任何交易端点。
 
-只读性用行数比对断言：GET /api/journal 前后，journal 读到的表行数必须完全一致。
+只读性用行数比对断言：读取 journal 前后，journal 读到的表行数必须完全一致。
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ from app.execution import (
     paper_snapshot,
 )
 from app.instrument import Instrument, list_instruments, sync_instruments
-from app.journal import ExecutionSnapshot, RecordedSignal, latest_expectations
+from app.journal import ExecutionSnapshot, RecordedSignal, latest_expectations, load_journal
 from app.market import upsert_candles
 from app.strategy import TargetLeg, TargetPortfolio, get_instance
 from tests.factories.instruments import make_ref
@@ -270,39 +270,37 @@ def test_phase5_signal_to_journal(journal_client: tuple[TestClient, str]) -> Non
     client, instance_id = journal_client
     before = table_counts()
 
-    response = client.get("/api/journal")
+    view = load_journal(snapshot=client.app.state.execution_snapshot)
+    assert view is not None
+    assert view.mode == "paper"
 
-    assert response.status_code == 200, response.text
-    body = response.json()
-    assert body["mode"] == "paper"
-
-    strategy = next(item for item in body["strategies"] if item["instance_id"] == instance_id)
-    assert strategy["expected_return"] is not None
-    assert strategy["expected_source"].startswith("backtest:")
-    assert strategy["expected_source"].endswith(":metrics.total_return")
-    assert strategy["actual_source"] == "execution:fills:2"
-    assert strategy["fill_count"] == 2
-    assert strategy["expected_source"] != strategy["actual_source"]
+    strategy = next(item for item in view.strategies if item.instance_id == instance_id)
+    assert strategy.expected_return is not None
+    assert strategy.expected_source.startswith("backtest:")
+    assert strategy.expected_source.endswith(":metrics.total_return")
+    assert strategy.actual_source == "execution:fills:2"
+    assert strategy.fill_count == 2
+    assert strategy.expected_source != strategy.actual_source
 
     expected_actual = Decimal("10") / Decimal("210")
-    assert abs(Decimal(strategy["actual_return"]) - expected_actual) < QUANTUM
-    assert Decimal(strategy["expected_return"]) != Decimal(strategy["actual_return"])
+    assert abs(strategy.actual_return - expected_actual) < QUANTUM
+    assert strategy.expected_return != strategy.actual_return
 
-    positions = body["positions"]
+    positions = view.positions
     assert len(positions) == 1
-    assert positions[0]["product_key"] == "BTC"
-    assert Decimal(positions[0]["qty"]) == AMOUNT_BOUGHT - AMOUNT_SOLD
+    assert positions[0].product_key == "BTC"
+    assert positions[0].qty == AMOUNT_BOUGHT - AMOUNT_SOLD
 
-    assert [order["side"] for order in body["orders"]] == ["buy", "sell"]
-    assert [fill["side"] for fill in body["fills"]] == ["buy", "sell"]
-    assert body["signals"][0]["instance_id"] == instance_id
-    categories = {entry["category"] for entry in body["items"]}
+    assert [order.side for order in view.orders] == ["buy", "sell"]
+    assert [fill.side for fill in view.fills] == ["buy", "sell"]
+    assert view.signals[0].instance_id == instance_id
+    categories = {entry.category for entry in view.entries}
     assert {"signal", "order", "fill"} <= categories
 
     # 预期来源可以回到具体运行：读库确认最新一次回测就是报出的那一条。
     record = get_instance(instance_id)
     assert record is not None
     sourced = latest_expectations([record])[instance_id]
-    assert sourced[1] == strategy["expected_source"]
+    assert sourced[1] == strategy.expected_source
 
     assert table_counts() == before

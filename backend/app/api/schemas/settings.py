@@ -39,6 +39,8 @@ class RiskSettings(BaseModel):
     max_total_notional: DecimalString
     max_positions: int
     max_leverage: DecimalString
+    max_single_instrument_weight_pct: DecimalString = "35"
+    max_margin_usage_pct: DecimalString = "70"
     max_daily_loss: DecimalString
     liquidation_buffer_pct: DecimalString
     stop_loss_mandatory: bool
@@ -51,6 +53,13 @@ class RiskSettings(BaseModel):
             raise ValueError("max_leverage 必须是十进制数") from exc
         if not Decimal(1) <= leverage <= Decimal(10):
             raise ValueError("max_leverage 必须在 1 到 10 之间")
+        for name in ("max_single_instrument_weight_pct", "max_margin_usage_pct"):
+            try:
+                value = Decimal(getattr(self, name))
+            except InvalidOperation as exc:
+                raise ValueError(f"{name} 必须是十进制数") from exc
+            if not Decimal(0) < value <= Decimal(100):
+                raise ValueError(f"{name} 必须在 0 到 100 之间")
         return self
 
 
@@ -108,6 +117,8 @@ class SettingsResponse(BaseModel):
                         "max_total_notional": "10000",
                         "max_positions": 5,
                         "max_leverage": "3",
+                        "max_single_instrument_weight_pct": "35",
+                        "max_margin_usage_pct": "70",
                         "max_daily_loss": "300",
                         "liquidation_buffer_pct": "10",
                         "stop_loss_mandatory": True,

@@ -1,0 +1,8 @@
+{
+  "position_ref": "exchange:okx-main:123456",
+  "risk_budget": "50",
+  "source": "local",
+  "stop_px": "210.00",
+  "updated_at": "2026-11-13T09:00:00Z",
+  "warning_threshold_pct": "1.5"
+}

@@ -27,9 +27,11 @@
     "liquidation_buffer_pct": "10",
     "max_daily_loss": "300",
     "max_leverage": "3",
+    "max_margin_usage_pct": "70",
     "max_order_notional": "1000",
     "max_position_notional": "3000",
     "max_positions": 5,
+    "max_single_instrument_weight_pct": "35",
     "max_total_notional": "10000",
     "stop_loss_mandatory": true
   },

@@ -445,6 +445,37 @@ def list_runs(
     return tuple(_header(row) for row in rows), total or 0
 
 
+def list_instrument_runs(
+    inst_id: str,
+    *,
+    created_since: datetime | None = None,
+    limit: int = 20,
+) -> tuple[BacktestRunHeader, ...]:
+    """按标的名取最近的运行记录（新到旧），可限制创建时间下限。
+
+    这里不按数据源过滤：详情页只回答「这个标的有哪些关联回测」，不在跨源结果之间
+    排序或比较。每行仍带 `data_source`，界面能区分代理行情与 OKX 行情。
+    """
+
+    symbol = inst_id.strip()
+    if not symbol:
+        raise ValidationError("关联回测的标的不能为空")
+    if limit < 1:
+        raise ValidationError(f"关联回测的条数必须是正整数:{limit}")
+    if created_since is not None and created_since.tzinfo is None:
+        raise ValidationError("关联回测的创建时间下限必须带时区")
+
+    statement = select(BacktestRunRow).where(BacktestRunRow.inst_id == symbol)
+    if created_since is not None:
+        statement = statement.where(BacktestRunRow.created_at >= _epoch(created_since))
+    statement = statement.order_by(
+        BacktestRunRow.created_at.desc(), BacktestRunRow.run_id.desc()
+    ).limit(limit)
+    with session_scope() as session:
+        rows = list(session.scalars(statement))
+    return tuple(_header(row) for row in rows)
+
+
 def delete_run(run_id: str) -> bool:
     """删掉一次回测及其逐笔交易与资金曲线；不存在返回 `False`。
 

@@ -15,7 +15,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 
 from app.core import Bar, ValidationError
@@ -25,7 +25,7 @@ from app.market.breadth import Breadth, Resonance, advance_decline, resonance_st
 from app.market.candles import duplicate_open_times, expected_open_times, find_gaps
 from app.market.correlation import METHODS, correlate, p_value
 from app.market.matrix import Matrix
-from app.market.model import Candle, CorrelationSnapshot, to_epoch
+from app.market.model import Candle, CorrelationSnapshot, from_epoch, to_epoch
 from app.market.session import UNKNOWN_ASSET, asset_session, day_asset_type, primary_source
 from app.market.sync import candle_sources, data_range, load_candles, normalize_bar_or_raise
 from app.shared import bar_seconds
@@ -50,7 +50,7 @@ class CandleGap:
 
 @dataclass(frozen=True, slots=True)
 class IntegrityReport:
-    """库内某标的某一周期的完整性：真实首末、应有/实有根数、缺口与重复。"""
+    """库内某标的某一周期的完整性：真实首末、应有/实有根数、缺口、重复与最后同步时间。"""
 
     symbol: str
     bar: str
@@ -61,6 +61,7 @@ class IntegrityReport:
     missing: int
     gaps: tuple[CandleGap, ...]
     duplicates: tuple[datetime, ...]
+    last_synced_at: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,6 +102,7 @@ def integrity(symbol: str, bar: str, *, source: str | None = None) -> IntegrityR
 
     canonical = normalize_bar_or_raise(bar)
     first_last = data_range(symbol, canonical, source=source)
+    last_synced_at = _last_synced_at(symbol, canonical, source)
     if first_last is None:
         return IntegrityReport(
             symbol=symbol,
@@ -112,6 +114,7 @@ def integrity(symbol: str, bar: str, *, source: str | None = None) -> IntegrityR
             missing=0,
             gaps=(),
             duplicates=(),
+            last_synced_at=last_synced_at,
         )
 
     first, last = first_last
@@ -144,7 +147,21 @@ def integrity(symbol: str, bar: str, *, source: str | None = None) -> IntegrityR
             for gap_start, gap_end in gaps
         ),
         duplicates=tuple(duplicates),
+        last_synced_at=last_synced_at,
     )
+
+
+def _last_synced_at(symbol: str, bar: str, source: str | None) -> datetime | None:
+    """该序列最近一次写入时刻；没有 K 线时返回 `None`，不拿当前时间冒充同步。"""
+
+    statement = select(func.max(Candle.updated_at)).where(
+        Candle.symbol == symbol, Candle.bar == bar
+    )
+    if source is not None:
+        statement = statement.where(Candle.source == source)
+    with session_scope() as session:
+        latest = session.scalar(statement)
+    return None if latest is None else from_epoch(int(latest))
 
 
 def _day_boundary(symbol: str, bar: str, source: str | None) -> str:

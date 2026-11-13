@@ -29,6 +29,7 @@ TESTS_ROOT = BACKEND_ROOT / "tests"
 
 # 业务包清单：与 `app/` 下的目录一一对应；新增模块必须先在此登记。
 PACKAGES: tuple[str, ...] = (
+    "analysis",
     "api",
     "backtest",
     "core",
@@ -62,6 +63,11 @@ INFRA: frozenset[str] = frozenset({"config", "core"})
 # 唯一真源：模块 → 允许依赖的模块集合（规划 MKACG-707 定稿，逐行即契约）。
 # `jobs` / `api` 是装配层（"全部"），`main` 是装配根，`config` / `core` 是叶子。
 ALLOWED_DEPS: dict[str, frozenset[str]] = {
+    # 详情页聚合只编排已有域：行情、指标、相关性、回测与自选。它不写库，也不反向
+    # 依赖接口层。
+    "analysis": frozenset(
+        {"shared", "instrument", "market", "watchlist", "indicators", "backtest", "strategy"}
+    ),
     "core": frozenset(),
     "shared": frozenset(),
     "db": frozenset({"shared"}),

@@ -22,6 +22,7 @@ import getIndicatorsSeries from "./fixtures/indicators/get-indicators-series.jso
 import getInstruments from "./fixtures/instruments/get-instruments.json";
 import getInstrumentsSearch from "./fixtures/instruments/get-instruments-search.json";
 import getInstrumentsInstId from "./fixtures/instruments/get-instruments-inst_id.json";
+import getInstrumentsInstIdAnalysis from "./fixtures/instruments/get-instruments-inst_id-analysis.json";
 import getInstrumentsInstIdCandles from "./fixtures/instruments/get-instruments-inst_id-candles.json";
 import getManualPositions from "./fixtures/positions/get-manual-positions.json";
 import postManualPositions from "./fixtures/positions/post-manual-positions.json";
@@ -73,6 +74,7 @@ export const handlers = [
   http.get("*/api/instruments", () => HttpResponse.json(getInstruments)),
   http.get("*/api/instruments/search", () => HttpResponse.json(getInstrumentsSearch)),
   http.get("*/api/instruments/:inst_id", () => HttpResponse.json(getInstrumentsInstId)),
+  http.get("*/api/instruments/:inst_id/analysis", () => HttpResponse.json(getInstrumentsInstIdAnalysis)),
   http.get("*/api/instruments/:inst_id/candles", () => HttpResponse.json(getInstrumentsInstIdCandles)),
   http.get("*/api/manual-positions", () => HttpResponse.json(getManualPositions)),
   http.post("*/api/manual-positions", () => HttpResponse.json(postManualPositions, { status: 201 })),

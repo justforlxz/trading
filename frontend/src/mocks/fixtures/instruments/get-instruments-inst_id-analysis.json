@@ -1,0 +1,165 @@
+{
+  "bar": "1d",
+  "candles": {
+    "available_from": "2023-05-01T16:00:00Z",
+    "available_to": "2026-11-12T16:00:00Z",
+    "candles": [
+      {
+        "close": "231.42",
+        "data_source": "okx_spot",
+        "high": "232.10",
+        "is_closed": true,
+        "low": "229.44",
+        "open": "229.80",
+        "open_time": "2026-11-12T16:00:00Z",
+        "volume": "1520.335"
+      }
+    ],
+    "data_source": "okx_spot",
+    "gaps": [],
+    "overlays": [
+      {
+        "name": "MA20",
+        "points": [
+          {
+            "time": "2026-11-12T16:00:00Z",
+            "value": "226.51"
+          }
+        ]
+      },
+      {
+        "name": "MA60",
+        "points": [
+          {
+            "time": "2026-11-12T16:00:00Z",
+            "value": "219.08"
+          }
+        ]
+      }
+    ]
+  },
+  "correlations": [
+    {
+      "coefficient": "0.68",
+      "inst_id": "XQQQ-USDT",
+      "product_key": "QQQ",
+      "role": "benchmark",
+      "sample_size": 60,
+      "window": 60,
+      "window_end": "2026-11-12T16:00:00Z",
+      "window_start": "2026-08-20T16:00:00Z"
+    }
+  ],
+  "coverage": [
+    {
+      "available": true,
+      "available_from": "2023-05-01T16:00:00Z",
+      "available_to": "2026-11-12T16:00:00Z",
+      "bar": "1d",
+      "candle_count": 846,
+      "data_source": "okx_spot",
+      "gap_count": 0,
+      "last_synced_at": "2026-11-13T01:00:00Z"
+    },
+    {
+      "available": false,
+      "bar": "4h",
+      "candle_count": 0,
+      "data_source": "okx_spot",
+      "gap_count": 0,
+      "unavailable_reason": "尚未同步"
+    },
+    {
+      "available": false,
+      "bar": "1h",
+      "candle_count": 0,
+      "data_source": "okx_spot",
+      "gap_count": 0,
+      "unavailable_reason": "尚未同步"
+    }
+  ],
+  "indicators": {
+    "momentum": {
+      "macd": "1.28",
+      "macd_hist": "0.34",
+      "macd_signal": "0.94",
+      "rsi14": "61.4"
+    },
+    "readings": [
+      "收盘价 231.42，MA20 为 226.51，价格位于 MA20 上方 2.17%；MA20 的 5 根斜率是 1.42%。",
+      "RSI(14) 为 61.40，MACD 为 1.2800，信号线为 0.9400，柱状值为 0.3400。",
+      "当前成交量是 20 根均量的 1.32 倍，近 20 根相对 XQQQ-USDT 的超额收益为 4.60 个百分点。"
+    ],
+    "relative_strength": {
+      "benchmark_inst_id": "XQQQ-USDT",
+      "benchmark_return_pct": "3.20",
+      "excess_return_pct": "4.60",
+      "symbol_return_pct": "7.80",
+      "window": 20
+    },
+    "trend": {
+      "close": "231.42",
+      "ma20": "226.51",
+      "ma20_slope_pct": "1.42",
+      "ma60": "219.08",
+      "ma60_slope_pct": "0.86",
+      "price_vs_ma20_pct": "2.17",
+      "price_vs_ma60_pct": "5.63",
+      "slope_window": 5
+    },
+    "volatility": {
+      "atr14": "5.32",
+      "atr_pct": "2.30",
+      "atr_pct_avg20": "1.90"
+    },
+    "volume": {
+      "average20": "1151.78",
+      "current": "1520.335",
+      "relative": "1.32"
+    }
+  },
+  "instrument": {
+    "asset_type": "tokenized_equity",
+    "base_currency": "XAAPL",
+    "inst_id": "XAAPL-USDT",
+    "inst_type": "SPOT",
+    "listing_time": "2026-07-01T00:00:00Z",
+    "lot_size": "0.001",
+    "min_order_size": "0.001",
+    "product_key": "AAPL",
+    "quote_currency": "USDT",
+    "tick_size": "0.01",
+    "trading_status": "live"
+  },
+  "levels": {
+    "high20": "238.90",
+    "high_distance_pct": "3.23",
+    "low20": "214.10",
+    "low_distance_pct": "-7.48",
+    "window": 20
+  },
+  "linked_strategies": [
+    {
+      "backtest_end_date": "2026-11-01",
+      "backtest_start_date": "2026-10-01",
+      "created_at": "2026-11-10T01:20:00Z",
+      "data_source": "okx_spot",
+      "max_drawdown_pct": "6.12",
+      "run_id": "bt_0001",
+      "strategy_id": "ma_cross",
+      "strategy_instance_id": "si_0001",
+      "strategy_name": "AAPL 趋势",
+      "total_return_pct": "12.4055",
+      "trade_count": 37
+    }
+  ],
+  "quote": {
+    "last": {
+      "as_of": "2026-11-13T16:00:00Z",
+      "change": "2.84",
+      "change_pct": "1.24",
+      "price": "231.42",
+      "source": "okx_spot"
+    }
+  }
+}

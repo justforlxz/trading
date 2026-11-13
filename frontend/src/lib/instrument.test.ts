@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { CandleBar } from "./api";
-import { DEFAULT_BAR_ORDER, coverageLabel, resolveDefaultBar } from "./instrument";
+import {
+  DEFAULT_BAR_ORDER,
+  coverageLabel,
+  resolveAvailableBar,
+  resolveDefaultBar,
+} from "./instrument";
 
 function loaderWithData(barsWithData: CandleBar[]) {
   return vi.fn(async (bar: CandleBar) => ({
@@ -43,5 +48,44 @@ describe("coverageLabel", () => {
     expect(coverageLabel(null, "2026-11-11T16:00:00Z")).toBeNull();
     expect(coverageLabel("2026-07-15T16:00:00Z", undefined)).toBeNull();
     expect(coverageLabel("not-a-time", "2026-11-11T16:00:00Z")).toBeNull();
+  });
+});
+
+describe("resolveAvailableBar", () => {
+  it("当前周期可用时保持不变", () => {
+    expect(
+      resolveAvailableBar(
+        [
+          { bar: "1d", available: true },
+          { bar: "4h", available: true },
+        ],
+        "4h",
+      ),
+    ).toBe("4h");
+  });
+
+  it("当前周期不可用时退回第一个可用周期", () => {
+    expect(
+      resolveAvailableBar(
+        [
+          { bar: "1d", available: true },
+          { bar: "4h", available: false },
+          { bar: "1h", available: true },
+        ],
+        "4h",
+      ),
+    ).toBe("1d");
+  });
+
+  it("所有周期都不可用时保持当前选择", () => {
+    expect(
+      resolveAvailableBar(
+        [
+          { bar: "1d", available: false },
+          { bar: "4h", available: false },
+        ],
+        "4h",
+      ),
+    ).toBe("4h");
   });
 });

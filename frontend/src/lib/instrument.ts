@@ -5,7 +5,7 @@
  * 全空。这里只做「按顺序探测」与时间文案，不计算任何指标。
  */
 
-import type { CandleBar } from "./api";
+import type { CandleBar, InstrumentAnalysisBar } from "./api";
 
 /** 有多个周期可看时优先 `1d`；自选列表的行情快照同样取日线。 */
 export const DEFAULT_BAR_ORDER: CandleBar[] = ["1d", "4h", "1h", "15m", "5m", "1m"];
@@ -44,4 +44,17 @@ function formatUtc(value: string): string | null {
     `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ` +
     `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`
   );
+}
+
+/**
+ * 切换标的后保留当前周期：新标的没有该周期数据时，退回第一个有数据的周期。
+ *
+ * 覆盖顺序以后端返回为准（1d、4h、1h），所以优先回到日线，不把用户留在空图。
+ */
+export function resolveAvailableBar(
+  coverage: ReadonlyArray<{ bar: InstrumentAnalysisBar; available: boolean }>,
+  current: InstrumentAnalysisBar,
+): InstrumentAnalysisBar {
+  if (coverage.some((row) => row.bar === current && row.available)) return current;
+  return coverage.find((row) => row.available)?.bar ?? current;
 }

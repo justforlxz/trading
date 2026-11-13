@@ -4,7 +4,7 @@
 """
 
 from app.instrument.model import Instrument, InstrumentPair, spot_currency
-from app.instrument.rules import TradingRules, trading_categories, trading_rules
+from app.instrument.rules import TradingRules, okx_source, trading_categories, trading_rules
 from app.instrument.service import (
     DEFAULT_QUOTE_CURRENCY,
     SyncReport,
@@ -28,6 +28,7 @@ __all__ = [
     "get_instrument_pair",
     "list_instruments",
     "list_tradable",
+    "okx_source",
     "resolve_instrument",
     "spot_currency",
     "sync_instruments",

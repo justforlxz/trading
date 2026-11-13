@@ -31,6 +31,19 @@ export type WatchlistStrategy = components["schemas"]["WatchlistStrategy"];
 export type InstrumentRef = components["schemas"]["InstrumentRef"];
 export type InstrumentSearchResponse = components["schemas"]["InstrumentSearchResponse"];
 export type InstrumentDetailResponse = components["schemas"]["InstrumentDetailResponse"];
+export type InstrumentAnalysisResponse = components["schemas"]["InstrumentAnalysisResponse"];
+export type InstrumentAnalysisQuote = InstrumentAnalysisResponse["quote"];
+export type InstrumentAnalysisPrice = NonNullable<InstrumentAnalysisQuote["last"]>;
+export type InstrumentAnalysisCandles = InstrumentAnalysisResponse["candles"];
+export type InstrumentAnalysisCandle = InstrumentAnalysisCandles["candles"][number];
+export type InstrumentAnalysisOverlay = InstrumentAnalysisCandles["overlays"][number];
+export type InstrumentAnalysisIndicators = InstrumentAnalysisResponse["indicators"];
+export type InstrumentAnalysisLevels = InstrumentAnalysisResponse["levels"];
+export type InstrumentAnalysisCorrelation = InstrumentAnalysisResponse["correlations"][number];
+export type InstrumentAnalysisLinkedBacktest =
+  InstrumentAnalysisResponse["linked_strategies"][number];
+export type InstrumentAnalysisCoverage = InstrumentAnalysisResponse["coverage"][number];
+export type InstrumentAnalysisBar = InstrumentAnalysisResponse["bar"];
 export type CandleSeriesResponse = components["schemas"]["CandleSeriesResponse"];
 export type CandleBar = CandleSeriesResponse["bar"];
 export type IndicatorSeries = components["schemas"]["IndicatorSeries"];
@@ -163,6 +176,17 @@ export function removeWatchlistItem(instId: string): Promise<void> {
 
 export function fetchInstrumentDetail(instId: string): Promise<InstrumentDetailResponse> {
   return request<InstrumentDetailResponse>(`/instruments/${encodeURIComponent(instId)}`);
+}
+
+/** 详情页聚合：所有派生值由后端算好，前端只负责展示。 */
+export function fetchInstrumentAnalysis(
+  instId: string,
+  bar: InstrumentAnalysisBar = "1d",
+): Promise<InstrumentAnalysisResponse> {
+  const query = new URLSearchParams({ bar });
+  return request<InstrumentAnalysisResponse>(
+    `/instruments/${encodeURIComponent(instId)}/analysis?${query.toString()}`,
+  );
 }
 
 /** 详情页读的是标的自身在 OKX 的行情：现货与永续是两条来源，按形态取值。 */

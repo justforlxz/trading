@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { PageHeading } from "../../components/layout/page-parts";
 import {
@@ -39,6 +40,8 @@ export default function BacktestsPage() {
   const [detail, setDetail] = useState<BacktestDetailResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const queryRunId = searchParams.get("run");
 
   useEffect(() => {
     let active = true;
@@ -78,7 +81,7 @@ export default function BacktestsPage() {
     };
   }, [dataSource, metric, reload]);
 
-  const openDetail = (runId: string) => {
+  const openDetail = useCallback((runId: string) => {
     setBusy(true);
     setError(null);
     fetchBacktest(runId)
@@ -90,7 +93,12 @@ export default function BacktestsPage() {
         setError(reason instanceof Error ? reason.message : "回测结果加载失败");
       })
       .finally(() => setBusy(false));
-  };
+  }, []);
+
+  useEffect(() => {
+    if (queryRunId === null) return;
+    openDetail(queryRunId);
+  }, [queryRunId, openDetail]);
 
   const submit = (request: BacktestRequest) => {
     setBusy(true);

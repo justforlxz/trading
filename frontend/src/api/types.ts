@@ -472,7 +472,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Overview */
+        /**
+         * Get Overview
+         * @description 市场驾驶舱聚合；同一 `as_of` 与同一份库状态返回相同 JSON。
+         */
         get: operations["get_overview_api_overview_get"];
         put?: never;
         post?: never;
@@ -952,24 +955,6 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** AccountSummary */
-        AccountSummary: {
-            /** Available */
-            available: string;
-            /** Currency */
-            currency: string;
-            /** Equity */
-            equity: string;
-            /**
-             * Mode
-             * @enum {string}
-             */
-            mode: "manual" | "paper" | "live";
-            /** Today Pnl */
-            today_pnl: string;
-            /** Unrealized Pnl */
-            unrealized_pnl: string;
-        };
         /** BacktestCosts */
         BacktestCosts: {
             /** Maker Fee Bps */
@@ -1945,15 +1930,6 @@ export interface components {
             /** Short Exposure */
             short_exposure: string;
         };
-        /** ExposureSummary */
-        ExposureSummary: {
-            /** Gross Exposure */
-            gross_exposure: string;
-            /** Margin Used Pct */
-            margin_used_pct: string;
-            /** Net Exposure */
-            net_exposure: string;
-        };
         /** Fill */
         Fill: {
             /** Fee */
@@ -2689,6 +2665,30 @@ export interface components {
             window: number;
         };
         /**
+         * MarketState
+         * @description 一个类别在 `as_of` 时刻的资产时段与参考行情来源。
+         *
+         *     类别只是展示分组：`SPOT` / `SWAP` 内部可能同时含有多种资产，类别层级没有
+         *     唯一的 `asset_type`，因此这里与 T1.7 一致地使用类别规则作为兜底取值。
+         */
+        MarketState: {
+            /**
+             * Inst Type
+             * @enum {string}
+             */
+            inst_type: "SPOT" | "SWAP";
+            /**
+             * Primary Source
+             * @enum {string}
+             */
+            primary_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+            /**
+             * Session
+             * @enum {string}
+             */
+            session: "pre" | "regular" | "post" | "closed";
+        };
+        /**
          * Opportunity
          * @description 一条机会记录。
          *
@@ -2954,84 +2954,113 @@ export interface components {
         };
         /**
          * OverviewResponse
+         * @description 首页市场驾驶舱：市场状态、共振、组合、机会流与风险告警。
          * @example {
-         *       "account": {
-         *         "available": "8160.00",
-         *         "currency": "USDT",
-         *         "equity": "10240.55",
-         *         "mode": "paper",
-         *         "today_pnl": "-12.30",
-         *         "unrealized_pnl": "28.64"
-         *       },
-         *       "active_strategies": [
+         *       "as_of": "2026-11-10T08:00:00Z",
+         *       "market": [
          *         {
+         *           "as_of": "2026-11-10T08:00:00Z",
+         *           "bar": "1d",
+         *           "breadth": {
+         *             "advancers": 8,
+         *             "decliners": 2,
+         *             "participants": 11,
+         *             "ratio": "4",
+         *             "unchanged": 1
+         *           },
+         *           "inst_type": "SPOT",
+         *           "resonance": {
+         *             "participants": 11,
+         *             "strength": "0.62",
+         *             "window": 20
+         *           }
+         *         },
+         *         {
+         *           "as_of": "2026-11-10T08:00:00Z",
+         *           "bar": "1d",
+         *           "breadth": {
+         *             "advancers": 5,
+         *             "decliners": 5,
+         *             "participants": 10,
+         *             "ratio": "1",
+         *             "unchanged": 0
+         *           },
+         *           "inst_type": "SWAP",
+         *           "resonance": {
+         *             "participants": 10,
+         *             "strength": "0",
+         *             "window": 20
+         *           }
+         *         }
+         *       ],
+         *       "market_states": [
+         *         {
+         *           "inst_type": "SPOT",
+         *           "primary_source": "okx_spot",
+         *           "session": "regular"
+         *         },
+         *         {
+         *           "inst_type": "SWAP",
+         *           "primary_source": "us_equity_proxy",
+         *           "session": "post"
+         *         }
+         *       ],
+         *       "portfolio": {
+         *         "gross_exposure": "3510.40",
+         *         "net_exposure": "1997.15",
+         *         "open_positions": 3,
+         *         "strategies": [
+         *           {
+         *             "instance_id": "si_0001",
+         *             "name": "AAPL 均线趋势",
+         *             "open_positions": 1
+         *           }
+         *         ]
+         *       },
+         *       "recent_opportunities": [
+         *         {
+         *           "anchor_product_key": "AAPL",
+         *           "as_of": "2026-11-10T00:00:00Z",
+         *           "evidence": "{\"correlation\":0.87,\"breadth\":0.8,\"resonance\":0.62}",
+         *           "legs": [
+         *             {
+         *               "direction": "long",
+         *               "inst_id": "MSFT-USDT-SWAP",
+         *               "inst_type": "SWAP",
+         *               "product_key": "MSFT",
+         *               "score": "0.82"
+         *             }
+         *           ],
+         *           "mode": "target",
+         *           "opportunity_id": "opp_0001",
+         *           "score": "0.78",
+         *           "status": "new"
+         *         }
+         *       ],
+         *       "risk_events": [
+         *         {
+         *           "created_at": "2026-11-10T07:00:00Z",
+         *           "detail": "杠杆 25 超过上限 20",
+         *           "event_id": "re_0001",
+         *           "inst_id": "AAPL-USDT-SWAP",
          *           "instance_id": "si_0001",
-         *           "latest_signal_at": "2026-11-10T07:00:00Z",
-         *           "name": "AAPL 均线趋势",
-         *           "status": "paper_trading",
-         *           "strategy_id": "ma_cross"
-         *         }
-         *       ],
-         *       "exposure": {
-         *         "gross_exposure": "1997.15",
-         *         "margin_used_pct": "19.5",
-         *         "net_exposure": "1997.15"
-         *       },
-         *       "generated_at": "2026-11-10T08:00:00Z",
-         *       "positions": [
-         *         {
-         *           "avg_entry_price": "228.10",
-         *           "inst_id": "XAAPL-USDT",
-         *           "inst_type": "SPOT",
-         *           "leverage": "1",
-         *           "mark_price": "231.42",
-         *           "mode": "paper",
-         *           "notional": "1997.15",
-         *           "opened_at": "2026-11-09T14:00:00Z",
-         *           "product_key": "AAPL",
-         *           "qty": "8.63",
-         *           "side": "long",
-         *           "strategy_instance_id": "si_0001",
-         *           "unrealized_pnl": "28.64"
-         *         }
-         *       ],
-         *       "recent_signals": [
-         *         {
-         *           "action": "BUY",
-         *           "bar": "1h",
-         *           "generated_at": "2026-11-10T07:00:00Z",
-         *           "inst_id": "XAAPL-USDT",
-         *           "inst_type": "SPOT",
-         *           "price": "231.42",
-         *           "reason": "MA20 上穿 MA60",
-         *           "signal_id": "sig_0001",
-         *           "strategy_instance_id": "si_0001",
-         *           "target_weight": "0.25"
-         *         }
-         *       ],
-         *       "watchlist_highlights": [
-         *         {
-         *           "change_pct_24h": "1.86",
-         *           "inst_id": "XAAPL-USDT",
-         *           "last_price": "231.42",
-         *           "product_key": "AAPL"
+         *           "rule": "max_leverage"
          *         }
          *       ]
          *     }
          */
         OverviewResponse: {
-            account: components["schemas"]["AccountSummary"];
-            /** Active Strategies */
-            active_strategies: components["schemas"]["StrategyBrief"][];
-            exposure: components["schemas"]["ExposureSummary"];
-            /** Generated At */
-            generated_at: string;
-            /** Positions */
-            positions: components["schemas"]["Position"][];
-            /** Recent Signals */
-            recent_signals: components["schemas"]["Signal"][];
-            /** Watchlist Highlights */
-            watchlist_highlights: components["schemas"]["WatchlistBrief"][];
+            /** As Of */
+            as_of: string;
+            /** Market */
+            market: components["schemas"]["MarketOverviewResponse"][];
+            /** Market States */
+            market_states: components["schemas"]["MarketState"][];
+            portfolio: components["schemas"]["PortfolioSummary"];
+            /** Recent Opportunities */
+            recent_opportunities: components["schemas"]["Opportunity"][];
+            /** Risk Events */
+            risk_events: components["schemas"]["RiskEvent"][];
         };
         /**
          * ParamSpec
@@ -3175,6 +3204,32 @@ export interface components {
             product_key: string;
             /** Short Instance Ids */
             short_instance_ids: string[];
+        };
+        /**
+         * PortfolioStrategyBrief
+         * @description 单个策略实例的当前持仓数。
+         */
+        PortfolioStrategyBrief: {
+            /** Instance Id */
+            instance_id: string;
+            /** Name */
+            name: string;
+            /** Open Positions */
+            open_positions: number;
+        };
+        /**
+         * PortfolioSummary
+         * @description 全局组合概览；各策略明细来自 T7.1 的策略组合列表。
+         */
+        PortfolioSummary: {
+            /** Gross Exposure */
+            gross_exposure: string;
+            /** Net Exposure */
+            net_exposure: string;
+            /** Open Positions */
+            open_positions: number;
+            /** Strategies */
+            strategies: components["schemas"]["PortfolioStrategyBrief"][];
         };
         /** Position */
         Position: {
@@ -3833,22 +3888,6 @@ export interface components {
              * @enum {string}
              */
             to_status: "opportunity_discovery" | "strategy_generation" | "pending_review" | "backtested" | "validated" | "paper_trading" | "live_authorized" | "live_running" | "rejected";
-        };
-        /** StrategyBrief */
-        StrategyBrief: {
-            /** Instance Id */
-            instance_id: string;
-            /** Latest Signal At */
-            latest_signal_at?: string | null;
-            /** Name */
-            name: string;
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "opportunity_discovery" | "strategy_generation" | "pending_review" | "backtested" | "validated" | "paper_trading" | "live_authorized" | "live_running" | "rejected";
-            /** Strategy Id */
-            strategy_id: string;
         };
         /**
          * StrategyCatalogResponse
@@ -4517,17 +4556,6 @@ export interface components {
             group: string;
             /** Inst Id */
             inst_id: string;
-        };
-        /** WatchlistBrief */
-        WatchlistBrief: {
-            /** Change Pct 24H */
-            change_pct_24h: string;
-            /** Inst Id */
-            inst_id: string;
-            /** Last Price */
-            last_price: string;
-            /** Product Key */
-            product_key: string;
         };
         /**
          * WatchlistItem
@@ -5478,7 +5506,9 @@ export interface operations {
     };
     get_overview_api_overview_get: {
         parameters: {
-            query?: never;
+            query?: {
+                as_of?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -5492,6 +5522,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OverviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

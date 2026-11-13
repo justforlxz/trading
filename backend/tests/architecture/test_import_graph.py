@@ -70,7 +70,9 @@ ALLOWED_DEPS: dict[str, frozenset[str]] = {
     "exchange": frozenset({"shared", "db", "instrument"}),
     "instrument": frozenset({"shared", "db"}),
     "market": frozenset({"shared", "db", "exchange", "instrument"}),
-    "watchlist": frozenset({"shared", "db", "instrument", "market"}),
+    # 自选行要在后端补趋势、RSI 与 ATR，指标计算必须复用 `app.indicators`，
+    # 不能在域内重写一套与详情页/回测不同的算法。
+    "watchlist": frozenset({"shared", "db", "instrument", "market", "indicators"}),
     "relations": frozenset({"instrument", "market", "watchlist"}),
     "opportunity": frozenset({"db", "instrument", "market"}),
     "portfolio": frozenset({"db", "instrument", "strategy"}),

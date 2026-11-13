@@ -5147,9 +5147,15 @@ export interface components {
         };
         /**
          * WatchlistItem
-         * @description 自选列表一行：行情快照 + 关联运行态。
+         * @description 自选列表一行：日线快照、技术指标、数据覆盖与关联运行态。
+         *
+         *     价格与派生指标都可能为 `null`：该行没有日线时如实留空，不补 0。
+         *     `data_status` 区分「没有 K 线」与「有 K 线但指标历史不足」。
          * @example {
+         *       "atr_pct_14": "2.3",
+         *       "candle_count": 846,
          *       "change_pct_24h": "1.86",
+         *       "data_status": "ok",
          *       "group": "美股",
          *       "instrument": {
          *         "asset_type": "tokenized_equity",
@@ -5164,6 +5170,7 @@ export interface components {
          *         "tick_size": "0.01",
          *         "trading_status": "live"
          *       },
+         *       "last_candle_at": "2026-11-12T16:00:00Z",
          *       "last_price": "231.42",
          *       "last_signal": {
          *         "action": "BUY",
@@ -5177,6 +5184,7 @@ export interface components {
          *         "strategy_instance_id": "si_0001",
          *         "target_weight": "0.25"
          *       },
+         *       "rsi_14": "61.4",
          *       "strategy": {
          *         "enabled": true,
          *         "execution_mode": "paper",
@@ -5184,22 +5192,38 @@ export interface components {
          *         "name": "AAPL 趋势",
          *         "status": "live_running"
          *       },
+         *       "trend": "bullish",
          *       "volume_24h_quote": "4821334.55"
          *     }
          */
         WatchlistItem: {
             alert?: components["schemas"]["PriceAlert"] | null;
+            /** Atr Pct 14 */
+            atr_pct_14: string | null;
+            /** Candle Count */
+            candle_count: number;
             /** Change Pct 24H */
-            change_pct_24h: string;
+            change_pct_24h: string | null;
+            /**
+             * Data Status
+             * @enum {string}
+             */
+            data_status: "ok" | "partial" | "missing";
             /** Group */
             group: string;
             instrument: components["schemas"]["InstrumentInfo"];
+            /** Last Candle At */
+            last_candle_at: string | null;
             /** Last Price */
-            last_price: string;
+            last_price: string | null;
             last_signal?: components["schemas"]["Signal"] | null;
+            /** Rsi 14 */
+            rsi_14: string | null;
             strategy?: components["schemas"]["WatchlistStrategy"] | null;
+            /** Trend */
+            trend: ("bullish" | "bearish" | "neutral") | null;
             /** Volume 24H Quote */
-            volume_24h_quote: string;
+            volume_24h_quote: string | null;
         };
         /**
          * WatchlistResponse
@@ -5210,7 +5234,10 @@ export interface components {
          *       ],
          *       "items": [
          *         {
+         *           "atr_pct_14": "2.3",
+         *           "candle_count": 846,
          *           "change_pct_24h": "1.86",
+         *           "data_status": "ok",
          *           "group": "美股",
          *           "instrument": {
          *             "asset_type": "tokenized_equity",
@@ -5225,6 +5252,7 @@ export interface components {
          *             "tick_size": "0.01",
          *             "trading_status": "live"
          *           },
+         *           "last_candle_at": "2026-11-12T16:00:00Z",
          *           "last_price": "231.42",
          *           "last_signal": {
          *             "action": "BUY",
@@ -5238,6 +5266,7 @@ export interface components {
          *             "strategy_instance_id": "si_0001",
          *             "target_weight": "0.25"
          *           },
+         *           "rsi_14": "61.4",
          *           "strategy": {
          *             "enabled": true,
          *             "execution_mode": "paper",
@@ -5245,6 +5274,7 @@ export interface components {
          *             "name": "AAPL 趋势",
          *             "status": "live_running"
          *           },
+         *           "trend": "bullish",
          *           "volume_24h_quote": "4821334.55"
          *         }
          *       ]

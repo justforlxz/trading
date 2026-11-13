@@ -75,6 +75,7 @@ export type OverviewPortfolio = OverviewResponse["portfolio"];
 export type OverviewStrategyBrief = OverviewPortfolio["strategies"][number];
 export type OverviewOpportunity = OverviewResponse["recent_opportunities"][number];
 export type OverviewRiskEvent = OverviewResponse["risk_events"][number];
+export type MarketOverviewResponse = components["schemas"]["MarketOverviewResponse"];
 
 /** 后端错误体的形状：`detail` 是字符串，或 FastAPI 校验错误的条目数组。 */
 type ErrorBody = { detail?: string | Array<{ msg?: string }> };
@@ -127,6 +128,15 @@ export function fetchOverview(asOf?: string): Promise<OverviewResponse> {
 
 export function fetchWatchlist(): Promise<WatchlistResponse> {
   return request<WatchlistResponse>("/watchlist");
+}
+
+/** 某一类别在某一周期上的市场广度与共振；类别没有默认值，必须显式指定。 */
+export function fetchMarketOverview(
+  instType: "SPOT" | "SWAP",
+  bar: "1d" = "1d",
+): Promise<MarketOverviewResponse> {
+  const query = new URLSearchParams({ inst_type: instType, bar });
+  return request<MarketOverviewResponse>(`/market/overview?${query.toString()}`);
 }
 
 /** 按代码或产品键搜索已同步的标的；不传形态时两类一起返回。 */

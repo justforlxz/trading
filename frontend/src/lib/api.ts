@@ -109,7 +109,7 @@ async function failureMessage(response: Response): Promise<string> {
   return `请求失败（HTTP ${response.status}）`;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${BASE}${path}`, {
     ...init,
     headers: { accept: "application/json", ...init?.headers },

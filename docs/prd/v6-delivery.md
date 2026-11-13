@@ -319,8 +319,8 @@ flowchart TD
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/dashboard/summary` | 无 | `as_of`、`market`、`account`、`risk`、`positions`、`watchlist`、`alerts`、`strategies`、`activity`、`degraded[{module,status,reason,last_success_at}]` | 200（部分模块可为 `null`）、503 | B5 |
 | GET | `/api/market/overview` | 无 | `as_of`、`items[{symbol,name,value,change,change_pct,market_session,source,as_of,is_delayed,quality_status}]`，`symbol` 固定为 `NASDAQ`、`SP500`、`DOW`、`VIX`、`BTC` | 502、503 | B9 |
-| GET | `/api/account/summary` | 无 | `status`（`ok`、`stale`、`unconfigured`）、`account_id`、`currency`、`equity`、`available_equity`、`cash_balance`、`unrealized_pnl`、`used_margin`、`available_margin`、`margin_usage_pct`、`day_pnl`、`day_pnl_basis`、`position_notional`（待 B2 补齐）、`day_pnl_pct`（待 B2 补齐）、`captured_at`、`source` | 503 | B2 |
-| POST | `/api/account/sync` | 无 | 与 `GET /api/account/summary` 相同，另加 `positions_synced` | 502、503 | B2 |
+| GET | `/api/account/summary` | 无 | `status`（`ok`、`stale`、`unconfigured`）、`account_id`、`currency`、`equity`、`available_equity`、`cash_balance`、`unrealized_pnl`、`used_margin`、`available_margin`、`margin_usage_pct`、`day_pnl`、`day_pnl_basis`、`position_notional`（待 B2 补齐）、`day_pnl_pct`（待 B2 补齐）、`captured_at`、`source` | 200（未配置或没有快照时 `status` 为 `unconfigured` 或 `stale`，不用错误码） | B2 |
+| POST | `/api/account/sync` | 无 | 与 `GET /api/account/summary` 相同，另加 `positions_synced` | 200（未配置时 `status=unconfigured`）、502（上游失败） | B2 |
 | GET | `/api/instruments?query=` | `query`、`asset_class`（可选）、`limit`（可选，默认 20） | `items[{instrument_id,venue,inst_id,inst_type,base_asset,quote_asset,display_symbol,asset_class,name,state,tradable}]` | 400 | S1-2 |
 | GET | `/api/watchlist` | 无 | `items[{instrument_id,display_symbol,name,asset_class,quote,trend,rsi14,atr_pct,candle_count,last_updated_at,quality_status}]`、`summary{total,bullish,bearish,coverage_pct}`、`market_environment{risk_appetite,breadth,volatility,computed_at,rule_version}` | 503 | S1-2 |
 | POST | `/api/watchlist/items` | `instrument_id`、`group_id`（可选）、`sort_order`（可选） | 201：`id`、`instrument_id`、`sort_order`、`created_at` | 400、404、409 | S1-2 |
@@ -354,7 +354,7 @@ flowchart TD
 ### 6.1 账户与持仓接口的取舍
 
 - `GET /api/account/summary` 是账户卡的唯一契约，负责权益、可用权益、已用保证金、未实现盈亏、今日盈亏和保证金使用率；S2-1 的账户区只读这个接口。
-- `GET /api/positions` 是 v6 的合并持仓视图，同时返回 `source=exchange` 和 `source=manual`。已经合并的 B2 代码目前提供 `GET /api/positions/exchange` 和 `GET /api/manual-positions` 两个拆分接口，它们是合并视图的数据来源，不是 S2-1、S2-2 的页面契约。合并视图由 B2 后续增量在阶段 2 开工前交付；`docs/prd/v6.md` 已把 `GET /api/positions` 登记为开发中。
+- `GET /api/positions` 是 v6 的合并持仓视图，同时返回 `source=exchange` 和 `source=manual`。已经合并的 B2 代码目前提供 `GET /api/positions/exchange` 和 `GET /api/manual-positions` 两个拆分接口。合并视图尚未交付，S2-1 的 OKX 区先使用 `GET /api/positions/exchange`，S2-2 的手动区先使用 `GET /api/manual-positions`；`docs/prd/v6.md` 已把 `GET /api/positions` 登记为开发中。
 - 账户卡需要的 `position_notional` 和 `day_pnl_pct` 尚未出现在已经合并的 `GET /api/account/summary` 响应中。B2 后续增量补齐前，S2-1 显示“未提供”，不在前端计算。
 - `POST /api/account/sync` 只触发 OKX 只读快照同步，供 S2-1 的刷新操作使用；它不下单、不撤单、不改单、不平仓。
 
@@ -395,7 +395,7 @@ flowchart TD
 | 标的详情关联策略 | `GET /api/instruments/{id}/analysis` 的 `linked_strategies` | S4-3 | B6 |
 | 标的详情近期事件 | `GET /api/instruments/{id}/analysis` 的 `events` | S6-1 | B9 |
 | 持仓：账户概览 | `GET /api/account/summary` | S2-1 | B2 |
-| 持仓：OKX 区 | `GET /api/positions?source=exchange`（拆分接口 `GET /api/positions/exchange` 只作数据来源） | S2-1 | B2 |
+| 持仓：OKX 区 | `GET /api/positions/exchange`（合并视图 `GET /api/positions?source=exchange` 交付后再替换） | S2-1 | B2 |
 | 持仓：手动区 | `GET /api/positions?source=manual`（写入与流水用 `/api/manual-positions` 系列） | S2-2 | B2 |
 | 持仓：敞口分布 | `GET /api/dashboard/summary` 的 `risk.exposure` | S3-2 | B3 |
 | 策略与回测 | `/api/strategies` 系列 | S4-2 | B6 |

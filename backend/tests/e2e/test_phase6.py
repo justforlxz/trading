@@ -34,6 +34,7 @@ from app.execution import (
 from app.instrument import list_instruments, sync_instruments
 from app.portfolio import get_portfolio, record_fill
 from tests.factories.instruments import make_swap_ref
+from tests.factories.strategies import make_instance
 from tests.fakes.okx.server import FakeOkxServer
 
 D = Decimal
@@ -89,17 +90,8 @@ def test_order_partial_fill_disconnect_reconnect_and_reconcile(
     fake_okx_server: FakeOkxServer,
 ) -> None:
     sync_instruments([make_swap_ref()])
-    created = client.post(
-        "/api/strategy-instances",
-        json={
-            "strategy_id": "relative_value",
-            "name": "AAPL 永续对账",
-            "bar": "1d",
-            "inst_ids": [SWAP_INST_ID],
-        },
-    )
-    assert created.status_code == 201, created.text
-    instance_id = str(created.json()["instance_id"])
+    instance = make_instance(name="AAPL 永续对账", inst_ids=[SWAP_INST_ID])
+    instance_id = instance.instance_id
 
     book = fake_okx_server.store.book
     settings = _settings(fake_okx_server)

@@ -5594,6 +5594,155 @@
         "title": "InstrumentSearchResponse",
         "type": "object"
       },
+      "InstrumentStrategy": {
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "current_version": {
+            "title": "Current Version",
+            "type": "integer"
+          },
+          "current_version_id": {
+            "title": "Current Version Id",
+            "type": "string"
+          },
+          "direction": {
+            "enum": [
+              "long_only",
+              "short_only",
+              "long_short"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "instrument_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Instrument Ids",
+            "type": "array"
+          },
+          "linked_version_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Linked Version Ids",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "recent_backtest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StrategyBacktestSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "validated",
+              "enabled",
+              "paused",
+              "archived"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "strategy_id": {
+            "title": "Strategy Id",
+            "type": "string"
+          },
+          "timeframe": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Timeframe",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "strategy_id",
+          "name",
+          "category",
+          "status",
+          "current_version_id",
+          "current_version",
+          "timeframe",
+          "direction",
+          "instrument_ids",
+          "linked_version_ids",
+          "updated_at"
+        ],
+        "title": "InstrumentStrategy",
+        "type": "object"
+      },
+      "InstrumentStrategyListResponse": {
+        "examples": [
+          {
+            "items": [
+              {
+                "category": "directional",
+                "current_version": 1,
+                "current_version_id": "sv_0001",
+                "direction": "long_only",
+                "instrument_ids": [
+                  "XAAPL-USDT"
+                ],
+                "linked_version_ids": [
+                  "sv_0001"
+                ],
+                "name": "AAPL 趋势",
+                "recent_backtest": {
+                  "backtest_end_date": "2026-11-01",
+                  "backtest_start_date": "2026-10-01",
+                  "created_at": "2026-11-10T01:20:00Z",
+                  "data_source": "okx_spot",
+                  "max_drawdown_pct": "6.12",
+                  "run_id": "bt_0001",
+                  "strategy_version_id": "sv_0001",
+                  "total_return_pct": "12.4055",
+                  "trade_count": 37
+                },
+                "status": "draft",
+                "strategy_id": "st_0001",
+                "timeframe": "1d",
+                "updated_at": "2026-11-10T07:00:00Z"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InstrumentStrategy"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "InstrumentStrategyListResponse",
+        "type": "object"
+      },
       "LinkedBacktest": {
         "properties": {
           "backtest_end_date": {
@@ -8389,205 +8538,78 @@
         "title": "StrategyApprovalTransition",
         "type": "object"
       },
-      "StrategyCatalogResponse": {
-        "examples": [
-          {
-            "items": [
-              {
-                "emitted_actions": [
-                  "BUY",
-                  "SELL",
-                  "HOLD"
-                ],
-                "name": "MA Cross",
-                "params": [
-                  {
-                    "default": 20,
-                    "kind": "int",
-                    "maximum": 200,
-                    "minimum": 2,
-                    "name": "fast",
-                    "title": "快线周期"
-                  },
-                  {
-                    "default": 60,
-                    "kind": "int",
-                    "maximum": 500,
-                    "minimum": 3,
-                    "name": "slow",
-                    "title": "慢线周期"
-                  }
-                ],
-                "required_bars": [
-                  "1h",
-                  "4h",
-                  "1d"
-                ],
-                "required_indicators": [
-                  "sma"
-                ],
-                "strategy_id": "ma_cross",
-                "summary": "快慢均线交叉产生多空信号。",
-                "version": "1.0.0"
-              }
-            ]
-          }
-        ],
+      "StrategyBacktestSummary": {
+        "description": "列表与详情里的最近一次回测摘要；指标已是百分数。",
         "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/StrategyDefinition"
-            },
-            "title": "Items",
-            "type": "array"
-          }
-        },
-        "required": [
-          "items"
-        ],
-        "title": "StrategyCatalogResponse",
-        "type": "object"
-      },
-      "StrategyDefinition": {
-        "description": "策略模板：一个模板可派生多个独立配置的实例。",
-        "properties": {
-          "emitted_actions": {
-            "items": {
-              "enum": [
-                "BUY",
-                "SELL",
-                "HOLD"
-              ],
-              "type": "string"
-            },
-            "title": "Emitted Actions",
-            "type": "array"
-          },
-          "name": {
-            "title": "Name",
+          "backtest_end_date": {
+            "format": "date",
+            "title": "Backtest End Date",
             "type": "string"
           },
-          "params": {
-            "items": {
-              "$ref": "#/components/schemas/ParamSpec"
-            },
-            "title": "Params",
-            "type": "array"
-          },
-          "required_bars": {
-            "items": {
-              "enum": [
-                "1m",
-                "5m",
-                "15m",
-                "1h",
-                "4h",
-                "1d"
-              ],
-              "type": "string"
-            },
-            "title": "Required Bars",
-            "type": "array"
-          },
-          "required_indicators": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Required Indicators",
-            "type": "array"
-          },
-          "strategy_id": {
-            "title": "Strategy Id",
-            "type": "string"
-          },
-          "summary": {
-            "title": "Summary",
-            "type": "string"
-          },
-          "version": {
-            "title": "Version",
-            "type": "string"
-          }
-        },
-        "required": [
-          "strategy_id",
-          "name",
-          "version",
-          "summary",
-          "params",
-          "required_indicators",
-          "required_bars",
-          "emitted_actions"
-        ],
-        "title": "StrategyDefinition",
-        "type": "object"
-      },
-      "StrategyInstance": {
-        "examples": [
-          {
-            "bar": "1h",
-            "created_at": "2026-11-08T02:15:00Z",
-            "enabled": true,
-            "execution_mode": "paper",
-            "inst_ids": [
-              "XAAPL-USDT"
-            ],
-            "instance_id": "si_0001",
-            "latest_signal_at": "2026-11-10T07:00:00Z",
-            "name": "AAPL 均线趋势",
-            "params": {
-              "fast": 20,
-              "slow": 60
-            },
-            "status": "paper_trading",
-            "strategy_id": "ma_cross",
-            "strategy_version": "1.0.0",
-            "updated_at": "2026-11-10T07:00:00Z"
-          }
-        ],
-        "properties": {
-          "bar": {
-            "enum": [
-              "1m",
-              "5m",
-              "15m",
-              "1h",
-              "4h",
-              "1d"
-            ],
-            "title": "Bar",
+          "backtest_start_date": {
+            "format": "date",
+            "title": "Backtest Start Date",
             "type": "string"
           },
           "created_at": {
             "title": "Created At",
             "type": "string"
           },
-          "enabled": {
-            "default": true,
-            "title": "Enabled",
-            "type": "boolean"
-          },
-          "execution_mode": {
+          "data_source": {
             "enum": [
-              "manual",
-              "paper",
-              "live"
+              "okx",
+              "okx_spot",
+              "okx_swap",
+              "us_equity_proxy"
             ],
-            "title": "Execution Mode",
+            "title": "Data Source",
             "type": "string"
           },
-          "inst_ids": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Inst Ids",
-            "type": "array"
-          },
-          "instance_id": {
-            "title": "Instance Id",
+          "max_drawdown_pct": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Max Drawdown Pct",
             "type": "string"
           },
-          "latest_signal_at": {
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "strategy_version_id": {
+            "title": "Strategy Version Id",
+            "type": "string"
+          },
+          "total_return_pct": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Total Return Pct",
+            "type": "string"
+          },
+          "trade_count": {
+            "title": "Trade Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "run_id",
+          "strategy_version_id",
+          "data_source",
+          "total_return_pct",
+          "max_drawdown_pct",
+          "trade_count",
+          "backtest_start_date",
+          "backtest_end_date",
+          "created_at"
+        ],
+        "title": "StrategyBacktestSummary",
+        "type": "object"
+      },
+      "StrategyCreateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "change_note": {
             "anyOf": [
               {
                 "type": "string"
@@ -8596,79 +8618,74 @@
                 "type": "null"
               }
             ],
-            "title": "Latest Signal At"
+            "title": "Change Note"
+          },
+          "cost_model": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Model"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "direction": {
+            "enum": [
+              "long_only",
+              "short_only",
+              "long_short"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "instrument_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Instrument Ids",
+            "type": "array"
           },
           "name": {
             "title": "Name",
             "type": "string"
           },
-          "params": {
-            "additionalProperties": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "number"
-                },
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "boolean"
-                }
-              ]
-            },
-            "title": "Params",
+          "parameters": {
+            "additionalProperties": true,
+            "title": "Parameters",
             "type": "object"
           },
-          "status": {
-            "enum": [
-              "opportunity_discovery",
-              "strategy_generation",
-              "pending_review",
-              "backtested",
-              "validated",
-              "paper_trading",
-              "live_authorized",
-              "live_running",
-              "rejected"
+          "position_sizing": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Status",
-            "type": "string"
+            "title": "Position Sizing"
           },
-          "strategy_id": {
-            "title": "Strategy Id",
-            "type": "string"
+          "rule_json": {
+            "additionalProperties": true,
+            "title": "Rule Json",
+            "type": "object"
           },
-          "strategy_version": {
-            "title": "Strategy Version",
-            "type": "string"
-          },
-          "updated_at": {
-            "title": "Updated At",
-            "type": "string"
-          }
-        },
-        "required": [
-          "instance_id",
-          "strategy_id",
-          "strategy_version",
-          "name",
-          "bar",
-          "params",
-          "inst_ids",
-          "status",
-          "execution_mode",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "StrategyInstance",
-        "type": "object"
-      },
-      "StrategyInstanceCreateRequest": {
-        "properties": {
-          "bar": {
+          "timeframe": {
             "enum": [
               "1m",
               "5m",
@@ -8677,118 +8694,539 @@
               "4h",
               "1d"
             ],
-            "title": "Bar",
-            "type": "string"
-          },
-          "inst_ids": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Inst Ids",
-            "type": "array"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "params": {
-            "additionalProperties": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "number"
-                },
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "boolean"
-                }
-              ]
-            },
-            "title": "Params",
-            "type": "object"
-          },
-          "strategy_id": {
-            "title": "Strategy Id",
+            "title": "Timeframe",
             "type": "string"
           }
         },
         "required": [
-          "strategy_id",
           "name",
-          "bar",
-          "inst_ids"
+          "category",
+          "timeframe",
+          "direction",
+          "rule_json",
+          "instrument_ids"
         ],
-        "title": "StrategyInstanceCreateRequest",
+        "title": "StrategyCreateRequest",
         "type": "object"
       },
-      "StrategyInstanceListResponse": {
+      "StrategyCreatedResponse": {
         "examples": [
           {
-            "items": [
-              {
-                "bar": "1h",
-                "created_at": "2026-11-08T02:15:00Z",
-                "enabled": true,
-                "execution_mode": "paper",
-                "inst_ids": [
-                  "XAAPL-USDT"
-                ],
-                "instance_id": "si_0001",
-                "latest_signal_at": "2026-11-10T07:00:00Z",
-                "name": "AAPL 均线趋势",
-                "params": {
-                  "fast": 20,
-                  "slow": 60
-                },
-                "status": "paper_trading",
-                "strategy_id": "ma_cross",
-                "strategy_version": "1.0.0",
-                "updated_at": "2026-11-10T07:00:00Z"
-              }
-            ],
-            "total": 1
+            "created_at": "2026-11-08T02:15:00Z",
+            "id": "st_0001",
+            "status": "draft",
+            "version_id": "sv_0001"
           }
         ],
         "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/StrategyInstance"
-            },
-            "title": "Items",
-            "type": "array"
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
           },
-          "total": {
-            "title": "Total",
-            "type": "integer"
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "validated",
+              "enabled",
+              "paused",
+              "archived"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "version_id": {
+            "title": "Version Id",
+            "type": "string"
           }
         },
         "required": [
-          "items",
-          "total"
+          "id",
+          "version_id",
+          "status",
+          "created_at"
         ],
-        "title": "StrategyInstanceListResponse",
+        "title": "StrategyCreatedResponse",
         "type": "object"
       },
-      "StrategyInstanceUpdateRequest": {
-        "additionalProperties": false,
-        "description": "PATCH 语义：只落显式提交的字段。\n\n生命周期阶段**不在这条端点上改**：阶段推进只经 `/api/approvals` 的状态机，\n否则一次 PATCH 就能从草稿跳到实盘运行，绕过人工审核、历史回测与量化验证\n（`docs/prd/v2.md` §三.5「任何阶段都不能被跳过」）。提交 `status` 会因\n`extra=\"forbid\"` 直接 422，不会静默忽略。\n\n`enabled` 是实例的启停开关，只决定它是否产出信号，不改变生命周期阶段。",
+      "StrategyDetail": {
+        "examples": [
+          {
+            "category": "directional",
+            "cost_model": {
+              "fee_bps": "10",
+              "slippage_bps": "5"
+            },
+            "created_at": "2026-11-08T02:15:00Z",
+            "current_version": 1,
+            "current_version_id": "sv_0001",
+            "description": "均线趋势跟随",
+            "direction": "long_only",
+            "id": "st_0001",
+            "instrument_ids": [
+              "XAAPL-USDT"
+            ],
+            "latest_backtest": {
+              "backtest_end_date": "2026-11-01",
+              "backtest_start_date": "2026-10-01",
+              "created_at": "2026-11-10T01:20:00Z",
+              "data_source": "okx_spot",
+              "max_drawdown_pct": "6.12",
+              "run_id": "bt_0001",
+              "strategy_version_id": "sv_0001",
+              "total_return_pct": "12.4055",
+              "trade_count": 37
+            },
+            "name": "AAPL 趋势",
+            "parameters": {
+              "fast": 20,
+              "slow": 60
+            },
+            "position_sizing": {
+              "max_positions": 3,
+              "type": "equal_weight",
+              "weight": 0.3333
+            },
+            "rule_json": {
+              "direction": "long_only",
+              "entry": {
+                "all": [
+                  {
+                    "left": "MA(20)",
+                    "op": ">",
+                    "right": "MA(60)"
+                  }
+                ]
+              },
+              "exit": {
+                "any": [
+                  {
+                    "left": "MA(20)",
+                    "op": "<",
+                    "right": "MA(60)"
+                  }
+                ]
+              },
+              "position_sizing": {
+                "max_positions": 3,
+                "type": "equal_weight",
+                "weight": 0.3333
+              },
+              "timeframe": "1d"
+            },
+            "status": "draft",
+            "timeframe": "1d",
+            "updated_at": "2026-11-10T07:00:00Z",
+            "versions": [
+              {
+                "change_note": "初始版本",
+                "created_at": "2026-11-08T02:15:00Z",
+                "direction": "long_only",
+                "timeframe": "1d",
+                "version": 1,
+                "version_id": "sv_0001"
+              }
+            ]
+          }
+        ],
         "properties": {
-          "enabled": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "cost_model": {
             "anyOf": [
               {
-                "type": "boolean"
+                "additionalProperties": true,
+                "type": "object"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Enabled"
+            "title": "Cost Model"
           },
-          "inst_ids": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_version": {
+            "title": "Current Version",
+            "type": "integer"
+          },
+          "current_version_id": {
+            "title": "Current Version Id",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "direction": {
+            "enum": [
+              "long_only",
+              "short_only",
+              "long_short"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "instrument_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Instrument Ids",
+            "type": "array"
+          },
+          "latest_backtest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StrategyBacktestSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "parameters": {
+            "additionalProperties": true,
+            "title": "Parameters",
+            "type": "object"
+          },
+          "position_sizing": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position Sizing"
+          },
+          "rule_json": {
+            "additionalProperties": true,
+            "title": "Rule Json",
+            "type": "object"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "validated",
+              "enabled",
+              "paused",
+              "archived"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "timeframe": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Timeframe",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/StrategyVersionSummary"
+            },
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "category",
+          "status",
+          "current_version_id",
+          "current_version",
+          "timeframe",
+          "direction",
+          "rule_json",
+          "parameters",
+          "instrument_ids",
+          "versions",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "StrategyDetail",
+        "type": "object"
+      },
+      "StrategyInstrumentUpdateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "instrument_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Instrument Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "instrument_ids"
+        ],
+        "title": "StrategyInstrumentUpdateRequest",
+        "type": "object"
+      },
+      "StrategyListResponse": {
+        "examples": [
+          {
+            "items": [
+              {
+                "category": "directional",
+                "created_at": "2026-11-08T02:15:00Z",
+                "current_version": 1,
+                "current_version_id": "sv_0001",
+                "description": "均线趋势跟随",
+                "direction": "long_only",
+                "id": "st_0001",
+                "instrument_count": 1,
+                "latest_backtest": {
+                  "backtest_end_date": "2026-11-01",
+                  "backtest_start_date": "2026-10-01",
+                  "created_at": "2026-11-10T01:20:00Z",
+                  "data_source": "okx_spot",
+                  "max_drawdown_pct": "6.12",
+                  "run_id": "bt_0001",
+                  "strategy_version_id": "sv_0001",
+                  "total_return_pct": "12.4055",
+                  "trade_count": 37
+                },
+                "name": "AAPL 趋势",
+                "status": "draft",
+                "timeframe": "1d",
+                "updated_at": "2026-11-10T07:00:00Z"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StrategySummary"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "StrategyListResponse",
+        "type": "object"
+      },
+      "StrategySummary": {
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_version": {
+            "title": "Current Version",
+            "type": "integer"
+          },
+          "current_version_id": {
+            "title": "Current Version Id",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "direction": {
+            "enum": [
+              "long_only",
+              "short_only",
+              "long_short"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "instrument_count": {
+            "title": "Instrument Count",
+            "type": "integer"
+          },
+          "latest_backtest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StrategyBacktestSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "validated",
+              "enabled",
+              "paused",
+              "archived"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "timeframe": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Timeframe",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "category",
+          "status",
+          "current_version_id",
+          "current_version",
+          "timeframe",
+          "direction",
+          "instrument_count",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "StrategySummary",
+        "type": "object"
+      },
+      "StrategyUpdateRequest": {
+        "additionalProperties": false,
+        "description": "只改提交的字段；出现任一版本字段时新建下一版。",
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "change_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Note"
+          },
+          "cost_model": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Model"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "enum": [
+                  "long_only",
+                  "short_only",
+                  "long_short"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "instrument_ids": {
             "anyOf": [
               {
                 "items": {
@@ -8800,7 +9238,7 @@
                 "type": "null"
               }
             ],
-            "title": "Inst Ids"
+            "title": "Instrument Ids"
           },
           "name": {
             "anyOf": [
@@ -8813,83 +9251,368 @@
             ],
             "title": "Name"
           },
-          "params": {
+          "parameters": {
             "anyOf": [
               {
-                "additionalProperties": {
-                  "anyOf": [
-                    {
-                      "type": "integer"
-                    },
-                    {
-                      "type": "number"
-                    },
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "boolean"
-                    }
-                  ]
-                },
+                "additionalProperties": true,
                 "type": "object"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Params"
-          }
-        },
-        "title": "StrategyInstanceUpdateRequest",
-        "type": "object"
-      },
-      "StrategyReplay": {
-        "description": "一次目标组合回放：目标组合 + 逐点净敞口 + 可复现的规范化 JSON 与哈希。\n\n`target` 用 `TargetPortfolio` 的既有形状；`canonical_json` 是它的规范化序列化\n（腿按 `product_key` 排序、键排序、无多余空白），`target_hash` 是这段文本的\nsha256——同一历史区间回放两次，两者都相同。",
-        "examples": [
-          {
-            "bar": "1d",
-            "canonical_json": "{\"legs\":[{\"product_key\":\"AAPL\",\"side\":\"long\",\"target_weight\":\"0.5\"},{\"product_key\":\"MSFT\",\"side\":\"short\",\"target_weight\":\"0.5\"}],\"net_exposure\":\"0\"}",
-            "created_at": "2026-11-10T09:30:00Z",
-            "end": "2026-11-10T00:00:00Z",
-            "instance_id": "si_0001",
-            "points": [
+            "title": "Parameters"
+          },
+          "position_sizing": {
+            "anyOf": [
               {
-                "as_of": "2026-11-09T00:00:00Z",
-                "leg_count": 2,
-                "net_exposure": "0.12"
+                "additionalProperties": true,
+                "type": "object"
               },
               {
-                "as_of": "2026-11-10T00:00:00Z",
-                "leg_count": 2,
-                "net_exposure": "0"
+                "type": "null"
               }
             ],
-            "replay_id": "srp_0001",
-            "start": "2026-10-10T00:00:00Z",
-            "strategy_id": "relative_value",
-            "target": {
-              "legs": [
-                {
-                  "direction": "long",
-                  "inst_id": "XAAPL-USDT",
-                  "inst_type": "SPOT",
-                  "target_weight": "0.5"
-                },
-                {
-                  "direction": "short",
-                  "inst_id": "XMSFT-USDT",
-                  "inst_type": "SPOT",
-                  "target_weight": "0.5"
-                }
-              ],
-              "net_exposure": "0"
-            },
-            "target_hash": "0f3c8c1a2b7d4e5f60718293a4b5c6d7e8f90123a4b5c6d7e8f90123a4b5c6d7"
+            "title": "Position Sizing"
+          },
+          "rule_json": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Json"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "draft",
+                  "validated",
+                  "enabled",
+                  "paused",
+                  "archived"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "timeframe": {
+            "anyOf": [
+              {
+                "enum": [
+                  "1m",
+                  "5m",
+                  "15m",
+                  "1h",
+                  "4h",
+                  "1d"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeframe"
+          }
+        },
+        "title": "StrategyUpdateRequest",
+        "type": "object"
+      },
+      "StrategyUpdatedResponse": {
+        "examples": [
+          {
+            "id": "st_0001",
+            "status": "draft",
+            "updated_at": "2026-11-10T07:00:00Z",
+            "version_id": "sv_0002"
           }
         ],
         "properties": {
-          "bar": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "validated",
+              "enabled",
+              "paused",
+              "archived"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version_id": {
+            "title": "Version Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "version_id",
+          "status",
+          "updated_at"
+        ],
+        "title": "StrategyUpdatedResponse",
+        "type": "object"
+      },
+      "StrategyVersionCreateRequest": {
+        "additionalProperties": false,
+        "description": "新建下一版：未提交的字段沿用当前版本。",
+        "properties": {
+          "change_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Note"
+          },
+          "cost_model": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Model"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "enum": [
+                  "long_only",
+                  "short_only",
+                  "long_short"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "instrument_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrument Ids"
+          },
+          "parameters": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameters"
+          },
+          "position_sizing": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position Sizing"
+          },
+          "rule_json": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Json"
+          },
+          "timeframe": {
+            "anyOf": [
+              {
+                "enum": [
+                  "1m",
+                  "5m",
+                  "15m",
+                  "1h",
+                  "4h",
+                  "1d"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeframe"
+          }
+        },
+        "title": "StrategyVersionCreateRequest",
+        "type": "object"
+      },
+      "StrategyVersionDetail": {
+        "examples": [
+          {
+            "change_note": "初始版本",
+            "cost_model": {
+              "fee_bps": "10",
+              "slippage_bps": "5"
+            },
+            "created_at": "2026-11-08T02:15:00Z",
+            "direction": "long_only",
+            "instrument_ids": [
+              "XAAPL-USDT"
+            ],
+            "parameters": {
+              "fast": 20,
+              "slow": 60
+            },
+            "position_sizing": {
+              "max_positions": 3,
+              "type": "equal_weight",
+              "weight": 0.3333
+            },
+            "rule_json": {
+              "direction": "long_only",
+              "entry": {
+                "all": [
+                  {
+                    "left": "MA(20)",
+                    "op": ">",
+                    "right": "MA(60)"
+                  }
+                ]
+              },
+              "exit": {
+                "any": [
+                  {
+                    "left": "MA(20)",
+                    "op": "<",
+                    "right": "MA(60)"
+                  }
+                ]
+              },
+              "position_sizing": {
+                "max_positions": 3,
+                "type": "equal_weight",
+                "weight": 0.3333
+              },
+              "timeframe": "1d"
+            },
+            "strategy_id": "st_0001",
+            "timeframe": "1d",
+            "version": 1,
+            "version_id": "sv_0001"
+          }
+        ],
+        "properties": {
+          "change_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Note"
+          },
+          "cost_model": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Model"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "direction": {
+            "enum": [
+              "long_only",
+              "short_only",
+              "long_short"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "instrument_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Instrument Ids",
+            "type": "array"
+          },
+          "parameters": {
+            "additionalProperties": true,
+            "title": "Parameters",
+            "type": "object"
+          },
+          "position_sizing": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position Sizing"
+          },
+          "rule_json": {
+            "additionalProperties": true,
+            "title": "Rule Json",
+            "type": "object"
+          },
+          "strategy_id": {
+            "title": "Strategy Id",
+            "type": "string"
+          },
+          "timeframe": {
             "enum": [
               "1m",
               "5m",
@@ -8898,111 +9621,87 @@
               "4h",
               "1d"
             ],
-            "title": "Bar",
+            "title": "Timeframe",
             "type": "string"
           },
-          "canonical_json": {
-            "title": "Canonical Json",
-            "type": "string"
+          "version": {
+            "title": "Version",
+            "type": "integer"
           },
-          "created_at": {
-            "title": "Created At",
-            "type": "string"
-          },
-          "end": {
-            "title": "End",
-            "type": "string"
-          },
-          "instance_id": {
-            "title": "Instance Id",
-            "type": "string"
-          },
-          "points": {
-            "items": {
-              "$ref": "#/components/schemas/StrategyReplayPoint"
-            },
-            "title": "Points",
-            "type": "array"
-          },
-          "replay_id": {
-            "title": "Replay Id",
-            "type": "string"
-          },
-          "start": {
-            "title": "Start",
-            "type": "string"
-          },
-          "strategy_id": {
-            "title": "Strategy Id",
-            "type": "string"
-          },
-          "target": {
-            "$ref": "#/components/schemas/TargetPortfolio"
-          },
-          "target_hash": {
-            "title": "Target Hash",
+          "version_id": {
+            "title": "Version Id",
             "type": "string"
           }
         },
         "required": [
-          "replay_id",
-          "instance_id",
+          "version_id",
           "strategy_id",
-          "bar",
-          "start",
-          "end",
-          "target",
-          "canonical_json",
-          "target_hash",
-          "points",
+          "version",
+          "timeframe",
+          "direction",
+          "rule_json",
+          "parameters",
+          "instrument_ids",
           "created_at"
         ],
-        "title": "StrategyReplay",
+        "title": "StrategyVersionDetail",
         "type": "object"
       },
-      "StrategyReplayListResponse": {
+      "StrategyVersionListResponse": {
         "examples": [
           {
             "items": [
               {
-                "bar": "1d",
-                "canonical_json": "{\"legs\":[{\"product_key\":\"AAPL\",\"side\":\"long\",\"target_weight\":\"0.5\"},{\"product_key\":\"MSFT\",\"side\":\"short\",\"target_weight\":\"0.5\"}],\"net_exposure\":\"0\"}",
-                "created_at": "2026-11-10T09:30:00Z",
-                "end": "2026-11-10T00:00:00Z",
-                "instance_id": "si_0001",
-                "points": [
-                  {
-                    "as_of": "2026-11-09T00:00:00Z",
-                    "leg_count": 2,
-                    "net_exposure": "0.12"
-                  },
-                  {
-                    "as_of": "2026-11-10T00:00:00Z",
-                    "leg_count": 2,
-                    "net_exposure": "0"
-                  }
-                ],
-                "replay_id": "srp_0001",
-                "start": "2026-10-10T00:00:00Z",
-                "strategy_id": "relative_value",
-                "target": {
-                  "legs": [
-                    {
-                      "direction": "long",
-                      "inst_id": "XAAPL-USDT",
-                      "inst_type": "SPOT",
-                      "target_weight": "0.5"
-                    },
-                    {
-                      "direction": "short",
-                      "inst_id": "XMSFT-USDT",
-                      "inst_type": "SPOT",
-                      "target_weight": "0.5"
-                    }
-                  ],
-                  "net_exposure": "0"
+                "change_note": "初始版本",
+                "cost_model": {
+                  "fee_bps": "10",
+                  "slippage_bps": "5"
                 },
-                "target_hash": "0f3c8c1a2b7d4e5f60718293a4b5c6d7e8f90123a4b5c6d7e8f90123a4b5c6d7"
+                "created_at": "2026-11-08T02:15:00Z",
+                "direction": "long_only",
+                "instrument_ids": [
+                  "XAAPL-USDT"
+                ],
+                "parameters": {
+                  "fast": 20,
+                  "slow": 60
+                },
+                "position_sizing": {
+                  "max_positions": 3,
+                  "type": "equal_weight",
+                  "weight": 0.3333
+                },
+                "rule_json": {
+                  "direction": "long_only",
+                  "entry": {
+                    "all": [
+                      {
+                        "left": "MA(20)",
+                        "op": ">",
+                        "right": "MA(60)"
+                      }
+                    ]
+                  },
+                  "exit": {
+                    "any": [
+                      {
+                        "left": "MA(20)",
+                        "op": "<",
+                        "right": "MA(60)"
+                      }
+                    ]
+                  },
+                  "position_sizing": {
+                    "max_positions": 3,
+                    "type": "equal_weight",
+                    "weight": 0.3333
+                  },
+                  "timeframe": "1d"
+                },
+                "strategy_id": "st_0001",
+                "timeframe": "1d",
+                "version": 1,
+                "version_id": "sv_0001"
               }
             ],
             "total": 1
@@ -9011,7 +9710,7 @@
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/StrategyReplay"
+              "$ref": "#/components/schemas/StrategyVersionDetail"
             },
             "title": "Items",
             "type": "array"
@@ -9025,141 +9724,64 @@
           "items",
           "total"
         ],
-        "title": "StrategyReplayListResponse",
+        "title": "StrategyVersionListResponse",
         "type": "object"
       },
-      "StrategyReplayPoint": {
-        "description": "回放曲线上的一个点：该时点的目标组合有几条腿、净敞口是多少。\n\n`as_of` 是**该根 K 线的开盘时刻**，不是决策时刻：回放在这个时点构造的视图包含\n这根已收盘的 K 线，因此它表达的是「这根 K 线收盘之后」的目标组合。下游不要把它\n当成「开盘前只知道历史」的时刻。\n\n净值需要资金与成本假设，属于回测；这里画的是目标组合本身的净敞口走势。",
+      "StrategyVersionSummary": {
         "properties": {
-          "as_of": {
-            "title": "As Of",
+          "change_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Note"
+          },
+          "created_at": {
+            "title": "Created At",
             "type": "string"
           },
-          "leg_count": {
-            "title": "Leg Count",
-            "type": "integer"
-          },
-          "net_exposure": {
-            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
-            "title": "Net Exposure",
-            "type": "string"
-          }
-        },
-        "required": [
-          "as_of",
-          "net_exposure",
-          "leg_count"
-        ],
-        "title": "StrategyReplayPoint",
-        "type": "object"
-      },
-      "StrategyReplayRequest": {
-        "description": "回放区间：左闭右闭，`end` 那一根已收盘 K 线也在内。\n\n周期不由请求决定：回放始终用实例配置的周期，避免「实例按日线建、回放却按小时跑」\n这种对不上配置的结果。",
-        "properties": {
-          "end": {
-            "format": "date-time",
-            "title": "End",
-            "type": "string"
-          },
-          "start": {
-            "format": "date-time",
-            "title": "Start",
-            "type": "string"
-          }
-        },
-        "required": [
-          "start",
-          "end"
-        ],
-        "title": "StrategyReplayRequest",
-        "type": "object"
-      },
-      "TargetLeg": {
-        "description": "目标组合的一条腿：某个标的、某个方向、某个目标权重。\n\n`target_weight` 是权重（占组合资金的比例，正数表示该腿的大小），方向单独由\n`direction` 表达——不用权重符号再编码一次方向。\n\n`qty` 与 `unit` 是**服务端换算出的**下单数量：`SPOT` 按标的币数量（`base`），\n`SWAP` 按合约张数（`contract`），换算依赖价格、合约面值与精度，前端不做这类\n派生计算（`AGENTS.md` §6）。因此请求里可以不带这两个字段，由服务端在生成目标\n组合时填入；读到 `null` 表示这一步尚未换算。",
-        "properties": {
           "direction": {
             "enum": [
-              "long",
-              "short"
+              "long_only",
+              "short_only",
+              "long_short"
             ],
             "title": "Direction",
             "type": "string"
           },
-          "inst_id": {
-            "title": "Inst Id",
-            "type": "string"
-          },
-          "inst_type": {
+          "timeframe": {
             "enum": [
-              "SPOT",
-              "SWAP"
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
             ],
-            "title": "Inst Type",
+            "title": "Timeframe",
             "type": "string"
           },
-          "qty": {
-            "anyOf": [
-              {
-                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Qty"
+          "version": {
+            "title": "Version",
+            "type": "integer"
           },
-          "target_weight": {
-            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
-            "title": "Target Weight",
+          "version_id": {
+            "title": "Version Id",
             "type": "string"
-          },
-          "unit": {
-            "anyOf": [
-              {
-                "enum": [
-                  "base",
-                  "contract"
-                ],
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Unit"
           }
         },
         "required": [
-          "inst_id",
-          "inst_type",
+          "version_id",
+          "version",
+          "timeframe",
           "direction",
-          "target_weight"
+          "created_at"
         ],
-        "title": "TargetLeg",
-        "type": "object"
-      },
-      "TargetPortfolio": {
-        "description": "目标组合：多腿、多空并存，`net_exposure` 是多头权重之和减空头权重之和。",
-        "properties": {
-          "legs": {
-            "items": {
-              "$ref": "#/components/schemas/TargetLeg"
-            },
-            "title": "Legs",
-            "type": "array"
-          },
-          "net_exposure": {
-            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
-            "title": "Net Exposure",
-            "type": "string"
-          }
-        },
-        "required": [
-          "legs",
-          "net_exposure"
-        ],
-        "title": "TargetPortfolio",
+        "title": "StrategyVersionSummary",
         "type": "object"
       },
       "TimeSplit": {
@@ -11043,6 +11665,49 @@
         ]
       }
     },
+    "/api/instruments/{inst_id}/strategies": {
+      "get": {
+        "description": "标的详情页的关联策略：最近一个月内有回测的，带最近一次结果。",
+        "operationId": "list_instrument_strategies_api_instruments__inst_id__strategies_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "inst_id",
+            "required": true,
+            "schema": {
+              "title": "Inst Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstrumentStrategyListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Instrument Strategies",
+        "tags": [
+          "strategy"
+        ]
+      }
+    },
     "/api/manual-positions": {
       "get": {
         "operationId": "get_manual_positions_api_manual_positions_get",
@@ -11880,34 +12545,12 @@
     },
     "/api/strategies": {
       "get": {
-        "description": "模板目录：内容来自代码注册表，同时把它投影进 `strategy_templates` 表。\n\n`required_indicators` 与 `emitted_actions` 按空列表返回：模板只产出目标组合，\n既不引用指标模块的序列，也不产出单标的动作。",
-        "operationId": "list_strategy_templates_api_strategies_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StrategyCatalogResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "List Strategy Templates",
-        "tags": [
-          "strategy"
-        ]
-      }
-    },
-    "/api/strategy-instances": {
-      "get": {
-        "description": "按模板与启停状态过滤的实例列表；`total` 是过滤条件下的全部条数。",
-        "operationId": "list_strategy_instances_api_strategy_instances_get",
+        "description": "用户策略列表：当前版本、状态、标的数量与最近回测摘要。",
+        "operationId": "list_strategies_endpoint_api_strategies_get",
         "parameters": [
           {
             "in": "query",
-            "name": "strategy_id",
+            "name": "status",
             "required": false,
             "schema": {
               "anyOf": [
@@ -11918,245 +12561,23 @@
                   "type": "null"
                 }
               ],
-              "title": "Strategy Id"
+              "title": "Status"
             }
           },
           {
             "in": "query",
-            "name": "enabled",
+            "name": "category",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "boolean"
+                  "type": "string"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "Enabled"
-            }
-          },
-          {
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "default": 100,
-              "maximum": 500,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StrategyInstanceListResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "List Strategy Instances",
-        "tags": [
-          "strategy"
-        ]
-      },
-      "post": {
-        "description": "建实例：模板必须已登记、参数必须过模板 schema、标的必须已同步。",
-        "operationId": "create_strategy_instance_api_strategy_instances_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/StrategyInstanceCreateRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StrategyInstance"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Create Strategy Instance",
-        "tags": [
-          "strategy"
-        ]
-      }
-    },
-    "/api/strategy-instances/{instance_id}": {
-      "delete": {
-        "description": "删除实例及其回放记录。",
-        "operationId": "delete_strategy_instance_api_strategy_instances__instance_id__delete",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "instance_id",
-            "required": true,
-            "schema": {
-              "title": "Instance Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Delete Strategy Instance",
-        "tags": [
-          "strategy"
-        ]
-      },
-      "get": {
-        "operationId": "get_strategy_instance_api_strategy_instances__instance_id__get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "instance_id",
-            "required": true,
-            "schema": {
-              "title": "Instance Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StrategyInstance"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Get Strategy Instance",
-        "tags": [
-          "strategy"
-        ]
-      },
-      "patch": {
-        "description": "改参、换标的、启停；生命周期阶段不在这条端点上改。",
-        "operationId": "update_strategy_instance_api_strategy_instances__instance_id__patch",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "instance_id",
-            "required": true,
-            "schema": {
-              "title": "Instance Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/StrategyInstanceUpdateRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StrategyInstance"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Update Strategy Instance",
-        "tags": [
-          "strategy"
-        ]
-      }
-    },
-    "/api/strategy-instances/{instance_id}/replays": {
-      "get": {
-        "description": "该实例已落库的回放记录；实例不存在返回 404，还没回放过返回空列表。",
-        "operationId": "list_strategy_replays_api_strategy_instances__instance_id__replays_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "instance_id",
-            "required": true,
-            "schema": {
-              "title": "Instance Id",
-              "type": "string"
+              "title": "Category"
             }
           },
           {
@@ -12165,10 +12586,26 @@
             "required": false,
             "schema": {
               "default": 50,
-              "maximum": 200,
+              "maximum": 100,
               "minimum": 1,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
             }
           }
         ],
@@ -12177,7 +12614,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StrategyReplayListResponse"
+                  "$ref": "#/components/schemas/StrategyListResponse"
                 }
               }
             },
@@ -12194,30 +12631,19 @@
             "description": "Validation Error"
           }
         },
-        "summary": "List Strategy Replays",
+        "summary": "List Strategies Endpoint",
         "tags": [
           "strategy"
         ]
       },
       "post": {
-        "description": "在历史区间上回放该实例的目标组合并落库。\n\n停用的实例返回 409（域层的 `Conflict`）：空结果与「没有信号」分不清。\n\n顺序是「算好 → 映射成契约模型 → 落库」：契约校验失败时库里不会多出一行读不出来\n的记录，历史接口也不会被一条坏行永久打坏。",
-        "operationId": "create_strategy_replay_api_strategy_instances__instance_id__replays_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "instance_id",
-            "required": true,
-            "schema": {
-              "title": "Instance Id",
-              "type": "string"
-            }
-          }
-        ],
+        "description": "创建策略与第一个草稿版本。",
+        "operationId": "create_strategy_endpoint_api_strategies_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/StrategyReplayRequest"
+                "$ref": "#/components/schemas/StrategyCreateRequest"
               }
             }
           },
@@ -12228,7 +12654,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StrategyReplay"
+                  "$ref": "#/components/schemas/StrategyCreatedResponse"
                 }
               }
             },
@@ -12245,7 +12671,256 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Create Strategy Replay",
+        "summary": "Create Strategy Endpoint",
+        "tags": [
+          "strategy"
+        ]
+      }
+    },
+    "/api/strategies/{strategy_id}": {
+      "get": {
+        "description": "策略详情：当前版本、参数、标的、版本目录与最近回测。",
+        "operationId": "get_strategy_endpoint_api_strategies__strategy_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "strategy_id",
+            "required": true,
+            "schema": {
+              "title": "Strategy Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Strategy Endpoint",
+        "tags": [
+          "strategy"
+        ]
+      },
+      "put": {
+        "description": "只改元数据时原地更新；提交任一版本字段时新建下一版。",
+        "operationId": "update_strategy_endpoint_api_strategies__strategy_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "strategy_id",
+            "required": true,
+            "schema": {
+              "title": "Strategy Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StrategyUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyUpdatedResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Strategy Endpoint",
+        "tags": [
+          "strategy"
+        ]
+      }
+    },
+    "/api/strategies/{strategy_id}/versions": {
+      "get": {
+        "operationId": "list_strategy_versions_api_strategies__strategy_id__versions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "strategy_id",
+            "required": true,
+            "schema": {
+              "title": "Strategy Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyVersionListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Strategy Versions",
+        "tags": [
+          "strategy"
+        ]
+      },
+      "post": {
+        "description": "新建下一版；未提交的字段沿用当前版本。旧版本不提供修改入口。",
+        "operationId": "create_strategy_version_api_strategies__strategy_id__versions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "strategy_id",
+            "required": true,
+            "schema": {
+              "title": "Strategy Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StrategyVersionCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyVersionDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Strategy Version",
+        "tags": [
+          "strategy"
+        ]
+      }
+    },
+    "/api/strategies/{strategy_id}/versions/{version}/instruments": {
+      "put": {
+        "description": "整批替换当前版本的标的集合；旧版本返回 409。",
+        "operationId": "update_strategy_version_instruments_api_strategies__strategy_id__versions__version__instruments_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "strategy_id",
+            "required": true,
+            "schema": {
+              "title": "Strategy Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StrategyInstrumentUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyVersionDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Strategy Version Instruments",
         "tags": [
           "strategy"
         ]

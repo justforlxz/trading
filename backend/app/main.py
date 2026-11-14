@@ -43,8 +43,12 @@ from app.positions import (  # noqa: F401
 from app.settings import SettingsRow, apply_saved_settings  # noqa: F401
 from app.strategy import (  # noqa: F401
     StrategyInstanceRow,
+    StrategyInstrumentRow,
+    StrategyLinkedBacktestRow,
     StrategyReplayRow,
     StrategyTemplateRow,
+    StrategyVersionRow,
+    UserStrategyRow,
 )
 from app.stream import StreamHub
 from app.watchlist import WatchlistItemRow  # noqa: F401

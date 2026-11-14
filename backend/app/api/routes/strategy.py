@@ -1,237 +1,327 @@
-"""策略域端点：模板目录、实例增删改查与启停、目标组合回放。
+"""v6 策略端点：用户策略、不可变版本、版本标的与回测关联。
 
-端点只做入参校验与响应组装：模板投影、实例持久化与回放计算都在 `app.strategy` 里。
-域层用 `None` 表示「没有这条实例」，这一层再翻译成 404；停用实例的回放由域层抛
-`Conflict`，统一错误处理翻成 409，不会静默返回空结果。
-
-审批相关端点不在这里：阶段推进只经 `/api/approvals` 的状态机（T3.6）。
+端点只做参数校验与响应组装；规则校验、版本递增和事务边界都在 `app.strategy`。
+旧模板目录与 `/api/strategy-instances` CRUD 已删除，不保留别名或双写；执行引擎与
+审批状态机仍留在后端，但不由这里暴露。
 """
 
 from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, Query
 
 from app.api.mapping import decimal_str
 from app.api.schemas import (
-    ParamSpec,
-    StrategyCatalogResponse,
-    StrategyDefinition,
-    StrategyInstance,
-    StrategyInstanceCreateRequest,
-    StrategyInstanceListResponse,
-    StrategyInstanceUpdateRequest,
-    StrategyReplay,
-    StrategyReplayListResponse,
-    StrategyReplayPoint,
-    StrategyReplayRequest,
-    TargetLeg,
-    TargetPortfolio,
+    InstrumentStrategy,
+    InstrumentStrategyListResponse,
+    StrategyBacktestSummary,
+    StrategyCreatedResponse,
+    StrategyCreateRequest,
+    StrategyDetail,
+    StrategyInstrumentUpdateRequest,
+    StrategyListResponse,
+    StrategySummary,
+    StrategyUpdatedResponse,
+    StrategyUpdateRequest,
+    StrategyVersionCreateRequest,
+    StrategyVersionDetail,
+    StrategyVersionListResponse,
+    StrategyVersionSummary,
 )
+from app.backtest import BacktestRunHeader, latest_linked_backtests
 from app.strategy import (
-    InstanceRecord,
-    ReplayRecord,
-    TemplateDefinition,
-    create_instance,
-    delete_instance,
-    get_instance,
-    list_instances,
-    list_replays,
-    prepare_replay,
-    project_templates,
-    save_replay,
-    update_instance,
+    InstrumentStrategyRecord,
+    StrategyRecord,
+    StrategyVersionRecord,
+    create_strategy,
+    create_version,
+    get_user_strategy,
+    get_version,
+    list_strategies_for_instrument,
+    list_user_strategies,
+    list_versions,
+    replace_version_instruments,
+    update_strategy,
 )
 
 __all__ = ["strategy_router"]
 
 strategy_router = APIRouter(tags=["strategy"])
+_HUNDRED = Decimal(100)
 
 
-@strategy_router.get("/strategies", response_model=StrategyCatalogResponse)
-def list_strategy_templates() -> StrategyCatalogResponse:
-    """模板目录：内容来自代码注册表，同时把它投影进 `strategy_templates` 表。
+@strategy_router.get("/strategies", response_model=StrategyListResponse)
+def list_strategies_endpoint(
+    status: str | None = Query(None),
+    category: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=100),
+    cursor: str | None = Query(None),
+) -> StrategyListResponse:
+    """用户策略列表：当前版本、状态、标的数量与最近回测摘要。"""
 
-    `required_indicators` 与 `emitted_actions` 按空列表返回：模板只产出目标组合，
-    既不引用指标模块的序列，也不产出单标的动作。
-    """
-
-    return StrategyCatalogResponse(items=[_definition(item) for item in project_templates()])
-
-
-@strategy_router.get("/strategy-instances", response_model=StrategyInstanceListResponse)
-def list_strategy_instances(
-    strategy_id: str | None = Query(None),
-    enabled: bool | None = Query(None),
-    limit: int = Query(100, ge=1, le=500),
-) -> StrategyInstanceListResponse:
-    """按模板与启停状态过滤的实例列表；`total` 是过滤条件下的全部条数。"""
-
-    records, total = list_instances(strategy_id=strategy_id, enabled=enabled, limit=limit)
-    return StrategyInstanceListResponse(
-        items=[_instance(record) for record in records], total=total
+    records, next_cursor = list_user_strategies(
+        status=status,
+        category=category,
+        limit=limit,
+        cursor=cursor,
+    )
+    summaries = latest_linked_backtests(
+        [version_id for record in records for version_id in record.version_ids]
+    )
+    return StrategyListResponse(
+        items=[_summary(record, summaries) for record in records],
+        next_cursor=next_cursor,
     )
 
 
-@strategy_router.post("/strategy-instances", response_model=StrategyInstance, status_code=201)
-def create_strategy_instance(payload: StrategyInstanceCreateRequest) -> StrategyInstance:
-    """建实例：模板必须已登记、参数必须过模板 schema、标的必须已同步。"""
+@strategy_router.post("/strategies", response_model=StrategyCreatedResponse, status_code=201)
+def create_strategy_endpoint(payload: StrategyCreateRequest) -> StrategyCreatedResponse:
+    """创建策略与第一个草稿版本。"""
 
-    return _instance(
-        create_instance(
-            strategy_id=payload.strategy_id,
-            name=payload.name,
-            bar=payload.bar,
-            params=payload.params,
-            inst_ids=payload.inst_ids,
-        )
-    )
-
-
-@strategy_router.get("/strategy-instances/{instance_id}", response_model=StrategyInstance)
-def get_strategy_instance(instance_id: str) -> StrategyInstance:
-    record = get_instance(instance_id)
-    if record is None:
-        raise HTTPException(status_code=404, detail=f"未找到策略实例 {instance_id}")
-    return _instance(record)
-
-
-@strategy_router.patch("/strategy-instances/{instance_id}", response_model=StrategyInstance)
-def update_strategy_instance(
-    instance_id: str, payload: StrategyInstanceUpdateRequest
-) -> StrategyInstance:
-    """改参、换标的、启停；生命周期阶段不在这条端点上改。"""
-
-    record = update_instance(
-        instance_id,
+    record = create_strategy(
         name=payload.name,
-        params=payload.params,
-        inst_ids=payload.inst_ids,
-        enabled=payload.enabled,
+        category=payload.category,
+        description=payload.description,
+        timeframe=payload.timeframe,
+        direction=payload.direction,
+        rule_json=payload.rule_json,
+        parameters=payload.parameters,
+        instrument_ids=payload.instrument_ids,
+        cost_model=payload.cost_model,
+        position_sizing=payload.position_sizing,
+        change_note=payload.change_note,
     )
+    return StrategyCreatedResponse(
+        id=record.id,
+        version_id=record.current_version_id,
+        status=record.status,
+        created_at=record.created_at,
+    )
+
+
+@strategy_router.get("/strategies/{strategy_id}", response_model=StrategyDetail)
+def get_strategy_endpoint(strategy_id: str) -> StrategyDetail:
+    """策略详情：当前版本、参数、标的、版本目录与最近回测。"""
+
+    record = get_user_strategy(strategy_id)
     if record is None:
-        raise HTTPException(status_code=404, detail=f"未找到策略实例 {instance_id}")
-    return _instance(record)
+        raise HTTPException(status_code=404, detail=f"未找到策略 {strategy_id}")
+    versions = list_versions(strategy_id) or ()
+    summaries = latest_linked_backtests(list(record.version_ids))
+    return _detail(record, versions, summaries)
 
 
-@strategy_router.delete("/strategy-instances/{instance_id}", status_code=204, response_model=None)
-def delete_strategy_instance(instance_id: str) -> None:
-    """删除实例及其回放记录。"""
+@strategy_router.put("/strategies/{strategy_id}", response_model=StrategyUpdatedResponse)
+def update_strategy_endpoint(
+    strategy_id: str, payload: StrategyUpdateRequest
+) -> StrategyUpdatedResponse:
+    """只改元数据时原地更新；提交任一版本字段时新建下一版。"""
 
-    if not delete_instance(instance_id):
-        raise HTTPException(status_code=404, detail=f"未找到策略实例 {instance_id}")
-
-
-@strategy_router.post(
-    "/strategy-instances/{instance_id}/replays",
-    response_model=StrategyReplay,
-    status_code=201,
-)
-def create_strategy_replay(instance_id: str, payload: StrategyReplayRequest) -> StrategyReplay:
-    """在历史区间上回放该实例的目标组合并落库。
-
-    停用的实例返回 409（域层的 `Conflict`）：空结果与「没有信号」分不清。
-
-    顺序是「算好 → 映射成契约模型 → 落库」：契约校验失败时库里不会多出一行读不出来
-    的记录，历史接口也不会被一条坏行永久打坏。
-    """
-
-    record = prepare_replay(instance_id, start=payload.start, end=payload.end)
+    record = update_strategy(strategy_id, payload.model_dump(exclude_unset=True))
     if record is None:
-        raise HTTPException(status_code=404, detail=f"未找到策略实例 {instance_id}")
-    replay = _replay(record)
-    save_replay(record)
-    return replay
+        raise HTTPException(status_code=404, detail=f"未找到策略 {strategy_id}")
+    return StrategyUpdatedResponse(
+        id=record.id,
+        version_id=record.current_version_id,
+        status=record.status,
+        updated_at=record.updated_at,
+    )
 
 
 @strategy_router.get(
-    "/strategy-instances/{instance_id}/replays",
-    response_model=StrategyReplayListResponse,
+    "/strategies/{strategy_id}/versions", response_model=StrategyVersionListResponse
 )
-def list_strategy_replays(
-    instance_id: str,
-    limit: int = Query(50, ge=1, le=200),
-) -> StrategyReplayListResponse:
-    """该实例已落库的回放记录；实例不存在返回 404，还没回放过返回空列表。"""
-
-    result = list_replays(instance_id, limit=limit)
-    if result is None:
-        raise HTTPException(status_code=404, detail=f"未找到策略实例 {instance_id}")
-    records, total = result
-    return StrategyReplayListResponse(items=[_replay(record) for record in records], total=total)
-
-
-def _definition(record: TemplateDefinition) -> StrategyDefinition:
-    return StrategyDefinition(
-        strategy_id=record.strategy_id,
-        name=record.name,
-        version=record.version,
-        summary=record.summary,
-        params=[
-            ParamSpec(
-                name=param.name,
-                title=param.title,
-                kind=param.kind,
-                default=param.default,
-                minimum=param.minimum,
-                maximum=param.maximum,
-            )
-            for param in record.params
-        ],
-        required_indicators=[],
-        required_bars=list(record.bars),
-        emitted_actions=[],
+def list_strategy_versions(strategy_id: str) -> StrategyVersionListResponse:
+    versions = list_versions(strategy_id)
+    if versions is None:
+        raise HTTPException(status_code=404, detail=f"未找到策略 {strategy_id}")
+    return StrategyVersionListResponse(
+        items=[_version_detail(version) for version in versions],
+        total=len(versions),
     )
 
 
-def _instance(record: InstanceRecord) -> StrategyInstance:
-    return StrategyInstance(
-        instance_id=record.instance_id,
-        strategy_id=record.strategy_id,
-        strategy_version=record.strategy_version,
+@strategy_router.post(
+    "/strategies/{strategy_id}/versions",
+    response_model=StrategyVersionDetail,
+    status_code=201,
+)
+def create_strategy_version(
+    strategy_id: str, payload: StrategyVersionCreateRequest
+) -> StrategyVersionDetail:
+    """新建下一版；未提交的字段沿用当前版本。旧版本不提供修改入口。"""
+
+    record = create_version(strategy_id, payload.model_dump(exclude_unset=True))
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"未找到策略 {strategy_id}")
+    version = get_version(strategy_id, record.current_version)
+    if version is None:
+        raise HTTPException(status_code=404, detail=f"未找到策略版本 {record.current_version}")
+    return _version_detail(version)
+
+
+@strategy_router.put(
+    "/strategies/{strategy_id}/versions/{version}/instruments",
+    response_model=StrategyVersionDetail,
+)
+def update_strategy_version_instruments(
+    strategy_id: str,
+    version: int,
+    payload: StrategyInstrumentUpdateRequest,
+) -> StrategyVersionDetail:
+    """整批替换当前版本的标的集合；旧版本返回 409。"""
+
+    record = replace_version_instruments(strategy_id, version, payload.instrument_ids)
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"未找到策略 {strategy_id} 的版本 {version}")
+    return _version_detail(record)
+
+
+def _summary(record: StrategyRecord, summaries: dict[str, BacktestRunHeader]) -> StrategySummary:
+    return StrategySummary(
+        id=record.id,
         name=record.name,
-        bar=record.bar,
-        params=dict(record.params),
-        inst_ids=list(record.inst_ids),
-        status=record.lifecycle_status,
-        enabled=record.enabled,
-        execution_mode=record.execution_mode,
-        latest_signal_at=record.latest_signal_at,
+        category=record.category,
+        description=record.description,
+        status=record.status,
+        current_version_id=record.current_version_id,
+        current_version=record.current_version,
+        timeframe=record.timeframe,
+        direction=record.direction,
+        instrument_count=len(record.instrument_ids),
+        latest_backtest=_latest_backtest(record, summaries),
         created_at=record.created_at,
         updated_at=record.updated_at,
     )
 
 
-def _replay(record: ReplayRecord) -> StrategyReplay:
-    """域回放记录 → 契约模型：目标组合复用 `TargetPortfolio` 的既有形状。"""
-
-    return StrategyReplay(
-        replay_id=record.replay_id,
-        instance_id=record.instance_id,
-        strategy_id=record.strategy_id,
-        bar=record.bar,
-        start=record.start,
-        end=record.end,
-        target=TargetPortfolio(
-            legs=[
-                TargetLeg(
-                    inst_id=leg.inst_id,
-                    inst_type=leg.inst_type,
-                    direction=leg.side,
-                    target_weight=decimal_str(leg.target_weight),
-                )
-                for leg in record.legs
-            ],
-            net_exposure=decimal_str(record.net_exposure),
-        ),
-        canonical_json=record.canonical_json,
-        target_hash=record.target_hash,
-        points=[
-            StrategyReplayPoint(
-                as_of=point.as_of,
-                net_exposure=decimal_str(point.net_exposure),
-                leg_count=point.leg_count,
+def _detail(
+    record: StrategyRecord,
+    versions: tuple[StrategyVersionRecord, ...],
+    summaries: dict[str, BacktestRunHeader],
+) -> StrategyDetail:
+    return StrategyDetail(
+        id=record.id,
+        name=record.name,
+        category=record.category,
+        description=record.description,
+        status=record.status,
+        current_version_id=record.current_version_id,
+        current_version=record.current_version,
+        timeframe=record.timeframe,
+        direction=record.direction,
+        rule_json=dict(record.rule_json),
+        parameters=dict(record.parameters),
+        position_sizing=(None if record.position_sizing is None else dict(record.position_sizing)),
+        cost_model=None if record.cost_model is None else dict(record.cost_model),
+        instrument_ids=list(record.instrument_ids),
+        versions=[
+            StrategyVersionSummary(
+                version_id=version.version_id,
+                version=version.version,
+                timeframe=version.timeframe,
+                direction=version.direction,
+                change_note=version.change_note,
+                created_at=version.created_at,
             )
-            for point in record.points
+            for version in versions
         ],
+        latest_backtest=_latest_backtest(record, summaries),
         created_at=record.created_at,
+        updated_at=record.updated_at,
+    )
+
+
+def _version_detail(version: StrategyVersionRecord) -> StrategyVersionDetail:
+    return StrategyVersionDetail(
+        version_id=version.version_id,
+        strategy_id=version.strategy_id,
+        version=version.version,
+        timeframe=version.timeframe,
+        direction=version.direction,
+        rule_json=dict(version.rule_json),
+        parameters=dict(version.parameters),
+        position_sizing=(
+            None if version.position_sizing is None else dict(version.position_sizing)
+        ),
+        cost_model=None if version.cost_model is None else dict(version.cost_model),
+        change_note=version.change_note,
+        instrument_ids=list(version.instrument_ids),
+        created_at=version.created_at,
+    )
+
+
+def _latest_backtest(
+    record: StrategyRecord, summaries: dict[str, BacktestRunHeader]
+) -> StrategyBacktestSummary | None:
+    candidates = [
+        (summaries[version_id], version_id)
+        for version_id in record.version_ids
+        if version_id in summaries
+    ]
+    if not candidates:
+        return None
+    header, version_id = max(candidates, key=lambda item: (item[0].created_at, item[0].run_id))
+    return _backtest_summary(header, version_id)
+
+
+def _backtest_summary(header: BacktestRunHeader, version_id: str) -> StrategyBacktestSummary:
+    return StrategyBacktestSummary(
+        run_id=header.run_id,
+        strategy_version_id=version_id,
+        data_source=header.data_source,
+        total_return_pct=decimal_str(header.metrics["total_return"] * _HUNDRED),
+        max_drawdown_pct=decimal_str(header.metrics["max_drawdown"] * _HUNDRED),
+        trade_count=int(header.metrics["trade_count"]),
+        backtest_start_date=header.start_date,
+        backtest_end_date=header.end_date,
+        created_at=header.created_at,
+    )
+
+
+def _instrument_strategy(
+    record: InstrumentStrategyRecord, summaries: dict[str, BacktestRunHeader]
+) -> InstrumentStrategy:
+    candidates = [
+        (summaries[version_id], version_id)
+        for version_id in record.version_ids
+        if version_id in summaries
+    ]
+    recent = None
+    if candidates:
+        header, version_id = max(candidates, key=lambda item: (item[0].created_at, item[0].run_id))
+        recent = _backtest_summary(header, version_id)
+    strategy = record.strategy
+    return InstrumentStrategy(
+        strategy_id=strategy.id,
+        name=strategy.name,
+        category=strategy.category,
+        status=strategy.status,
+        current_version_id=strategy.current_version_id,
+        current_version=strategy.current_version,
+        timeframe=strategy.timeframe,
+        direction=strategy.direction,
+        instrument_ids=list(strategy.instrument_ids),
+        linked_version_ids=list(record.version_ids),
+        recent_backtest=recent,
+        updated_at=strategy.updated_at,
+    )
+
+
+@strategy_router.get(
+    "/instruments/{inst_id}/strategies", response_model=InstrumentStrategyListResponse
+)
+def list_instrument_strategies(inst_id: str) -> InstrumentStrategyListResponse:
+    """标的详情页的关联策略：最近一个月内有回测的，带最近一次结果。"""
+
+    records = list_strategies_for_instrument(inst_id)
+    version_ids = [version_id for record in records for version_id in record.version_ids]
+    summaries = latest_linked_backtests(
+        version_ids,
+        created_since=datetime.now(UTC).replace(microsecond=0) - timedelta(days=30),
+    )
+    return InstrumentStrategyListResponse(
+        items=[_instrument_strategy(record, summaries) for record in records]
     )

@@ -1,0 +1,32 @@
+{
+  "items": [
+    {
+      "category": "directional",
+      "current_version": 1,
+      "current_version_id": "sv_0001",
+      "direction": "long_only",
+      "instrument_ids": [
+        "XAAPL-USDT"
+      ],
+      "linked_version_ids": [
+        "sv_0001"
+      ],
+      "name": "AAPL 趋势",
+      "recent_backtest": {
+        "backtest_end_date": "2026-11-01",
+        "backtest_start_date": "2026-10-01",
+        "created_at": "2026-11-10T01:20:00Z",
+        "data_source": "okx_spot",
+        "max_drawdown_pct": "6.12",
+        "run_id": "bt_0001",
+        "strategy_version_id": "sv_0001",
+        "total_return_pct": "12.4055",
+        "trade_count": 37
+      },
+      "status": "draft",
+      "strategy_id": "st_0001",
+      "timeframe": "1d",
+      "updated_at": "2026-11-10T07:00:00Z"
+    }
+  ]
+}

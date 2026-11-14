@@ -15,6 +15,7 @@ from app.journal import ExecutionSnapshot, RecordedSignal
 from app.market import upsert_candles
 from tests.api.conftest import latest_opens, seed_daily, seed_instruments
 from tests.factories.instruments import make_ref
+from tests.factories.strategies import make_instance
 
 DECIMAL = re.compile(r"^-?\d{1,20}(\.\d{1,12})?$")
 UTC_ZULU = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
@@ -284,18 +285,12 @@ def test_watchlist_rows_compose_running_strategy_and_latest_signal(client: TestC
     for inst_id in ("XAAPL-USDT", "XETH-USDT"):
         assert client.post("/api/watchlist", json={"inst_id": inst_id}).status_code == 201
 
-    created = client.post(
-        "/api/strategy-instances",
-        json={
-            "strategy_id": "directional",
-            "name": "AAPL 方向",
-            "bar": "1d",
-            "params": {"trend_window": 2, "momentum_window": 1, "leg_count": 2},
-            "inst_ids": ["XAAPL-USDT"],
-        },
-    )
-    assert created.status_code == 201, created.text
-    instance_id = created.json()["instance_id"]
+    instance_id = make_instance(
+        strategy_id="directional",
+        name="AAPL 方向",
+        params={"trend_window": 2, "momentum_window": 1, "leg_count": 2},
+        inst_ids=["XAAPL-USDT"],
+    ).instance_id
 
     client.app.state.execution_snapshot = ExecutionSnapshot(
         signals=(

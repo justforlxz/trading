@@ -49,17 +49,22 @@ export type CandleBar = CandleSeriesResponse["bar"];
 export type IndicatorSeries = components["schemas"]["IndicatorSeries"];
 export type IndicatorSeriesResponse = components["schemas"]["IndicatorSeriesResponse"];
 export type IndicatorParamValue = IndicatorSeries["params"][string];
-export type StrategyCatalogResponse = components["schemas"]["StrategyCatalogResponse"];
-export type StrategyDefinition = components["schemas"]["StrategyDefinition"];
-export type StrategyParamSpec = StrategyDefinition["params"][number];
-export type StrategyParamValue = StrategyDefinition["params"][number]["default"];
-export type StrategyInstance = components["schemas"]["StrategyInstance"];
-export type StrategyInstanceListResponse = components["schemas"]["StrategyInstanceListResponse"];
-export type StrategyInstanceCreateRequest = components["schemas"]["StrategyInstanceCreateRequest"];
-export type StrategyInstanceUpdateRequest = components["schemas"]["StrategyInstanceUpdateRequest"];
-export type StrategyReplay = components["schemas"]["StrategyReplay"];
-export type StrategyReplayListResponse = components["schemas"]["StrategyReplayListResponse"];
-export type StrategyReplayPoint = StrategyReplay["points"][number];
+export type StrategySummary = components["schemas"]["StrategySummary"];
+export type StrategyListResponse = components["schemas"]["StrategyListResponse"];
+export type StrategyDetail = components["schemas"]["StrategyDetail"];
+export type StrategyVersionDetail = components["schemas"]["StrategyVersionDetail"];
+export type StrategyCreateRequest = components["schemas"]["StrategyCreateRequest"];
+export type StrategyUpdateRequest = components["schemas"]["StrategyUpdateRequest"];
+export type StrategyVersionCreateRequest = components["schemas"]["StrategyVersionCreateRequest"];
+export type StrategyInstrumentUpdateRequest =
+  components["schemas"]["StrategyInstrumentUpdateRequest"];
+export type StrategyCreatedResponse = components["schemas"]["StrategyCreatedResponse"];
+export type StrategyUpdatedResponse = components["schemas"]["StrategyUpdatedResponse"];
+export type StrategyVersionListResponse = components["schemas"]["StrategyVersionListResponse"];
+export type StrategyBacktestSummary = components["schemas"]["StrategyBacktestSummary"];
+export type InstrumentStrategy = components["schemas"]["InstrumentStrategy"];
+export type InstrumentStrategyListResponse =
+  components["schemas"]["InstrumentStrategyListResponse"];
 export type BacktestRunSummary = components["schemas"]["BacktestRunSummary"];
 export type BacktestRunListResponse = components["schemas"]["BacktestRunListResponse"];
 export type BacktestRankingResponse = components["schemas"]["BacktestRankingResponse"];
@@ -210,53 +215,65 @@ export function fetchIndicatorSeries(
   return request<IndicatorSeriesResponse>(`/indicators/series?${query.toString()}`);
 }
 
-export function fetchStrategies(): Promise<StrategyCatalogResponse> {
-  return request<StrategyCatalogResponse>("/strategies");
+export function fetchStrategies(): Promise<StrategyListResponse> {
+  return request<StrategyListResponse>("/strategies");
 }
 
-export function fetchStrategyInstances(): Promise<StrategyInstanceListResponse> {
-  return request<StrategyInstanceListResponse>("/strategy-instances");
+export function fetchStrategy(strategyId: string): Promise<StrategyDetail> {
+  return request<StrategyDetail>(`/strategies/${encodeURIComponent(strategyId)}`);
 }
 
-export function createStrategyInstance(
-  body: StrategyInstanceCreateRequest,
-): Promise<StrategyInstance> {
-  return send<StrategyInstance>("/strategy-instances", "POST", body);
+export function createStrategy(body: StrategyCreateRequest): Promise<StrategyCreatedResponse> {
+  return send<StrategyCreatedResponse>("/strategies", "POST", body);
 }
 
-export function updateStrategyInstance(
-  instanceId: string,
-  body: StrategyInstanceUpdateRequest,
-): Promise<StrategyInstance> {
-  return send<StrategyInstance>(
-    `/strategy-instances/${encodeURIComponent(instanceId)}`,
-    "PATCH",
+export function updateStrategy(
+  strategyId: string,
+  body: StrategyUpdateRequest,
+): Promise<StrategyUpdatedResponse> {
+  return send<StrategyUpdatedResponse>(
+    `/strategies/${encodeURIComponent(strategyId)}`,
+    "PUT",
     body,
   );
 }
 
-export function deleteStrategyInstance(instanceId: string): Promise<void> {
-  return request<void>(`/strategy-instances/${encodeURIComponent(instanceId)}`, {
-    method: "DELETE",
-  });
-}
-
-/** 回放区间按实例配置的周期跑；`start` / `end` 由页面按用户输入的日期拼成 UTC 时刻。 */
-export function replayStrategyInstance(
-  instanceId: string,
-  start: string,
-  end: string,
-): Promise<StrategyReplay> {
-  return send<StrategyReplay>(
-    `/strategy-instances/${encodeURIComponent(instanceId)}/replays`,
-    "POST",
-    { start, end },
+export function fetchStrategyVersions(
+  strategyId: string,
+): Promise<StrategyVersionListResponse> {
+  return request<StrategyVersionListResponse>(
+    `/strategies/${encodeURIComponent(strategyId)}/versions`,
   );
 }
 
-export function fetchStrategyReplays(instanceId: string): Promise<StrategyReplayListResponse> {
-  return request<StrategyReplayListResponse>(
-    `/strategy-instances/${encodeURIComponent(instanceId)}/replays`,
+export function createStrategyVersion(
+  strategyId: string,
+  body: StrategyVersionCreateRequest,
+): Promise<StrategyUpdatedResponse> {
+  return send<StrategyUpdatedResponse>(
+    `/strategies/${encodeURIComponent(strategyId)}/versions`,
+    "POST",
+    body,
+  );
+}
+
+export function replaceStrategyVersionInstruments(
+  strategyId: string,
+  version: number,
+  body: StrategyInstrumentUpdateRequest,
+): Promise<StrategyVersionDetail> {
+  return send<StrategyVersionDetail>(
+    `/strategies/${encodeURIComponent(strategyId)}/versions/${version}/instruments`,
+    "PUT",
+    body,
+  );
+}
+
+export function fetchInstrumentStrategies(
+  instId: string,
+): Promise<InstrumentStrategyListResponse> {
+  return request<InstrumentStrategyListResponse>(
+    `/instruments/${encodeURIComponent(instId)}/strategies`,
   );
 }
 

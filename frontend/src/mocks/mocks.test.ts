@@ -21,7 +21,7 @@ const BASE = "http://localhost";
 const DOMAIN_PROBES = [
   ["watchlist", "/api/watchlist"],
   ["indicators", "/api/indicators"],
-  ["strategy", "/api/strategy-instances"],
+  ["strategy", "/api/strategies"],
   ["backtest", "/api/backtests?data_source=okx"],
   ["settings", "/api/settings"],
   ["dashboard", "/api/dashboard/summary"],

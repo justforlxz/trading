@@ -23,12 +23,13 @@ from app.strategy import (
     get_instance,
 )
 from tests.factories.instruments import make_ref
+from tests.factories.strategies import make_instance
 
 ACTOR = "lxz"
 
 
 @pytest.fixture()
-def instance(client: TestClient) -> dict[str, object]:
+def instance(client: TestClient) -> InstanceRecord:
     """一支草稿阶段的实例；标的与参数走真实写入路径建出来。"""
 
     sync_instruments(
@@ -37,17 +38,10 @@ def instance(client: TestClient) -> dict[str, object]:
             make_ref(inst_id="ETH-USDT", base_ccy="ETH", inst_category="1"),
         ]
     )
-    created = client.post(
-        "/api/strategy-instances",
-        json={
-            "strategy_id": "relative_value",
-            "name": "BTC/ETH 配对",
-            "bar": "1d",
-            "inst_ids": ["BTC-USDT", "ETH-USDT"],
-        },
+    return make_instance(
+        name="BTC/ETH 配对",
+        inst_ids=["BTC-USDT", "ETH-USDT"],
     )
-    assert created.status_code == 201, created.text
-    return created.json()
 
 
 def passing_report() -> ValidationReport:
@@ -80,11 +74,11 @@ def approvals(client: TestClient) -> dict[str, object]:
 
 
 def test_submit_review_moves_the_instance_into_pending_review(
-    client: TestClient, instance: dict[str, object]
+    client: TestClient, instance: InstanceRecord
 ) -> None:
     """提交审核：实例进待审核，同时写一条带推进人的记录。"""
 
-    instance_id = str(instance["instance_id"])
+    instance_id = instance.instance_id
     response = client.post(
         "/api/approvals",
         json={"instance_id": instance_id, "actor": ACTOR, "note": "提交人工审核"},
@@ -105,11 +99,11 @@ def test_submit_review_moves_the_instance_into_pending_review(
 
 
 def test_approve_records_the_reviewer_and_moves_to_backtested(
-    client: TestClient, instance: dict[str, object]
+    client: TestClient, instance: InstanceRecord
 ) -> None:
     """审核通过：进历史回测阶段，记录里留下审核人与依据引用。"""
 
-    instance_id = str(instance["instance_id"])
+    instance_id = instance.instance_id
     client.post("/api/approvals", json={"instance_id": instance_id, "actor": ACTOR})
 
     response = client.post(
@@ -128,11 +122,11 @@ def test_approve_records_the_reviewer_and_moves_to_backtested(
 
 
 def test_reject_sends_the_instance_back_to_the_draft_only(
-    client: TestClient, instance: dict[str, object]
+    client: TestClient, instance: InstanceRecord
 ) -> None:
     """驳回：实例进 rejected；从 rejected 不能直接申请实盘授权。"""
 
-    instance_id = str(instance["instance_id"])
+    instance_id = instance.instance_id
     client.post("/api/approvals", json={"instance_id": instance_id, "actor": ACTOR})
 
     rejected = client.post(
@@ -150,11 +144,11 @@ def test_reject_sends_the_instance_back_to_the_draft_only(
 
 
 def test_illegal_transition_answers_400_and_changes_nothing(
-    client: TestClient, instance: dict[str, object]
+    client: TestClient, instance: InstanceRecord
 ) -> None:
     """草稿阶段直接审核通过不在转移表里：400，实例仍停在草稿。"""
 
-    instance_id = str(instance["instance_id"])
+    instance_id = instance.instance_id
     response = client.post(f"/api/approvals/{instance_id}/approve", json={"actor": ACTOR})
 
     assert response.status_code == 400, response.text
@@ -164,7 +158,7 @@ def test_illegal_transition_answers_400_and_changes_nothing(
 
 
 def test_live_authorization_records_the_fact_and_checks_the_budget(
-    client: TestClient, instance: dict[str, object]
+    client: TestClient, instance: InstanceRecord
 ) -> None:
     """实盘授权：模拟交易阶段之后才可申请，预算必须为正数。
 
@@ -172,7 +166,7 @@ def test_live_authorization_records_the_fact_and_checks_the_budget(
     端点只负责最后那一步。
     """
 
-    instance_id = str(instance["instance_id"])
+    instance_id = instance.instance_id
     client.post("/api/approvals", json={"instance_id": instance_id, "actor": ACTOR})
     client.post(f"/api/approvals/{instance_id}/approve", json={"actor": ACTOR})
     advance(read_instance(instance_id), "validated", ACTOR, passing_report())
@@ -215,12 +209,12 @@ def test_unknown_instance_answers_404(client: TestClient) -> None:
 
 
 def test_instance_rows_keep_the_column_the_screen_reads(
-    client: TestClient, instance: dict[str, object]
+    client: TestClient, instance: InstanceRecord
 ) -> None:
     """写库的列名是 `lifecycle_status`；对外的 `status` 字段由接口层映射出来。"""
 
     with session_scope() as session:
-        row = session.get(StrategyInstanceRow, str(instance["instance_id"]))
+        row = session.get(StrategyInstanceRow, instance.instance_id)
         assert row is not None
         assert row.lifecycle_status == "strategy_generation"
         assert "status" not in StrategyInstanceRow.__table__.columns

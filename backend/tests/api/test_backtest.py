@@ -23,6 +23,7 @@ from app.core import Bar, Timeframe
 from app.instrument import sync_instruments
 from app.market import upsert_candles
 from tests.factories.instruments import make_ref
+from tests.factories.strategies import make_instance, patch_instance
 
 DAY = timedelta(days=1)
 AS_OF = datetime(2026, 11, 10, 23, 0, tzinfo=UTC)
@@ -74,18 +75,11 @@ def instance_id(client: TestClient) -> str:
     """一只相对价值实例：两只加密现货、三日回看窗口，区间与行情逐根对齐。"""
 
     seed_market()
-    created = client.post(
-        "/api/strategy-instances",
-        json={
-            "strategy_id": "relative_value",
-            "name": "BTC/ETH 相对价值",
-            "bar": "1d",
-            "params": PAIR_PARAMS,
-            "inst_ids": list(INSTRUMENTS),
-        },
-    )
-    assert created.status_code == 201, created.text
-    return created.json()["instance_id"]
+    return make_instance(
+        name="BTC/ETH 相对价值",
+        params=PAIR_PARAMS,
+        inst_ids=list(INSTRUMENTS),
+    ).instance_id
 
 
 def payload(instance_id: str, **overrides: object) -> dict[str, object]:
@@ -257,10 +251,8 @@ def test_list_and_ranking_distinguish_parameter_combinations(
 
     baseline = run_single(client, instance_id)
     changed_params = {"reversion_window": 2, "strength_window": 2, "pair_count": 1}
-    patched = client.patch(
-        f"/api/strategy-instances/{instance_id}", json={"params": changed_params}
-    )
-    assert patched.status_code == 200, patched.text
+    patched = patch_instance(instance_id, params=changed_params)
+    assert patched is not None
     changed = run_single(client, instance_id)
 
     items = client.get("/api/backtests", params={"data_source": SOURCE}).json()["items"]
@@ -297,7 +289,7 @@ def test_unknown_instance_is_404(client: TestClient, instance_id: str) -> None:
 
 
 def test_disabled_instance_is_409(client: TestClient, instance_id: str) -> None:
-    client.patch(f"/api/strategy-instances/{instance_id}", json={"enabled": False})
+    assert patch_instance(instance_id, enabled=False) is not None
     response = client.post("/api/backtests", json=payload(instance_id))
     assert response.status_code == 409
     assert "已停用" in response.json()["detail"]
@@ -403,18 +395,11 @@ def test_batch_failure_leaves_no_partial_rows(client: TestClient) -> None:
             ]
         )
 
-    created = client.post(
-        "/api/strategy-instances",
-        json={
-            "strategy_id": "relative_value",
-            "name": "BTC/ETH 相对价值",
-            "bar": "1d",
-            "params": PAIR_PARAMS,
-            "inst_ids": list(INSTRUMENTS),
-        },
-    )
-    assert created.status_code == 201, created.text
-    instance = created.json()["instance_id"]
+    instance = make_instance(
+        name="BTC/ETH 相对价值",
+        params=PAIR_PARAMS,
+        inst_ids=INSTRUMENTS,
+    ).instance_id
 
     body = payload(instance, targets={"mode": "list", "inst_ids": ["BTC-USDT", "ETH-USDT"]})
     response = client.post("/api/backtests", json=body)

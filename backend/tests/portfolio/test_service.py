@@ -29,7 +29,9 @@ from app.portfolio import (
     record_allocation,
     record_fill,
 )
+from app.strategy import list_instances
 from tests.factories.instruments import make_ref, make_swap_ref
+from tests.factories.strategies import make_instance
 
 D = Decimal
 MOMENT = datetime(2026, 11, 10, 12, 0, tzinfo=UTC)
@@ -45,36 +47,19 @@ def seeded(client: TestClient) -> TestClient:
             make_ref(inst_id="ETH-USDT", base_ccy="ETH", inst_category="1"),
         ]
     )
-    created = client.post(
-        "/api/strategy-instances",
-        json={
-            "strategy_id": "relative_value",
-            "name": "BTC/ETH 配对",
-            "bar": "1d",
-            "inst_ids": ["BTC-USDT", "ETH-USDT"],
-        },
-    )
-    assert created.status_code == 201, created.text
+    make_instance(name="BTC/ETH 配对", inst_ids=["BTC-USDT", "ETH-USDT"])
     return client
 
 
 def new_instance(client: TestClient, name: str, inst_ids: list[str]) -> str:
-    created = client.post(
-        "/api/strategy-instances",
-        json={
-            "strategy_id": "relative_value",
-            "name": name,
-            "bar": "1d",
-            "inst_ids": inst_ids,
-        },
-    )
-    assert created.status_code == 201, created.text
-    return str(created.json()["instance_id"])
+    del client
+    return make_instance(name=name, inst_ids=inst_ids).instance_id
 
 
 def only_instance(client: TestClient) -> str:
-    listed = client.get("/api/strategy-instances").json()
-    return str(listed["items"][0]["instance_id"])
+    del client
+    records, _ = list_instances()
+    return records[0].instance_id
 
 
 def test_recorded_fills_rebuild_the_fifo_ledger(seeded: TestClient) -> None:

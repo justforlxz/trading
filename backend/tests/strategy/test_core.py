@@ -440,12 +440,14 @@ def test_strategy_imports_no_io_layers() -> None:
       合法」「报告是否达标」这些规则本身是纯函数，`tests/strategy/test_approval.py` 的
       全组合用例不碰库；落库的那一步（改阶段 + 写一条审批记录）必须在这里完成，否则
       又可以绕开状态机直接改阶段。
+    - `management.py`：v6 用户策略、版本、版本标的与回测关联的读写编排（B6），与
+      `service.py` 同一分工；规则校验在 `rules.py`，本文件只负责事务与落库。
 
     其余模块逐文件检查，因此把 IO 带进计算模块（含 components / templates / builtin）
     会红。
     """
 
-    io_boundary = frozenset({"model.py", "service.py", "approval.py"})
+    io_boundary = frozenset({"model.py", "service.py", "approval.py", "management.py"})
     forbidden = ("app.db", "app.exchange", "session", "httpx")
     violations: list[str] = []
     for path in _strategy_sources():

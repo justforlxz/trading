@@ -31,6 +31,7 @@ from app.journal import ExecutionSnapshot, RecordedSignal, latest_expectations, 
 from app.market import upsert_candles
 from app.strategy import TargetLeg, TargetPortfolio, get_instance
 from tests.factories.instruments import make_ref
+from tests.factories.strategies import make_instance
 
 INST_IDS = ("BTC-USDT", "ETH-USDT")
 BTC = "BTC-USDT"
@@ -105,18 +106,13 @@ def seed_market() -> None:
 
 
 def create_instance(client: TestClient) -> str:
-    created = client.post(
-        "/api/strategy-instances",
-        json={
-            "strategy_id": "relative_value",
-            "name": "BTC/ETH 相对价值",
-            "bar": "1d",
-            "params": {"reversion_window": 3, "strength_window": 2, "pair_count": 1},
-            "inst_ids": list(INST_IDS),
-        },
+    del client
+    instance = make_instance(
+        name="BTC/ETH 相对价值",
+        params={"reversion_window": 3, "strength_window": 2, "pair_count": 1},
+        inst_ids=INST_IDS,
     )
-    assert created.status_code == 201, created.text
-    return created.json()["instance_id"]
+    return instance.instance_id
 
 
 def run_backtest(client: TestClient, instance_id: str) -> None:

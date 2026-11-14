@@ -48,7 +48,7 @@
     "position_size": "2000",
     "quote_currency": "USDT",
     "start_date": "2026-08-01",
-    "strategy_instance_id": "si_0001",
+    "strategy_version_id": "sv_0001",
     "targets": {
       "inst_ids": [
         "XAAPL-USDT"
@@ -91,7 +91,7 @@
     "run_id": "bt_0001",
     "start_date": "2026-08-01",
     "status": "succeeded",
-    "strategy_instance_id": "si_0001",
+    "strategy_version_id": "sv_0001",
     "symbol_count": 1
   },
   "trades": [
@@ -103,11 +103,13 @@
       "fee": "1.98",
       "inst_id": "XAAPL-USDT",
       "inst_type": "SPOT",
+      "net_pnl": "33.26",
       "pnl": "35.24",
       "product_key": "XAAPL",
       "qty": "8.63",
       "reason": "MA20 下穿 MA60",
       "side": "long",
+      "slippage": "0.42",
       "trade_id": "tr_0001"
     }
   ]

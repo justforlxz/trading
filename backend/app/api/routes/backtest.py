@@ -26,27 +26,42 @@
 
 from __future__ import annotations
 
+import csv
+import io
 from collections.abc import Sequence
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 
 from app.api.mapping import decimal_str
 from app.api.schemas import (
+    BacktestBatchResponse,
+    BacktestChartCandle,
+    BacktestChartResponse,
     BacktestCosts,
     BacktestDetailResponse,
+    BacktestEquityPoint,
+    BacktestEquityResponse,
     BacktestLeg,
+    BacktestMarker,
     BacktestMetrics,
+    BacktestOverlay,
+    BacktestOverlayPoint,
     BacktestPortfolio,
     BacktestRankingResponse,
     BacktestRankingRow,
+    BacktestReplayPoint,
+    BacktestReplayResponse,
+    BacktestReplayTrade,
     BacktestRequest,
     BacktestRunListResponse,
     BacktestRunSummary,
     BacktestTrade,
+    BacktestTradeListResponse,
     EquityPoint,
+    GroupEquityPoint,
     RankingMetric,
 )
 from app.api.schemas.common import DataSource
@@ -65,11 +80,22 @@ from app.backtest import (
     run_backtest,
     save_runs,
 )
-from app.core import Conflict, InstrumentRef, ValidationError
+from app.core import InstrumentRef, ValidationError
+from app.indicators import compute
 from app.instrument import Instrument, list_instruments
 from app.jobs import TargetScope, resolve_scope
 from app.market import load_candles
-from app.strategy import TargetLeg, TargetPortfolio, evaluate_replay, get_instance
+from app.strategy import (
+    InstanceRecord,
+    StrategyVersionRecord,
+    TargetLeg,
+    TargetPortfolio,
+    evaluate_replay,
+    get_template,
+    get_user_strategy,
+    get_version_by_id,
+    resolve_params,
+)
 
 __all__ = ["backtest_router"]
 
@@ -114,25 +140,24 @@ def get_backtest_ranking(
     )
 
 
-@backtest_router.post("/backtests", response_model=BacktestRunSummary, status_code=202)
-def create_backtest(payload: BacktestRequest) -> BacktestRunSummary:
-    """按请求跑一次批量回测，每个标的各落一条运行；返回其中第一条。
+@backtest_router.post("/backtests", response_model=BacktestBatchResponse, status_code=202)
+def create_backtest(payload: BacktestRequest) -> BacktestBatchResponse:
+    """按策略版本跑一次批量回测，每个标的各落一条运行，并返回等权组合净值。
 
-    实例不存在返回 404，已停用返回 409（与目标组合回放同一口径）：静默跳过一个停用的
-    实例会让「没有信号」与「没跑」混成同一件事。
+    版本不存在返回 404；周期与版本不一致、标的超出版本范围、类别没有对应模板都返回
+    400。目标组合仍由现有模板引擎按同一份历史行情逐时点回放，撮合与成本模型不变。
+    每个运行都在同一事务里写入 `strategy_linked_backtests`，历史回测因此永远指向
+    当时那个不可变版本。
     """
 
-    instance = get_instance(payload.strategy_instance_id)
-    if instance is None:
-        raise HTTPException(
-            status_code=404, detail=f"未找到策略实例 {payload.strategy_instance_id}"
-        )
-    if not instance.enabled:
-        raise Conflict(f"策略实例 {instance.instance_id} 已停用, 不能回测")
-    if payload.bar != instance.bar:
+    version = get_version_by_id(payload.strategy_version_id)
+    if version is None:
+        raise HTTPException(status_code=404, detail=f"未找到策略版本 {payload.strategy_version_id}")
+    if payload.bar != version.timeframe:
         raise ValidationError(
-            f"回测周期必须与策略实例一致: 实例是 {instance.bar}, 请求是 {payload.bar}"
+            f"回测周期必须与策略版本一致: 版本是 {version.timeframe}, 请求是 {payload.bar}"
         )
+    instance = _version_instance(version)
 
     inst_ids = resolve_scope(
         TargetScope(
@@ -141,11 +166,11 @@ def create_backtest(payload: BacktestRequest) -> BacktestRunSummary:
             group=payload.targets.group,
         )
     )
-    outside = [inst_id for inst_id in inst_ids if inst_id not in instance.inst_ids]
+    outside = [inst_id for inst_id in inst_ids if inst_id not in version.instrument_ids]
     if outside:
         raise ValidationError(
-            f"标的 {outside[0]} 不在策略实例 {instance.instance_id} 的标的集合内, "
-            f"可选: {', '.join(instance.inst_ids)}"
+            f"标的 {outside[0]} 不在策略版本 {version.version_id} 的标的集合内, "
+            f"可选: {', '.join(version.instrument_ids)}"
         )
 
     start, end = _window(payload.start_date, payload.end_date)
@@ -178,16 +203,22 @@ def create_backtest(payload: BacktestRequest) -> BacktestRunSummary:
         run_request = BacktestInput(
             bars=by_key,
             instruments={instrument.product_key: _instrument_ref(instrument)},
-            targets=_targets(outcome.targets, instrument, timeline, weight_cap),
+            targets=_targets(
+                outcome.targets,
+                instrument,
+                timeline,
+                weight_cap,
+                direction=version.direction,
+            ),
             initial_capital=initial_capital,
             execution_model=payload.execution_model,
             costs=costs,
             settle=None,
         )
         run_spec = BacktestSpec(
-            strategy_instance_id=instance.instance_id,
-            strategy_id=instance.strategy_id,
-            strategy_version=instance.strategy_version,
+            strategy_version_id=version.version_id,
+            strategy_id=version.strategy_id,
+            strategy_version=str(version.version),
             params=dict(instance.params),
             bar=payload.bar,
             start_date=payload.start_date,
@@ -211,7 +242,11 @@ def create_backtest(payload: BacktestRequest) -> BacktestRunSummary:
 
     # 整批一个事务：要么全部落库，要么一行都不留。
     records = save_runs(plans)
-    return _summary(records[0])
+    return BacktestBatchResponse(
+        **_summary(records[0]).model_dump(),
+        run_ids=[record.run_id for record in records],
+        group_equity=_group_equity(records),
+    )
 
 
 @backtest_router.get("/backtests", response_model=BacktestRunListResponse)
@@ -256,6 +291,431 @@ def delete_backtest(run_id: str) -> None:
 
     if not delete_run(run_id):
         raise HTTPException(status_code=404, detail=f"未找到回测记录 {run_id}")
+
+
+@backtest_router.get("/backtests/{run_id}/chart", response_model=BacktestChartResponse)
+def get_backtest_chart(run_id: str) -> BacktestChartResponse:
+    """K 线、买卖标记与均线叠加；标记只从 `backtest_trades` 生成。"""
+
+    record = _require_run(run_id)
+    bars = _run_bars(record)
+    times = [point.time for point in record.equity]
+    selected = {bar.open_time: bar for bar in bars}
+    candles = [_chart_candle(selected[moment]) for moment in times if moment in selected]
+    return BacktestChartResponse(
+        run_id=record.run_id,
+        inst_id=record.inst_id,
+        bar=record.bar,
+        data_source=record.data_source,
+        candles=candles,
+        markers=_markers(record.trades),
+        overlays=_overlays(bars, set(times)),
+    )
+
+
+@backtest_router.get("/backtests/{run_id}/equity", response_model=BacktestEquityResponse)
+def get_backtest_equity(run_id: str) -> BacktestEquityResponse:
+    """策略净值与回撤序列；引擎没有保存基准行情，因此 `benchmark` 为 null。"""
+
+    record = _require_run(run_id)
+    initial = record.metrics["initial_capital"]
+    peak = initial
+    points: list[BacktestEquityPoint] = []
+    for point in record.equity:
+        peak = max(peak, point.equity)
+        drawdown = Decimal(0) if peak <= 0 else (point.equity - peak) / peak
+        points.append(
+            BacktestEquityPoint(
+                time=point.time,
+                equity=decimal_str(point.equity),
+                benchmark_equity=None,
+                drawdown=_ratio(drawdown),
+            )
+        )
+    return BacktestEquityResponse(run_id=record.run_id, benchmark=None, points=points)
+
+
+@backtest_router.get("/backtests/{run_id}/replay", response_model=BacktestReplayResponse)
+def get_backtest_replay(run_id: str) -> BacktestReplayResponse:
+    """按 K 线索引排列的回放点；只读本次运行保存的行情、净值与成交。"""
+
+    record = _require_run(run_id)
+    bars = _run_bars(record)
+    by_time = {bar.open_time: bar for bar in bars}
+    ma20 = _indicator_values(bars, 20)
+    ma60 = _indicator_values(bars, 60)
+
+    points: list[BacktestReplayPoint] = []
+    index_by_time: dict[datetime, int] = {}
+    previous = Decimal(0)
+    for index, (point, exposure) in enumerate(zip(record.equity, record.exposure, strict=True)):
+        index_by_time[point.time] = index
+        delta = exposure.net_exposure - previous
+        signal = "BUY" if delta > 0 else "SELL" if delta < 0 else "HOLD"
+        position = point.equity * exposure.net_exposure
+        candle = by_time.get(point.time)
+        points.append(
+            BacktestReplayPoint(
+                index=index,
+                time=point.time,
+                close=None if candle is None else decimal_str(candle.close),
+                equity=decimal_str(point.equity),
+                cash=decimal_str(point.equity - position),
+                position=decimal_str(position),
+                signal=signal,
+                indicators={
+                    "ma20": None if point.time not in ma20 else decimal_str(ma20[point.time]),
+                    "ma60": None if point.time not in ma60 else decimal_str(ma60[point.time]),
+                },
+            )
+        )
+        previous = exposure.net_exposure
+
+    events: list[BacktestReplayTrade] = []
+    for trade in record.trades:
+        trade_id = _trade_id(trade)
+        for kind, moment, side, price in (
+            ("entry", trade.entry_time, _entry_side(trade.side), trade.entry_price),
+            ("exit", trade.exit_time, _exit_side(trade.side), trade.exit_price),
+        ):
+            index = index_by_time.get(moment)
+            if index is None:
+                continue
+            events.append(
+                BacktestReplayTrade(
+                    index=index,
+                    trade_id=trade_id,
+                    kind=kind,
+                    side=side,
+                    price=decimal_str(price),
+                    qty=decimal_str(trade.qty),
+                )
+            )
+    events.sort(key=lambda item: (item.index, item.kind, item.trade_id))
+    return BacktestReplayResponse(
+        run_id=record.run_id,
+        bar=record.bar,
+        points=points,
+        trades=events,
+    )
+
+
+@backtest_router.get("/backtests/{run_id}/trades", response_model=BacktestTradeListResponse)
+def list_backtest_trades(
+    run_id: str,
+    side: str | None = Query(None, pattern="^(long|short)$"),
+    result: str | None = Query(None, pattern="^(profit|loss)$"),
+    inst_id: str | None = Query(None),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+) -> BacktestTradeListResponse:
+    """按方向、盈亏结果与标的筛选交易明细，分页返回本页与总条数。"""
+
+    record = _require_run(run_id)
+    filtered = _filter_trades(record, side=side, result=result, inst_id=inst_id)
+    page = filtered[offset : offset + limit]
+    return BacktestTradeListResponse(
+        run_id=record.run_id,
+        items=[_trade(trade) for trade in page],
+        total=len(filtered),
+        limit=limit,
+        offset=offset,
+    )
+
+
+@backtest_router.get(
+    "/backtests/{run_id}/trades.csv",
+    response_class=Response,
+    responses={200: {"content": {"text/csv": {"schema": {"type": "string"}}}}},
+)
+def export_backtest_trades(
+    run_id: str,
+    side: str | None = Query(None, pattern="^(long|short)$"),
+    result: str | None = Query(None, pattern="^(profit|loss)$"),
+    inst_id: str | None = Query(None),
+) -> Response:
+    """导出当前筛选条件下的交易明细；UTF-8 带 BOM，列顺序固定。"""
+
+    record = _require_run(run_id)
+    filtered = _filter_trades(record, side=side, result=result, inst_id=inst_id)
+    buffer = io.StringIO()
+    buffer.write("\ufeff")
+    writer = csv.writer(buffer)
+    writer.writerow(
+        [
+            "标的",
+            "方向",
+            "开仓时间",
+            "开仓价",
+            "平仓时间",
+            "平仓价",
+            "数量",
+            "手续费",
+            "资金费",
+            "滑点",
+            "净盈亏",
+            "退出原因",
+        ]
+    )
+    for trade in filtered:
+        writer.writerow(
+            [
+                trade.inst_id,
+                "多头" if trade.side == "long" else "空头",
+                _iso_z(trade.entry_time),
+                decimal_str(trade.entry_price),
+                _iso_z(trade.exit_time),
+                decimal_str(trade.exit_price),
+                decimal_str(trade.qty),
+                decimal_str(trade.fee),
+                "",
+                decimal_str(trade.slippage),
+                decimal_str(trade.pnl - trade.fee),
+                trade.reason,
+            ]
+        )
+    return Response(
+        content=buffer.getvalue().encode("utf-8"),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="backtest-{record.run_id}-trades.csv"'
+        },
+    )
+
+
+def _require_run(run_id: str) -> BacktestRunRecord:
+    """取一次已保存的运行；不存在时按统一错误格式回答 404。"""
+
+    record = get_run(run_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"未找到回测记录 {run_id}")
+    return record
+
+
+def _version_instance(version: StrategyVersionRecord) -> InstanceRecord:
+    """把不可变策略版本投影成模板引擎可执行的实例。
+
+    用户策略的 `category` 就是模板登记名（方向性 / 相对价值这类组合方式）；版本的
+    `parameters` 是这套模板的参数。投影只发生在内存里，不写 `strategy_instances`：
+    回测的历史事实由 `backtest_runs` 与 `strategy_linked_backtests` 保存，不依赖实例表。
+    """
+
+    strategy = get_user_strategy(version.strategy_id)
+    if strategy is None:
+        raise ValidationError(f"未找到策略版本 {version.version_id} 所属的策略")
+    try:
+        template = get_template(strategy.category)
+    except ValidationError as exc:
+        raise ValidationError(f"策略类别 {strategy.category!r} 没有对应的回测模板: {exc}") from exc
+    params = resolve_params(template.param_schema, dict(version.parameters))
+    return InstanceRecord(
+        instance_id=version.version_id,
+        strategy_id=template.meta.name,
+        strategy_version=str(version.version),
+        name=strategy.name,
+        bar=version.timeframe,
+        params=params,
+        inst_ids=version.instrument_ids,
+        lifecycle_status="strategy_generation",
+        enabled=True,
+        execution_mode="manual",
+        latest_signal_at=None,
+        created_at=version.created_at,
+        updated_at=version.created_at,
+    )
+
+
+def _run_bars(record: BacktestRunRecord) -> list[Any]:
+    """读回本次运行区间与数据源内的 K 线；只查历史库，不访问实时行情。
+
+    结束时刻是「结束日当天 23:59:59Z」，而 `load_candles` 的窗口是半开区间；加一秒
+    才能把恰好落在该秒上的最后一根 K 线包含进来。
+    """
+
+    start, end = _window(record.start_date, record.end_date)
+    return load_candles(
+        record.inst_id,
+        record.bar,
+        start=start,
+        end=end + timedelta(seconds=1),
+        source=record.data_source,
+    )
+
+
+def _chart_candle(bar: Any) -> BacktestChartCandle:
+    """行情模块的一根 K 线 → 图表契约；来源与是否收盘原样保留。"""
+
+    return BacktestChartCandle(
+        time=bar.open_time,
+        open=decimal_str(bar.open),
+        high=decimal_str(bar.high),
+        low=decimal_str(bar.low),
+        close=decimal_str(bar.close),
+        volume=decimal_str(bar.volume),
+        is_complete=bool(bar.confirm),
+        source=bar.source,
+    )
+
+
+def _markers(trades: Sequence[Any]) -> list[BacktestMarker]:
+    """每笔完整交易生成入场与出场两个标记；标记只来自 `backtest_trades`。
+
+    多头入场的买卖方向是买入、出场是卖出；空头相反。盈亏与退出原因只放在出场标记
+    上：同一笔交易的盈亏说两次没有意义，入场时也还没有结果。
+    """
+
+    markers: list[BacktestMarker] = []
+    for trade in trades:
+        trade_id = _trade_id(trade)
+        markers.append(
+            BacktestMarker(
+                trade_id=trade_id,
+                kind="entry",
+                time=trade.entry_time,
+                price=decimal_str(trade.entry_price),
+                side=_entry_side(trade.side),
+                qty=decimal_str(trade.qty),
+            )
+        )
+        markers.append(
+            BacktestMarker(
+                trade_id=trade_id,
+                kind="exit",
+                time=trade.exit_time,
+                price=decimal_str(trade.exit_price),
+                side=_exit_side(trade.side),
+                qty=decimal_str(trade.qty),
+                pnl=decimal_str(trade.pnl),
+                reason=trade.reason,
+            )
+        )
+    markers.sort(key=lambda item: (item.time, item.kind != "entry", item.trade_id))
+    return markers
+
+
+def _overlays(bars: Sequence[Any], times: set[datetime]) -> list[BacktestOverlay]:
+    """由本次运行已保存的 K 线计算 MA20 / MA60，只保留净值时间轴上的点。"""
+
+    overlays: list[BacktestOverlay] = []
+    for period in (20, 60):
+        values = _indicator_values(bars, period)
+        overlays.append(
+            BacktestOverlay(
+                name=f"MA{period}",
+                points=[
+                    BacktestOverlayPoint(time=moment, value=decimal_str(values[moment]))
+                    for moment in sorted(times)
+                    if moment in values
+                ],
+            )
+        )
+    return overlays
+
+
+def _indicator_values(bars: Sequence[Any], period: int) -> dict[datetime, Decimal]:
+    """按周期算 SMA，返回「时刻 → 值」；窗口未成形的点不出现。"""
+
+    series = compute("sma", bars, {"period": period})
+    return {
+        point.time: point.values["sma"]
+        for point in series.points
+        if point.values.get("sma") is not None
+    }
+
+
+def _ratio(value: Decimal) -> str:
+    """比率按契约的小数位收口；正负号就是回撤方向，不改写为百分比。"""
+
+    return decimal_str(value)
+
+
+def _entry_side(side: str) -> str:
+    return "buy" if side == "long" else "sell"
+
+
+def _exit_side(side: str) -> str:
+    return "sell" if side == "long" else "buy"
+
+
+def _trade_id(trade: Any) -> str:
+    """稳定标识：产品键 + 开仓与平仓时刻 + 持仓方向 + 数量。
+
+    同一标的可以在同一根 K 线上分批建立方向相同的仓位，只用开仓时刻与方向会让
+    这些交易共用一个标识，回放和图表就分不清是哪一笔。平仓时刻与数量一起参与，
+    才能在保存下来的成交之间保持唯一。
+    """
+
+    return (
+        f"{trade.product_key}:{trade.entry_time.isoformat()}:"
+        f"{trade.exit_time.isoformat()}:{trade.side}:{decimal_str(trade.qty)}"
+    )
+
+
+def _filter_trades(
+    record: BacktestRunRecord,
+    *,
+    side: str | None,
+    result: str | None,
+    inst_id: str | None,
+) -> list[Any]:
+    """按方向、净盈亏结果与标的筛选；结果按「价格盈亏 − 手续费」判定。"""
+
+    selected: list[Any] = []
+    for trade in record.trades:
+        if side is not None and trade.side != side:
+            continue
+        net = trade.pnl - trade.fee
+        if result == "profit" and net <= 0:
+            continue
+        if result == "loss" and net >= 0:
+            continue
+        if inst_id is not None and trade.inst_id != inst_id:
+            continue
+        selected.append(trade)
+    return selected
+
+
+def _iso_z(value: datetime) -> str:
+    """CSV 里的时刻统一成 UTC、秒精度、带 `Z`。"""
+
+    return value.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _group_equity(records: Sequence[BacktestRunRecord]) -> list[GroupEquityPoint]:
+    """把同一批的成员运行合成等权组合净值。
+
+    每个成员先用自己的首点归一化，再在每个时刻对已开始的成员取平均；成员在某个时刻
+    没有曲线点时沿用自己上一个有效值。这样不同标的的初始资金和日线起点不同也能合成，
+    且不会为缺失成员补一条假曲线。
+    """
+
+    members: list[tuple[Decimal, dict[datetime, Decimal]]] = []
+    for record in records:
+        if not record.equity:
+            continue
+        base = record.equity[0].equity
+        if base <= 0:
+            continue
+        members.append((base, {point.time: point.equity for point in record.equity}))
+    if not members:
+        return []
+
+    timeline = sorted({moment for _, points in members for moment in points})
+    last: list[Decimal | None] = [None] * len(members)
+    combined: list[GroupEquityPoint] = []
+    for moment in timeline:
+        total = Decimal(0)
+        count = 0
+        for index, (base, points) in enumerate(members):
+            value = points.get(moment)
+            if value is not None:
+                last[index] = value
+            if last[index] is not None:
+                total += last[index] / base
+                count += 1
+        if count:
+            combined.append(GroupEquityPoint(time=moment, nav=decimal_str(total / Decimal(count))))
+    return combined
 
 
 def _window(start_date: date, end_date: date) -> tuple[datetime, datetime]:
@@ -307,6 +767,8 @@ def _targets(
     instrument: Instrument,
     timeline: set[datetime],
     weight_cap: Decimal,
+    *,
+    direction: str,
 ) -> tuple[TargetPortfolio, ...]:
     """把完整目标组合序列收窄成本次运行只含一条腿的序列。
 
@@ -327,6 +789,7 @@ def _targets(
             )
             for leg in target.legs
             if leg.product_key == instrument.product_key
+            and (direction == "long_short" or leg.side == direction.split("_")[0])
         )
         rounds.append(TargetPortfolio(as_of=target.as_of, legs=legs))
     return tuple(rounds)
@@ -359,7 +822,7 @@ def _summary(record: BacktestRunRecord | BacktestRunHeader) -> BacktestRunSummar
     return BacktestRunSummary(
         run_id=record.run_id,
         status="succeeded",
-        strategy_instance_id=record.strategy_instance_id,
+        strategy_version_id=record.strategy_version_id,
         params=dict(record.params),
         data_source=record.data_source,
         inst_id=record.inst_id,
@@ -466,7 +929,7 @@ def _trade(trade: Any) -> BacktestTrade:
     """
 
     return BacktestTrade(
-        trade_id=f"{trade.product_key}:{trade.entry_time.isoformat()}:{trade.side}",
+        trade_id=_trade_id(trade),
         product_key=trade.product_key,
         inst_id=trade.inst_id,
         inst_type=trade.inst_type,
@@ -477,8 +940,10 @@ def _trade(trade: Any) -> BacktestTrade:
         exit_time=trade.exit_time,
         exit_price=decimal_str(trade.exit_price),
         fee=decimal_str(trade.fee),
+        slippage=decimal_str(trade.slippage),
         funding=None,
         pnl=decimal_str(trade.pnl),
+        net_pnl=decimal_str(trade.pnl - trade.fee),
         reason=trade.reason,
     )
 
@@ -486,7 +951,9 @@ def _trade(trade: Any) -> BacktestTrade:
 def _request(record: BacktestRunRecord) -> BacktestRequest:
     """落库的请求原样还原成契约模型；坏数据属于「不该发生」，直接判错。"""
 
-    return BacktestRequest.model_validate(dict(record.request))
+    payload = dict(record.request)
+    payload["strategy_version_id"] = record.strategy_version_id or ""
+    return BacktestRequest.model_validate(payload)
 
 
 def _ranking_row(header: BacktestRunHeader) -> BacktestRankingRow:

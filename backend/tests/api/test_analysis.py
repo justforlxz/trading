@@ -13,6 +13,7 @@ from app.backtest.model import BacktestRunRow
 from app.core import Bar, Timeframe
 from app.db import session_scope
 from app.market import upsert_candles
+from app.strategy import create_strategy, link_backtest
 from tests.api.conftest import latest_opens, seed_instruments
 from tests.factories.instruments import make_ref, make_swap_ref
 
@@ -57,11 +58,27 @@ def seed_watchlist(client: TestClient, *inst_ids: str) -> None:
         assert response.status_code == 201, response.text
 
 
-def add_backtest_run(inst_id: str) -> str:
-    """写一条已完成的回测行；经由公开读取路径验证关联策略映射。"""
+def add_backtest_run(inst_id: str) -> tuple[str, str, str]:
+    """写一条已完成且正式关联到策略版本的回测行。"""
 
     run_id = "bt_detail_0001"
     created = datetime.now(UTC).replace(microsecond=0)
+    strategy = create_strategy(
+        name="AAPL 趋势",
+        category="directional",
+        description=None,
+        timeframe="1d",
+        direction="long_only",
+        rule_json={
+            "entry": {"all": [{"left": "MA(20)", "op": ">", "right": "MA(60)"}]},
+            "exit": {"any": [{"left": "MA(20)", "op": "<", "right": "MA(60)"}]},
+        },
+        parameters={"trend_window": 20, "momentum_window": 10, "leg_count": 1},
+        instrument_ids=[inst_id],
+        cost_model=None,
+        position_sizing=None,
+        change_note="初始版本",
+    )
     metrics = {
         "total_return": "0.124055",
         "max_drawdown": "0.0612",
@@ -77,9 +94,9 @@ def add_backtest_run(inst_id: str) -> str:
         session.add(
             BacktestRunRow(
                 run_id=run_id,
-                strategy_instance_id="si_0001",
-                strategy_id="ma_cross",
-                strategy_version="1.0.0",
+                strategy_instance_id=strategy.current_version_id,
+                strategy_id=strategy.id,
+                strategy_version="1",
                 params_json=json.dumps({"fast": 5, "slow": 20}),
                 bar="1d",
                 start_date=date(2026, 10, 1),
@@ -98,7 +115,8 @@ def add_backtest_run(inst_id: str) -> str:
                 created_at=int(created.timestamp()),
             )
         )
-    return run_id
+    assert link_backtest(strategy.current_version_id, run_id) is True
+    return run_id, strategy.current_version_id, strategy.id
 
 
 def test_daily_analysis_returns_every_aggregate_field(client: TestClient) -> None:
@@ -271,7 +289,7 @@ def test_linked_strategies_come_from_saved_backtest_runs(client: TestClient) -> 
 
     seed_instruments(make_ref())
     seed_analysis_bars("XAAPL-USDT")
-    run_id = add_backtest_run("XAAPL-USDT")
+    run_id, version_id, strategy_id = add_backtest_run("XAAPL-USDT")
 
     response = client.get("/api/instruments/XAAPL-USDT/analysis")
 
@@ -279,7 +297,9 @@ def test_linked_strategies_come_from_saved_backtest_runs(client: TestClient) -> 
     linked = response.json()["linked_strategies"]
     assert len(linked) == 1
     assert linked[0]["run_id"] == run_id
-    assert linked[0]["strategy_id"] == "ma_cross"
+    assert linked[0]["strategy_id"] == strategy_id
+    assert linked[0]["strategy_version_id"] == version_id
+    assert linked[0]["strategy_name"] == "AAPL 趋势"
     assert linked[0]["total_return_pct"] == "12.4055"
     assert linked[0]["max_drawdown_pct"] == "6.12"
     assert linked[0]["trade_count"] == 37

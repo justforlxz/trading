@@ -148,7 +148,8 @@ class CorrelationReading(BaseModel):
 
 class LinkedBacktest(BaseModel):
     run_id: str
-    strategy_instance_id: str
+    #: 旧运行没有策略版本关联时为 null；新运行总是指向一个不可变版本。
+    strategy_version_id: str | None = None
     strategy_name: str
     strategy_id: str
     data_source: DataSource
@@ -283,7 +284,7 @@ _EXAMPLE_ANALYSIS = {
     "linked_strategies": [
         {
             "run_id": "bt_0001",
-            "strategy_instance_id": "si_0001",
+            "strategy_version_id": "sv_0001",
             "strategy_name": "AAPL 趋势",
             "strategy_id": "ma_cross",
             "data_source": "okx_spot",

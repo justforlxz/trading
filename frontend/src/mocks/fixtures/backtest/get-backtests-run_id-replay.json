@@ -1,0 +1,41 @@
+{
+  "bar": "1d",
+  "points": [
+    {
+      "cash": "10000",
+      "close": "103",
+      "equity": "10000",
+      "index": 0,
+      "indicators": {
+        "ma20": "98.40"
+      },
+      "position": "0",
+      "signal": "HOLD",
+      "time": "2026-11-05T00:00:00Z"
+    },
+    {
+      "cash": "9128.37",
+      "close": "101",
+      "equity": "10020",
+      "index": 1,
+      "indicators": {
+        "ma20": "99.10",
+        "ma60": "96.80"
+      },
+      "position": "891.63",
+      "signal": "BUY",
+      "time": "2026-11-06T00:00:00Z"
+    }
+  ],
+  "run_id": "bt_0001",
+  "trades": [
+    {
+      "index": 1,
+      "kind": "entry",
+      "price": "101",
+      "qty": "8.63",
+      "side": "buy",
+      "trade_id": "tr_0001"
+    }
+  ]
+}

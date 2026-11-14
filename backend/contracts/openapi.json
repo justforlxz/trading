@@ -751,6 +751,422 @@
         "title": "AnalysisQuote",
         "type": "object"
       },
+      "BacktestBatchResponse": {
+        "description": "批量回测的创建结果：第一条运行的汇总 + 全部运行标识 + 等权组合净值。",
+        "examples": [
+          {
+            "bar": "1h",
+            "combination": "equal_weight",
+            "combination_note": "各成员运行按首点归一化后的净值等权平均；缺失时沿用上一有效点",
+            "created_at": "2026-11-10T01:20:00Z",
+            "data_source": "okx",
+            "end_date": "2026-11-01",
+            "finished_at": "2026-11-10T01:21:30Z",
+            "group_equity": [
+              {
+                "nav": "1",
+                "time": "2026-11-05T00:00:00Z"
+              },
+              {
+                "nav": "1.004",
+                "time": "2026-11-06T00:00:00Z"
+              }
+            ],
+            "inst_id": "XAAPL-USDT",
+            "inst_type": "SPOT",
+            "is_proxy": false,
+            "metrics": {
+              "annualized_return_pct": "48.21",
+              "avg_holding_hours": "18.4",
+              "final_capital": "11240.55",
+              "funding_coverage_pct": "100",
+              "funding_missing_count": 0,
+              "funding_total": "-12.84",
+              "initial_capital": "10000",
+              "max_drawdown_pct": "-6.12",
+              "max_single_loss": "-158.20",
+              "max_single_win": "312.40",
+              "payoff_ratio": "1.72",
+              "profit_factor": "1.95",
+              "sharpe": "1.31",
+              "total_return_pct": "12.4055",
+              "trade_count": 37,
+              "win_rate": "0.54"
+            },
+            "params": {
+              "pair_count": 1,
+              "reversion_window": 3,
+              "strength_window": 2
+            },
+            "run_id": "bt_0001",
+            "run_ids": [
+              "bt_0001",
+              "bt_0002"
+            ],
+            "start_date": "2026-08-01",
+            "status": "succeeded",
+            "strategy_version_id": "sv_0001",
+            "symbol_count": 1
+          }
+        ],
+        "properties": {
+          "bar": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Bar",
+            "type": "string"
+          },
+          "combination": {
+            "const": "equal_weight",
+            "default": "equal_weight",
+            "title": "Combination",
+            "type": "string"
+          },
+          "combination_note": {
+            "default": "各成员运行按首点归一化后的净值等权平均；缺失时沿用上一有效点",
+            "title": "Combination Note",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "data_source": {
+            "enum": [
+              "okx",
+              "okx_spot",
+              "okx_swap",
+              "us_equity_proxy"
+            ],
+            "title": "Data Source",
+            "type": "string"
+          },
+          "end_date": {
+            "format": "date",
+            "title": "End Date",
+            "type": "string"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "group_equity": {
+            "items": {
+              "$ref": "#/components/schemas/GroupEquityPoint"
+            },
+            "title": "Group Equity",
+            "type": "array"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "inst_type": {
+            "enum": [
+              "SPOT",
+              "SWAP"
+            ],
+            "title": "Inst Type",
+            "type": "string"
+          },
+          "is_proxy": {
+            "title": "Is Proxy",
+            "type": "boolean"
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BacktestMetrics"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "params": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "title": "Params",
+            "type": "object"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "run_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Run Ids",
+            "type": "array"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "strategy_version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategy Version Id"
+          },
+          "symbol_count": {
+            "title": "Symbol Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "run_id",
+          "status",
+          "strategy_version_id",
+          "params",
+          "data_source",
+          "inst_id",
+          "inst_type",
+          "is_proxy",
+          "bar",
+          "start_date",
+          "end_date",
+          "symbol_count",
+          "created_at",
+          "run_ids",
+          "group_equity"
+        ],
+        "title": "BacktestBatchResponse",
+        "type": "object"
+      },
+      "BacktestChartCandle": {
+        "description": "回测 K 线：只包含本次运行实际用到的 bar，来源与是否收盘原样保留。",
+        "properties": {
+          "close": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Close",
+            "type": "string"
+          },
+          "high": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "High",
+            "type": "string"
+          },
+          "is_complete": {
+            "title": "Is Complete",
+            "type": "boolean"
+          },
+          "low": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Low",
+            "type": "string"
+          },
+          "open": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Open",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "okx",
+              "okx_spot",
+              "okx_swap",
+              "us_equity_proxy"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "time": {
+            "title": "Time",
+            "type": "string"
+          },
+          "volume": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Volume",
+            "type": "string"
+          }
+        },
+        "required": [
+          "time",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "is_complete",
+          "source"
+        ],
+        "title": "BacktestChartCandle",
+        "type": "object"
+      },
+      "BacktestChartResponse": {
+        "description": "K 线图：K 线、来自成交表的买卖标记、由已保存行情算出的均线叠加。",
+        "examples": [
+          {
+            "bar": "1d",
+            "candles": [
+              {
+                "close": "103",
+                "high": "104",
+                "is_complete": true,
+                "low": "99",
+                "open": "100",
+                "source": "okx",
+                "time": "2026-11-05T00:00:00Z",
+                "volume": "1200"
+              }
+            ],
+            "data_source": "okx",
+            "inst_id": "XAAPL-USDT",
+            "markers": [
+              {
+                "kind": "entry",
+                "price": "101",
+                "qty": "8.63",
+                "side": "buy",
+                "time": "2026-11-06T00:00:00Z",
+                "trade_id": "tr_0001"
+              },
+              {
+                "kind": "exit",
+                "pnl": "17.26",
+                "price": "103",
+                "qty": "8.63",
+                "reason": "MA20 下穿 MA60",
+                "side": "sell",
+                "time": "2026-11-08T00:00:00Z",
+                "trade_id": "tr_0001"
+              }
+            ],
+            "overlays": [
+              {
+                "name": "MA20",
+                "points": [
+                  {
+                    "time": "2026-11-05T00:00:00Z",
+                    "value": "98.40"
+                  }
+                ]
+              }
+            ],
+            "run_id": "bt_0001"
+          }
+        ],
+        "properties": {
+          "bar": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Bar",
+            "type": "string"
+          },
+          "candles": {
+            "items": {
+              "$ref": "#/components/schemas/BacktestChartCandle"
+            },
+            "title": "Candles",
+            "type": "array"
+          },
+          "data_source": {
+            "enum": [
+              "okx",
+              "okx_spot",
+              "okx_swap",
+              "us_equity_proxy"
+            ],
+            "title": "Data Source",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "markers": {
+            "items": {
+              "$ref": "#/components/schemas/BacktestMarker"
+            },
+            "title": "Markers",
+            "type": "array"
+          },
+          "overlays": {
+            "items": {
+              "$ref": "#/components/schemas/BacktestOverlay"
+            },
+            "title": "Overlays",
+            "type": "array"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "inst_id",
+          "bar",
+          "data_source",
+          "candles",
+          "markers",
+          "overlays"
+        ],
+        "title": "BacktestChartResponse",
+        "type": "object"
+      },
       "BacktestCosts": {
         "properties": {
           "maker_fee_bps": {
@@ -836,7 +1252,7 @@
               "position_size": "2000",
               "quote_currency": "USDT",
               "start_date": "2026-08-01",
-              "strategy_instance_id": "si_0001",
+              "strategy_version_id": "sv_0001",
               "targets": {
                 "inst_ids": [
                   "XAAPL-USDT"
@@ -879,7 +1295,7 @@
               "run_id": "bt_0001",
               "start_date": "2026-08-01",
               "status": "succeeded",
-              "strategy_instance_id": "si_0001",
+              "strategy_version_id": "sv_0001",
               "symbol_count": 1
             },
             "trades": [
@@ -891,11 +1307,13 @@
                 "fee": "1.98",
                 "inst_id": "XAAPL-USDT",
                 "inst_type": "SPOT",
+                "net_pnl": "33.26",
                 "pnl": "35.24",
                 "product_key": "XAAPL",
                 "qty": "8.63",
                 "reason": "MA20 下穿 MA60",
                 "side": "long",
+                "slippage": "0.42",
                 "trade_id": "tr_0001"
               }
             ]
@@ -942,6 +1360,93 @@
           "equity_curve"
         ],
         "title": "BacktestDetailResponse",
+        "type": "object"
+      },
+      "BacktestEquityPoint": {
+        "description": "净值曲线的一个点；`benchmark_equity` 缺失时保持 null，不补假线。",
+        "properties": {
+          "benchmark_equity": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Equity"
+          },
+          "drawdown": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Drawdown",
+            "type": "string"
+          },
+          "equity": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Equity",
+            "type": "string"
+          },
+          "time": {
+            "title": "Time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "time",
+          "equity",
+          "drawdown"
+        ],
+        "title": "BacktestEquityPoint",
+        "type": "object"
+      },
+      "BacktestEquityResponse": {
+        "examples": [
+          {
+            "points": [
+              {
+                "drawdown": "0",
+                "equity": "10000",
+                "time": "2026-11-05T00:00:00Z"
+              },
+              {
+                "drawdown": "-0.006",
+                "equity": "9940",
+                "time": "2026-11-06T00:00:00Z"
+              }
+            ],
+            "run_id": "bt_0001"
+          }
+        ],
+        "properties": {
+          "benchmark": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/BacktestEquityPoint"
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "points"
+        ],
+        "title": "BacktestEquityResponse",
         "type": "object"
       },
       "BacktestLeg": {
@@ -1024,6 +1529,78 @@
           "contribution_pct"
         ],
         "title": "BacktestLeg",
+        "type": "object"
+      },
+      "BacktestMarker": {
+        "description": "一笔完整交易的入场或出场标记；每个标记都来自 `backtest_trades` 的一行。",
+        "properties": {
+          "kind": {
+            "enum": [
+              "entry",
+              "exit"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "pnl": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pnl"
+          },
+          "price": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Price",
+            "type": "string"
+          },
+          "qty": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Qty",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "side": {
+            "enum": [
+              "buy",
+              "sell"
+            ],
+            "title": "Side",
+            "type": "string"
+          },
+          "time": {
+            "title": "Time",
+            "type": "string"
+          },
+          "trade_id": {
+            "title": "Trade Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trade_id",
+          "kind",
+          "time",
+          "price",
+          "side",
+          "qty"
+        ],
+        "title": "BacktestMarker",
         "type": "object"
       },
       "BacktestMetrics": {
@@ -1150,6 +1727,46 @@
           "max_single_loss"
         ],
         "title": "BacktestMetrics",
+        "type": "object"
+      },
+      "BacktestOverlay": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/BacktestOverlayPoint"
+            },
+            "title": "Points",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "points"
+        ],
+        "title": "BacktestOverlay",
+        "type": "object"
+      },
+      "BacktestOverlayPoint": {
+        "properties": {
+          "time": {
+            "title": "Time",
+            "type": "string"
+          },
+          "value": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "time",
+          "value"
+        ],
+        "title": "BacktestOverlayPoint",
         "type": "object"
       },
       "BacktestPortfolio": {
@@ -1326,6 +1943,215 @@
         "title": "BacktestRankingRow",
         "type": "object"
       },
+      "BacktestReplayPoint": {
+        "description": "按 K 线索引排列的一个回放点；全部字段来自已保存的行情与结果。",
+        "properties": {
+          "cash": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Cash",
+            "type": "string"
+          },
+          "close": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close"
+          },
+          "equity": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Equity",
+            "type": "string"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "indicators": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Indicators",
+            "type": "object"
+          },
+          "position": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Position",
+            "type": "string"
+          },
+          "signal": {
+            "enum": [
+              "BUY",
+              "SELL",
+              "HOLD"
+            ],
+            "title": "Signal",
+            "type": "string"
+          },
+          "time": {
+            "title": "Time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "index",
+          "time",
+          "equity",
+          "cash",
+          "position",
+          "signal",
+          "indicators"
+        ],
+        "title": "BacktestReplayPoint",
+        "type": "object"
+      },
+      "BacktestReplayResponse": {
+        "examples": [
+          {
+            "bar": "1d",
+            "points": [
+              {
+                "cash": "10000",
+                "close": "103",
+                "equity": "10000",
+                "index": 0,
+                "indicators": {
+                  "ma20": "98.40"
+                },
+                "position": "0",
+                "signal": "HOLD",
+                "time": "2026-11-05T00:00:00Z"
+              },
+              {
+                "cash": "9128.37",
+                "close": "101",
+                "equity": "10020",
+                "index": 1,
+                "indicators": {
+                  "ma20": "99.10",
+                  "ma60": "96.80"
+                },
+                "position": "891.63",
+                "signal": "BUY",
+                "time": "2026-11-06T00:00:00Z"
+              }
+            ],
+            "run_id": "bt_0001",
+            "trades": [
+              {
+                "index": 1,
+                "kind": "entry",
+                "price": "101",
+                "qty": "8.63",
+                "side": "buy",
+                "trade_id": "tr_0001"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "bar": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Bar",
+            "type": "string"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/BacktestReplayPoint"
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "trades": {
+            "items": {
+              "$ref": "#/components/schemas/BacktestReplayTrade"
+            },
+            "title": "Trades",
+            "type": "array"
+          }
+        },
+        "required": [
+          "run_id",
+          "bar",
+          "points",
+          "trades"
+        ],
+        "title": "BacktestReplayResponse",
+        "type": "object"
+      },
+      "BacktestReplayTrade": {
+        "description": "回放时间轴上的成交事件；`index` 与该运行第几根 K 线对应。",
+        "properties": {
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "entry",
+              "exit"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "price": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Price",
+            "type": "string"
+          },
+          "qty": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Qty",
+            "type": "string"
+          },
+          "side": {
+            "enum": [
+              "buy",
+              "sell"
+            ],
+            "title": "Side",
+            "type": "string"
+          },
+          "trade_id": {
+            "title": "Trade Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "index",
+          "trade_id",
+          "kind",
+          "side",
+          "price",
+          "qty"
+        ],
+        "title": "BacktestReplayTrade",
+        "type": "object"
+      },
       "BacktestRequest": {
         "description": "一次回测的全部可复现输入。结果必须能按这份配置重放。",
         "properties": {
@@ -1396,8 +2222,8 @@
             "title": "Start Date",
             "type": "string"
           },
-          "strategy_instance_id": {
-            "title": "Strategy Instance Id",
+          "strategy_version_id": {
+            "title": "Strategy Version Id",
             "type": "string"
           },
           "targets": {
@@ -1405,7 +2231,7 @@
           }
         },
         "required": [
-          "strategy_instance_id",
+          "strategy_version_id",
           "targets",
           "bar",
           "start_date",
@@ -1461,7 +2287,7 @@
                 "run_id": "bt_0001",
                 "start_date": "2026-08-01",
                 "status": "succeeded",
-                "strategy_instance_id": "si_0001",
+                "strategy_version_id": "sv_0001",
                 "symbol_count": 1
               }
             ],
@@ -1536,7 +2362,7 @@
             "run_id": "bt_0001",
             "start_date": "2026-08-01",
             "status": "succeeded",
-            "strategy_instance_id": "si_0001",
+            "strategy_version_id": "sv_0001",
             "symbol_count": 1
           }
         ],
@@ -1659,9 +2485,16 @@
             "title": "Status",
             "type": "string"
           },
-          "strategy_instance_id": {
-            "title": "Strategy Instance Id",
-            "type": "string"
+          "strategy_version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategy Version Id"
           },
           "symbol_count": {
             "title": "Symbol Count",
@@ -1671,7 +2504,7 @@
         "required": [
           "run_id",
           "status",
-          "strategy_instance_id",
+          "strategy_version_id",
           "params",
           "data_source",
           "inst_id",
@@ -1965,6 +2798,11 @@
             "title": "Inst Type",
             "type": "string"
           },
+          "net_pnl": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Net Pnl",
+            "type": "string"
+          },
           "pnl": {
             "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
             "title": "Pnl",
@@ -1991,6 +2829,11 @@
             "title": "Side",
             "type": "string"
           },
+          "slippage": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Slippage",
+            "type": "string"
+          },
           "trade_id": {
             "title": "Trade Id",
             "type": "string"
@@ -2008,10 +2851,75 @@
           "exit_time",
           "exit_price",
           "fee",
+          "slippage",
           "pnl",
+          "net_pnl",
           "reason"
         ],
         "title": "BacktestTrade",
+        "type": "object"
+      },
+      "BacktestTradeListResponse": {
+        "examples": [
+          {
+            "items": [
+              {
+                "entry_price": "101",
+                "entry_time": "2026-11-06T00:00:00Z",
+                "exit_price": "103",
+                "exit_time": "2026-11-08T00:00:00Z",
+                "fee": "0.87",
+                "inst_id": "XAAPL-USDT",
+                "inst_type": "SPOT",
+                "net_pnl": "16.39",
+                "pnl": "17.26",
+                "product_key": "XAAPL",
+                "qty": "8.63",
+                "reason": "MA20 下穿 MA60",
+                "side": "long",
+                "slippage": "0.44",
+                "trade_id": "tr_0001"
+              }
+            ],
+            "limit": 100,
+            "offset": 0,
+            "run_id": "bt_0001",
+            "total": 1
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BacktestTrade"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "run_id",
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "BacktestTradeListResponse",
         "type": "object"
       },
       "Candle": {
@@ -4791,6 +5699,26 @@
         "title": "FillListResponse",
         "type": "object"
       },
+      "GroupEquityPoint": {
+        "description": "等权组合净值：各成员以首点归一化后取平均，`nav` 从 1 开始。",
+        "properties": {
+          "nav": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Nav",
+            "type": "string"
+          },
+          "time": {
+            "title": "Time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "time",
+          "nav"
+        ],
+        "title": "GroupEquityPoint",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -5210,8 +6138,8 @@
                 "max_drawdown_pct": "6.12",
                 "run_id": "bt_0001",
                 "strategy_id": "ma_cross",
-                "strategy_instance_id": "si_0001",
                 "strategy_name": "AAPL 趋势",
+                "strategy_version_id": "sv_0001",
                 "total_return_pct": "12.4055",
                 "trade_count": 37
               }
@@ -5782,13 +6710,20 @@
             "title": "Strategy Id",
             "type": "string"
           },
-          "strategy_instance_id": {
-            "title": "Strategy Instance Id",
-            "type": "string"
-          },
           "strategy_name": {
             "title": "Strategy Name",
             "type": "string"
+          },
+          "strategy_version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategy Version Id"
           },
           "total_return_pct": {
             "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
@@ -5802,7 +6737,6 @@
         },
         "required": [
           "run_id",
-          "strategy_instance_id",
           "strategy_name",
           "strategy_id",
           "data_source",
@@ -10773,7 +11707,7 @@
         ]
       },
       "post": {
-        "description": "按请求跑一次批量回测，每个标的各落一条运行；返回其中第一条。\n\n实例不存在返回 404，已停用返回 409（与目标组合回放同一口径）：静默跳过一个停用的\n实例会让「没有信号」与「没跑」混成同一件事。",
+        "description": "按策略版本跑一次批量回测，每个标的各落一条运行，并返回等权组合净值。\n\n版本不存在返回 404；周期与版本不一致、标的超出版本范围、类别没有对应模板都返回\n400。目标组合仍由现有模板引擎按同一份历史行情逐时点回放，撮合与成本模型不变。\n每个运行都在同一事务里写入 `strategy_linked_backtests`，历史回测因此永远指向\n当时那个不可变版本。",
         "operationId": "create_backtest_api_backtests_post",
         "requestBody": {
           "content": {
@@ -10790,7 +11724,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BacktestRunSummary"
+                  "$ref": "#/components/schemas/BacktestBatchResponse"
                 }
               }
             },
@@ -10962,6 +11896,344 @@
           }
         },
         "summary": "Get Backtest",
+        "tags": [
+          "backtest"
+        ]
+      }
+    },
+    "/api/backtests/{run_id}/chart": {
+      "get": {
+        "description": "K 线、买卖标记与均线叠加；标记只从 `backtest_trades` 生成。",
+        "operationId": "get_backtest_chart_api_backtests__run_id__chart_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestChartResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Backtest Chart",
+        "tags": [
+          "backtest"
+        ]
+      }
+    },
+    "/api/backtests/{run_id}/equity": {
+      "get": {
+        "description": "策略净值与回撤序列；引擎没有保存基准行情，因此 `benchmark` 为 null。",
+        "operationId": "get_backtest_equity_api_backtests__run_id__equity_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestEquityResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Backtest Equity",
+        "tags": [
+          "backtest"
+        ]
+      }
+    },
+    "/api/backtests/{run_id}/replay": {
+      "get": {
+        "description": "按 K 线索引排列的回放点；只读本次运行保存的行情、净值与成交。",
+        "operationId": "get_backtest_replay_api_backtests__run_id__replay_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestReplayResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Backtest Replay",
+        "tags": [
+          "backtest"
+        ]
+      }
+    },
+    "/api/backtests/{run_id}/trades": {
+      "get": {
+        "description": "按方向、盈亏结果与标的筛选交易明细，分页返回本页与总条数。",
+        "operationId": "list_backtest_trades_api_backtests__run_id__trades_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "side",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^(long|short)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Side"
+            }
+          },
+          {
+            "in": "query",
+            "name": "result",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^(profit|loss)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Result"
+            }
+          },
+          {
+            "in": "query",
+            "name": "inst_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Inst Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestTradeListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Backtest Trades",
+        "tags": [
+          "backtest"
+        ]
+      }
+    },
+    "/api/backtests/{run_id}/trades.csv": {
+      "get": {
+        "description": "导出当前筛选条件下的交易明细；UTF-8 带 BOM，列顺序固定。",
+        "operationId": "export_backtest_trades_api_backtests__run_id__trades_csv_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "side",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^(long|short)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Side"
+            }
+          },
+          {
+            "in": "query",
+            "name": "result",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^(profit|loss)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Result"
+            }
+          },
+          {
+            "in": "query",
+            "name": "inst_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Inst Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Backtest Trades",
         "tags": [
           "backtest"
         ]

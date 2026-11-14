@@ -35,7 +35,7 @@ from app.market import (
     pearson,
 )
 from app.shared import bar_seconds
-from app.strategy import list_instances
+from app.strategy import get_user_strategy
 from app.watchlist import group_of, tracked_instruments
 
 __all__ = ["ANALYSIS_BARS", "Analysis", "AnalysisCandles", "instrument_analysis"]
@@ -172,7 +172,7 @@ class Correlation:
 @dataclass(frozen=True, slots=True)
 class LinkedStrategy:
     run_id: str
-    strategy_instance_id: str
+    strategy_version_id: str | None
     strategy_name: str
     strategy_id: str
     data_source: str
@@ -534,16 +534,19 @@ def _linked_strategies(instrument: Instrument) -> tuple[LinkedStrategy, ...]:
     headers = list_instrument_runs(
         instrument.symbol, created_since=since, limit=LINKED_STRATEGY_LIMIT
     )
-    instances, _ = list_instances(limit=500)
-    names = {instance.instance_id: instance.name for instance in instances}
-    return tuple(_linked(header, names) for header in headers)
+    names: dict[str, str] = {}
+    for header in headers:
+        if header.strategy_id not in names:
+            strategy = get_user_strategy(header.strategy_id)
+            names[header.strategy_id] = header.strategy_id if strategy is None else strategy.name
+    return tuple(_linked(header, names[header.strategy_id]) for header in headers)
 
 
-def _linked(header: BacktestRunHeader, names: dict[str, str]) -> LinkedStrategy:
+def _linked(header: BacktestRunHeader, strategy_name: str) -> LinkedStrategy:
     return LinkedStrategy(
         run_id=header.run_id,
-        strategy_instance_id=header.strategy_instance_id,
-        strategy_name=names.get(header.strategy_instance_id, header.strategy_id),
+        strategy_version_id=header.strategy_version_id,
+        strategy_name=strategy_name,
         strategy_id=header.strategy_id,
         data_source=header.data_source,
         total_return_pct=header.metrics["total_return"] * _HUNDRED,

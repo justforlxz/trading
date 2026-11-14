@@ -4,6 +4,9 @@ import { HttpResponse, http } from "msw";
 
 import getAccountSummary from "./fixtures/positions/get-account-summary.json";
 import postAccountSync from "./fixtures/positions/post-account-sync.json";
+import getActivity from "./fixtures/alerts/get-activity.json";
+import getAlerts from "./fixtures/alerts/get-alerts.json";
+import patchAlertsAlertId from "./fixtures/alerts/patch-alerts-alert_id.json";
 import getApprovals from "./fixtures/approval/get-approvals.json";
 import postApprovals from "./fixtures/approval/post-approvals.json";
 import postApprovalsInstanceIdApprove from "./fixtures/approval/post-approvals-instance_id-approve.json";
@@ -41,6 +44,10 @@ import getOpportunitiesOpportunityId from "./fixtures/opportunity/get-opportunit
 import patchOpportunitiesOpportunityId from "./fixtures/opportunity/patch-opportunities-opportunity_id.json";
 import getPositionsExchange from "./fixtures/positions/get-positions-exchange.json";
 import putPositionsPositionRefRiskConfig from "./fixtures/risk/put-positions-position_ref-risk-config.json";
+import getResearchNotes from "./fixtures/research/get-research-notes.json";
+import postResearchNotes from "./fixtures/research/post-research-notes.json";
+import getResearchNotesNoteId from "./fixtures/research/get-research-notes-note_id.json";
+import putResearchNotesNoteId from "./fixtures/research/put-research-notes-note_id.json";
 import getRiskEvents from "./fixtures/risk/get-risk-events.json";
 import patchRiskEventsEventIdResolve from "./fixtures/risk/patch-risk-events-event_id-resolve.json";
 import getRiskExposure from "./fixtures/risk/get-risk-exposure.json";
@@ -56,12 +63,14 @@ import putStrategiesStrategyIdVersionsVersionInstruments from "./fixtures/strate
 import getWatchlist from "./fixtures/watchlist/get-watchlist.json";
 import postWatchlist from "./fixtures/watchlist/post-watchlist.json";
 import patchWatchlistInstId from "./fixtures/watchlist/patch-watchlist-inst_id.json";
-import putWatchlistInstIdAlert from "./fixtures/watchlist/put-watchlist-inst_id-alert.json";
 import getWatchlistInstIdRelated from "./fixtures/watchlist/get-watchlist-inst_id-related.json";
 
 export const handlers = [
   http.get("*/api/account/summary", () => HttpResponse.json(getAccountSummary)),
   http.post("*/api/account/sync", () => HttpResponse.json(postAccountSync)),
+  http.get("*/api/activity", () => HttpResponse.json(getActivity)),
+  http.get("*/api/alerts", () => HttpResponse.json(getAlerts)),
+  http.patch("*/api/alerts/:alert_id", () => HttpResponse.json(patchAlertsAlertId)),
   http.get("*/api/approvals", () => HttpResponse.json(getApprovals)),
   http.post("*/api/approvals", () => HttpResponse.json(postApprovals, { status: 201 })),
   http.post("*/api/approvals/:instance_id/approve", () => HttpResponse.json(postApprovalsInstanceIdApprove)),
@@ -102,6 +111,11 @@ export const handlers = [
   http.patch("*/api/opportunities/:opportunity_id", () => HttpResponse.json(patchOpportunitiesOpportunityId)),
   http.get("*/api/positions/exchange", () => HttpResponse.json(getPositionsExchange)),
   http.put("*/api/positions/:position_ref/risk-config", () => HttpResponse.json(putPositionsPositionRefRiskConfig)),
+  http.get("*/api/research-notes", () => HttpResponse.json(getResearchNotes)),
+  http.post("*/api/research-notes", () => HttpResponse.json(postResearchNotes, { status: 201 })),
+  http.get("*/api/research-notes/:note_id", () => HttpResponse.json(getResearchNotesNoteId)),
+  http.put("*/api/research-notes/:note_id", () => HttpResponse.json(putResearchNotesNoteId)),
+  http.delete("*/api/research-notes/:note_id", () => new HttpResponse(null, { status: 204 })),
   http.get("*/api/risk/events", () => HttpResponse.json(getRiskEvents)),
   http.patch("*/api/risk/events/:event_id/resolve", () => HttpResponse.json(patchRiskEventsEventIdResolve)),
   http.get("*/api/risk/exposure", () => HttpResponse.json(getRiskExposure)),
@@ -118,7 +132,5 @@ export const handlers = [
   http.post("*/api/watchlist", () => HttpResponse.json(postWatchlist, { status: 201 })),
   http.patch("*/api/watchlist/:inst_id", () => HttpResponse.json(patchWatchlistInstId)),
   http.delete("*/api/watchlist/:inst_id", () => new HttpResponse(null, { status: 204 })),
-  http.put("*/api/watchlist/:inst_id/alert", () => HttpResponse.json(putWatchlistInstIdAlert)),
-  http.delete("*/api/watchlist/:inst_id/alert", () => new HttpResponse(null, { status: 204 })),
   http.get("*/api/watchlist/:inst_id/related", () => HttpResponse.json(getWatchlistInstIdRelated)),
 ];

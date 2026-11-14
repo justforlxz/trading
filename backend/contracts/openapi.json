@@ -347,6 +347,294 @@
         "title": "AccountSyncResponse",
         "type": "object"
       },
+      "ActivityItem": {
+        "examples": [
+          {
+            "created_at": "2026-11-10T23:00:00Z",
+            "event_type": "research_note.created",
+            "id": "ac_0001",
+            "object_id": "rn_0001",
+            "object_type": "research_note",
+            "payload": {
+              "type": "hypothesis"
+            },
+            "summary": "创建研究记录「AAPL 假设」"
+          }
+        ],
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "event_type": {
+            "title": "Event Type",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "object_id": {
+            "title": "Object Id",
+            "type": "string"
+          },
+          "object_type": {
+            "title": "Object Type",
+            "type": "string"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "event_type",
+          "object_type",
+          "object_id",
+          "summary",
+          "payload",
+          "created_at"
+        ],
+        "title": "ActivityItem",
+        "type": "object"
+      },
+      "ActivityListResponse": {
+        "examples": [
+          {
+            "items": [
+              {
+                "created_at": "2026-11-10T23:00:00Z",
+                "event_type": "research_note.created",
+                "id": "ac_0001",
+                "object_id": "rn_0001",
+                "object_type": "research_note",
+                "payload": {
+                  "type": "hypothesis"
+                },
+                "summary": "创建研究记录「AAPL 假设」"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ActivityItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ActivityListResponse",
+        "type": "object"
+      },
+      "AlertItem": {
+        "examples": [
+          {
+            "detail": "XAAPL-USDT 没有有效止损记录",
+            "id": "al_0001",
+            "instrument_id": "XAAPL-USDT",
+            "payload": {
+              "position_ref": "manual:0001"
+            },
+            "rule_id": "stop_missing",
+            "rule_version": "b3-exposure-v1",
+            "severity": "warning",
+            "status": "pending",
+            "title": "持仓缺少止损",
+            "triggered_at": "2026-11-10T23:00:00Z",
+            "type": "risk"
+          }
+        ],
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "instrument_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrument Id"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          },
+          "rule_id": {
+            "title": "Rule Id",
+            "type": "string"
+          },
+          "rule_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Version"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning",
+              "critical"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "acknowledged",
+              "ignored",
+              "expired"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "triggered_at": {
+            "title": "Triggered At",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "indicator",
+              "price",
+              "risk",
+              "strategy",
+              "data"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "severity",
+          "rule_id",
+          "title",
+          "detail",
+          "payload",
+          "status",
+          "triggered_at"
+        ],
+        "title": "AlertItem",
+        "type": "object"
+      },
+      "AlertListResponse": {
+        "examples": [
+          {
+            "items": [
+              {
+                "detail": "XAAPL-USDT 没有有效止损记录",
+                "id": "al_0001",
+                "instrument_id": "XAAPL-USDT",
+                "payload": {
+                  "position_ref": "manual:0001"
+                },
+                "rule_id": "stop_missing",
+                "rule_version": "b3-exposure-v1",
+                "severity": "warning",
+                "status": "pending",
+                "title": "持仓缺少止损",
+                "triggered_at": "2026-11-10T23:00:00Z",
+                "type": "risk"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AlertItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "AlertListResponse",
+        "type": "object"
+      },
+      "AlertStatusUpdateRequest": {
+        "properties": {
+          "status": {
+            "enum": [
+              "acknowledged",
+              "ignored"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "AlertStatusUpdateRequest",
+        "type": "object"
+      },
       "AnalysisCandles": {
         "properties": {
           "available_from": {
@@ -3745,7 +4033,7 @@
         "type": "object"
       },
       "DashboardAlertItem": {
-        "description": "待处理提醒；当前来源是 B3 的未处置风险事件，B8 合并后换成提醒事件表。",
+        "description": "待处理提醒；来源是提醒事件表。",
         "properties": {
           "detail": {
             "title": "Detail",
@@ -3795,7 +4083,13 @@
             "type": "string"
           },
           "type": {
-            "const": "risk",
+            "enum": [
+              "indicator",
+              "price",
+              "risk",
+              "strategy",
+              "data"
+            ],
             "title": "Type",
             "type": "string"
           }
@@ -8345,86 +8639,6 @@
         "title": "PositionRiskConfigResponse",
         "type": "object"
       },
-      "PriceAlert": {
-        "examples": [
-          {
-            "direction": "above",
-            "enabled": true,
-            "inst_id": "XAAPL-USDT",
-            "price": "235.00"
-          }
-        ],
-        "properties": {
-          "direction": {
-            "enum": [
-              "above",
-              "below"
-            ],
-            "title": "Direction",
-            "type": "string"
-          },
-          "enabled": {
-            "title": "Enabled",
-            "type": "boolean"
-          },
-          "inst_id": {
-            "title": "Inst Id",
-            "type": "string"
-          },
-          "price": {
-            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
-            "title": "Price",
-            "type": "string"
-          },
-          "triggered_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Triggered At"
-          }
-        },
-        "required": [
-          "inst_id",
-          "direction",
-          "price",
-          "enabled"
-        ],
-        "title": "PriceAlert",
-        "type": "object"
-      },
-      "PriceAlertRequest": {
-        "properties": {
-          "direction": {
-            "enum": [
-              "above",
-              "below"
-            ],
-            "title": "Direction",
-            "type": "string"
-          },
-          "enabled": {
-            "default": true,
-            "title": "Enabled",
-            "type": "boolean"
-          },
-          "price": {
-            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
-            "title": "Price",
-            "type": "string"
-          }
-        },
-        "required": [
-          "direction",
-          "price"
-        ],
-        "title": "PriceAlertRequest",
-        "type": "object"
-      },
       "RelatedInstrument": {
         "properties": {
           "asset_type": {
@@ -8564,6 +8778,407 @@
           "window"
         ],
         "title": "RelativeStrengthIndicators",
+        "type": "object"
+      },
+      "ResearchNoteCreateRequest": {
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "related_backtest_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Backtest Id"
+          },
+          "related_instrument_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Instrument Id"
+          },
+          "related_strategy_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Strategy Id"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "hypothesis",
+              "backtest_conclusion",
+              "decision",
+              "review"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "content"
+        ],
+        "title": "ResearchNoteCreateRequest",
+        "type": "object"
+      },
+      "ResearchNoteCreatedResponse": {
+        "examples": [
+          {
+            "created_at": "2026-11-10T23:00:00Z",
+            "id": "rn_0001",
+            "title": "AAPL 突破假设",
+            "type": "hypothesis"
+          }
+        ],
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "hypothesis",
+              "backtest_conclusion",
+              "decision",
+              "review"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "title",
+          "created_at"
+        ],
+        "title": "ResearchNoteCreatedResponse",
+        "type": "object"
+      },
+      "ResearchNoteItem": {
+        "examples": [
+          {
+            "content": "收盘价站上 MA20 后观察三日",
+            "created_at": "2026-11-10T23:00:00Z",
+            "id": "rn_0001",
+            "related_backtest_id": "bt_0001",
+            "related_instrument_id": "XAAPL-USDT",
+            "related_strategy_id": "st_0001",
+            "tags": [
+              "趋势",
+              "验证中"
+            ],
+            "title": "AAPL 突破假设",
+            "type": "hypothesis",
+            "updated_at": "2026-11-10T23:00:00Z"
+          }
+        ],
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "related_backtest_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Backtest Id"
+          },
+          "related_instrument_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Instrument Id"
+          },
+          "related_strategy_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Strategy Id"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "hypothesis",
+              "backtest_conclusion",
+              "decision",
+              "review"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "title",
+          "content",
+          "tags",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ResearchNoteItem",
+        "type": "object"
+      },
+      "ResearchNoteListResponse": {
+        "examples": [
+          {
+            "items": [
+              {
+                "content": "收盘价站上 MA20 后观察三日",
+                "created_at": "2026-11-10T23:00:00Z",
+                "id": "rn_0001",
+                "related_backtest_id": "bt_0001",
+                "related_instrument_id": "XAAPL-USDT",
+                "related_strategy_id": "st_0001",
+                "tags": [
+                  "趋势",
+                  "验证中"
+                ],
+                "title": "AAPL 突破假设",
+                "type": "hypothesis",
+                "updated_at": "2026-11-10T23:00:00Z"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchNoteItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ResearchNoteListResponse",
+        "type": "object"
+      },
+      "ResearchNoteUpdateRequest": {
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "related_backtest_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Backtest Id"
+          },
+          "related_instrument_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Instrument Id"
+          },
+          "related_strategy_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Strategy Id"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "hypothesis",
+                  "backtest_conclusion",
+                  "decision",
+                  "review"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          }
+        },
+        "title": "ResearchNoteUpdateRequest",
+        "type": "object"
+      },
+      "ResearchNoteUpdatedResponse": {
+        "examples": [
+          {
+            "created_at": "2026-11-10T23:00:00Z",
+            "id": "rn_0001",
+            "title": "AAPL 突破假设（更新）",
+            "type": "hypothesis",
+            "updated_at": "2026-11-11T01:00:00Z"
+          }
+        ],
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "hypothesis",
+              "backtest_conclusion",
+              "decision",
+              "review"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "title",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ResearchNoteUpdatedResponse",
         "type": "object"
       },
       "RiskConfigUpdateRequest": {
@@ -11036,16 +11651,6 @@
           }
         ],
         "properties": {
-          "alert": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PriceAlert"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "atr_pct_14": {
             "anyOf": [
               {
@@ -11381,6 +11986,314 @@
         "summary": "Sync Account Snapshot",
         "tags": [
           "positions"
+        ]
+      }
+    },
+    "/api/activity": {
+      "get": {
+        "description": "按时间倒序返回活动流水，可按事件类型与对象类型筛选。",
+        "operationId": "get_activity_api_activity_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "event_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Event Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "object_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Object Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Activity",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
+    "/api/alerts": {
+      "get": {
+        "description": "按状态、类型、级别与标的筛选提醒；默认只返回待处理提醒。",
+        "operationId": "get_alerts_api_alerts_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "pending",
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "severity",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Severity"
+            }
+          },
+          {
+            "in": "query",
+            "name": "instrument_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Instrument Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Alerts",
+        "tags": [
+          "alerts"
+        ]
+      }
+    },
+    "/api/alerts/{alert_id}": {
+      "patch": {
+        "description": "确认或忽略一条待处理提醒；处置结果写一条活动。",
+        "operationId": "patch_alert_api_alerts__alert_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "alert_id",
+            "required": true,
+            "schema": {
+              "title": "Alert Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlertStatusUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Alert",
+        "tags": [
+          "alerts"
         ]
       }
     },
@@ -13575,6 +14488,340 @@
         ]
       }
     },
+    "/api/research-notes": {
+      "get": {
+        "description": "按类型、关联标的/策略/回测与时间筛选研究记录。",
+        "operationId": "get_research_notes_api_research_notes_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "related_instrument_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Related Instrument Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "related_strategy_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Related Strategy Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "related_backtest_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Related Backtest Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "created_at_desc",
+              "title": "Sort",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchNoteListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Research Notes",
+        "tags": [
+          "research"
+        ]
+      },
+      "post": {
+        "operationId": "post_research_note_api_research_notes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResearchNoteCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchNoteCreatedResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Research Note",
+        "tags": [
+          "research"
+        ]
+      }
+    },
+    "/api/research-notes/{note_id}": {
+      "delete": {
+        "operationId": "remove_research_note_api_research_notes__note_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "note_id",
+            "required": true,
+            "schema": {
+              "title": "Note Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Research Note",
+        "tags": [
+          "research"
+        ]
+      },
+      "get": {
+        "operationId": "get_research_note_api_research_notes__note_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "note_id",
+            "required": true,
+            "schema": {
+              "title": "Note Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchNoteItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Research Note",
+        "tags": [
+          "research"
+        ]
+      },
+      "put": {
+        "operationId": "put_research_note_api_research_notes__note_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "note_id",
+            "required": true,
+            "schema": {
+              "title": "Note Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResearchNoteUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchNoteUpdatedResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Research Note",
+        "tags": [
+          "research"
+        ]
+      }
+    },
     "/api/risk/events": {
       "get": {
         "operationId": "list_risk_event_records_api_risk_events_get",
@@ -14479,93 +15726,6 @@
           }
         },
         "summary": "Update Watchlist Item",
-        "tags": [
-          "watchlist"
-        ]
-      }
-    },
-    "/api/watchlist/{inst_id}/alert": {
-      "delete": {
-        "description": "删除价格提醒；没有提醒时按不存在处理。",
-        "operationId": "delete_price_alert_api_watchlist__inst_id__alert_delete",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "inst_id",
-            "required": true,
-            "schema": {
-              "title": "Inst Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Delete Price Alert",
-        "tags": [
-          "watchlist"
-        ]
-      },
-      "put": {
-        "description": "写入或覆盖价格提醒；标的必须已在自选里。",
-        "operationId": "put_price_alert_api_watchlist__inst_id__alert_put",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "inst_id",
-            "required": true,
-            "schema": {
-              "title": "Inst Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PriceAlertRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PriceAlert"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Put Price Alert",
         "tags": [
           "watchlist"
         ]

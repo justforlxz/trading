@@ -35,6 +35,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Response
 
+from app.activity import record_activity
 from app.api.mapping import decimal_str
 from app.api.schemas import (
     BacktestBatchResponse,
@@ -150,6 +151,38 @@ def create_backtest(payload: BacktestRequest) -> BacktestBatchResponse:
     当时那个不可变版本。
     """
 
+    record_activity(
+        event_type="backtest.started",
+        object_type="backtest",
+        object_id=payload.strategy_version_id,
+        summary=f"回测开始：策略版本 {payload.strategy_version_id}",
+        payload={
+            "strategy_version_id": payload.strategy_version_id,
+            "inst_ids": list(payload.targets.inst_ids),
+            "bar": payload.bar,
+            "start_date": payload.start_date,
+            "end_date": payload.end_date,
+            "data_source": payload.data_source,
+        },
+    )
+    try:
+        return _create_backtest(payload)
+    except Exception as exc:
+        record_activity(
+            event_type="backtest.failed",
+            object_type="backtest",
+            object_id=payload.strategy_version_id,
+            summary=f"回测失败：策略版本 {payload.strategy_version_id}",
+            payload={
+                "strategy_version_id": payload.strategy_version_id,
+                "error": str(exc),
+                "status": getattr(exc, "http_status", 500),
+            },
+        )
+        raise
+
+
+def _create_backtest(payload: BacktestRequest) -> BacktestBatchResponse:
     version = get_version_by_id(payload.strategy_version_id)
     if version is None:
         raise HTTPException(status_code=404, detail=f"未找到策略版本 {payload.strategy_version_id}")

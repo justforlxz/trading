@@ -12,6 +12,8 @@ from threading import Event
 from fastapi import FastAPI
 
 from app import __version__
+from app.activity import ActivityEventRow  # noqa: F401
+from app.alerts import AlertEventRow  # noqa: F401
 from app.api import include_routers, register_error_handlers
 
 # 导入即注册域模型：迁移只认得已注册的元数据，装配根负责把域模型拉进来。
@@ -40,6 +42,7 @@ from app.positions import (  # noqa: F401
     ManualTradeRow,
     PositionRiskConfigRow,
 )
+from app.research import ResearchNoteRow  # noqa: F401
 from app.settings import SettingsRow, apply_saved_settings  # noqa: F401
 from app.strategy import (  # noqa: F401
     StrategyInstanceRow,

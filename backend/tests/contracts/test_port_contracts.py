@@ -30,6 +30,7 @@ from app.core import (
     InvariantViolation,
     MarketDataPort,
     Money,
+    NotFound,
     Order,
     OrderIntent,
     Position,
@@ -429,6 +430,7 @@ def test_error_hierarchy_is_closed() -> None:
         ExecutionRejected,
         UnprocessableEntity,
         InvariantViolation,
+        NotFound,
     }
 
 
@@ -442,6 +444,7 @@ def test_error_hierarchy_is_closed() -> None:
         (RiskBlocked, 409),
         (ExecutionRejected, 422),
         (UnprocessableEntity, 422),
+        (NotFound, 404),
         (InvariantViolation, 500),
     ],
 )

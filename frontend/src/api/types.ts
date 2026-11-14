@@ -40,6 +40,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Activity
+         * @description 按时间倒序返回活动流水，可按事件类型与对象类型筛选。
+         */
+        get: operations["get_activity_api_activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Alerts
+         * @description 按状态、类型、级别与标的筛选提醒；默认只返回待处理提醒。
+         */
+        get: operations["get_alerts_api_alerts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/alerts/{alert_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Patch Alert
+         * @description 确认或忽略一条待处理提醒；处置结果写一条活动。
+         */
+        patch: operations["patch_alert_api_alerts__alert_id__patch"];
+        trace?: never;
+    };
     "/api/approvals": {
         parameters: {
             query?: never;
@@ -761,6 +821,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/research-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Research Notes
+         * @description 按类型、关联标的/策略/回测与时间筛选研究记录。
+         */
+        get: operations["get_research_notes_api_research_notes_get"];
+        put?: never;
+        /** Post Research Note */
+        post: operations["post_research_note_api_research_notes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/research-notes/{note_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Research Note */
+        get: operations["get_research_note_api_research_notes__note_id__get"];
+        /** Put Research Note */
+        put: operations["put_research_note_api_research_notes__note_id__put"];
+        post?: never;
+        /** Remove Research Note */
+        delete: operations["remove_research_note_api_research_notes__note_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/risk/events": {
         parameters: {
             query?: never;
@@ -1065,30 +1165,6 @@ export interface paths {
         patch: operations["update_watchlist_item_api_watchlist__inst_id__patch"];
         trace?: never;
     };
-    "/api/watchlist/{inst_id}/alert": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Put Price Alert
-         * @description 写入或覆盖价格提醒；标的必须已在自选里。
-         */
-        put: operations["put_price_alert_api_watchlist__inst_id__alert_put"];
-        post?: never;
-        /**
-         * Delete Price Alert
-         * @description 删除价格提醒；没有提醒时按不存在处理。
-         */
-        delete: operations["delete_price_alert_api_watchlist__inst_id__alert_delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/watchlist/{inst_id}/related": {
         parameters: {
             query?: never;
@@ -1227,6 +1303,153 @@ export interface components {
             unrealized_pnl?: string | null;
             /** Used Margin */
             used_margin?: string | null;
+        };
+        /**
+         * ActivityItem
+         * @example {
+         *       "created_at": "2026-11-10T23:00:00Z",
+         *       "event_type": "research_note.created",
+         *       "id": "ac_0001",
+         *       "object_id": "rn_0001",
+         *       "object_type": "research_note",
+         *       "payload": {
+         *         "type": "hypothesis"
+         *       },
+         *       "summary": "创建研究记录「AAPL 假设」"
+         *     }
+         */
+        ActivityItem: {
+            /** Created At */
+            created_at: string;
+            /** Event Type */
+            event_type: string;
+            /** Id */
+            id: string;
+            /** Object Id */
+            object_id: string;
+            /** Object Type */
+            object_type: string;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Summary */
+            summary: string;
+        };
+        /**
+         * ActivityListResponse
+         * @example {
+         *       "items": [
+         *         {
+         *           "created_at": "2026-11-10T23:00:00Z",
+         *           "event_type": "research_note.created",
+         *           "id": "ac_0001",
+         *           "object_id": "rn_0001",
+         *           "object_type": "research_note",
+         *           "payload": {
+         *             "type": "hypothesis"
+         *           },
+         *           "summary": "创建研究记录「AAPL 假设」"
+         *         }
+         *       ]
+         *     }
+         */
+        ActivityListResponse: {
+            /** Items */
+            items: components["schemas"]["ActivityItem"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /**
+         * AlertItem
+         * @example {
+         *       "detail": "XAAPL-USDT 没有有效止损记录",
+         *       "id": "al_0001",
+         *       "instrument_id": "XAAPL-USDT",
+         *       "payload": {
+         *         "position_ref": "manual:0001"
+         *       },
+         *       "rule_id": "stop_missing",
+         *       "rule_version": "b3-exposure-v1",
+         *       "severity": "warning",
+         *       "status": "pending",
+         *       "title": "持仓缺少止损",
+         *       "triggered_at": "2026-11-10T23:00:00Z",
+         *       "type": "risk"
+         *     }
+         */
+        AlertItem: {
+            /** Detail */
+            detail: string;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Id */
+            id: string;
+            /** Instrument Id */
+            instrument_id?: string | null;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Rule Id */
+            rule_id: string;
+            /** Rule Version */
+            rule_version?: string | null;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "critical";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "acknowledged" | "ignored" | "expired";
+            /** Title */
+            title: string;
+            /** Triggered At */
+            triggered_at: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "indicator" | "price" | "risk" | "strategy" | "data";
+        };
+        /**
+         * AlertListResponse
+         * @example {
+         *       "items": [
+         *         {
+         *           "detail": "XAAPL-USDT 没有有效止损记录",
+         *           "id": "al_0001",
+         *           "instrument_id": "XAAPL-USDT",
+         *           "payload": {
+         *             "position_ref": "manual:0001"
+         *           },
+         *           "rule_id": "stop_missing",
+         *           "rule_version": "b3-exposure-v1",
+         *           "severity": "warning",
+         *           "status": "pending",
+         *           "title": "持仓缺少止损",
+         *           "triggered_at": "2026-11-10T23:00:00Z",
+         *           "type": "risk"
+         *         }
+         *       ]
+         *     }
+         */
+        AlertListResponse: {
+            /** Items */
+            items: components["schemas"]["AlertItem"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** AlertStatusUpdateRequest */
+        AlertStatusUpdateRequest: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "acknowledged" | "ignored";
         };
         /** AnalysisCandles */
         AnalysisCandles: {
@@ -2771,7 +2994,7 @@ export interface components {
         };
         /**
          * DashboardAlertItem
-         * @description 待处理提醒；当前来源是 B3 的未处置风险事件，B8 合并后换成提醒事件表。
+         * @description 待处理提醒；来源是提醒事件表。
          */
         DashboardAlertItem: {
             /** Detail */
@@ -2795,9 +3018,9 @@ export interface components {
             triggered_at: string;
             /**
              * Type
-             * @constant
+             * @enum {string}
              */
-            type: "risk";
+            type: "indicator" | "price" | "risk" | "strategy" | "data";
         };
         /** DashboardAlertsModule */
         DashboardAlertsModule: {
@@ -4857,45 +5080,6 @@ export interface components {
             /** Warning Threshold Pct */
             warning_threshold_pct?: string | null;
         };
-        /**
-         * PriceAlert
-         * @example {
-         *       "direction": "above",
-         *       "enabled": true,
-         *       "inst_id": "XAAPL-USDT",
-         *       "price": "235.00"
-         *     }
-         */
-        PriceAlert: {
-            /**
-             * Direction
-             * @enum {string}
-             */
-            direction: "above" | "below";
-            /** Enabled */
-            enabled: boolean;
-            /** Inst Id */
-            inst_id: string;
-            /** Price */
-            price: string;
-            /** Triggered At */
-            triggered_at?: string | null;
-        };
-        /** PriceAlertRequest */
-        PriceAlertRequest: {
-            /**
-             * Direction
-             * @enum {string}
-             */
-            direction: "above" | "below";
-            /**
-             * Enabled
-             * @default true
-             */
-            enabled: boolean;
-            /** Price */
-            price: string;
-        };
         /** RelatedInstrument */
         RelatedInstrument: {
             /**
@@ -4948,6 +5132,161 @@ export interface components {
             symbol_return_pct?: string | null;
             /** Window */
             window: number;
+        };
+        /** ResearchNoteCreateRequest */
+        ResearchNoteCreateRequest: {
+            /** Content */
+            content: string;
+            /** Related Backtest Id */
+            related_backtest_id?: string | null;
+            /** Related Instrument Id */
+            related_instrument_id?: string | null;
+            /** Related Strategy Id */
+            related_strategy_id?: string | null;
+            /** Tags */
+            tags?: string[];
+            /** Title */
+            title: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "hypothesis" | "backtest_conclusion" | "decision" | "review";
+        };
+        /**
+         * ResearchNoteCreatedResponse
+         * @example {
+         *       "created_at": "2026-11-10T23:00:00Z",
+         *       "id": "rn_0001",
+         *       "title": "AAPL 突破假设",
+         *       "type": "hypothesis"
+         *     }
+         */
+        ResearchNoteCreatedResponse: {
+            /** Created At */
+            created_at: string;
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "hypothesis" | "backtest_conclusion" | "decision" | "review";
+        };
+        /**
+         * ResearchNoteItem
+         * @example {
+         *       "content": "收盘价站上 MA20 后观察三日",
+         *       "created_at": "2026-11-10T23:00:00Z",
+         *       "id": "rn_0001",
+         *       "related_backtest_id": "bt_0001",
+         *       "related_instrument_id": "XAAPL-USDT",
+         *       "related_strategy_id": "st_0001",
+         *       "tags": [
+         *         "趋势",
+         *         "验证中"
+         *       ],
+         *       "title": "AAPL 突破假设",
+         *       "type": "hypothesis",
+         *       "updated_at": "2026-11-10T23:00:00Z"
+         *     }
+         */
+        ResearchNoteItem: {
+            /** Content */
+            content: string;
+            /** Created At */
+            created_at: string;
+            /** Id */
+            id: string;
+            /** Related Backtest Id */
+            related_backtest_id?: string | null;
+            /** Related Instrument Id */
+            related_instrument_id?: string | null;
+            /** Related Strategy Id */
+            related_strategy_id?: string | null;
+            /** Tags */
+            tags: string[];
+            /** Title */
+            title: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "hypothesis" | "backtest_conclusion" | "decision" | "review";
+            /** Updated At */
+            updated_at: string;
+        };
+        /**
+         * ResearchNoteListResponse
+         * @example {
+         *       "items": [
+         *         {
+         *           "content": "收盘价站上 MA20 后观察三日",
+         *           "created_at": "2026-11-10T23:00:00Z",
+         *           "id": "rn_0001",
+         *           "related_backtest_id": "bt_0001",
+         *           "related_instrument_id": "XAAPL-USDT",
+         *           "related_strategy_id": "st_0001",
+         *           "tags": [
+         *             "趋势",
+         *             "验证中"
+         *           ],
+         *           "title": "AAPL 突破假设",
+         *           "type": "hypothesis",
+         *           "updated_at": "2026-11-10T23:00:00Z"
+         *         }
+         *       ]
+         *     }
+         */
+        ResearchNoteListResponse: {
+            /** Items */
+            items: components["schemas"]["ResearchNoteItem"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** ResearchNoteUpdateRequest */
+        ResearchNoteUpdateRequest: {
+            /** Content */
+            content?: string | null;
+            /** Related Backtest Id */
+            related_backtest_id?: string | null;
+            /** Related Instrument Id */
+            related_instrument_id?: string | null;
+            /** Related Strategy Id */
+            related_strategy_id?: string | null;
+            /** Tags */
+            tags?: string[] | null;
+            /** Title */
+            title?: string | null;
+            /** Type */
+            type?: ("hypothesis" | "backtest_conclusion" | "decision" | "review") | null;
+        };
+        /**
+         * ResearchNoteUpdatedResponse
+         * @example {
+         *       "created_at": "2026-11-10T23:00:00Z",
+         *       "id": "rn_0001",
+         *       "title": "AAPL 突破假设（更新）",
+         *       "type": "hypothesis",
+         *       "updated_at": "2026-11-11T01:00:00Z"
+         *     }
+         */
+        ResearchNoteUpdatedResponse: {
+            /** Created At */
+            created_at: string;
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "hypothesis" | "backtest_conclusion" | "decision" | "review";
+            /** Updated At */
+            updated_at: string;
         };
         /**
          * RiskConfigUpdateRequest
@@ -6072,7 +6411,6 @@ export interface components {
          *     }
          */
         WatchlistItem: {
-            alert?: components["schemas"]["PriceAlert"] | null;
             /** Atr Pct 14 */
             atr_pct_14: string | null;
             /** Candle Count */
@@ -6233,6 +6571,113 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccountSyncResponse"];
+                };
+            };
+        };
+    };
+    get_activity_api_activity_get: {
+        parameters: {
+            query?: {
+                event_type?: string | null;
+                object_type?: string | null;
+                from?: string | null;
+                to?: string | null;
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_alerts_api_alerts_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                type?: string | null;
+                severity?: string | null;
+                instrument_id?: string | null;
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_alert_api_alerts__alert_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                alert_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlertStatusUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7533,6 +7978,173 @@ export interface operations {
             };
         };
     };
+    get_research_notes_api_research_notes_get: {
+        parameters: {
+            query?: {
+                type?: string | null;
+                related_instrument_id?: string | null;
+                related_strategy_id?: string | null;
+                related_backtest_id?: string | null;
+                from?: string | null;
+                to?: string | null;
+                limit?: number;
+                cursor?: string | null;
+                sort?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchNoteListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_research_note_api_research_notes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResearchNoteCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchNoteCreatedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_research_note_api_research_notes__note_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                note_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchNoteItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_research_note_api_research_notes__note_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                note_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResearchNoteUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResearchNoteUpdatedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_research_note_api_research_notes__note_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                note_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_risk_event_records_api_risk_events_get: {
         parameters: {
             query?: {
@@ -8153,70 +8765,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["WatchlistItem"];
                 };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    put_price_alert_api_watchlist__inst_id__alert_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                inst_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PriceAlertRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PriceAlert"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_price_alert_api_watchlist__inst_id__alert_delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                inst_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description Validation Error */
             422: {

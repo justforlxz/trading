@@ -26,6 +26,7 @@ from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.activity import record_activity
 from app.config import get_settings
 from app.core import (
     AccountSnapshot,
@@ -212,8 +213,19 @@ def sync_account(*, clock: Clock | None = None) -> AccountSyncView:
     moment = (clock or SystemClock()).now()
     port = create_trade_port(clock=clock)
     try:
-        snapshot = port.account_snapshot()
-        positions = port.position_snapshots()
+        try:
+            snapshot = port.account_snapshot()
+            positions = port.position_snapshots()
+        except Exception as exc:
+            record_activity(
+                event_type="account.sync.failed",
+                object_type="account",
+                object_id=DEFAULT_ACCOUNT_ID,
+                summary="账户与持仓同步失败",
+                payload={"error_type": type(exc).__name__},
+                clock=clock,
+            )
+            raise
     finally:
         port.close()
 
@@ -224,6 +236,14 @@ def sync_account(*, clock: Clock | None = None) -> AccountSyncView:
         positions=positions,
     )
     assert summary is not None  # 刚刚写入或同一时刻已存在
+    record_activity(
+        event_type="account.sync.succeeded",
+        object_type="account",
+        object_id=DEFAULT_ACCOUNT_ID,
+        summary=f"账户与持仓同步成功，共 {len(positions)} 条持仓",
+        payload={"positions_synced": len(positions)},
+        clock=clock,
+    )
     return AccountSyncView(summary, len(positions))
 
 
@@ -578,6 +598,15 @@ def create_manual_position(
                 )
             )
             session.flush()
+            record_activity(
+                session=session,
+                event_type="position.manual.created",
+                object_type="manual_position",
+                object_id=position_id,
+                summary=f"创建手动持仓 {inst_id} {side} {quantity}",
+                payload={"inst_id": inst_id, "side": side, "quantity": str(quantity)},
+                clock=clock,
+            )
         return _manual_position_view(position)
     except IntegrityError:
         # 并发同键：先提交的一方占用唯一键，落败的事务已整体回滚；重查原记录返回。
@@ -636,6 +665,15 @@ def update_manual_position(
             position.note = changes["note"]  # type: ignore[assignment]
         position.updated_at = moment
         session.flush()
+        record_activity(
+            session=session,
+            event_type="position.manual.updated",
+            object_type="manual_position",
+            object_id=position_id,
+            summary=f"更新手动持仓 {position.inst_id} 的{'、'.join(sorted(changes))}",
+            payload={"inst_id": position.inst_id, "fields": sorted(changes)},
+            clock=clock,
+        )
     return _manual_position_view(position)
 
 
@@ -714,6 +752,20 @@ def add_manual_trade(
         position.updated_at = moment
         session.add(trade)
         session.flush()
+        record_activity(
+            session=session,
+            event_type="position.manual.trade_added",
+            object_type="manual_position",
+            object_id=position_id,
+            summary=f"手动持仓 {position.inst_id} 写入{action}流水",
+            payload={
+                "inst_id": position.inst_id,
+                "action": action,
+                "quantity": str(quantity),
+                "price": str(price),
+            },
+            clock=clock,
+        )
         return _manual_trade_view(
             trade,
             quantity_after=effect.quantity,
@@ -763,7 +815,16 @@ def delete_manual_position(position_id: str) -> bool | None:
         )
         if trades:
             raise Conflict("该手动持仓已有流水, 不能删除")
+        inst_id = position.inst_id
         session.delete(position)
+        record_activity(
+            session=session,
+            event_type="position.manual.deleted",
+            object_type="manual_position",
+            object_id=position_id,
+            summary=f"删除手动持仓 {inst_id}",
+            payload={"inst_id": inst_id},
+        )
     return True
 
 

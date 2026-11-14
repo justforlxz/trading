@@ -19,6 +19,7 @@ __all__ = [
     "DataUnavailable",
     "ExecutionRejected",
     "InvariantViolation",
+    "NotFound",
     "RiskBlocked",
     "TradingError",
     "UnprocessableEntity",
@@ -62,6 +63,12 @@ class Conflict(TradingError):
     """
 
     http_status: ClassVar[int] = 409
+
+
+class NotFound(TradingError):
+    """请求的对象不存在。调用方换一个标识之后才可能成功。"""
+
+    http_status: ClassVar[int] = 404
 
 
 class RiskBlocked(TradingError):

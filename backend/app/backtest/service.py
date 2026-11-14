@@ -34,6 +34,7 @@ from uuid import uuid4
 
 from sqlalchemy import func, select
 
+from app.activity import record_activity
 from app.backtest.costs import CostModel, decimal_text
 from app.backtest.engine import EXECUTION_MODELS, BacktestInput, BacktestResult, EquityPoint
 from app.backtest.metrics import (
@@ -257,6 +258,18 @@ def save_runs(plans: Sequence[BacktestRunPlan]) -> tuple[BacktestRunRecord, ...]
             session.add_all(item.trade_rows)
             session.add_all(item.equity_rows)
             session.add(item.link_row)
+            record_activity(
+                session=session,
+                event_type="backtest.completed",
+                object_type="backtest",
+                object_id=item.run_row.run_id,
+                summary=f"回测 {item.run_row.run_id} 完成",
+                payload={
+                    "run_id": item.run_row.run_id,
+                    "strategy_version_id": item.run_row.strategy_instance_id,
+                    "inst_id": item.run_row.inst_id,
+                },
+            )
     return tuple(item.record for item in prepared)
 
 

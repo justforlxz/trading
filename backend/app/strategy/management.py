@@ -22,6 +22,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.orm import Session
 
+from app.activity import record_activity
 from app.core import Conflict, InvariantViolation, ValidationError
 from app.db import session_scope
 from app.instrument import list_instruments
@@ -229,6 +230,15 @@ def create_strategy(
             instruments=instruments,
             now=now,
         )
+        record_activity(
+            session=session,
+            event_type="strategy.created",
+            object_type="strategy",
+            object_id=strategy_row.id,
+            summary=f"创建策略「{strategy_row.name}」",
+            payload={"strategy_id": strategy_row.id, "category": strategy_row.category},
+            clock=None,
+        )
     record = get_user_strategy(strategy_row.id)
     if record is None:
         raise InvariantViolation("策略创建后读不到")
@@ -251,6 +261,7 @@ def update_strategy(strategy_id: str, changes: Mapping[str, Any]) -> StrategyRec
         strategy = session.get(UserStrategyRow, strategy_id, with_for_update=True)
         if strategy is None:
             return None
+        previous_status = strategy.status
         if "name" in changes:
             strategy.name = _require_name(changes["name"])
         if "category" in changes:
@@ -287,6 +298,19 @@ def update_strategy(strategy_id: str, changes: Mapping[str, Any]) -> StrategyRec
                 ),
             )
         strategy.updated_at = now
+        if strategy.status != previous_status:
+            record_activity(
+                session=session,
+                event_type="strategy.status_changed",
+                object_type="strategy",
+                object_id=strategy_id,
+                summary=f"策略「{strategy.name}」状态由 {previous_status} 变为 {strategy.status}",
+                payload={
+                    "strategy_id": strategy_id,
+                    "from": previous_status,
+                    "to": strategy.status,
+                },
+            )
     return get_user_strategy(strategy_id)
 
 
@@ -330,6 +354,14 @@ def create_version(strategy_id: str, changes: Mapping[str, Any]) -> StrategyReco
             ),
         )
         strategy.updated_at = now
+        record_activity(
+            session=session,
+            event_type="strategy.version_created",
+            object_type="strategy",
+            object_id=strategy_id,
+            summary=f"策略「{strategy.name}」创建新版本",
+            payload={"strategy_id": strategy_id},
+        )
     return get_user_strategy(strategy_id)
 
 

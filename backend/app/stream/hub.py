@@ -23,6 +23,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 from uuid import uuid4
 
+from app.activity import record_activity
 from app.config import get_settings
 from app.core import (
     AccountSnapshot,
@@ -89,6 +90,12 @@ PRIVATE_DATASET = "private_ws"
 SOURCE_WS = "okx_ws"
 SOURCE_REST = "okx_rest"
 ACCOUNT_CURRENCY = "USDT"
+
+_STATUS_SUMMARIES = {
+    "data_source.connected": "行情数据源已连接",
+    "data_source.reconnected": "行情数据源已重连",
+    "data_source.disconnected": "行情数据源已断开",
+}
 
 #: 上游频道 → (事件字段, 上游价格字段)。
 _QUOTE_FIELDS: dict[str, tuple[str, str]] = {
@@ -392,19 +399,38 @@ class StreamHub:
     def _set_status(self, dataset: str, connected: bool, error: str) -> None:
         status = self._status[dataset]
         now = self._clock.now()
+        event_type = ""
         if connected:
             if status.ever_connected:
                 status.reconnect_count += 1
+                event_type = "data_source.reconnected"
                 self._schedule_reconcile(dataset)
+            elif not status.connected:
+                event_type = "data_source.connected"
             status.ever_connected = True
             status.connected = True
             status.last_error = None
             status.last_success_at = now
         else:
+            was_connected = status.connected
             status.connected = False
             if error:
                 status.last_error = error
+            if was_connected:
+                event_type = "data_source.disconnected"
         self._broadcast_status(dataset)
+        if event_type:
+            try:
+                record_activity(
+                    event_type=event_type,
+                    object_type="data_source",
+                    object_id=f"okx:{dataset}",
+                    summary=_STATUS_SUMMARIES[event_type],
+                    payload={"dataset": dataset, "error": status.last_error},
+                    clock=self._clock,
+                )
+            except Exception:  # 活动写库失败不能阻断推送
+                logger.exception("数据源状态活动写入失败")
 
     def _schedule_reconcile(self, dataset: str) -> None:
         if dataset == PUBLIC_DATASET:

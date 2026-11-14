@@ -1,4 +1,4 @@
-"""自选端点：分组、条目、价格提醒、相关标的的 HTTP 契约与错误路径。"""
+"""自选端点：分组、条目、相关标的的 HTTP 契约与错误路径。"""
 
 from __future__ import annotations
 
@@ -51,7 +51,6 @@ def test_add_item_returns_quote_and_registers_group(market_data: TestClient) -> 
     assert UTC_ZULU.match(body["instrument"]["listing_time"]) is not None
     assert body["strategy"] is None
     assert body["last_signal"] is None
-    assert body["alert"] is None
     assert body["candle_count"] == 3
     assert body["data_status"] == "partial"
     assert body["trend"] is None
@@ -140,75 +139,19 @@ def test_delete_item_is_204_and_then_404(market_data: TestClient) -> None:
     assert market_data.get("/api/watchlist").json() == {"items": [], "groups": []}
 
 
-def test_put_alert_creates_and_upserts(market_data: TestClient) -> None:
-    """价格提醒可重复覆盖；未触发时 triggered_at 为 null。"""
+def test_legacy_price_alert_routes_are_gone(market_data: TestClient) -> None:
+    """旧价格提醒接口随 0017 一起删除；v6 只走 `/api/alerts`。"""
 
     market_data.post("/api/watchlist", json={"inst_id": "XAAPL-USDT"})
 
-    created = market_data.put(
-        "/api/watchlist/XAAPL-USDT/alert", json={"direction": "above", "price": "130.5"}
-    )
-    updated = market_data.put(
-        "/api/watchlist/XAAPL-USDT/alert",
-        json={"direction": "below", "price": "99", "enabled": False},
-    )
-
-    assert created.status_code == 200
-    assert created.json() == {
-        "inst_id": "XAAPL-USDT",
-        "direction": "above",
-        "price": "130.5",
-        "enabled": True,
-        "triggered_at": None,
-    }
-    assert updated.status_code == 200
-    assert updated.json() == {
-        "inst_id": "XAAPL-USDT",
-        "direction": "below",
-        "price": "99",
-        "enabled": False,
-        "triggered_at": None,
-    }
-    listed = market_data.get("/api/watchlist").json()
-    assert listed["items"][0]["alert"] == updated.json()
-
-
-def test_delete_alert_is_204_and_then_404(market_data: TestClient) -> None:
-    """删除提醒后条目的 alert 归空；重复删除是 404。"""
-
-    market_data.post("/api/watchlist", json={"inst_id": "XAAPL-USDT"})
-    market_data.put("/api/watchlist/XAAPL-USDT/alert", json={"direction": "above", "price": "130"})
-
-    first = market_data.delete("/api/watchlist/XAAPL-USDT/alert")
-    second = market_data.delete("/api/watchlist/XAAPL-USDT/alert")
-
-    assert first.status_code == 204
-    assert second.status_code == 404
-    assert market_data.get("/api/watchlist").json()["items"][0]["alert"] is None
-
-
-def test_put_alert_outside_watchlist_is_404(market_data: TestClient) -> None:
-    """只能给自选里的标的设提醒。"""
-
-    response = market_data.put(
+    put = market_data.put(
         "/api/watchlist/XAAPL-USDT/alert", json={"direction": "above", "price": "130"}
     )
+    delete = market_data.delete("/api/watchlist/XAAPL-USDT/alert")
 
-    assert response.status_code == 404
-    assert response.json()["detail"]
-
-
-def test_put_alert_rejects_unknown_direction(market_data: TestClient) -> None:
-    """方向只接受 above / below。"""
-
-    market_data.post("/api/watchlist", json={"inst_id": "XAAPL-USDT"})
-
-    response = market_data.put(
-        "/api/watchlist/XAAPL-USDT/alert", json={"direction": "sideways", "price": "130"}
-    )
-
-    assert response.status_code == 422
-    assert response.json()["detail"]
+    assert put.status_code == 404
+    assert delete.status_code == 404
+    assert "alert" not in market_data.get("/api/watchlist").json()["items"][0]
 
 
 def test_related_instruments_rank_by_absolute_correlation(market_data: TestClient) -> None:

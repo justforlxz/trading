@@ -13,6 +13,8 @@ from alembic.script import ScriptDirectory
 from sqlalchemy import text
 
 # 导入即注册表元数据（与 `app.main` 的装配顺序一致），否则 `Base.metadata` 是空的。
+from app.activity import ActivityEventRow  # noqa: F401
+from app.alerts import AlertEventRow  # noqa: F401
 from app.backtest import (  # noqa: F401
     BacktestEquityRow,
     BacktestRunRow,
@@ -36,6 +38,7 @@ from app.positions import (  # noqa: F401
     ManualTradeRow,
     PositionRiskConfigRow,
 )
+from app.research import ResearchNoteRow  # noqa: F401
 from app.strategy import (  # noqa: F401
     StrategyApprovalRow,
     StrategyInstanceRow,
@@ -177,6 +180,26 @@ def test_strategies_migration_creates_versions_instruments_and_links() -> None:
                 "SELECT COUNT(*) FROM information_schema.table_constraints "
                 "WHERE table_schema = current_schema() "
                 "AND table_name = 'strategy_versions' "
+                "AND constraint_type = 'UNIQUE'"
+            )
+        ).scalar_one()
+    assert unique >= 1
+
+
+def test_research_alerts_activity_migration_and_legacy_price_alerts_removed() -> None:
+    """0017 建出研究记录、提醒与活动三张表，并删除旧价格提醒表。"""
+
+    init_db()
+
+    tables = _tables()
+    assert {"research_notes", "alert_events", "activity_events"} <= tables
+    assert "price_alerts" not in tables
+    with session_scope() as session:
+        unique = session.execute(
+            text(
+                "SELECT COUNT(*) FROM information_schema.table_constraints "
+                "WHERE table_schema = current_schema() "
+                "AND table_name = 'alert_events' "
                 "AND constraint_type = 'UNIQUE'"
             )
         ).scalar_one()

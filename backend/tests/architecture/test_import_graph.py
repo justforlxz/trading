@@ -85,9 +85,22 @@ ALLOWED_DEPS: dict[str, frozenset[str]] = {
     "indicators": frozenset({"shared"}),
     "strategy": frozenset({"shared", "db", "instrument", "market", "indicators"}),
     "backtest": frozenset({"shared", "db", "instrument", "market", "strategy"}),
-    # 分级处置要覆盖同标的的待批准组合申请（`portfolio_adjustments`），这是
-    # T6.5 引入的唯一新增依赖边；覆盖规则只写在 `app/risk/actions.py`。
-    "risk": frozenset({"shared", "db", "instrument", "market", "strategy", "portfolio"}),
+    # 分级处置要覆盖同标的的待批准组合申请（`portfolio_adjustments`）；风险与敞口
+    # 还要读持仓快照（`positions`）、复用指标实现 ATR（`indicators`）、读风险阈值
+    # （`settings`）。计算仍是纯函数，不反向依赖接口层。
+    "risk": frozenset(
+        {
+            "shared",
+            "db",
+            "instrument",
+            "market",
+            "indicators",
+            "positions",
+            "settings",
+            "strategy",
+            "portfolio",
+        }
+    ),
     "settings": frozenset({"db"}),
     "execution": frozenset(
         {"shared", "db", "instrument", "market", "strategy", "risk", "exchange"}

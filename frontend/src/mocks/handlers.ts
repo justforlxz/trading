@@ -35,8 +35,10 @@ import getOpportunitiesOpportunityId from "./fixtures/opportunity/get-opportunit
 import patchOpportunitiesOpportunityId from "./fixtures/opportunity/patch-opportunities-opportunity_id.json";
 import getOverview from "./fixtures/overview/get-overview.json";
 import getPositionsExchange from "./fixtures/positions/get-positions-exchange.json";
+import putPositionsPositionRefRiskConfig from "./fixtures/risk/put-positions-position_ref-risk-config.json";
 import getRiskEvents from "./fixtures/risk/get-risk-events.json";
 import patchRiskEventsEventIdResolve from "./fixtures/risk/patch-risk-events-event_id-resolve.json";
+import getRiskExposure from "./fixtures/risk/get-risk-exposure.json";
 import getSettings from "./fixtures/settings/get-settings.json";
 import putSettings from "./fixtures/settings/put-settings.json";
 import getStrategies from "./fixtures/strategy/get-strategies.json";
@@ -88,8 +90,10 @@ export const handlers = [
   http.patch("*/api/opportunities/:opportunity_id", () => HttpResponse.json(patchOpportunitiesOpportunityId)),
   http.get("*/api/overview", () => HttpResponse.json(getOverview)),
   http.get("*/api/positions/exchange", () => HttpResponse.json(getPositionsExchange)),
+  http.put("*/api/positions/:position_ref/risk-config", () => HttpResponse.json(putPositionsPositionRefRiskConfig)),
   http.get("*/api/risk/events", () => HttpResponse.json(getRiskEvents)),
   http.patch("*/api/risk/events/:event_id/resolve", () => HttpResponse.json(patchRiskEventsEventIdResolve)),
+  http.get("*/api/risk/exposure", () => HttpResponse.json(getRiskExposure)),
   http.get("*/api/settings", () => HttpResponse.json(getSettings)),
   http.put("*/api/settings", () => HttpResponse.json(putSettings)),
   http.get("*/api/strategies", () => HttpResponse.json(getStrategies)),

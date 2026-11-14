@@ -56,6 +56,9 @@ DEFAULT_RISK: dict[str, Any] = {
     "max_total_notional": "10000",
     "max_positions": 5,
     "max_leverage": "3",
+    # B3 风险与敞口阈值：单标的占组合总名义价值的上限，以及保证金使用率上限。
+    "max_single_instrument_weight_pct": "35",
+    "max_margin_usage_pct": "70",
     "max_daily_loss": "300",
     "liquidation_buffer_pct": "10",
     "stop_loss_mandatory": True,

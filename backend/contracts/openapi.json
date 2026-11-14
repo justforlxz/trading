@@ -2932,6 +2932,270 @@
         "title": "ExecutionStateResponse",
         "type": "object"
       },
+      "ExposurePositionItem": {
+        "properties": {
+          "atr_distance": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Atr Distance"
+          },
+          "display_symbol": {
+            "title": "Display Symbol",
+            "type": "string"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Flags",
+            "type": "array"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "lever": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lever"
+          },
+          "mark_px": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mark Px"
+          },
+          "notional": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notional"
+          },
+          "position_ref": {
+            "title": "Position Ref",
+            "type": "string"
+          },
+          "side": {
+            "enum": [
+              "long",
+              "short"
+            ],
+            "title": "Side",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "exchange",
+              "manual"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "stop_distance_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Distance Pct"
+          },
+          "stop_px": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Px"
+          },
+          "weight_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Pct"
+          }
+        },
+        "required": [
+          "position_ref",
+          "source",
+          "inst_id",
+          "display_symbol",
+          "side",
+          "flags"
+        ],
+        "title": "ExposurePositionItem",
+        "type": "object"
+      },
+      "ExposureRuleItem": {
+        "properties": {
+          "level": {
+            "enum": [
+              "warning",
+              "critical"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "position_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position Ref"
+          },
+          "rule_id": {
+            "title": "Rule Id",
+            "type": "string"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "rule_id",
+          "level"
+        ],
+        "title": "ExposureRuleItem",
+        "type": "object"
+      },
+      "ExposureSummary": {
+        "properties": {
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "gross_notional": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Gross Notional",
+            "type": "string"
+          },
+          "long_notional": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Long Notional",
+            "type": "string"
+          },
+          "margin_usage_basis": {
+            "anyOf": [
+              {
+                "enum": [
+                  "margin_ratio",
+                  "used_margin"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin Usage Basis"
+          },
+          "margin_usage_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin Usage Pct"
+          },
+          "net_notional": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Net Notional",
+            "type": "string"
+          },
+          "risk_level": {
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Risk Level",
+            "type": "string"
+          },
+          "short_notional": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Short Notional",
+            "type": "string"
+          }
+        },
+        "required": [
+          "long_notional",
+          "short_notional",
+          "net_notional",
+          "gross_notional",
+          "risk_level",
+          "currency"
+        ],
+        "title": "ExposureSummary",
+        "type": "object"
+      },
       "Fill": {
         "properties": {
           "fee": {
@@ -5676,6 +5940,75 @@
         "title": "PositionListResponse",
         "type": "object"
       },
+      "PositionRiskConfigResponse": {
+        "examples": [
+          {
+            "position_ref": "exchange:okx-main:123456",
+            "risk_budget": "50",
+            "source": "local",
+            "stop_px": "210.00",
+            "updated_at": "2026-11-13T09:00:00Z",
+            "warning_threshold_pct": "1.5"
+          }
+        ],
+        "properties": {
+          "position_ref": {
+            "title": "Position Ref",
+            "type": "string"
+          },
+          "risk_budget": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Budget"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "stop_px": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Px"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          },
+          "warning_threshold_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warning Threshold Pct"
+          }
+        },
+        "required": [
+          "position_ref",
+          "source",
+          "updated_at"
+        ],
+        "title": "PositionRiskConfigResponse",
+        "type": "object"
+      },
       "PriceAlert": {
         "examples": [
           {
@@ -5897,6 +6230,50 @@
         "title": "RelativeStrengthIndicators",
         "type": "object"
       },
+      "RiskConfigUpdateRequest": {
+        "additionalProperties": false,
+        "description": "本地风险配置的部分更新；显式传 `null` 表示清除该字段。",
+        "properties": {
+          "risk_budget": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Budget"
+          },
+          "stop_px": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Px"
+          },
+          "warning_threshold_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warning Threshold Pct"
+          }
+        },
+        "title": "RiskConfigUpdateRequest",
+        "type": "object"
+      },
       "RiskEvent": {
         "examples": [
           {
@@ -6054,6 +6431,105 @@
         "title": "RiskEventListResponse",
         "type": "object"
       },
+      "RiskExposureResponse": {
+        "examples": [
+          {
+            "as_of": "2026-11-13T09:00:00Z",
+            "positions": [
+              {
+                "atr_distance": "3.8",
+                "display_symbol": "AAPL-USDT",
+                "flags": [],
+                "inst_id": "AAPL-USDT-SWAP",
+                "lever": "3",
+                "mark_px": "231.42",
+                "notional": "1851.36",
+                "position_ref": "exchange:okx-main:123456",
+                "side": "long",
+                "source": "exchange",
+                "stop_distance_pct": "9.25",
+                "stop_px": "210.00",
+                "weight_pct": "42.14"
+              }
+            ],
+            "rules": [
+              {
+                "level": "warning",
+                "position_ref": "exchange:okx-main:123456",
+                "rule_id": "stop_distance",
+                "threshold": "1",
+                "value": "0.8"
+              }
+            ],
+            "sectors": [
+              {
+                "notional": "1200.00",
+                "sector": "semiconductor",
+                "weight_pct": "27.32"
+              }
+            ],
+            "status": "ok",
+            "summary": {
+              "currency": "USDT",
+              "gross_notional": "4393.20",
+              "long_notional": "3412.80",
+              "margin_usage_basis": "margin_ratio",
+              "margin_usage_pct": "45.36",
+              "net_notional": "2432.40",
+              "risk_level": "low",
+              "short_notional": "980.40"
+            }
+          }
+        ],
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/ExposurePositionItem"
+            },
+            "title": "Positions",
+            "type": "array"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/ExposureRuleItem"
+            },
+            "title": "Rules",
+            "type": "array"
+          },
+          "sectors": {
+            "items": {
+              "$ref": "#/components/schemas/SectorExposureItem"
+            },
+            "title": "Sectors",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "empty"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ExposureSummary"
+          }
+        },
+        "required": [
+          "as_of",
+          "status",
+          "summary",
+          "positions",
+          "sectors",
+          "rules"
+        ],
+        "title": "RiskExposureResponse",
+        "type": "object"
+      },
       "RiskSettings": {
         "description": "风控限额。`max_leverage` 的硬上限（10）不因配置抬高（decisions.md L1）。",
         "properties": {
@@ -6072,6 +6548,12 @@
             "title": "Max Leverage",
             "type": "string"
           },
+          "max_margin_usage_pct": {
+            "default": "70",
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Max Margin Usage Pct",
+            "type": "string"
+          },
           "max_order_notional": {
             "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
             "title": "Max Order Notional",
@@ -6085,6 +6567,12 @@
           "max_positions": {
             "title": "Max Positions",
             "type": "integer"
+          },
+          "max_single_instrument_weight_pct": {
+            "default": "35",
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Max Single Instrument Weight Pct",
+            "type": "string"
           },
           "max_total_notional": {
             "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
@@ -6107,6 +6595,31 @@
           "stop_loss_mandatory"
         ],
         "title": "RiskSettings",
+        "type": "object"
+      },
+      "SectorExposureItem": {
+        "properties": {
+          "notional": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Notional",
+            "type": "string"
+          },
+          "sector": {
+            "title": "Sector",
+            "type": "string"
+          },
+          "weight_pct": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Weight Pct",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sector",
+          "notional",
+          "weight_pct"
+        ],
+        "title": "SectorExposureItem",
         "type": "object"
       },
       "SettingsResponse": {
@@ -6140,9 +6653,11 @@
               "liquidation_buffer_pct": "10",
               "max_daily_loss": "300",
               "max_leverage": "3",
+              "max_margin_usage_pct": "70",
               "max_order_notional": "1000",
               "max_position_notional": "3000",
               "max_positions": 5,
+              "max_single_instrument_weight_pct": "35",
               "max_total_notional": "10000",
               "stop_loss_mandatory": true
             },
@@ -9846,6 +10361,59 @@
         ]
       }
     },
+    "/api/positions/{position_ref}/risk-config": {
+      "put": {
+        "description": "保存或更新本地止损、风险预算与预警阈值。",
+        "operationId": "put_position_risk_config_api_positions__position_ref__risk_config_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "position_ref",
+            "required": true,
+            "schema": {
+              "title": "Position Ref",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RiskConfigUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PositionRiskConfigResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Position Risk Config",
+        "tags": [
+          "risk"
+        ]
+      }
+    },
     "/api/risk/events": {
       "get": {
         "operationId": "list_risk_event_records_api_risk_events_get",
@@ -9976,6 +10544,28 @@
           }
         },
         "summary": "Resolve Risk Event Record",
+        "tags": [
+          "risk"
+        ]
+      }
+    },
+    "/api/risk/exposure": {
+      "get": {
+        "description": "组合风险与敞口：多空名义价值、行业分布、止损距离与规则结果。",
+        "operationId": "get_risk_exposure_api_risk_exposure_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskExposureResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Risk Exposure",
         "tags": [
           "risk"
         ]

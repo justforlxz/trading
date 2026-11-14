@@ -619,6 +619,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/positions/{position_ref}/risk-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Position Risk Config
+         * @description 保存或更新本地止损、风险预算与预警阈值。
+         */
+        put: operations["put_position_risk_config_api_positions__position_ref__risk_config_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/risk/events": {
         parameters: {
             query?: never;
@@ -651,6 +671,26 @@ export interface paths {
         head?: never;
         /** Resolve Risk Event Record */
         patch: operations["resolve_risk_event_record_api_risk_events__event_id__resolve_patch"];
+        trace?: never;
+    };
+    "/api/risk/exposure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Risk Exposure
+         * @description 组合风险与敞口：多空名义价值、行业分布、止损距离与规则结果。
+         */
+        get: operations["get_risk_exposure_api_risk_exposure_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/settings": {
@@ -2229,6 +2269,79 @@ export interface components {
              */
             mode: "manual" | "paper" | "live";
         };
+        /** ExposurePositionItem */
+        ExposurePositionItem: {
+            /** Atr Distance */
+            atr_distance?: string | null;
+            /** Display Symbol */
+            display_symbol: string;
+            /** Flags */
+            flags: string[];
+            /** Inst Id */
+            inst_id: string;
+            /** Lever */
+            lever?: string | null;
+            /** Mark Px */
+            mark_px?: string | null;
+            /** Notional */
+            notional?: string | null;
+            /** Position Ref */
+            position_ref: string;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "long" | "short";
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "exchange" | "manual";
+            /** Stop Distance Pct */
+            stop_distance_pct?: string | null;
+            /** Stop Px */
+            stop_px?: string | null;
+            /** Weight Pct */
+            weight_pct?: string | null;
+        };
+        /** ExposureRuleItem */
+        ExposureRuleItem: {
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "warning" | "critical";
+            /** Position Ref */
+            position_ref?: string | null;
+            /** Rule Id */
+            rule_id: string;
+            /** Threshold */
+            threshold?: string | null;
+            /** Value */
+            value?: string | null;
+        };
+        /** ExposureSummary */
+        ExposureSummary: {
+            /** Currency */
+            currency: string;
+            /** Gross Notional */
+            gross_notional: string;
+            /** Long Notional */
+            long_notional: string;
+            /** Margin Usage Basis */
+            margin_usage_basis?: ("margin_ratio" | "used_margin") | null;
+            /** Margin Usage Pct */
+            margin_usage_pct?: string | null;
+            /** Net Notional */
+            net_notional: string;
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "low" | "medium" | "high";
+            /** Short Notional */
+            short_notional: string;
+        };
         /** Fill */
         Fill: {
             /** Fee */
@@ -3646,6 +3759,31 @@ export interface components {
             mode: "manual" | "paper" | "live";
         };
         /**
+         * PositionRiskConfigResponse
+         * @example {
+         *       "position_ref": "exchange:okx-main:123456",
+         *       "risk_budget": "50",
+         *       "source": "local",
+         *       "stop_px": "210.00",
+         *       "updated_at": "2026-11-13T09:00:00Z",
+         *       "warning_threshold_pct": "1.5"
+         *     }
+         */
+        PositionRiskConfigResponse: {
+            /** Position Ref */
+            position_ref: string;
+            /** Risk Budget */
+            risk_budget?: string | null;
+            /** Source */
+            source: string;
+            /** Stop Px */
+            stop_px?: string | null;
+            /** Updated At */
+            updated_at: string;
+            /** Warning Threshold Pct */
+            warning_threshold_pct?: string | null;
+        };
+        /**
          * PriceAlert
          * @example {
          *       "direction": "above",
@@ -3738,6 +3876,18 @@ export interface components {
             window: number;
         };
         /**
+         * RiskConfigUpdateRequest
+         * @description 本地风险配置的部分更新；显式传 `null` 表示清除该字段。
+         */
+        RiskConfigUpdateRequest: {
+            /** Risk Budget */
+            risk_budget?: string | null;
+            /** Stop Px */
+            stop_px?: string | null;
+            /** Warning Threshold Pct */
+            warning_threshold_pct?: string | null;
+        };
+        /**
          * RiskEvent
          * @example {
          *       "action": "warn",
@@ -3801,6 +3951,72 @@ export interface components {
             total: number;
         };
         /**
+         * RiskExposureResponse
+         * @example {
+         *       "as_of": "2026-11-13T09:00:00Z",
+         *       "positions": [
+         *         {
+         *           "atr_distance": "3.8",
+         *           "display_symbol": "AAPL-USDT",
+         *           "flags": [],
+         *           "inst_id": "AAPL-USDT-SWAP",
+         *           "lever": "3",
+         *           "mark_px": "231.42",
+         *           "notional": "1851.36",
+         *           "position_ref": "exchange:okx-main:123456",
+         *           "side": "long",
+         *           "source": "exchange",
+         *           "stop_distance_pct": "9.25",
+         *           "stop_px": "210.00",
+         *           "weight_pct": "42.14"
+         *         }
+         *       ],
+         *       "rules": [
+         *         {
+         *           "level": "warning",
+         *           "position_ref": "exchange:okx-main:123456",
+         *           "rule_id": "stop_distance",
+         *           "threshold": "1",
+         *           "value": "0.8"
+         *         }
+         *       ],
+         *       "sectors": [
+         *         {
+         *           "notional": "1200.00",
+         *           "sector": "semiconductor",
+         *           "weight_pct": "27.32"
+         *         }
+         *       ],
+         *       "status": "ok",
+         *       "summary": {
+         *         "currency": "USDT",
+         *         "gross_notional": "4393.20",
+         *         "long_notional": "3412.80",
+         *         "margin_usage_basis": "margin_ratio",
+         *         "margin_usage_pct": "45.36",
+         *         "net_notional": "2432.40",
+         *         "risk_level": "low",
+         *         "short_notional": "980.40"
+         *       }
+         *     }
+         */
+        RiskExposureResponse: {
+            /** As Of */
+            as_of: string;
+            /** Positions */
+            positions: components["schemas"]["ExposurePositionItem"][];
+            /** Rules */
+            rules: components["schemas"]["ExposureRuleItem"][];
+            /** Sectors */
+            sectors: components["schemas"]["SectorExposureItem"][];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "empty";
+            summary: components["schemas"]["ExposureSummary"];
+        };
+        /**
          * RiskSettings
          * @description 风控限额。`max_leverage` 的硬上限（10）不因配置抬高（decisions.md L1）。
          */
@@ -3811,16 +4027,35 @@ export interface components {
             max_daily_loss: string;
             /** Max Leverage */
             max_leverage: string;
+            /**
+             * Max Margin Usage Pct
+             * @default 70
+             */
+            max_margin_usage_pct: string;
             /** Max Order Notional */
             max_order_notional: string;
             /** Max Position Notional */
             max_position_notional: string;
             /** Max Positions */
             max_positions: number;
+            /**
+             * Max Single Instrument Weight Pct
+             * @default 35
+             */
+            max_single_instrument_weight_pct: string;
             /** Max Total Notional */
             max_total_notional: string;
             /** Stop Loss Mandatory */
             stop_loss_mandatory: boolean;
+        };
+        /** SectorExposureItem */
+        SectorExposureItem: {
+            /** Notional */
+            notional: string;
+            /** Sector */
+            sector: string;
+            /** Weight Pct */
+            weight_pct: string;
         };
         /**
          * SettingsResponse
@@ -3853,9 +4088,11 @@ export interface components {
          *         "liquidation_buffer_pct": "10",
          *         "max_daily_loss": "300",
          *         "max_leverage": "3",
+         *         "max_margin_usage_pct": "70",
          *         "max_order_notional": "1000",
          *         "max_position_notional": "3000",
          *         "max_positions": 5,
+         *         "max_single_instrument_weight_pct": "35",
          *         "max_total_notional": "10000",
          *         "stop_loss_mandatory": true
          *       },
@@ -5839,6 +6076,41 @@ export interface operations {
             };
         };
     };
+    put_position_risk_config_api_positions__position_ref__risk_config_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                position_ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RiskConfigUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PositionRiskConfigResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_risk_event_records_api_risk_events_get: {
         parameters: {
             query?: {
@@ -5900,6 +6172,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_risk_exposure_api_risk_exposure_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiskExposureResponse"];
                 };
             };
         };

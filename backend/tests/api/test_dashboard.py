@@ -25,6 +25,7 @@ from app.db.engine import get_engine
 from app.instrument import sync_instruments
 from app.market import upsert_candles
 from app.risk import RiskContext, RiskEngine, TradeRequest, resolve_risk_event
+from app.strategy import create_instance
 from tests.api.conftest import latest_opens, seed_daily
 from tests.factories.instruments import make_ref, make_swap_ref
 
@@ -297,17 +298,13 @@ def test_strategies_count_and_recent_backtest(client: TestClient) -> None:
     """策略卡给出实例计数与最近 30 天的一次回测；没有回测时为 `null`。"""
 
     _strategy_market()
-    instance = client.post(
-        "/api/strategy-instances",
-        json={
-            "strategy_id": "relative_value",
-            "name": "BTC/ETH 首页",
-            "bar": "1d",
-            "params": {"reversion_window": 3, "strength_window": 2, "pair_count": 1},
-            "inst_ids": ["BTC-USDT", "ETH-USDT"],
-        },
+    instance = create_instance(
+        strategy_id="relative_value",
+        name="BTC/ETH 首页",
+        bar="1d",
+        params={"reversion_window": 3, "strength_window": 2, "pair_count": 1},
+        inst_ids=["BTC-USDT", "ETH-USDT"],
     )
-    assert instance.status_code == 201, instance.text
 
     before = client.get("/api/dashboard/summary").json()["strategies"]["data"]
     assert before == {
@@ -321,7 +318,7 @@ def test_strategies_count_and_recent_backtest(client: TestClient) -> None:
     run = client.post(
         "/api/backtests",
         json={
-            "strategy_instance_id": instance.json()["instance_id"],
+            "strategy_instance_id": instance.instance_id,
             "targets": {"mode": "single", "inst_ids": ["BTC-USDT"], "group": None},
             "bar": "1d",
             "start_date": "2026-11-05",

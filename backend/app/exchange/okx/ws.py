@@ -119,6 +119,7 @@ class OkxWebSocket:
         max_attempts: int = MAX_RECONNECT_ATTEMPTS,
         backoff_seconds: float = RECONNECT_BASE_SECONDS,
         deduper: Deduper | None = None,
+        on_status: Callable[[bool, str], None] | None = None,
     ) -> None:
         self._settings = settings or get_settings()
         self._channels = tuple(channels) if channels is not None else DEFAULT_CHANNELS
@@ -129,10 +130,18 @@ class OkxWebSocket:
         self._max_attempts = max_attempts
         self._backoff = backoff_seconds
         self._deduper = deduper or Deduper()
+        self._on_status = on_status
         require_credentials(self._settings)
 
     async def messages(self) -> AsyncIterator[dict[str, Any]]:
-        """推送行的异步迭代器；连续断开超过上限时抛 `ExchangeError`。
+        """只交出数据行；频道名由 `channel_messages` 提供。"""
+
+        async for _channel, rows in self.channel_messages():
+            for row in rows:
+                yield row
+
+    async def channel_messages(self) -> AsyncIterator[tuple[str, list[dict[str, Any]]]]:
+        """按上游封包交出 `(频道, 数据行列表)`；连续断开超过上限时抛 `ExchangeError`。
 
         「断开」包含两种形态：连接层抛异常，以及上游以正常闭包（关闭码 1000/1001，
         例如维护、重启、登录会话到期）结束迭代。后者不抛异常，如果只把异常当断线，
@@ -146,20 +155,27 @@ class OkxWebSocket:
             try:
                 async with self._connect(self._url) as socket:
                     await self._handshake(socket)
+                    self._notify(True, "")
                     async for raw in socket:
-                        for row in _rows(raw):
-                            if self._deduper.accept(row):
-                                # 收到行才说明这条连接真的通了：把连续断开计数清零。
-                                attempt = 0
-                                yield row
+                        channel, rows = _channel_rows(raw)
+                        fresh = [row for row in rows if self._deduper.accept(row)]
+                        if fresh:
+                            # 收到行才说明这条连接真的通了：把连续断开计数清零。
+                            attempt = 0
+                            yield channel, fresh
             except RECONNECT_ON as exc:
                 reason = str(exc)
             else:
                 reason = "上游正常关闭连接"
+            self._notify(False, reason)
             if attempt >= self._max_attempts:
                 raise ExchangeError(f"WebSocket 连续断开 {attempt} 次后放弃重连:{reason}")
             await self._sleep(self._backoff * 2**attempt)
             attempt += 1
+
+    def _notify(self, connected: bool, error: str) -> None:
+        if self._on_status is not None:
+            self._on_status(connected, error)
 
     async def _handshake(self, socket: Any) -> None:
         """登录并等到回执，然后订阅；登录失败立刻报错，不进入收流阶段。"""
@@ -199,13 +215,21 @@ class OkxWebSocket:
 def _rows(raw: str | bytes) -> list[dict[str, Any]]:
     """上游推送封包 `{"arg": …, "data": [ … ]}` → 逐行数据。"""
 
+    return _channel_rows(raw)[1]
+
+
+def _channel_rows(raw: str | bytes) -> tuple[str, list[dict[str, Any]]]:
+    """上游推送封包 → `(频道, 逐行数据)`；频道名用于区分账户与持仓。"""
+
     try:
         message = json.loads(raw)
     except ValueError as exc:
         raise ExchangeError("推送不是合法 JSON") from exc
     if not isinstance(message, dict):
         raise ExchangeError("推送结构异常")
+    arg = message.get("arg")
+    channel = str(arg.get("channel") or "") if isinstance(arg, dict) else ""
     data = message.get("data")
     if not isinstance(data, list):
-        return []
-    return [row for row in data if isinstance(row, dict)]
+        return channel, []
+    return channel, [row for row in data if isinstance(row, dict)]

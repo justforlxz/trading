@@ -47,6 +47,7 @@ PACKAGES: tuple[str, ...] = (
     "risk",
     "settings",
     "shared",
+    "stream",
     "strategy",
     "watchlist",
 )
@@ -102,6 +103,8 @@ ALLOWED_DEPS: dict[str, frozenset[str]] = {
         }
     ),
     "settings": frozenset({"db"}),
+    # 推送层只编排交易所连接与 B2 的账户/持仓快照；行情合并与订阅过滤不放进业务域。
+    "stream": frozenset({"exchange", "positions"}),
     "execution": frozenset(
         {"shared", "db", "instrument", "market", "strategy", "risk", "exchange"}
     ),

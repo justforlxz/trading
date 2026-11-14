@@ -13,12 +13,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
-from app.core import ReplayClock
+from app.core import AccountSnapshot, ExchangePosition, ReplayClock
 from app.db import session_scope
 from app.exchange.okx.instruments import parse_instruments
 from app.instrument import sync_instruments
 from app.main import create_app
-from app.positions import account_summary
+from app.positions import account_summary, exchange_positions, record_exchange_snapshot
 from app.positions.model import AccountSnapshotRow, ManualPositionRow
 from tests.api.conftest import seed_daily
 from tests.exchange.conftest import SPOT_INSTRUMENT, SWAP_INST_ID, SWAP_INSTRUMENT
@@ -529,4 +529,70 @@ def _snapshot(marker: str, equity: str, captured_at: datetime) -> AccountSnapsho
         captured_at=captured_at,
         source="okx_rest",
         raw_payload_ref=marker,
+    )
+
+
+def test_position_batch_can_be_replaced_and_shrunk_at_one_captured_at(
+    client: TestClient,
+) -> None:
+    sync_instruments(parse_instruments([SWAP_INSTRUMENT]))
+    captured_at = datetime(2026, 11, 13, 9, 0, tzinfo=UTC)
+    account = AccountSnapshot(
+        currency="USDT",
+        equity=Decimal("100"),
+        available_equity=Decimal("80"),
+        cash_balance=Decimal("50"),
+        unrealized_pnl=Decimal("0"),
+        used_margin=Decimal("20"),
+        available_margin=Decimal("80"),
+        margin_ratio=Decimal("0.2"),
+    )
+    first = _exchange_position("1", "2", mark_px="101")
+    second = _exchange_position("2", "3", mark_px="102")
+
+    record_exchange_snapshot(
+        captured_at=captured_at,
+        source="okx_ws",
+        snapshot=account,
+        positions=[first, second],
+    )
+    view = exchange_positions()
+    assert view.as_of == captured_at
+    assert {item.pos_id for item in view.items} == {"1", "2"}
+
+    updated = _exchange_position("1", "5", mark_px="103")
+    record_exchange_snapshot(
+        captured_at=captured_at,
+        source="okx_ws",
+        positions=[updated, second],
+    )
+    view = exchange_positions()
+    assert {item.pos_id: item.size for item in view.items} == {
+        "1": Decimal("5"),
+        "2": Decimal("3"),
+    }
+
+    record_exchange_snapshot(
+        captured_at=captured_at,
+        source="okx_ws",
+        positions=[updated],
+    )
+    view = exchange_positions()
+    assert [item.pos_id for item in view.items] == ["1"]
+
+
+def _exchange_position(pos_id: str, size: str, *, mark_px: str) -> ExchangePosition:
+    return ExchangePosition(
+        pos_id=pos_id,
+        inst_id=SWAP_INST_ID,
+        pos_side="long",
+        size=Decimal(size),
+        avg_px=Decimal("100"),
+        mark_px=Decimal(mark_px),
+        upl=None,
+        upl_ratio=None,
+        lever=None,
+        mgn_mode=None,
+        liq_px=None,
+        margin=None,
     )

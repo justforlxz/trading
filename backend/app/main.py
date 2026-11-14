@@ -46,6 +46,7 @@ from app.strategy import (  # noqa: F401
     StrategyReplayRow,
     StrategyTemplateRow,
 )
+from app.stream import StreamHub
 from app.watchlist import WatchlistItemRow  # noqa: F401
 
 logger = logging.getLogger(__name__)
@@ -59,12 +60,15 @@ async def lifespan(_app: FastAPI) -> Iterator[None]:
     apply_saved_settings()
     stop_scheduler = Event()
     scheduler = start_equity_snapshot_scheduler(stop_scheduler)
+    hub = StreamHub()
+    _app.state.stream_hub = hub
     logger.info("trading api ready: version=%s", __version__)
     try:
         yield
     finally:
         stop_scheduler.set()
         scheduler.join(timeout=5.0)
+        await hub.stop()
 
 
 def create_app() -> FastAPI:

@@ -14,6 +14,10 @@ import getBacktests from "./fixtures/backtest/get-backtests.json";
 import postBacktests from "./fixtures/backtest/post-backtests.json";
 import getBacktestsRanking from "./fixtures/backtest/get-backtests-ranking.json";
 import getBacktestsRunId from "./fixtures/backtest/get-backtests-run_id.json";
+import getBacktestsRunIdChart from "./fixtures/backtest/get-backtests-run_id-chart.json";
+import getBacktestsRunIdEquity from "./fixtures/backtest/get-backtests-run_id-equity.json";
+import getBacktestsRunIdReplay from "./fixtures/backtest/get-backtests-run_id-replay.json";
+import getBacktestsRunIdTrades from "./fixtures/backtest/get-backtests-run_id-trades.json";
 import getCorrelationMatrix from "./fixtures/correlation/get-correlation-matrix.json";
 import getCorrelationSeries from "./fixtures/correlation/get-correlation-series.json";
 import getDashboardSummary from "./fixtures/dashboard/get-dashboard-summary.json";
@@ -69,6 +73,11 @@ export const handlers = [
   http.get("*/api/backtests/ranking", () => HttpResponse.json(getBacktestsRanking)),
   http.get("*/api/backtests/:run_id", () => HttpResponse.json(getBacktestsRunId)),
   http.delete("*/api/backtests/:run_id", () => new HttpResponse(null, { status: 204 })),
+  http.get("*/api/backtests/:run_id/chart", () => HttpResponse.json(getBacktestsRunIdChart)),
+  http.get("*/api/backtests/:run_id/equity", () => HttpResponse.json(getBacktestsRunIdEquity)),
+  http.get("*/api/backtests/:run_id/replay", () => HttpResponse.json(getBacktestsRunIdReplay)),
+  http.get("*/api/backtests/:run_id/trades", () => HttpResponse.json(getBacktestsRunIdTrades)),
+  http.get("*/api/backtests/:run_id/trades.csv", () => new HttpResponse(null, { status: 200 })),
   http.get("*/api/correlation/matrix", () => HttpResponse.json(getCorrelationMatrix)),
   http.get("*/api/correlation/series", () => HttpResponse.json(getCorrelationSeries)),
   http.get("*/api/dashboard/summary", () => HttpResponse.json(getDashboardSummary)),

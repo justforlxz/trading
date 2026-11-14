@@ -1,0 +1,49 @@
+{
+  "bar": "1d",
+  "candles": [
+    {
+      "close": "103",
+      "high": "104",
+      "is_complete": true,
+      "low": "99",
+      "open": "100",
+      "source": "okx",
+      "time": "2026-11-05T00:00:00Z",
+      "volume": "1200"
+    }
+  ],
+  "data_source": "okx",
+  "inst_id": "XAAPL-USDT",
+  "markers": [
+    {
+      "kind": "entry",
+      "price": "101",
+      "qty": "8.63",
+      "side": "buy",
+      "time": "2026-11-06T00:00:00Z",
+      "trade_id": "tr_0001"
+    },
+    {
+      "kind": "exit",
+      "pnl": "17.26",
+      "price": "103",
+      "qty": "8.63",
+      "reason": "MA20 下穿 MA60",
+      "side": "sell",
+      "time": "2026-11-08T00:00:00Z",
+      "trade_id": "tr_0001"
+    }
+  ],
+  "overlays": [
+    {
+      "name": "MA20",
+      "points": [
+        {
+          "time": "2026-11-05T00:00:00Z",
+          "value": "98.40"
+        }
+      ]
+    }
+  ],
+  "run_id": "bt_0001"
+}

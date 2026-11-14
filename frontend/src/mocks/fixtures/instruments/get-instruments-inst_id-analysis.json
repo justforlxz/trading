@@ -147,8 +147,8 @@
       "max_drawdown_pct": "6.12",
       "run_id": "bt_0001",
       "strategy_id": "ma_cross",
-      "strategy_instance_id": "si_0001",
       "strategy_name": "AAPL 趋势",
+      "strategy_version_id": "sv_0001",
       "total_return_pct": "12.4055",
       "trade_count": 37
     }

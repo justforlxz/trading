@@ -77,9 +77,13 @@ class BacktestSpec:
 
     `data_fingerprint` 由 `data_fingerprint(bars, data_source)` 算出后传入：服务层不重复
     读行情，指纹必须来自实际喂进引擎的那份数据。
+
+    `strategy_version_id` 是不可变策略版本的身份。`backtest_runs` 没有单独的版本列
+    （B7 不新增迁移），写入时落在历史列 `strategy_instance_id` 上；读接口再从
+    `strategy_linked_backtests` 取同一关联，旧运行没有关联时如实返回 null。
     """
 
-    strategy_instance_id: str
+    strategy_version_id: str
     strategy_id: str
     strategy_version: str
     params: Mapping[str, Any]
@@ -97,7 +101,7 @@ class BacktestSpec:
 
     def __post_init__(self) -> None:
         for name in (
-            "strategy_instance_id",
+            "strategy_version_id",
             "strategy_id",
             "strategy_version",
             "data_source",
@@ -147,7 +151,8 @@ class BacktestRunRecord:
     """
 
     run_id: str
-    strategy_instance_id: str
+    #: v6 策略版本；旧运行没有关联记录时为 null。
+    strategy_version_id: str | None
     strategy_id: str
     strategy_version: str
     params: Mapping[str, Any]
@@ -251,6 +256,7 @@ def save_runs(plans: Sequence[BacktestRunPlan]) -> tuple[BacktestRunRecord, ...]
             session.flush()
             session.add_all(item.trade_rows)
             session.add_all(item.equity_rows)
+            session.add(item.link_row)
     return tuple(item.record for item in prepared)
 
 
@@ -261,6 +267,7 @@ class _PreparedRun:
     run_row: BacktestRunRow
     trade_rows: tuple[BacktestTradeRow, ...]
     equity_rows: tuple[BacktestEquityRow, ...]
+    link_row: StrategyLinkedBacktestRow
     record: BacktestRunRecord
 
 
@@ -286,7 +293,8 @@ def _prepare(plan: BacktestRunPlan) -> _PreparedRun:
 
     run_row = BacktestRunRow(
         run_id=run_id,
-        strategy_instance_id=spec.strategy_instance_id,
+        # 历史列名保持不变，v6 起写入的是不可变策略版本标识。
+        strategy_instance_id=spec.strategy_version_id,
         strategy_id=spec.strategy_id,
         strategy_version=spec.strategy_version,
         params_json=_json_text(spec.params),
@@ -337,7 +345,7 @@ def _prepare(plan: BacktestRunPlan) -> _PreparedRun:
     )
     record = BacktestRunRecord(
         run_id=run_id,
-        strategy_instance_id=spec.strategy_instance_id,
+        strategy_version_id=spec.strategy_version_id,
         strategy_id=spec.strategy_id,
         strategy_version=spec.strategy_version,
         params=MappingProxyType(dict(spec.params)),
@@ -364,6 +372,11 @@ def _prepare(plan: BacktestRunPlan) -> _PreparedRun:
         run_row=run_row,
         trade_rows=trade_rows,
         equity_rows=equity_rows,
+        link_row=StrategyLinkedBacktestRow(
+            strategy_version_id=spec.strategy_version_id,
+            backtest_run_id=run_id,
+            created_at=created_at,
+        ),
         record=record,
     )
 
@@ -392,7 +405,12 @@ def get_run(run_id: str) -> BacktestRunRecord | None:
                 .order_by(BacktestEquityRow.time)
             )
         )
-    return _record(row, trade_rows, equity_rows)
+        version_id = session.scalar(
+            select(StrategyLinkedBacktestRow.strategy_version_id).where(
+                StrategyLinkedBacktestRow.backtest_run_id == run_id
+            )
+        )
+    return _record(row, trade_rows, equity_rows, version_id)
 
 
 @dataclass(frozen=True, slots=True)
@@ -404,7 +422,7 @@ class BacktestRunHeader:
     """
 
     run_id: str
-    strategy_instance_id: str
+    strategy_version_id: str | None
     strategy_id: str
     strategy_version: str
     params: Mapping[str, Any]
@@ -437,15 +455,19 @@ def list_runs(
         raise ValidationError("回测列表的 data_source 不能为空")
     condition = BacktestRunRow.data_source == data_source
     statement = (
-        select(BacktestRunRow)
+        select(BacktestRunRow, StrategyLinkedBacktestRow.strategy_version_id)
+        .outerjoin(
+            StrategyLinkedBacktestRow,
+            StrategyLinkedBacktestRow.backtest_run_id == BacktestRunRow.run_id,
+        )
         .where(condition)
         .order_by(BacktestRunRow.created_at.desc(), BacktestRunRow.run_id)
         .limit(limit)
     )
     with session_scope() as session:
-        rows = list(session.scalars(statement))
+        rows = session.execute(statement).all()
         total = session.scalar(select(func.count()).select_from(BacktestRunRow).where(condition))
-    return tuple(_header(row) for row in rows), total or 0
+    return tuple(_header(row, version_id) for row, version_id in rows), total or 0
 
 
 def latest_run(*, created_since: datetime | None = None) -> BacktestRunHeader | None:
@@ -457,15 +479,18 @@ def latest_run(*, created_since: datetime | None = None) -> BacktestRunHeader | 
 
     if created_since is not None and created_since.tzinfo is None:
         raise ValidationError("最近回测的创建时间下限必须带时区")
-    statement = select(BacktestRunRow)
+    statement = select(BacktestRunRow, StrategyLinkedBacktestRow.strategy_version_id).outerjoin(
+        StrategyLinkedBacktestRow,
+        StrategyLinkedBacktestRow.backtest_run_id == BacktestRunRow.run_id,
+    )
     if created_since is not None:
         statement = statement.where(BacktestRunRow.created_at >= _epoch(created_since))
     statement = statement.order_by(
         BacktestRunRow.created_at.desc(), BacktestRunRow.run_id.desc()
     ).limit(1)
     with session_scope() as session:
-        row = session.scalars(statement).first()
-    return None if row is None else _header(row)
+        row = session.execute(statement).first()
+    return None if row is None else _header(row[0], row[1])
 
 
 def list_instrument_runs(
@@ -488,15 +513,22 @@ def list_instrument_runs(
     if created_since is not None and created_since.tzinfo is None:
         raise ValidationError("关联回测的创建时间下限必须带时区")
 
-    statement = select(BacktestRunRow).where(BacktestRunRow.inst_id == symbol)
+    statement = (
+        select(BacktestRunRow, StrategyLinkedBacktestRow.strategy_version_id)
+        .outerjoin(
+            StrategyLinkedBacktestRow,
+            StrategyLinkedBacktestRow.backtest_run_id == BacktestRunRow.run_id,
+        )
+        .where(BacktestRunRow.inst_id == symbol)
+    )
     if created_since is not None:
         statement = statement.where(BacktestRunRow.created_at >= _epoch(created_since))
     statement = statement.order_by(
         BacktestRunRow.created_at.desc(), BacktestRunRow.run_id.desc()
     ).limit(limit)
     with session_scope() as session:
-        rows = list(session.scalars(statement))
-    return tuple(_header(row) for row in rows)
+        rows = session.execute(statement).all()
+    return tuple(_header(row, version_id) for row, version_id in rows)
 
 
 def latest_linked_backtests(
@@ -530,7 +562,7 @@ def latest_linked_backtests(
         rows = session.execute(statement).all()
     latest: dict[str, BacktestRunHeader] = {}
     for version_id, row in rows:
-        latest.setdefault(version_id, _header(row))
+        latest.setdefault(version_id, _header(row, version_id))
     return latest
 
 
@@ -576,6 +608,7 @@ def _result_hash(spec: BacktestSpec) -> str:
     """
 
     payload: dict[str, Any] = {
+        "strategy_version_id": spec.strategy_version_id,
         "strategy_id": spec.strategy_id,
         "strategy_version": spec.strategy_version,
         "params": spec.params,
@@ -624,6 +657,7 @@ def _record(
     row: BacktestRunRow,
     trade_rows: Sequence[BacktestTradeRow],
     equity_rows: Sequence[BacktestEquityRow],
+    version_id: str | None,
 ) -> BacktestRunRecord:
     """把三张表的行拼回一个记录；JSON 文本在这里还原成映射与定点数。"""
 
@@ -639,7 +673,7 @@ def _record(
     )
     return BacktestRunRecord(
         run_id=row.run_id,
-        strategy_instance_id=row.strategy_instance_id,
+        strategy_version_id=version_id,
         strategy_id=row.strategy_id,
         strategy_version=row.strategy_version,
         params=MappingProxyType(json.loads(row.params_json)),
@@ -695,13 +729,13 @@ def _from_epoch(value: int) -> datetime:
     return datetime.fromtimestamp(value, tz=UTC)
 
 
-def _header(row: BacktestRunRow) -> BacktestRunHeader:
+def _header(row: BacktestRunRow, version_id: str | None) -> BacktestRunHeader:
     """运行行 → 列表项：指标与组合汇总从 JSON 文本还原成定点数。"""
 
     portfolio_raw = json.loads(row.portfolio_json)
     return BacktestRunHeader(
         run_id=row.run_id,
-        strategy_instance_id=row.strategy_instance_id,
+        strategy_version_id=version_id,
         strategy_id=row.strategy_id,
         strategy_version=row.strategy_version,
         params=MappingProxyType(json.loads(row.params_json)),

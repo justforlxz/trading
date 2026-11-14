@@ -23,13 +23,24 @@ from app.api.schemas.common import (
 )
 
 __all__ = [
+    "BacktestBatchResponse",
+    "BacktestChartCandle",
+    "BacktestChartResponse",
     "BacktestCosts",
     "BacktestDetailResponse",
+    "BacktestEquityPoint",
+    "BacktestEquityResponse",
     "BacktestLeg",
+    "BacktestMarker",
     "BacktestMetrics",
+    "BacktestOverlay",
+    "BacktestOverlayPoint",
     "BacktestPortfolio",
     "BacktestRankingResponse",
     "BacktestRankingRow",
+    "BacktestReplayPoint",
+    "BacktestReplayResponse",
+    "BacktestReplayTrade",
     "BacktestRequest",
     "BacktestRunListResponse",
     "BacktestRunSummary",
@@ -38,7 +49,9 @@ __all__ = [
     "BacktestSweepResponse",
     "BacktestTargets",
     "BacktestTrade",
+    "BacktestTradeListResponse",
     "EquityPoint",
+    "GroupEquityPoint",
     "RankingMetric",
     "RunStatus",
     "TimeSplit",
@@ -66,7 +79,7 @@ class BacktestCosts(BaseModel):
 class BacktestRequest(BaseModel):
     """一次回测的全部可复现输入。结果必须能按这份配置重放。"""
 
-    strategy_instance_id: str
+    strategy_version_id: str
     targets: BacktestTargets
     bar: Bar
     start_date: date
@@ -124,7 +137,7 @@ _EXAMPLE_METRICS = {
 _EXAMPLE_RUN = {
     "run_id": "bt_0001",
     "status": "succeeded",
-    "strategy_instance_id": "si_0001",
+    "strategy_version_id": "sv_0001",
     "params": {"reversion_window": 3, "strength_window": 2, "pair_count": 1},
     "data_source": "okx",
     "inst_id": "XAAPL-USDT",
@@ -141,7 +154,7 @@ _EXAMPLE_RUN = {
 }
 
 _EXAMPLE_REQUEST = {
-    "strategy_instance_id": "si_0001",
+    "strategy_version_id": "sv_0001",
     "targets": {"mode": "single", "inst_ids": ["XAAPL-USDT"], "group": None},
     "bar": "1h",
     "start_date": "2026-08-01",
@@ -165,7 +178,8 @@ _EXAMPLE_REQUEST = {
 class BacktestRunSummary(BaseModel):
     run_id: str
     status: RunStatus
-    strategy_instance_id: str
+    # 旧运行没有 `strategy_linked_backtests` 关联时为 null；新运行总是有值。
+    strategy_version_id: str | None
     # 这次运行实际使用的策略参数：换参数重跑会得到新的一条，列表靠它区分不同组合。
     params: dict[str, ParamValue]
     data_source: DataSource
@@ -212,16 +226,312 @@ class BacktestTrade(BaseModel):
     exit_time: UtcDatetime
     exit_price: DecimalString
     fee: DecimalString
+    slippage: DecimalString
     # 资金费按组合记账（`BacktestMetrics.funding_total`），逐腿拆分由 T4.7 承接；
     # 在那之前这里一律为 null，不用 `0` 假装「这条腿没有资金费」。
     funding: DecimalString | None = None
     pnl: DecimalString
+    #: 净盈亏 = 价格盈亏 − 手续费；资金费按组合记账，逐腿拆分前为 null。
+    net_pnl: DecimalString
     reason: str
 
 
 class EquityPoint(BaseModel):
     time: UtcDatetime
     equity: DecimalString
+
+
+class BacktestChartCandle(BaseModel):
+    """回测 K 线：只包含本次运行实际用到的 bar，来源与是否收盘原样保留。"""
+
+    time: UtcDatetime
+    open: DecimalString
+    high: DecimalString
+    low: DecimalString
+    close: DecimalString
+    volume: DecimalString
+    is_complete: bool
+    source: DataSource
+
+
+class BacktestMarker(BaseModel):
+    """一笔完整交易的入场或出场标记；每个标记都来自 `backtest_trades` 的一行。"""
+
+    trade_id: str
+    kind: Literal["entry", "exit"]
+    time: UtcDatetime
+    price: DecimalString
+    side: Literal["buy", "sell"]
+    qty: DecimalString
+    pnl: DecimalString | None = None
+    reason: str | None = None
+
+
+class BacktestOverlayPoint(BaseModel):
+    time: UtcDatetime
+    value: DecimalString
+
+
+class BacktestOverlay(BaseModel):
+    name: str
+    points: list[BacktestOverlayPoint]
+
+
+class BacktestChartResponse(BaseModel):
+    """K 线图：K 线、来自成交表的买卖标记、由已保存行情算出的均线叠加。"""
+
+    run_id: str
+    inst_id: str
+    bar: Bar
+    data_source: DataSource
+    candles: list[BacktestChartCandle]
+    markers: list[BacktestMarker]
+    overlays: list[BacktestOverlay]
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "run_id": "bt_0001",
+                    "inst_id": "XAAPL-USDT",
+                    "bar": "1d",
+                    "data_source": "okx",
+                    "candles": [
+                        {
+                            "time": "2026-11-05T00:00:00Z",
+                            "open": "100",
+                            "high": "104",
+                            "low": "99",
+                            "close": "103",
+                            "volume": "1200",
+                            "is_complete": True,
+                            "source": "okx",
+                        }
+                    ],
+                    "markers": [
+                        {
+                            "trade_id": "tr_0001",
+                            "kind": "entry",
+                            "time": "2026-11-06T00:00:00Z",
+                            "price": "101",
+                            "side": "buy",
+                            "qty": "8.63",
+                            "pnl": None,
+                            "reason": None,
+                        },
+                        {
+                            "trade_id": "tr_0001",
+                            "kind": "exit",
+                            "time": "2026-11-08T00:00:00Z",
+                            "price": "103",
+                            "side": "sell",
+                            "qty": "8.63",
+                            "pnl": "17.26",
+                            "reason": "MA20 下穿 MA60",
+                        },
+                    ],
+                    "overlays": [
+                        {
+                            "name": "MA20",
+                            "points": [{"time": "2026-11-05T00:00:00Z", "value": "98.40"}],
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+
+
+class BacktestEquityPoint(BaseModel):
+    """净值曲线的一个点；`benchmark_equity` 缺失时保持 null，不补假线。"""
+
+    time: UtcDatetime
+    equity: DecimalString
+    benchmark_equity: DecimalString | None = None
+    #: 相对前高的回撤比率，0 表示新高、-0.05 表示回撤 5%。
+    drawdown: DecimalString
+
+
+class BacktestEquityResponse(BaseModel):
+    run_id: str
+    #: 基准标识。当前引擎不保存基准行情，缺失时为 null。
+    benchmark: str | None = None
+    points: list[BacktestEquityPoint]
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "run_id": "bt_0001",
+                    "benchmark": None,
+                    "points": [
+                        {
+                            "time": "2026-11-05T00:00:00Z",
+                            "equity": "10000",
+                            "benchmark_equity": None,
+                            "drawdown": "0",
+                        },
+                        {
+                            "time": "2026-11-06T00:00:00Z",
+                            "equity": "9940",
+                            "benchmark_equity": None,
+                            "drawdown": "-0.006",
+                        },
+                    ],
+                }
+            ]
+        }
+    )
+
+
+class BacktestReplayTrade(BaseModel):
+    """回放时间轴上的成交事件；`index` 与该运行第几根 K 线对应。"""
+
+    index: int
+    trade_id: str
+    kind: Literal["entry", "exit"]
+    side: Literal["buy", "sell"]
+    price: DecimalString
+    qty: DecimalString
+
+
+class BacktestReplayPoint(BaseModel):
+    """按 K 线索引排列的一个回放点；全部字段来自已保存的行情与结果。"""
+
+    index: int
+    time: UtcDatetime
+    close: DecimalString | None = None
+    equity: DecimalString
+    cash: DecimalString
+    position: DecimalString
+    signal: Literal["BUY", "SELL", "HOLD"]
+    indicators: dict[str, DecimalString | None]
+
+
+class BacktestReplayResponse(BaseModel):
+    run_id: str
+    bar: Bar
+    points: list[BacktestReplayPoint]
+    trades: list[BacktestReplayTrade]
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "run_id": "bt_0001",
+                    "bar": "1d",
+                    "points": [
+                        {
+                            "index": 0,
+                            "time": "2026-11-05T00:00:00Z",
+                            "close": "103",
+                            "equity": "10000",
+                            "cash": "10000",
+                            "position": "0",
+                            "signal": "HOLD",
+                            "indicators": {"ma20": "98.40", "ma60": None},
+                        },
+                        {
+                            "index": 1,
+                            "time": "2026-11-06T00:00:00Z",
+                            "close": "101",
+                            "equity": "10020",
+                            "cash": "9128.37",
+                            "position": "891.63",
+                            "signal": "BUY",
+                            "indicators": {"ma20": "99.10", "ma60": "96.80"},
+                        },
+                    ],
+                    "trades": [
+                        {
+                            "index": 1,
+                            "trade_id": "tr_0001",
+                            "kind": "entry",
+                            "side": "buy",
+                            "price": "101",
+                            "qty": "8.63",
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+
+
+class BacktestTradeListResponse(BaseModel):
+    run_id: str
+    items: list[BacktestTrade]
+    total: int
+    limit: int
+    offset: int
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "run_id": "bt_0001",
+                    "items": [
+                        {
+                            "trade_id": "tr_0001",
+                            "product_key": "XAAPL",
+                            "inst_id": "XAAPL-USDT",
+                            "inst_type": "SPOT",
+                            "side": "long",
+                            "qty": "8.63",
+                            "entry_time": "2026-11-06T00:00:00Z",
+                            "entry_price": "101",
+                            "exit_time": "2026-11-08T00:00:00Z",
+                            "exit_price": "103",
+                            "fee": "0.87",
+                            "slippage": "0.44",
+                            "funding": None,
+                            "pnl": "17.26",
+                            "net_pnl": "16.39",
+                            "reason": "MA20 下穿 MA60",
+                        }
+                    ],
+                    "total": 1,
+                    "limit": 100,
+                    "offset": 0,
+                }
+            ]
+        }
+    )
+
+
+class GroupEquityPoint(BaseModel):
+    """等权组合净值：各成员以首点归一化后取平均，`nav` 从 1 开始。"""
+
+    time: UtcDatetime
+    nav: DecimalString
+
+
+class BacktestBatchResponse(BacktestRunSummary):
+    """批量回测的创建结果：第一条运行的汇总 + 全部运行标识 + 等权组合净值。"""
+
+    run_ids: list[str]
+    combination: Literal["equal_weight"] = "equal_weight"
+    combination_note: str = "各成员运行按首点归一化后的净值等权平均；缺失时沿用上一有效点"
+    group_equity: list[GroupEquityPoint]
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    **_EXAMPLE_RUN,
+                    "run_ids": ["bt_0001", "bt_0002"],
+                    "combination": "equal_weight",
+                    "combination_note": (
+                        "各成员运行按首点归一化后的净值等权平均；缺失时沿用上一有效点"
+                    ),
+                    "group_equity": [
+                        {"time": "2026-11-05T00:00:00Z", "nav": "1"},
+                        {"time": "2026-11-06T00:00:00Z", "nav": "1.004"},
+                    ],
+                }
+            ]
+        }
+    )
 
 
 class BacktestPortfolio(BaseModel):
@@ -312,8 +622,10 @@ class BacktestDetailResponse(BaseModel):
                             "exit_time": "2026-08-05T06:00:00Z",
                             "exit_price": "232.44",
                             "fee": "1.98",
+                            "slippage": "0.42",
                             "funding": None,
                             "pnl": "35.24",
+                            "net_pnl": "33.26",
                             "reason": "MA20 下穿 MA60",
                         }
                     ],

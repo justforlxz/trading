@@ -47,6 +47,7 @@ __all__ = [
     "create_version",
     "get_user_strategy",
     "get_version",
+    "get_version_by_id",
     "link_backtest",
     "list_strategies_for_instrument",
     "list_user_strategies",
@@ -355,6 +356,19 @@ def get_version(strategy_id: str, version: int) -> StrategyVersionRecord | None:
                 StrategyVersionRow.version == version,
             )
         )
+        if row is None:
+            return None
+        instruments = _version_instruments(session, row.id)
+    return _version_record(row, instruments)
+
+
+def get_version_by_id(version_id: str) -> StrategyVersionRecord | None:
+    """按版本主键取一条不可变版本；回测入口只需要版本标识，不需要再拼策略与版本号。"""
+
+    if not isinstance(version_id, str) or not version_id.strip():
+        raise ValidationError("策略版本标识不能为空")
+    with session_scope() as session:
+        row = session.get(StrategyVersionRow, version_id)
         if row is None:
             return None
         instruments = _version_instruments(session, row.id)

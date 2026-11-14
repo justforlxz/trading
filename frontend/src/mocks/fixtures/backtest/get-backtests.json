@@ -36,7 +36,7 @@
       "run_id": "bt_0001",
       "start_date": "2026-08-01",
       "status": "succeeded",
-      "strategy_instance_id": "si_0001",
+      "strategy_version_id": "sv_0001",
       "symbol_count": 1
     }
   ],

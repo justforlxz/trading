@@ -230,7 +230,7 @@ def _analysis_payload(result: Analysis) -> InstrumentAnalysisResponse:
         linked_strategies=[
             LinkedBacktest(
                 run_id=row.run_id,
-                strategy_instance_id=row.strategy_instance_id,
+                strategy_version_id=row.strategy_version_id,
                 strategy_name=row.strategy_name,
                 strategy_id=row.strategy_id,
                 data_source=row.data_source,

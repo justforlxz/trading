@@ -28,6 +28,7 @@ from app.risk import RiskContext, RiskEngine, TradeRequest, resolve_risk_event
 from app.strategy import create_instance
 from tests.api.conftest import latest_opens, seed_daily
 from tests.factories.instruments import make_ref, make_swap_ref
+from tests.factories.strategies import make_strategy
 
 D = Decimal
 DAY = timedelta(days=1)
@@ -298,10 +299,17 @@ def test_strategies_count_and_recent_backtest(client: TestClient) -> None:
     """策略卡给出实例计数与最近 30 天的一次回测；没有回测时为 `null`。"""
 
     _strategy_market()
-    instance = create_instance(
+    create_instance(
         strategy_id="relative_value",
         name="BTC/ETH 首页",
         bar="1d",
+        params={"reversion_window": 3, "strength_window": 2, "pair_count": 1},
+        inst_ids=["BTC-USDT", "ETH-USDT"],
+    )
+    strategy = make_strategy(
+        name="BTC/ETH 首页版本",
+        category="relative_value",
+        direction="long_short",
         params={"reversion_window": 3, "strength_window": 2, "pair_count": 1},
         inst_ids=["BTC-USDT", "ETH-USDT"],
     )
@@ -318,7 +326,7 @@ def test_strategies_count_and_recent_backtest(client: TestClient) -> None:
     run = client.post(
         "/api/backtests",
         json={
-            "strategy_instance_id": instance.instance_id,
+            "strategy_version_id": strategy.current_version_id,
             "targets": {"mode": "single", "inst_ids": ["BTC-USDT"], "group": None},
             "bar": "1d",
             "start_date": "2026-11-05",

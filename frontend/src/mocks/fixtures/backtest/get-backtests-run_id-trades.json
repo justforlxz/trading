@@ -1,0 +1,25 @@
+{
+  "items": [
+    {
+      "entry_price": "101",
+      "entry_time": "2026-11-06T00:00:00Z",
+      "exit_price": "103",
+      "exit_time": "2026-11-08T00:00:00Z",
+      "fee": "0.87",
+      "inst_id": "XAAPL-USDT",
+      "inst_type": "SPOT",
+      "net_pnl": "16.39",
+      "pnl": "17.26",
+      "product_key": "XAAPL",
+      "qty": "8.63",
+      "reason": "MA20 下穿 MA60",
+      "side": "long",
+      "slippage": "0.44",
+      "trade_id": "tr_0001"
+    }
+  ],
+  "limit": 100,
+  "offset": 0,
+  "run_id": "bt_0001",
+  "total": 1
+}

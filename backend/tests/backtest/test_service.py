@@ -26,7 +26,7 @@ from app.backtest import (
 )
 from app.core import Bar, InstrumentRef, Timeframe, ValidationError
 from app.db import init_db, session_scope
-from app.strategy import TargetLeg, TargetPortfolio
+from app.strategy import StrategyVersionRow, TargetLeg, TargetPortfolio, UserStrategyRow
 
 START = datetime(2026, 3, 2, tzinfo=UTC)
 BAR = Timeframe.parse("1h")
@@ -54,6 +54,47 @@ def backtest_schema() -> None:
 
 
 pytestmark = pytest.mark.usefixtures("backtest_schema")
+
+
+@pytest.fixture(autouse=True)
+def seeded_versions(backtest_schema: None) -> None:
+    """写入两个可被回测关联的策略版本；关联表有外键，不能只编一个标识。"""
+
+    del backtest_schema
+    now = datetime(2026, 3, 1, tzinfo=UTC)
+    with session_scope() as session:
+        for version_id in ("sv_test", "sv_other"):
+            strategy_id = f"st_{version_id}"
+            session.add(
+                UserStrategyRow(
+                    id=strategy_id,
+                    name=version_id,
+                    category="relative_value",
+                    description=None,
+                    status="draft",
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+        # 策略版本通过 `strategy_id` 外键指向策略；两行模型之间没有声明关系，
+        # 同一个 flush 里 SQLAlchemy 不会自动按外键排序，先把父行写下去。
+        session.flush()
+        for version_id in ("sv_test", "sv_other"):
+            session.add(
+                StrategyVersionRow(
+                    id=version_id,
+                    strategy_id=f"st_{version_id}",
+                    version=1,
+                    timeframe="1h",
+                    direction="long_short",
+                    rule_json="{}",
+                    parameters_json="{}",
+                    position_sizing_json=None,
+                    cost_model_json=None,
+                    change_note=None,
+                    created_at=now,
+                )
+            )
 
 
 def moment(index: int) -> datetime:
@@ -132,7 +173,7 @@ def request(*, execution_model: str = "next_open") -> BacktestInput:
 
 def spec(**overrides: object) -> BacktestSpec:
     payload: dict[str, object] = {
-        "strategy_instance_id": "si_test",
+        "strategy_version_id": "sv_test",
         "strategy_id": "relative_value",
         "strategy_version": "1.0.0",
         "params": {"fast": 5, "slow": 20},
@@ -142,7 +183,7 @@ def spec(**overrides: object) -> BacktestSpec:
         "data_source": "okx",
         "inst_id": LEG_LONG,
         "inst_type": "SPOT",
-        "request": {"strategy_instance_id": "si_test", "data_source": "okx"},
+        "request": {"strategy_version_id": "sv_test", "data_source": "okx"},
         "data_fingerprint": data_fingerprint(bars(), "okx"),
         "execution_model": "next_open",
         "initial_capital": Decimal("10000"),
@@ -182,7 +223,7 @@ def test_result_tables_exist_after_migration() -> None:
 def test_saved_run_keeps_identity_and_summary() -> None:
     record = saved()
 
-    assert record.strategy_instance_id == "si_test"
+    assert record.strategy_version_id == "sv_test"
     assert record.strategy_id == "relative_value"
     assert record.strategy_version == "1.0.0"
     assert record.params == {"fast": 5, "slow": 20}
@@ -321,10 +362,10 @@ def test_result_hash_changes_with_the_execution_model() -> None:
     assert record.result_hash != baseline.result_hash
 
 
-def test_result_hash_ignores_the_run_instance_id() -> None:
-    """实例标识不是可复现输入：同一份输入换个实例跑，结果摘要不变。"""
+def test_result_hash_changes_with_the_strategy_version() -> None:
+    """策略版本是可复现输入：换版本跑，结果摘要必须跟着变。"""
 
-    assert saved().result_hash == saved(strategy_instance_id="si_other").result_hash
+    assert saved().result_hash != saved(strategy_version_id="sv_other").result_hash
 
 
 # ------------------------------------------------------------------ 行情指纹
@@ -352,7 +393,7 @@ def test_data_fingerprint_requires_a_source() -> None:
 @pytest.mark.parametrize(
     ("reason", "overrides"),
     [
-        ("实例标识为空", {"strategy_instance_id": ""}),
+        ("策略版本标识为空", {"strategy_version_id": ""}),
         ("策略模板为空", {"strategy_id": " "}),
         ("执行模型未知", {"execution_model": "next_bar"}),
         ("周期不在枚举内", {"bar": "2h"}),

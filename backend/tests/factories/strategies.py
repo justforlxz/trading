@@ -9,9 +9,48 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from app.strategy import InstanceRecord, create_instance, update_instance
+from app.strategy import (
+    InstanceRecord,
+    StrategyRecord,
+    create_instance,
+    create_strategy,
+    update_instance,
+)
 
-__all__ = ["make_instance", "patch_instance"]
+__all__ = ["make_instance", "make_strategy", "patch_instance"]
+
+
+def make_strategy(
+    *,
+    name: str = "测试策略",
+    category: str = "relative_value",
+    description: str | None = None,
+    bar: str = "1d",
+    direction: str = "long_short",
+    params: Mapping[str, object] | None = None,
+    inst_ids: Sequence[str],
+) -> StrategyRecord:
+    """建一条带首版草稿的用户策略，供回测入口按版本标识使用。"""
+
+    rule = {
+        "timeframe": bar,
+        "direction": direction,
+        "entry": {"all": [{"left": "MA(20)", "op": ">", "right": "MA(60)"}]},
+        "exit": {"any": [{"left": "MA(20)", "op": "<", "right": "MA(60)"}]},
+    }
+    return create_strategy(
+        name=name,
+        category=category,
+        description=description,
+        timeframe=bar,
+        direction=direction,
+        rule_json=rule,
+        parameters=params,
+        instrument_ids=inst_ids,
+        cost_model=None,
+        position_sizing=None,
+        change_note="初始版本",
+    )
 
 
 def make_instance(

@@ -9,6 +9,7 @@ paper 账本不调用假 OKX 的任何交易端点。
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -17,6 +18,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
+from app.backtest import BacktestRunRow
 from app.core import Bar, InstrumentRef, Signal, Timeframe
 from app.db import session_scope
 from app.execution import (
@@ -115,33 +117,51 @@ def create_instance(client: TestClient) -> str:
     return instance.instance_id
 
 
-def run_backtest(client: TestClient, instance_id: str) -> None:
-    """跑一次真实回测，给 journal 提供「预期收益」的来源行。"""
+def seed_legacy_expectation(instance_id: str) -> None:
+    """写入一条函数式实例口径的历史回测，给 journal 提供预期收益来源。
 
-    response = client.post(
-        "/api/backtests",
-        json={
-            "strategy_instance_id": instance_id,
-            "targets": {"mode": "list", "inst_ids": list(INST_IDS), "group": None},
-            "bar": "1d",
-            "start_date": (AS_OF.date() - timedelta(days=9)).isoformat(),
-            "end_date": AS_OF.date().isoformat(),
-            "initial_capital": "10000",
-            "quote_currency": "USDT",
-            "position_size": "10000",
-            "max_position_pct": "1",
-            "costs": {
-                "maker_fee_bps": "2",
-                "taker_fee_bps": "10",
-                "slippage_bps": "5",
-                "spread_bps": "2",
-            },
-            "funding_enabled": True,
-            "execution_model": "next_open",
-            "data_source": "okx_spot",
-        },
-    )
-    assert response.status_code == 202, response.text
+    v6 的 `POST /api/backtests` 已改为策略版本口径，不再产生以实例标识为键的运行；
+    journal 仍要能读取历史回测，因此这里直接按旧运行的落库形状写一条历史事实。
+    """
+
+    instance = get_instance(instance_id)
+    assert instance is not None
+    metrics = {
+        "total_return": "0.05",
+        "max_drawdown": "0.01",
+        "trade_count": "1",
+    }
+    portfolio = {
+        "net_exposure": "0",
+        "leg_win_rate": {},
+        "long_pnl": "0",
+        "short_pnl": "0",
+    }
+    with session_scope() as session:
+        session.add(
+            BacktestRunRow(
+                run_id="bt_phase5",
+                strategy_instance_id=instance_id,
+                strategy_id=instance.strategy_id,
+                strategy_version=instance.strategy_version,
+                params_json=json.dumps({}),
+                bar="1d",
+                start_date=AS_OF.date() - timedelta(days=9),
+                end_date=AS_OF.date(),
+                data_source="okx_spot",
+                inst_id=BTC,
+                inst_type="SPOT",
+                request_json=json.dumps({}),
+                data_fingerprint="0" * 64,
+                execution_model="next_open",
+                costs_json=json.dumps({}),
+                metrics_json=json.dumps(metrics),
+                portfolio_json=json.dumps(portfolio),
+                funding_total=Decimal("0"),
+                result_hash="1" * 64,
+                created_at=int(AS_OF.timestamp()),
+            )
+        )
 
 
 def instrument_ref(row: Instrument) -> InstrumentRef:
@@ -251,7 +271,7 @@ def table_counts() -> dict[str, int]:
 def journal_client(client: TestClient) -> Iterator[tuple[TestClient, str]]:
     seed_market()
     instance_id = create_instance(client)
-    run_backtest(client, instance_id)
+    seed_legacy_expectation(instance_id)
     snapshot = build_paper_chain(instance_id)
     client.app.state.execution_snapshot = snapshot
     try:

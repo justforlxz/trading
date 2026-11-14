@@ -1,4 +1,4 @@
-"""Phase 4 端到端：选策略实例 → 选标的集合 → 设成本 → 跑批量 → 看排名 → 打开单条。
+"""Phase 4 端到端：选策略版本 → 选标的集合 → 设成本 → 跑批量 → 看排名 → 打开单条。
 
 只走 HTTP 端点与业务写入路径（假 OKX 服务 → 交易适配器 → `sync_instruments` +
 `sync_candles`），不直接查回测表：「结果落库」由读回 `GET /backtests` 与
@@ -30,7 +30,8 @@ from app.core import MarketDataPort
 from app.exchange import create_market_data
 from app.instrument import sync_instruments
 from app.market import CRYPTO, sync_candles
-from tests.factories.strategies import make_instance, patch_instance
+from app.strategy import create_version, get_version_by_id
+from tests.factories.strategies import make_strategy
 from tests.fakes.okx.server import start_server
 from tests.fakes.okx.store import OkxStore
 
@@ -119,9 +120,9 @@ def fake_okx_settings() -> Iterator[Settings]:
 
 @dataclass(frozen=True, slots=True)
 class SeededMarket:
-    """一条已经建好的策略实例，以及行情里实际可用的日线根数。"""
+    """一个已经建好的策略版本，以及行情里实际可用的日线根数。"""
 
-    instance_id: str
+    version_id: str
     bar_count: int
 
 
@@ -157,28 +158,30 @@ def seed_market(port: MarketDataPort) -> int:
 
 @pytest.fixture()
 def seeded(client: TestClient, fake_okx_settings: Settings) -> Iterator[SeededMarket]:
-    """一只相对价值实例：BTC 与 ETH 两条腿，行情与区间逐根对齐。"""
+    """一个相对价值版本：BTC 与 ETH 两条腿，行情与区间逐根对齐。"""
 
     port = create_market_data(settings=fake_okx_settings)
     try:
         bar_count = seed_market(port)
-        instance = make_instance(
+        strategy = make_strategy(
             name="BTC/ETH 相对价值",
+            category="relative_value",
+            direction="long_short",
             params=PARAMS,
             inst_ids=INST_IDS,
         )
-        yield SeededMarket(instance.instance_id, bar_count)
+        yield SeededMarket(strategy.current_version_id, bar_count)
     finally:
         port.close()
 
 
 @pytest.fixture()
-def instance_id(seeded: SeededMarket) -> str:
-    return seeded.instance_id
+def version_id(seeded: SeededMarket) -> str:
+    return seeded.version_id
 
 
 def request_body(
-    instance_id: str,
+    version_id: str,
     *,
     inst_ids: Sequence[str] = INST_IDS,
     costs: dict[str, str] | None = None,
@@ -186,7 +189,7 @@ def request_body(
     """一次批量回测的完整请求：两个标的、给定成本、次日开盘成交。"""
 
     return {
-        "strategy_instance_id": instance_id,
+        "strategy_version_id": version_id,
         "targets": {"mode": "list", "inst_ids": list(inst_ids), "group": None},
         "bar": "1d",
         "start_date": START,
@@ -203,9 +206,9 @@ def request_body(
 
 
 def test_phase4_backtest_batch_ranking_and_detail(
-    client: TestClient, instance_id: str, seeded: SeededMarket
+    client: TestClient, version_id: str, seeded: SeededMarket
 ) -> None:
-    sent = request_body(instance_id)
+    sent = request_body(version_id)
     created = client.post("/api/backtests", json=sent)
     assert created.status_code == 202, created.text
     first = created.json()
@@ -299,16 +302,22 @@ def test_phase4_backtest_batch_ranking_and_detail(
         assert trade["funding"] is None
 
 
-def test_phase4_parameter_runs_are_comparable(client: TestClient, instance_id: str) -> None:
+def test_phase4_parameter_runs_are_comparable(client: TestClient, version_id: str) -> None:
     """换一组参数重跑是另一条结果，两条都留在列表里供人工对比（不标「最优」）。"""
 
-    baseline = client.post("/api/backtests", json=request_body(instance_id))
+    baseline = client.post("/api/backtests", json=request_body(version_id))
     assert baseline.status_code == 202, baseline.text
 
     changed_params = {"reversion_window": 2, "strength_window": 2, "pair_count": 1}
-    assert patch_instance(instance_id, params=changed_params) is not None
+    version = get_version_by_id(version_id)
+    assert version is not None
+    changed_version = create_version(
+        version.strategy_id,
+        {"parameters": changed_params, "change_note": "换参数"},
+    )
+    assert changed_version is not None
 
-    changed = client.post("/api/backtests", json=request_body(instance_id))
+    changed = client.post("/api/backtests", json=request_body(changed_version.current_version_id))
     assert changed.status_code == 202, changed.text
 
     listing = client.get("/api/backtests", params={"data_source": SOURCE}).json()
@@ -343,12 +352,12 @@ def test_phase4_parameter_runs_are_comparable(client: TestClient, instance_id: s
 
 
 def test_phase4_same_request_reproduces_the_same_result(
-    client: TestClient, instance_id: str
+    client: TestClient, version_id: str
 ) -> None:
     """同参数重跑：指标、逐笔交易与资金曲线逐字段相同（可复现的可观察证据）。"""
 
-    first = client.post("/api/backtests", json=request_body(instance_id, inst_ids=["BTC-USDT"]))
-    second = client.post("/api/backtests", json=request_body(instance_id, inst_ids=["BTC-USDT"]))
+    first = client.post("/api/backtests", json=request_body(version_id, inst_ids=["BTC-USDT"]))
+    second = client.post("/api/backtests", json=request_body(version_id, inst_ids=["BTC-USDT"]))
     assert first.status_code == 202, first.text
     assert second.status_code == 202, second.text
 
@@ -361,8 +370,8 @@ def test_phase4_same_request_reproduces_the_same_result(
     assert one["portfolio"] == two["portfolio"]
 
 
-def test_phase4_delete_then_list(client: TestClient, instance_id: str) -> None:
-    created = client.post("/api/backtests", json=request_body(instance_id, inst_ids=["BTC-USDT"]))
+def test_phase4_delete_then_list(client: TestClient, version_id: str) -> None:
+    created = client.post("/api/backtests", json=request_body(version_id, inst_ids=["BTC-USDT"]))
     assert created.status_code == 202, created.text
     run_id = created.json()["run_id"]
 

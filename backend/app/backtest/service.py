@@ -60,6 +60,7 @@ __all__ = [
     "data_fingerprint",
     "delete_run",
     "get_run",
+    "latest_run",
     "list_runs",
     "save_run",
     "save_runs",
@@ -443,6 +444,26 @@ def list_runs(
         rows = list(session.scalars(statement))
         total = session.scalar(select(func.count()).select_from(BacktestRunRow).where(condition))
     return tuple(_header(row) for row in rows), total or 0
+
+
+def latest_run(*, created_since: datetime | None = None) -> BacktestRunHeader | None:
+    """取最近创建的一次回测；可按创建时刻设下限。
+
+    这里只按创建时刻取一条，不比较不同数据源的指标，也不在多个标的之间求和：
+    一次回测只代表一个标的，把多条运行拼成「组合收益」会造出一个没有对应事实的数字。
+    """
+
+    if created_since is not None and created_since.tzinfo is None:
+        raise ValidationError("最近回测的创建时间下限必须带时区")
+    statement = select(BacktestRunRow)
+    if created_since is not None:
+        statement = statement.where(BacktestRunRow.created_at >= _epoch(created_since))
+    statement = statement.order_by(
+        BacktestRunRow.created_at.desc(), BacktestRunRow.run_id.desc()
+    ).limit(1)
+    with session_scope() as session:
+        row = session.scalars(statement).first()
+    return None if row is None else _header(row)
 
 
 def list_instrument_runs(

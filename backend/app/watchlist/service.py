@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -23,7 +24,7 @@ from app.core import DataUnavailable, InvariantViolation, ValidationError
 from app.db import session_scope
 from app.instrument import Instrument
 from app.market import correlation, load_candles
-from app.watchlist.metrics import DailySnapshot, summarize_daily
+from app.watchlist.metrics import MIN_QUOTE_BARS, DailySnapshot, summarize_daily
 from app.watchlist.model import PriceAlertRow, WatchlistGroup, WatchlistItemRow
 
 __all__ = [
@@ -32,6 +33,7 @@ __all__ = [
     "AlertSnapshot",
     "RelatedCandidate",
     "WatchlistEntry",
+    "WatchlistSummary",
     "add_item",
     "clear_alert",
     "list_entries",
@@ -40,6 +42,7 @@ __all__ = [
     "related_instruments",
     "remove_item",
     "set_alert",
+    "summarize_entries",
     "tracked_instruments",
 ]
 
@@ -47,6 +50,8 @@ DEFAULT_GROUP = "默认"
 QUOTE_BAR = "1d"
 
 _CORRELATION_PLACES = Decimal("0.0001")
+_COVERAGE_PLACES = Decimal("0.01")
+_HUNDRED = Decimal(100)
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +84,41 @@ class RelatedCandidate:
     product_key: str
     asset_type: str
     correlation: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class WatchlistSummary:
+    """自选摘要：数量、方向分布与日线覆盖率。
+
+    覆盖率只回答「有多少条目已经有两根以上日线，能算出价格与涨跌幅」，不把
+    趋势或 RSI 缺失算作没有数据；这两类指标需要更长的历史，由每一行自己的
+    `data_status` 单独说明。
+    """
+
+    total: int
+    bullish: int
+    bearish: int
+    coverage_pct: Decimal
+
+
+def summarize_entries(entries: Sequence[WatchlistEntry]) -> WatchlistSummary:
+    """把自选条目压成首页摘要；只统计传入的条目，不另读库。"""
+
+    total = len(entries)
+    bullish = sum(1 for entry in entries if entry.quote.trend == "bullish")
+    bearish = sum(1 for entry in entries if entry.quote.trend == "bearish")
+    covered = sum(1 for entry in entries if entry.quote.candle_count >= MIN_QUOTE_BARS)
+    coverage = (
+        Decimal(0)
+        if total == 0
+        else (Decimal(covered) / Decimal(total) * _HUNDRED).quantize(_COVERAGE_PLACES)
+    )
+    return WatchlistSummary(
+        total=total,
+        bullish=bullish,
+        bearish=bearish,
+        coverage_pct=coverage,
+    )
 
 
 def quote(inst_id: str) -> DailySnapshot:

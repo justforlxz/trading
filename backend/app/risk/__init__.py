@@ -44,6 +44,7 @@ from app.risk.rules import (
 from app.risk.service import (
     RiskEngine,
     list_risk_events,
+    list_unresolved_risk_events,
     resolve_risk_event,
 )
 
@@ -74,6 +75,7 @@ __all__ = [
     "evaluate",
     "exposure_report",
     "list_risk_events",
+    "list_unresolved_risk_events",
     "notional_value",
     "plan",
     "resolve_risk_event",

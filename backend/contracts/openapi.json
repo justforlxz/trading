@@ -2549,6 +2549,1502 @@
         "title": "CostSettings",
         "type": "object"
       },
+      "DashboardAccountData": {
+        "description": "账户卡内容；派生字段由 `app.positions` 给出，聚合层不重算。",
+        "properties": {
+          "account_id": {
+            "title": "Account Id",
+            "type": "string"
+          },
+          "available_equity": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Equity"
+          },
+          "available_margin": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Margin"
+          },
+          "captured_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured At"
+          },
+          "cash_balance": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Balance"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "day_pnl": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Pnl"
+          },
+          "day_pnl_basis": {
+            "const": "equity_only",
+            "default": "equity_only",
+            "title": "Day Pnl Basis",
+            "type": "string"
+          },
+          "equity": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Equity"
+          },
+          "margin_usage_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin Usage Pct"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "unrealized_pnl": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unrealized Pnl"
+          },
+          "used_margin": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Used Margin"
+          }
+        },
+        "required": [
+          "account_id",
+          "currency"
+        ],
+        "title": "DashboardAccountData",
+        "type": "object"
+      },
+      "DashboardAccountModule": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DashboardAccountData"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "stale",
+              "unavailable",
+              "unconfigured"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "DashboardAccountModule",
+        "type": "object"
+      },
+      "DashboardActivityItem": {
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "event_type": {
+            "title": "Event Type",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "object_id": {
+            "title": "Object Id",
+            "type": "string"
+          },
+          "object_type": {
+            "title": "Object Type",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "event_type",
+          "object_type",
+          "object_id",
+          "summary",
+          "created_at"
+        ],
+        "title": "DashboardActivityItem",
+        "type": "object"
+      },
+      "DashboardActivityModule": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DashboardActivityItem"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "stale",
+              "unavailable",
+              "unconfigured"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "DashboardActivityModule",
+        "type": "object"
+      },
+      "DashboardAlertItem": {
+        "description": "待处理提醒；当前来源是 B3 的未处置风险事件，B8 合并后换成提醒事件表。",
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "instrument_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrument Id"
+          },
+          "rule_id": {
+            "title": "Rule Id",
+            "type": "string"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          },
+          "status": {
+            "const": "pending",
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "triggered_at": {
+            "title": "Triggered At",
+            "type": "string"
+          },
+          "type": {
+            "const": "risk",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "rule_id",
+          "title",
+          "detail",
+          "status",
+          "triggered_at"
+        ],
+        "title": "DashboardAlertItem",
+        "type": "object"
+      },
+      "DashboardAlertsModule": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DashboardAlertItem"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "stale",
+              "unavailable",
+              "unconfigured"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "DashboardAlertsModule",
+        "type": "object"
+      },
+      "DashboardDegradedItem": {
+        "properties": {
+          "last_success_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "module": {
+            "title": "Module",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "stale",
+              "unavailable",
+              "unconfigured"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "module",
+          "status",
+          "reason"
+        ],
+        "title": "DashboardDegradedItem",
+        "type": "object"
+      },
+      "DashboardMarketData": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardMarketItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "session": {
+            "enum": [
+              "pre",
+              "regular",
+              "post",
+              "closed"
+            ],
+            "title": "Session",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session",
+          "items"
+        ],
+        "title": "DashboardMarketData",
+        "type": "object"
+      },
+      "DashboardMarketItem": {
+        "description": "一个标的类别在首页上的市场状态、广度与共振。",
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "bar": {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Bar",
+            "type": "string"
+          },
+          "breadth": {
+            "$ref": "#/components/schemas/MarketBreadth"
+          },
+          "inst_type": {
+            "enum": [
+              "SPOT",
+              "SWAP"
+            ],
+            "title": "Inst Type",
+            "type": "string"
+          },
+          "primary_source": {
+            "enum": [
+              "okx",
+              "okx_spot",
+              "okx_swap",
+              "us_equity_proxy"
+            ],
+            "title": "Primary Source",
+            "type": "string"
+          },
+          "resonance": {
+            "$ref": "#/components/schemas/MarketResonance"
+          },
+          "session": {
+            "enum": [
+              "pre",
+              "regular",
+              "post",
+              "closed"
+            ],
+            "title": "Session",
+            "type": "string"
+          }
+        },
+        "required": [
+          "inst_type",
+          "session",
+          "primary_source",
+          "bar",
+          "as_of",
+          "breadth",
+          "resonance"
+        ],
+        "title": "DashboardMarketItem",
+        "type": "object"
+      },
+      "DashboardMarketModule": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DashboardMarketData"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "stale",
+              "unavailable",
+              "unconfigured"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "DashboardMarketModule",
+        "type": "object"
+      },
+      "DashboardPositionItem": {
+        "description": "首页持仓行：只保留展示需要的字段，完整明细走各自的域接口。",
+        "properties": {
+          "display_symbol": {
+            "title": "Display Symbol",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "leverage": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leverage"
+          },
+          "mark_price": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mark Price"
+          },
+          "notional": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notional"
+          },
+          "position_ref": {
+            "title": "Position Ref",
+            "type": "string"
+          },
+          "side": {
+            "enum": [
+              "long",
+              "short"
+            ],
+            "title": "Side",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "exchange",
+              "manual"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "stop_distance_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Distance Pct"
+          },
+          "unrealized_pnl": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unrealized Pnl"
+          }
+        },
+        "required": [
+          "position_ref",
+          "source",
+          "inst_id",
+          "display_symbol",
+          "side"
+        ],
+        "title": "DashboardPositionItem",
+        "type": "object"
+      },
+      "DashboardPositionsData": {
+        "properties": {
+          "exchange_count": {
+            "title": "Exchange Count",
+            "type": "integer"
+          },
+          "exchange_status": {
+            "enum": [
+              "ok",
+              "stale",
+              "unconfigured"
+            ],
+            "title": "Exchange Status",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardPositionItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "manual_count": {
+            "title": "Manual Count",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "exchange_count",
+          "manual_count",
+          "exchange_status",
+          "items"
+        ],
+        "title": "DashboardPositionsData",
+        "type": "object"
+      },
+      "DashboardPositionsModule": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DashboardPositionsData"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "stale",
+              "unavailable",
+              "unconfigured"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "DashboardPositionsModule",
+        "type": "object"
+      },
+      "DashboardRecentBacktest": {
+        "description": "最近 30 天内创建的一次回测；一次回测只代表一个标的，不跨标的求和。",
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "data_source": {
+            "enum": [
+              "okx",
+              "okx_spot",
+              "okx_swap",
+              "us_equity_proxy"
+            ],
+            "title": "Data Source",
+            "type": "string"
+          },
+          "max_drawdown": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Max Drawdown",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "total_return": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Total Return",
+            "type": "string"
+          },
+          "trade_count": {
+            "title": "Trade Count",
+            "type": "integer"
+          },
+          "window_days": {
+            "title": "Window Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "run_id",
+          "data_source",
+          "window_days",
+          "total_return",
+          "max_drawdown",
+          "trade_count",
+          "as_of"
+        ],
+        "title": "DashboardRecentBacktest",
+        "type": "object"
+      },
+      "DashboardRiskData": {
+        "description": "风险卡：组合级数值与规则命中数量，不重复展开每条持仓的规则明细。",
+        "properties": {
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "gross_notional": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Gross Notional",
+            "type": "string"
+          },
+          "high_leverage_count": {
+            "title": "High Leverage Count",
+            "type": "integer"
+          },
+          "long_notional": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Long Notional",
+            "type": "string"
+          },
+          "margin_usage_basis": {
+            "anyOf": [
+              {
+                "enum": [
+                  "margin_ratio",
+                  "used_margin"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin Usage Basis"
+          },
+          "margin_usage_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin Usage Pct"
+          },
+          "max_single_instrument_weight_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Single Instrument Weight Pct"
+          },
+          "missing_stop_count": {
+            "title": "Missing Stop Count",
+            "type": "integer"
+          },
+          "near_stop_count": {
+            "title": "Near Stop Count",
+            "type": "integer"
+          },
+          "net_notional": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Net Notional",
+            "type": "string"
+          },
+          "position_count": {
+            "title": "Position Count",
+            "type": "integer"
+          },
+          "risk_level": {
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Risk Level",
+            "type": "string"
+          },
+          "short_notional": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Short Notional",
+            "type": "string"
+          }
+        },
+        "required": [
+          "risk_level",
+          "currency",
+          "long_notional",
+          "short_notional",
+          "net_notional",
+          "gross_notional",
+          "position_count",
+          "near_stop_count",
+          "high_leverage_count",
+          "missing_stop_count"
+        ],
+        "title": "DashboardRiskData",
+        "type": "object"
+      },
+      "DashboardRiskModule": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DashboardRiskData"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "stale",
+              "unavailable",
+              "unconfigured"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "DashboardRiskModule",
+        "type": "object"
+      },
+      "DashboardStrategiesData": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "integer"
+          },
+          "pending_signals": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Signals"
+          },
+          "recent_backtest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DashboardRecentBacktest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "running": {
+            "title": "Running",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "enabled",
+          "running"
+        ],
+        "title": "DashboardStrategiesData",
+        "type": "object"
+      },
+      "DashboardStrategiesModule": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DashboardStrategiesData"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "stale",
+              "unavailable",
+              "unconfigured"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "DashboardStrategiesModule",
+        "type": "object"
+      },
+      "DashboardSummaryResponse": {
+        "description": "首页一次请求返回八个模块；任一模块失败只影响它自己。",
+        "examples": [
+          {
+            "account": {
+              "as_of": "2026-11-13T09:00:00Z",
+              "data": {
+                "account_id": "okx-main",
+                "available_equity": "682.30",
+                "available_margin": "682.30",
+                "captured_at": "2026-11-13T09:00:00Z",
+                "cash_balance": "0",
+                "currency": "USDT",
+                "day_pnl_basis": "equity_only",
+                "equity": "1248.60",
+                "margin_usage_pct": "45.36",
+                "source": "okx_rest",
+                "unrealized_pnl": "31.84",
+                "used_margin": "566.30"
+              },
+              "status": "ok"
+            },
+            "activity": {
+              "as_of": "2026-11-13T09:00:00Z",
+              "data": [],
+              "status": "ok"
+            },
+            "alerts": {
+              "data": [],
+              "status": "ok"
+            },
+            "as_of": "2026-11-13T09:00:00Z",
+            "degraded": [],
+            "market": {
+              "as_of": "2026-11-13T09:00:00Z",
+              "data": {
+                "items": [
+                  {
+                    "as_of": "2026-11-13T09:00:00Z",
+                    "bar": "1d",
+                    "breadth": {
+                      "advancers": 8,
+                      "decliners": 2,
+                      "participants": 11,
+                      "ratio": "4",
+                      "unchanged": 1
+                    },
+                    "inst_type": "SPOT",
+                    "primary_source": "okx_spot",
+                    "resonance": {
+                      "participants": 11,
+                      "strength": "0.62",
+                      "window": 20
+                    },
+                    "session": "regular"
+                  },
+                  {
+                    "as_of": "2026-11-13T09:00:00Z",
+                    "bar": "1d",
+                    "breadth": {
+                      "advancers": 5,
+                      "decliners": 5,
+                      "participants": 10,
+                      "ratio": "1",
+                      "unchanged": 0
+                    },
+                    "inst_type": "SWAP",
+                    "primary_source": "us_equity_proxy",
+                    "resonance": {
+                      "participants": 10,
+                      "strength": "0",
+                      "window": 20
+                    },
+                    "session": "pre"
+                  }
+                ],
+                "session": "pre"
+              },
+              "status": "ok"
+            },
+            "positions": {
+              "as_of": "2026-11-13T09:00:00Z",
+              "data": {
+                "exchange_count": 1,
+                "exchange_status": "ok",
+                "items": [
+                  {
+                    "display_symbol": "AAPL-USDT",
+                    "inst_id": "AAPL-USDT-SWAP",
+                    "leverage": "3",
+                    "mark_price": "231.42",
+                    "notional": "1851.36",
+                    "position_ref": "exchange:okx-main:123456",
+                    "side": "long",
+                    "source": "exchange",
+                    "unrealized_pnl": "36.96"
+                  }
+                ],
+                "manual_count": 0,
+                "total": 1
+              },
+              "status": "ok"
+            },
+            "risk": {
+              "as_of": "2026-11-13T09:00:00Z",
+              "data": {
+                "currency": "USDT",
+                "gross_notional": "1851.36",
+                "high_leverage_count": 0,
+                "long_notional": "1851.36",
+                "margin_usage_basis": "margin_ratio",
+                "margin_usage_pct": "45.36",
+                "max_single_instrument_weight_pct": "100",
+                "missing_stop_count": 1,
+                "near_stop_count": 0,
+                "net_notional": "1851.36",
+                "position_count": 1,
+                "risk_level": "medium",
+                "short_notional": "0"
+              },
+              "status": "ok"
+            },
+            "strategies": {
+              "as_of": "2026-11-13T09:00:00Z",
+              "data": {
+                "enabled": 1,
+                "recent_backtest": {
+                  "as_of": "2026-11-12T10:00:00Z",
+                  "data_source": "okx_swap",
+                  "max_drawdown": "0.061",
+                  "run_id": "bt_0001",
+                  "total_return": "0.124",
+                  "trade_count": 18,
+                  "window_days": 30
+                },
+                "running": 0,
+                "total": 2
+              },
+              "status": "ok"
+            },
+            "watchlist": {
+              "as_of": "2026-11-12T16:00:00Z",
+              "data": {
+                "items": [
+                  {
+                    "change_pct_24h": "1.86",
+                    "data_status": "ok",
+                    "display_symbol": "AAPL",
+                    "inst_id": "XAAPL-USDT",
+                    "last_price": "231.42",
+                    "name": "Apple",
+                    "rsi_14": "61.4",
+                    "trend": "bullish"
+                  }
+                ],
+                "summary": {
+                  "bearish": 0,
+                  "bullish": 1,
+                  "coverage_pct": "100",
+                  "total": 1
+                }
+              },
+              "status": "ok"
+            }
+          }
+        ],
+        "properties": {
+          "account": {
+            "$ref": "#/components/schemas/DashboardAccountModule"
+          },
+          "activity": {
+            "$ref": "#/components/schemas/DashboardActivityModule"
+          },
+          "alerts": {
+            "$ref": "#/components/schemas/DashboardAlertsModule"
+          },
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "degraded": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardDegradedItem"
+            },
+            "title": "Degraded",
+            "type": "array"
+          },
+          "market": {
+            "$ref": "#/components/schemas/DashboardMarketModule"
+          },
+          "positions": {
+            "$ref": "#/components/schemas/DashboardPositionsModule"
+          },
+          "risk": {
+            "$ref": "#/components/schemas/DashboardRiskModule"
+          },
+          "strategies": {
+            "$ref": "#/components/schemas/DashboardStrategiesModule"
+          },
+          "watchlist": {
+            "$ref": "#/components/schemas/DashboardWatchlistModule"
+          }
+        },
+        "required": [
+          "as_of",
+          "market",
+          "account",
+          "risk",
+          "positions",
+          "watchlist",
+          "alerts",
+          "strategies",
+          "activity",
+          "degraded"
+        ],
+        "title": "DashboardSummaryResponse",
+        "type": "object"
+      },
+      "DashboardWatchlistData": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardWatchlistItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/DashboardWatchlistSummary"
+          }
+        },
+        "required": [
+          "summary",
+          "items"
+        ],
+        "title": "DashboardWatchlistData",
+        "type": "object"
+      },
+      "DashboardWatchlistItem": {
+        "properties": {
+          "change_pct_24h": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct 24H"
+          },
+          "data_status": {
+            "enum": [
+              "ok",
+              "partial",
+              "missing"
+            ],
+            "title": "Data Status",
+            "type": "string"
+          },
+          "display_symbol": {
+            "title": "Display Symbol",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "last_price": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Price"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "rsi_14": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rsi 14"
+          },
+          "trend": {
+            "anyOf": [
+              {
+                "enum": [
+                  "bullish",
+                  "bearish",
+                  "neutral"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trend"
+          }
+        },
+        "required": [
+          "inst_id",
+          "display_symbol",
+          "name",
+          "data_status"
+        ],
+        "title": "DashboardWatchlistItem",
+        "type": "object"
+      },
+      "DashboardWatchlistModule": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DashboardWatchlistData"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "stale",
+              "unavailable",
+              "unconfigured"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "DashboardWatchlistModule",
+        "type": "object"
+      },
+      "DashboardWatchlistSummary": {
+        "properties": {
+          "bearish": {
+            "title": "Bearish",
+            "type": "integer"
+          },
+          "bullish": {
+            "title": "Bullish",
+            "type": "integer"
+          },
+          "coverage_pct": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Coverage Pct",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "bullish",
+          "bearish",
+          "coverage_pct"
+        ],
+        "title": "DashboardWatchlistSummary",
+        "type": "object"
+      },
       "DataSettings": {
         "properties": {
           "proxy_configured": {
@@ -4929,46 +6425,6 @@
         "title": "MarketResonance",
         "type": "object"
       },
-      "MarketState": {
-        "description": "一个类别在 `as_of` 时刻的资产时段与参考行情来源。\n\n类别只是展示分组：`SPOT` / `SWAP` 内部可能同时含有多种资产，类别层级没有\n唯一的 `asset_type`，因此这里与 T1.7 一致地使用类别规则作为兜底取值。",
-        "properties": {
-          "inst_type": {
-            "enum": [
-              "SPOT",
-              "SWAP"
-            ],
-            "title": "Inst Type",
-            "type": "string"
-          },
-          "primary_source": {
-            "enum": [
-              "okx",
-              "okx_spot",
-              "okx_swap",
-              "us_equity_proxy"
-            ],
-            "title": "Primary Source",
-            "type": "string"
-          },
-          "session": {
-            "enum": [
-              "pre",
-              "regular",
-              "post",
-              "closed"
-            ],
-            "title": "Session",
-            "type": "string"
-          }
-        },
-        "required": [
-          "inst_type",
-          "session",
-          "primary_source"
-        ],
-        "title": "MarketState",
-        "type": "object"
-      },
       "MomentumIndicators": {
         "properties": {
           "macd": {
@@ -5509,151 +6965,6 @@
         "title": "OrderListResponse",
         "type": "object"
       },
-      "OverviewResponse": {
-        "description": "首页市场驾驶舱：市场状态、共振、组合、机会流与风险告警。",
-        "examples": [
-          {
-            "as_of": "2026-11-10T08:00:00Z",
-            "market": [
-              {
-                "as_of": "2026-11-10T08:00:00Z",
-                "bar": "1d",
-                "breadth": {
-                  "advancers": 8,
-                  "decliners": 2,
-                  "participants": 11,
-                  "ratio": "4",
-                  "unchanged": 1
-                },
-                "inst_type": "SPOT",
-                "resonance": {
-                  "participants": 11,
-                  "strength": "0.62",
-                  "window": 20
-                }
-              },
-              {
-                "as_of": "2026-11-10T08:00:00Z",
-                "bar": "1d",
-                "breadth": {
-                  "advancers": 5,
-                  "decliners": 5,
-                  "participants": 10,
-                  "ratio": "1",
-                  "unchanged": 0
-                },
-                "inst_type": "SWAP",
-                "resonance": {
-                  "participants": 10,
-                  "strength": "0",
-                  "window": 20
-                }
-              }
-            ],
-            "market_states": [
-              {
-                "inst_type": "SPOT",
-                "primary_source": "okx_spot",
-                "session": "regular"
-              },
-              {
-                "inst_type": "SWAP",
-                "primary_source": "us_equity_proxy",
-                "session": "post"
-              }
-            ],
-            "portfolio": {
-              "gross_exposure": "3510.40",
-              "net_exposure": "1997.15",
-              "open_positions": 3,
-              "strategies": [
-                {
-                  "instance_id": "si_0001",
-                  "name": "AAPL 均线趋势",
-                  "open_positions": 1
-                }
-              ]
-            },
-            "recent_opportunities": [
-              {
-                "anchor_product_key": "AAPL",
-                "as_of": "2026-11-10T00:00:00Z",
-                "evidence": "{\"correlation\":0.87,\"breadth\":0.8,\"resonance\":0.62}",
-                "legs": [
-                  {
-                    "direction": "long",
-                    "inst_id": "MSFT-USDT-SWAP",
-                    "inst_type": "SWAP",
-                    "product_key": "MSFT",
-                    "score": "0.82"
-                  }
-                ],
-                "mode": "target",
-                "opportunity_id": "opp_0001",
-                "score": "0.78",
-                "status": "new"
-              }
-            ],
-            "risk_events": [
-              {
-                "created_at": "2026-11-10T07:00:00Z",
-                "detail": "杠杆 25 超过上限 20",
-                "event_id": "re_0001",
-                "inst_id": "AAPL-USDT-SWAP",
-                "instance_id": "si_0001",
-                "rule": "max_leverage"
-              }
-            ]
-          }
-        ],
-        "properties": {
-          "as_of": {
-            "title": "As Of",
-            "type": "string"
-          },
-          "market": {
-            "items": {
-              "$ref": "#/components/schemas/MarketOverviewResponse"
-            },
-            "title": "Market",
-            "type": "array"
-          },
-          "market_states": {
-            "items": {
-              "$ref": "#/components/schemas/MarketState"
-            },
-            "title": "Market States",
-            "type": "array"
-          },
-          "portfolio": {
-            "$ref": "#/components/schemas/PortfolioSummary"
-          },
-          "recent_opportunities": {
-            "items": {
-              "$ref": "#/components/schemas/Opportunity"
-            },
-            "title": "Recent Opportunities",
-            "type": "array"
-          },
-          "risk_events": {
-            "items": {
-              "$ref": "#/components/schemas/RiskEvent"
-            },
-            "title": "Risk Events",
-            "type": "array"
-          }
-        },
-        "required": [
-          "as_of",
-          "market_states",
-          "market",
-          "portfolio",
-          "recent_opportunities",
-          "risk_events"
-        ],
-        "title": "OverviewResponse",
-        "type": "object"
-      },
       "ParamSpec": {
         "description": "指标或策略的可配置参数定义。",
         "properties": {
@@ -5722,64 +7033,6 @@
           "default"
         ],
         "title": "ParamSpec",
-        "type": "object"
-      },
-      "PortfolioStrategyBrief": {
-        "description": "单个策略实例的当前持仓数。",
-        "properties": {
-          "instance_id": {
-            "title": "Instance Id",
-            "type": "string"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "open_positions": {
-            "title": "Open Positions",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "instance_id",
-          "name",
-          "open_positions"
-        ],
-        "title": "PortfolioStrategyBrief",
-        "type": "object"
-      },
-      "PortfolioSummary": {
-        "description": "全局组合概览；各策略明细来自 T7.1 的策略组合列表。",
-        "properties": {
-          "gross_exposure": {
-            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
-            "title": "Gross Exposure",
-            "type": "string"
-          },
-          "net_exposure": {
-            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
-            "title": "Net Exposure",
-            "type": "string"
-          },
-          "open_positions": {
-            "title": "Open Positions",
-            "type": "integer"
-          },
-          "strategies": {
-            "items": {
-              "$ref": "#/components/schemas/PortfolioStrategyBrief"
-            },
-            "title": "Strategies",
-            "type": "array"
-          }
-        },
-        "required": [
-          "gross_exposure",
-          "net_exposure",
-          "open_positions",
-          "strategies"
-        ],
-        "title": "PortfolioSummary",
         "type": "object"
       },
       "Position": {
@@ -9262,6 +10515,28 @@
         ]
       }
     },
+    "/api/dashboard/summary": {
+      "get": {
+        "description": "首页一次请求返回八个模块；单个模块失败只把它自己标成不可用。",
+        "operationId": "get_dashboard_summary_api_dashboard_summary_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardSummaryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Dashboard Summary",
+        "tags": [
+          "dashboard"
+        ]
+      }
+    },
     "/api/execution": {
       "get": {
         "operationId": "get_execution_state_api_execution_get",
@@ -10285,57 +11560,6 @@
         "summary": "Update Opportunity Status",
         "tags": [
           "opportunity"
-        ]
-      }
-    },
-    "/api/overview": {
-      "get": {
-        "description": "市场驾驶舱聚合；同一 `as_of` 与同一份库状态返回相同 JSON。",
-        "operationId": "get_overview_api_overview_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "as_of",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "date-time",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "As Of"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OverviewResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Get Overview",
-        "tags": [
-          "overview"
         ]
       }
     },

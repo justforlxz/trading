@@ -33,6 +33,7 @@ PACKAGES: tuple[str, ...] = (
     "api",
     "backtest",
     "core",
+    "dashboard",
     "db",
     "exchange",
     "execution",
@@ -68,6 +69,9 @@ ALLOWED_DEPS: dict[str, frozenset[str]] = {
     "analysis": frozenset(
         {"shared", "instrument", "market", "watchlist", "indicators", "backtest", "strategy"}
     ),
+    # 首页聚合只读各域已有结果：市场、账户与持仓、风险、自选、策略与回测。它不写库，
+    # 不重算指标，也不反向依赖接口层。
+    "dashboard": frozenset({"backtest", "market", "positions", "risk", "strategy", "watchlist"}),
     "core": frozenset(),
     "shared": frozenset(),
     "db": frozenset({"shared"}),

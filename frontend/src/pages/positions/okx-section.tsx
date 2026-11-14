@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
+import { StreamNotice, StreamTag } from "../../components/ui/stream-status";
 import { formatBeijingTime, signedTone } from "../../lib/display";
 import {
   accountSourceLabel,
@@ -16,6 +17,8 @@ import {
   fetchExchangePositions,
   marginModeLabel,
   marginUsageText,
+  mergeAccountUpdate,
+  mergePositionUpdates,
   MISSING_VALUE,
   pnlText,
   positionSideLabel,
@@ -27,6 +30,8 @@ import {
   type ExchangePosition,
   type ExchangePositions,
 } from "../../lib/positions";
+import { usePositionStream } from "../../lib/stream-hooks";
+import type { StreamLiveness } from "../../lib/stream";
 import { cn } from "../../lib/utils";
 
 function momentText(value: string | null | undefined): string {
@@ -104,12 +109,14 @@ function ErrorNotice({ message }: { message: string }) {
 
 function AccountCard({
   account,
+  liveness,
   loading,
   syncing,
   syncError,
   onSync,
 }: {
   account: AccountSummary | null;
+  liveness: StreamLiveness;
   loading: boolean;
   syncing: boolean;
   syncError: string | null;
@@ -137,6 +144,9 @@ function AccountCard({
         </div>
       </CardHeader>
       <CardContent>
+        <div className="mb-3">
+          <StreamNotice liveness={liveness} subject="账户快照" />
+        </div>
         {syncError ? <ErrorNotice message={syncError} /> : null}
 
         {loading ? (
@@ -288,9 +298,11 @@ function ExchangeTable({ items }: { items: ExchangePosition[] }) {
 
 function ExchangePositionsCard({
   positions,
+  liveness,
   loading,
 }: {
   positions: ExchangePositions | null;
+  liveness: StreamLiveness;
   loading: boolean;
 }) {
   const emptyText =
@@ -315,9 +327,13 @@ function ExchangePositionsCard({
           <p className="text-sm text-muted-foreground">交易所持仓数据未返回。</p>
         ) : (
           <>
+            <div className="mb-3">
+              <StreamNotice liveness={liveness} subject="标记价、未实现盈亏与盈亏率" />
+            </div>
             <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
               <span>状态：{accountStatusLabel(positions.status)}</span>
               <span>截至 {momentText(positions.as_of)}</span>
+              <StreamTag liveness={liveness} />
             </div>
             <StatusNotice status={positions.status} asOf={positions.as_of} subject="交易所持仓" />
             {positions.items.length === 0 ? (
@@ -339,6 +355,7 @@ export type OkxSectionViewProps = {
   error: string | null;
   syncError: string | null;
   syncing: boolean;
+  liveness: StreamLiveness;
   onSync: () => void;
   onRetry: () => void;
 };
@@ -351,6 +368,7 @@ export function OkxSectionView({
   error,
   syncError,
   syncing,
+  liveness,
   onSync,
   onRetry,
 }: OkxSectionViewProps) {
@@ -372,12 +390,17 @@ export function OkxSectionView({
       {error ? <ErrorNotice message={error} /> : null}
       <AccountCard
         account={account}
+        liveness={liveness}
         loading={loading && account === null}
         syncing={syncing}
         syncError={syncError}
         onSync={onSync}
       />
-      <ExchangePositionsCard positions={positions} loading={loading && positions === null} />
+      <ExchangePositionsCard
+        positions={positions}
+        liveness={liveness}
+        loading={loading && positions === null}
+      />
     </section>
   );
 }
@@ -390,6 +413,7 @@ export default function OkxSection() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
+  const { positions: livePositions, account: liveAccount, liveness } = usePositionStream();
 
   useEffect(() => {
     let active = true;
@@ -435,12 +459,13 @@ export default function OkxSection() {
 
   return (
     <OkxSectionView
-      account={account}
-      positions={positions}
+      account={account === null ? null : mergeAccountUpdate(account, liveAccount)}
+      positions={positions === null ? null : mergePositionUpdates(positions, livePositions)}
       loading={loading}
       error={error}
       syncError={syncError}
       syncing={syncing}
+      liveness={liveness}
       onSync={() => void handleSync()}
       onRetry={() => setReloadToken((token) => token + 1)}
     />

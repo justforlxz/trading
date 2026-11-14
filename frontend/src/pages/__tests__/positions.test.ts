@@ -68,6 +68,7 @@ function render(overrides: Partial<OkxSectionViewProps> = {}): string {
       error: null,
       syncError: null,
       syncing: false,
+      liveness: "live",
       onSync: () => undefined,
       onRetry: () => undefined,
       ...overrides,
@@ -146,6 +147,14 @@ describe("OkxSectionView", () => {
     expect(html).toContain("同步失败，仍显示上一次快照");
     expect(html).toContain("1248.60");
     expect(html).toContain("2026-11-13 17:00");
+  });
+
+  it("推送断开时标注已断开，并保留最后已知价格", () => {
+    const html = render({ liveness: "stale" });
+
+    expect(html).toContain("实时推送已断开");
+    expect(html).toContain("已断开");
+    expect(html).toContain("231.42");
   });
 
   it("OKX 区只读，没有下单、撤单、改单或平仓入口", () => {

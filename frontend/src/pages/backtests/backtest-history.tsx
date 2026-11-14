@@ -17,6 +17,8 @@ export type BacktestHistoryPanelProps = {
   selectedRunId: string | null;
   onSelect: (runId: string) => void;
   onDelete: (runId: string) => void;
+  /** 策略页把版本标识映射成 `v1` 这类短标签；回测页不传，行为不变。 */
+  versionLabels?: Record<string, string>;
 };
 
 function metricRow(label: string, value: string, tone = false) {
@@ -39,6 +41,7 @@ export function BacktestHistoryPanel({
   selectedRunId,
   onSelect,
   onDelete,
+  versionLabels,
 }: BacktestHistoryPanelProps) {
   return (
     <Card>
@@ -67,8 +70,15 @@ export function BacktestHistoryPanel({
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <span className="text-sm font-medium">{run.inst_id}</span>
-                  <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
-                    {instTypeLabel(run.inst_type)}
+                  <span className="flex items-center gap-2">
+                    {run.strategy_version_id && versionLabels?.[run.strategy_version_id] ? (
+                      <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
+                        策略版本 {versionLabels[run.strategy_version_id]}
+                      </span>
+                    ) : null}
+                    <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
+                      {instTypeLabel(run.inst_type)}
+                    </span>
                   </span>
                 </div>
                 <p className="font-mono text-xs text-muted-foreground">

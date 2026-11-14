@@ -394,3 +394,25 @@ def test_version_position_sizing_matches_rule_json(market: TestClient) -> None:
 
     assert response.status_code == 201, response.text
     assert response.json()["position_sizing"] == sizing
+
+
+@pytest.mark.parametrize("method", ["put", "post"])
+def test_position_sizing_can_be_submitted_alone(market: TestClient, method: str) -> None:
+    """只提交顶层仓位规则是正常用法，不能拿继承来的旧规则当冲突对照。"""
+
+    created = create(market)
+    sizing = {"type": "equal_weight", "weight": 0.5, "max_positions": 2}
+    if method == "put":
+        response = market.put(f"/api/strategies/{created['id']}", json={"position_sizing": sizing})
+    else:
+        response = market.post(
+            f"/api/strategies/{created['id']}/versions", json={"position_sizing": sizing}
+        )
+
+    assert response.status_code in (200, 201), response.text
+    body = detail(market, created["id"])
+    assert body["current_version"] == 2
+    assert body["position_sizing"] == sizing
+    # 规则其余内容沿用当前版本，只把仓位规则换成本次提交的值。
+    assert body["rule_json"]["entry"] == RULES["entry"]
+    assert body["rule_json"]["position_sizing"] == sizing

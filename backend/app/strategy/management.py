@@ -481,28 +481,28 @@ def _insert_version(
     _require_timeframe(effective_timeframe)
     _require_direction(effective_direction)
 
-    rule_source = rule if rule is not None else _object(current.rule_json) if current else {}
+    submitted_rule = rule is not None
+    rule_source = rule if submitted_rule else _object(current.rule_json) if current else {}
     if not isinstance(rule_source, Mapping):
         raise ValidationError("rule_json 必须是 JSON 对象")
-    embedded_sizing = (
-        rule_source.get("position_sizing") if "position_sizing" in rule_source else None
-    )
-    if embedded_sizing is not None:
-        embedded_sizing = validate_position_sizing(embedded_sizing)
     if sizing is _UNSET:
-        effective_sizing = (
-            embedded_sizing
-            if "position_sizing" in rule_source
-            else _optional_object(current.position_sizing_json)
-            if current
-            else None
-        )
+        # 没有提交顶层仓位规则：规则里显式写了就沿用规则的值，否则沿用当前版本的列值。
+        if "position_sizing" in rule_source:
+            embedded = rule_source["position_sizing"]
+            effective_sizing = None if embedded is None else validate_position_sizing(embedded)
+        else:
+            effective_sizing = _optional_object(current.position_sizing_json) if current else None
+    elif sizing is None:
+        effective_sizing = None
     else:
-        if sizing is not None:
-            sizing = validate_position_sizing(sizing)
-            if embedded_sizing is not None and embedded_sizing != sizing:
+        declared_sizing = validate_position_sizing(sizing)
+        # 只有本次显式提交了 rule_json 时，顶层值才需要与规则内的值一致；
+        # 只提交顶层字段是调整仓位规则的正常用法，不能拿继承来的旧规则对照。
+        if submitted_rule and "position_sizing" in rule_source:
+            embedded = rule_source["position_sizing"]
+            if embedded is not None and validate_position_sizing(embedded) != declared_sizing:
                 raise ValidationError("position_sizing 与 rule_json.position_sizing 不一致")
-        effective_sizing = sizing
+        effective_sizing = declared_sizing
     rule_payload = dict(rule_source)
     if rule is not None:
         stated_timeframe = rule_payload.get("timeframe")

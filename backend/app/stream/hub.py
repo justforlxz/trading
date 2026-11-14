@@ -63,9 +63,10 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 #: 私有频道只订阅账户与持仓；订单、成交推送不属于 v6。
+#: `positions` 频道必须声明 instType，裸频道名会被上游以 60018 拒绝。
 PRIVATE_CHANNELS: tuple[dict[str, str], ...] = (
     {"channel": "account"},
-    {"channel": "positions"},
+    {"channel": "positions", "instType": "SWAP"},
 )
 
 #: 浏览器契约里的事件类型；B4 负责前三类，其余由对应业务包后续发布。

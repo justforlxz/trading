@@ -362,6 +362,8 @@ flowchart TD
 
 服务端统一连接 OKX，浏览器只连接 trading 自己的推送入口。行情高频事件按标的订阅并在前端节流；提醒、活动、回测状态等低频事件可以直接推送。
 
+私有频道地址按 `OKX_DEMO` 选择：`1`（模拟盘）连 `wss://wspap.okx.com:8443/ws/v5/private`，`0`（实盘）连 `wss://ws.okx.com:8443/ws/v5/private`。`OKX_WS_PRIVATE_URL` 可以显式覆盖这条推导。公共行情频道继续使用生产地址 `wss://ws.okx.com:8443/ws/v5/public`，模拟盘账户同样可以读取。
+
 | 事件 | 载荷 | 负责包 |
 | --- | --- | --- |
 | `market.quote.updated` | `instrument_id`、`quote`、`ts` | B4 |

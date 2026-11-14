@@ -16,7 +16,7 @@ from typing import Any
 
 import pytest
 
-from app.config import Settings
+from app.config import OKX_WS_PRIVATE_URL_DEMO, OKX_WS_PRIVATE_URL_PROD, Settings
 from app.core import ValidationError
 from app.exchange import ExchangeError
 from app.exchange.okx.ws import DEFAULT_CHANNELS, Deduper, OkxWebSocket, message_key
@@ -71,6 +71,7 @@ def _settings() -> Settings:
         okx_api_key=CREDENTIALS.api_key,
         okx_secret_key=CREDENTIALS.secret,
         okx_passphrase=CREDENTIALS.passphrase,
+        okx_demo=True,
     )
 
 
@@ -84,6 +85,16 @@ def _connect_script(*connections: FakeSocket | Exception) -> Callable[[str], Fak
         if isinstance(step, Exception):
             raise step
         return FakeConnection(step)
+
+    return connect
+
+
+def _recording_connect(urls: list[str], socket: FakeSocket) -> Callable[[str], FakeConnection]:
+    """记录 `connect()` 收到的地址，用来断言模拟盘/实盘各连了哪个域名。"""
+
+    def connect(url: str) -> FakeConnection:
+        urls.append(url)
+        return FakeConnection(socket)
 
     return connect
 
@@ -150,6 +161,70 @@ def test_a_zero_window_is_rejected() -> None:
 
 
 # -------------------------------------------------------------------- 断线重连
+
+
+def test_demo_settings_connect_to_the_demo_private_endpoint() -> None:
+    """`okx_demo=True` 连 `wspap`；连生产地址会让模拟盘登录失败。"""
+
+    urls: list[str] = []
+    socket = FakeSocket([_login_ack(), _push({"ts": "1", "fillPx": "100"})])
+    client = OkxWebSocket(
+        settings=_settings(),
+        connect=_recording_connect(urls, socket),
+        sleep=_no_sleep(),
+    )
+
+    asyncio.run(_take(client, 1))
+
+    assert urls == [OKX_WS_PRIVATE_URL_DEMO]
+
+
+def test_production_settings_connect_to_the_production_private_endpoint() -> None:
+    urls: list[str] = []
+    socket = FakeSocket([_login_ack(), _push({"ts": "1", "fillPx": "100"})])
+    client = OkxWebSocket(
+        settings=_settings().model_copy(update={"okx_demo": False}),
+        connect=_recording_connect(urls, socket),
+        sleep=_no_sleep(),
+    )
+
+    asyncio.run(_take(client, 1))
+
+    assert urls == [OKX_WS_PRIVATE_URL_PROD]
+
+
+def test_the_configured_url_overrides_the_demo_default() -> None:
+    """`OKX_WS_PRIVATE_URL` 显式给出时优先于按 `okx_demo` 推导的地址。"""
+
+    urls: list[str] = []
+    socket = FakeSocket([_login_ack(), _push({"ts": "1", "fillPx": "100"})])
+    settings = _settings().model_copy(
+        update={"okx_ws_private_url": "wss://private.example/ws/v5/private"}
+    )
+    client = OkxWebSocket(
+        settings=settings,
+        connect=_recording_connect(urls, socket),
+        sleep=_no_sleep(),
+    )
+
+    asyncio.run(_take(client, 1))
+
+    assert urls == ["wss://private.example/ws/v5/private"]
+
+
+def test_the_constructor_url_has_the_highest_priority() -> None:
+    urls: list[str] = []
+    socket = FakeSocket([_login_ack(), _push({"ts": "1", "fillPx": "100"})])
+    client = OkxWebSocket(
+        settings=_settings(),
+        url="wss://constructor.example/ws/v5/private",
+        connect=_recording_connect(urls, socket),
+        sleep=_no_sleep(),
+    )
+
+    asyncio.run(_take(client, 1))
+
+    assert urls == ["wss://constructor.example/ws/v5/private"]
 
 
 def test_three_disconnects_then_a_successful_reconnect_without_duplicates() -> None:

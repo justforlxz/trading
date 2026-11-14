@@ -15,6 +15,7 @@ from app.exchange import MarketPush
 from app.instrument import sync_instruments
 from app.positions import ExchangePositionView
 from app.stream import StreamHub
+from app.stream.hub import PRIVATE_CHANNELS
 from tests.factories.instruments import make_swap_ref
 
 
@@ -47,6 +48,13 @@ def _hub(**overrides: Any) -> StreamHub:
 
 def _quotes(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [event for event in events if event["type"] == "market.quote.updated"]
+
+
+def test_private_channels_subscribe_positions_with_the_swap_instrument_type() -> None:
+    """`positions` 频道缺 instType 会被上游拒绝，且订阅范围只有账户与持仓。"""
+
+    assert {item["channel"] for item in PRIVATE_CHANNELS} == {"account", "positions"}
+    assert {"channel": "positions", "instType": "SWAP"} in PRIVATE_CHANNELS
 
 
 def test_two_clients_with_different_instruments_do_not_cross_stream() -> None:

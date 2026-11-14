@@ -161,7 +161,7 @@ function render(overrides: Partial<OverviewViewProps> = {}): string {
         loading: false,
         priceLiveness: "live" as const,
         accountLiveness: "live" as const,
-        pushedModules: { account: false, positions: false, watchlist: false },
+        pushed: { account: null, positions: {}, watchlist: {} },
         onRefresh: () => undefined,
         ...overrides,
       }),
@@ -300,14 +300,23 @@ describe("首页 v6", () => {
     expect(html).toContain("2026-11-13 17:00");
   });
 
-  it("推送数据到达后卡片标注含推送数据，没有推送时写 HTTP 快照", () => {
+  it("推送到达后只标注被覆盖的字段，其余字段仍写快照时间", () => {
     const plain = render();
     expect(plain).toContain("HTTP 快照");
 
     const pushed = render({
-      pushedModules: { account: true, positions: true, watchlist: true },
+      pushed: {
+        account: "2026-11-13T09:10:00Z",
+        positions: { "exchange:okx-main:123456": "2026-11-13T09:10:00Z" },
+        watchlist: { "AAPL-USDT-SWAP": "2026-11-13T09:10:00Z" },
+      },
     });
-    expect(pushed).toContain("含推送数据");
+    expect(pushed.match(/1 条记录含推送字段/g)?.length).toBe(3);
+    expect(pushed).toContain("价格来自推送 2026-11-13 17:10");
+    expect(pushed).toContain("日涨跌、RSI 与趋势仍是 HTTP 快照 2026-11-13 00:00");
+    expect(pushed).toContain("标记价与未实现盈亏来自推送 2026-11-13 17:10");
+    expect(pushed).toContain("名义价值与止损距离仍是 HTTP 快照 2026-11-13 17:00");
+    expect(pushed).toContain("今日盈亏仍为快照");
   });
 
   it("整页读取失败时只显示原因，不展示任何业务数值", () => {

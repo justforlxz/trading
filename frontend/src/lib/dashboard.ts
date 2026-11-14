@@ -183,21 +183,46 @@ export type DashboardStreamInput = {
   account: AccountUpdate | null;
 };
 
-function laterOf(current: string | null | undefined, next: string | null): string | null {
-  if (next === null) return current ?? null;
-  if (current === null || current === undefined) return next;
-  return next > current ? next : current;
-}
+/**
+ * 每个被推送覆盖的字段各自的时刻。
+ *
+ * 推送只带部分字段（行情只有价格，持仓只有标记价与未实现盈亏），模块里的
+ * 日涨跌、RSI、止损距离仍是 HTTP 快照值。这里按字段记录时刻，页面就地标注，
+ * 模块时间保持快照时刻，不把旧字段伪装成实时值。
+ */
+export type DashboardPushed = {
+  /** 账户快照推送时刻；`null` 表示没有可用的账户推送。 */
+  account: string | null;
+  /** `position_ref` → 推送时刻。 */
+  positions: Record<string, string>;
+  /** `inst_id` → 价格推送时刻。 */
+  watchlist: Record<string, string>;
+};
+
+export type DashboardStreamResult = {
+  summary: DashboardSummary;
+  pushed: DashboardPushed;
+};
+
+const NOTHING_PUSHED: DashboardPushed = { account: null, positions: {}, watchlist: {} };
 
 /**
  * 把推送值合并到汇总上；只接受不早于模块时刻的更新，降级模块保持原样。
- * 没有任何变化时返回原对象，组件据此判断卡片里是否含推送值。
+ *
+ * 模块 `as_of` 一律保持 HTTP 快照时刻：推送只覆盖部分字段，推进模块时间会让
+ * 没被覆盖的字段显示在新时间下。被覆盖的字段各自的时刻记录在返回值 `pushed` 里。
+ * 没有任何变化时返回原 `summary` 对象，便于页面判断模块是否含推送值。
  */
 export function withStreamUpdates(
   summary: DashboardSummary,
   input: DashboardStreamInput,
-): DashboardSummary {
+): DashboardStreamResult {
   let changed = false;
+  const pushed: DashboardPushed = {
+    account: null,
+    positions: {},
+    watchlist: {},
+  };
 
   let account = summary.account;
   const accountData = account.data;
@@ -208,9 +233,9 @@ export function withStreamUpdates(
     isAtLeast(updateTime(accountUpdate), accountData.captured_at ?? account.as_of ?? null)
   ) {
     const moment = updateTime(accountUpdate);
+    pushed.account = moment;
     account = {
       ...account,
-      as_of: laterOf(account.as_of, moment),
       data: {
         ...accountData,
         account_id: accountUpdate.account_id || accountData.account_id,
@@ -233,7 +258,6 @@ export function withStreamUpdates(
   const positionsData = positions.data;
   if (positionsData != null) {
     const reference = positions.as_of ?? null;
-    let moduleTime = reference;
     const items = positionsData.items.map((item) => {
       const posId = item.source === "exchange" ? exchangePosId(item.position_ref) : null;
       const update = posId === null ? undefined : input.positions[posId];
@@ -241,11 +265,12 @@ export function withStreamUpdates(
       const markPrice = update.mark_px ?? item.mark_price;
       const unrealizedPnl = update.upl ?? item.unrealized_pnl;
       if (markPrice === item.mark_price && unrealizedPnl === item.unrealized_pnl) return item;
-      moduleTime = laterOf(moduleTime, updateTime(update));
+      const moment = updateTime(update);
+      if (moment !== null) pushed.positions[item.position_ref] = moment;
       return { ...item, mark_price: markPrice, unrealized_pnl: unrealizedPnl };
     });
     if (items.some((item, index) => item !== positionsData.items[index])) {
-      positions = { ...positions, as_of: moduleTime, data: { ...positionsData, items } };
+      positions = { ...positions, data: { ...positionsData, items } };
       changed = true;
     }
   }
@@ -254,22 +279,25 @@ export function withStreamUpdates(
   const watchlistData = watchlist.data;
   if (watchlistData != null) {
     const reference = watchlist.as_of ?? null;
-    let moduleTime = reference;
     const items = watchlistData.items.map((item) => {
       const quote = input.quotes[item.inst_id];
       if (quote === undefined || quote.last === null) return item;
-      if (!isAtLeast(quote.as_of ?? quote.received_at, reference)) return item;
+      const moment = quote.as_of ?? quote.received_at;
+      if (!isAtLeast(moment, reference)) return item;
       if (quote.last === item.last_price) return item;
-      moduleTime = laterOf(moduleTime, quote.as_of ?? quote.received_at);
+      if (moment !== null) pushed.watchlist[item.inst_id] = moment;
       return { ...item, last_price: quote.last };
     });
     if (items.some((item, index) => item !== watchlistData.items[index])) {
-      watchlist = { ...watchlist, as_of: moduleTime, data: { ...watchlistData, items } };
+      watchlist = { ...watchlist, data: { ...watchlistData, items } };
       changed = true;
     }
   }
 
-  return changed ? { ...summary, account, positions, watchlist } : summary;
+  return {
+    summary: changed ? { ...summary, account, positions, watchlist } : summary,
+    pushed: changed ? pushed : NOTHING_PUSHED,
+  };
 }
 
 /** 模块时间：没有时刻时如实写「无数据时间」，不借用页面加载时间。 */

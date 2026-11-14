@@ -35,7 +35,7 @@ export function ModuleCard({
   title,
   summary,
   module,
-  streamed,
+  pushedFields,
   to,
   className,
   children,
@@ -44,7 +44,8 @@ export function ModuleCard({
   title: string;
   summary: DashboardSummary;
   module: ModuleEnvelope<unknown>;
-  streamed: boolean;
+  /** 本模块有多少条记录被推送字段覆盖；0 表示整卡都是 HTTP 快照。 */
+  pushedFields: number;
   to?: string;
   className?: string;
   children: ReactNode;
@@ -70,7 +71,9 @@ export function ModuleCard({
         <CardDescription className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span>数据时间：{asOfText(module.as_of)}</span>
           <span aria-hidden="true">·</span>
-          <span>{streamed ? "含推送数据" : "HTTP 快照"}</span>
+          <span>
+            {pushedFields === 0 ? "HTTP 快照" : `${pushedFields} 条记录含推送字段`}
+          </span>
         </CardDescription>
       </CardHeader>
       <CardContent>

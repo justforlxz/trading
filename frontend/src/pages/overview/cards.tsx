@@ -46,7 +46,13 @@ function Metric({
   );
 }
 
-export function AccountBody({ summary }: { summary: DashboardSummary }) {
+export function AccountBody({
+  summary,
+  pushedAt,
+}: {
+  summary: DashboardSummary;
+  pushedAt: string | null;
+}) {
   const data = summary.account.data;
   if (data == null) return null;
   const usage = clampedPercent(data.margin_usage_pct);
@@ -60,6 +66,11 @@ export function AccountBody({ summary }: { summary: DashboardSummary }) {
           </p>
           <p className="mt-1 text-[11px] text-muted-foreground">
             账户 {data.account_id} · 来源 {accountSourceLabel(data.source)}
+          </p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {pushedAt === null
+              ? "权益、保证金与未实现盈亏：HTTP 快照"
+              : `权益、保证金与未实现盈亏：推送 ${asOfText(pushedAt)}；今日盈亏仍为快照 ${asOfText(summary.account.as_of)}`}
           </p>
         </div>
         <div className="text-right">
@@ -180,9 +191,16 @@ export function RiskBody({ summary }: { summary: DashboardSummary }) {
   );
 }
 
-export function PositionsBody({ summary }: { summary: DashboardSummary }) {
+export function PositionsBody({
+  summary,
+  pushed,
+}: {
+  summary: DashboardSummary;
+  pushed: Record<string, string>;
+}) {
   const data = summary.positions.data;
   if (data == null) return null;
+  const pushedAtList = [...new Set(Object.values(pushed).map((moment) => asOfText(moment)))];
   return (
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">
@@ -247,12 +265,18 @@ export function PositionsBody({ summary }: { summary: DashboardSummary }) {
                       ? "后端未返回止损距离"
                       : `距止损 ${percentOrMissingText(item.stop_distance_pct)}`}
                   </td>
+
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+      <p className="text-[11px] leading-5 text-muted-foreground">
+        {pushedAtList.length === 0
+          ? `标记价、未实现盈亏、名义价值与止损距离均为 HTTP 快照 ${asOfText(summary.positions.as_of)}。`
+          : `标记价与未实现盈亏来自推送 ${pushedAtList.join("、")}；名义价值与止损距离仍是 HTTP 快照 ${asOfText(summary.positions.as_of)}。`}
+      </p>
     </div>
   );
 }
@@ -296,9 +320,16 @@ export function MarketBody({ summary }: { summary: DashboardSummary }) {
   );
 }
 
-export function WatchlistBody({ summary }: { summary: DashboardSummary }) {
+export function WatchlistBody({
+  summary,
+  pushed,
+}: {
+  summary: DashboardSummary;
+  pushed: Record<string, string>;
+}) {
   const data = summary.watchlist.data;
   if (data == null) return null;
+  const pushedAtList = [...new Set(Object.values(pushed).map((moment) => asOfText(moment)))];
   return (
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">
@@ -358,12 +389,18 @@ export function WatchlistBody({ summary }: { summary: DashboardSummary }) {
                           ? "中性"
                           : "未生成"}
                   </td>
+
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+      <p className="text-[11px] leading-5 text-muted-foreground">
+        {pushedAtList.length === 0
+          ? `价格、日涨跌、RSI 与趋势均为 HTTP 快照 ${asOfText(summary.watchlist.as_of)}。`
+          : `价格来自推送 ${pushedAtList.join("、")}；日涨跌、RSI 与趋势仍是 HTTP 快照 ${asOfText(summary.watchlist.as_of)}。`}
+      </p>
     </div>
   );
 }

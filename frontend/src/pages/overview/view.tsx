@@ -4,7 +4,12 @@ import { PageHeading } from "../../components/layout/page-parts";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { StreamNotice } from "../../components/ui/stream-status";
-import { asOfText, moduleTitle, type DashboardSummary } from "../../lib/dashboard";
+import {
+  asOfText,
+  moduleTitle,
+  type DashboardPushed,
+  type DashboardSummary,
+} from "../../lib/dashboard";
 import type { StreamLiveness } from "../../lib/stream";
 import {
   AccountBody,
@@ -25,7 +30,7 @@ export type OverviewViewProps = {
   loading: boolean;
   priceLiveness: StreamLiveness;
   accountLiveness: StreamLiveness;
-  pushedModules: { account: boolean; positions: boolean; watchlist: boolean };
+  pushed: DashboardPushed;
   onRefresh: () => void;
 };
 
@@ -36,7 +41,7 @@ export function OverviewView({
   loading,
   priceLiveness,
   accountLiveness,
-  pushedModules,
+  pushed,
   onRefresh,
 }: OverviewViewProps) {
   return (
@@ -105,7 +110,7 @@ export function OverviewView({
             title="市场概况"
             summary={summary}
             module={summary.market}
-            streamed={false}
+            pushedFields={0}
           >
             <MarketBody summary={summary} />
           </ModuleCard>
@@ -116,17 +121,17 @@ export function OverviewView({
               title="账户概览"
               summary={summary}
               module={summary.account}
-              streamed={pushedModules.account}
+              pushedFields={pushed.account === null ? 0 : 1}
               to="/positions"
             >
-              <AccountBody summary={summary} />
+              <AccountBody summary={summary} pushedAt={pushed.account} />
             </ModuleCard>
             <ModuleCard
               name="risk"
               title="风险监控"
               summary={summary}
               module={summary.risk}
-              streamed={false}
+              pushedFields={0}
               to="/positions"
             >
               <RiskBody summary={summary} />
@@ -139,10 +144,10 @@ export function OverviewView({
               title="当前持仓"
               summary={summary}
               module={summary.positions}
-              streamed={pushedModules.positions}
+              pushedFields={Object.keys(pushed.positions).length}
               to="/positions"
             >
-              <PositionsBody summary={summary} />
+              <PositionsBody summary={summary} pushed={pushed.positions} />
             </ModuleCard>
             <Card className="min-w-0" data-module="market_summary" data-status="unavailable">
               <CardContent className="space-y-3 pt-6">
@@ -161,17 +166,17 @@ export function OverviewView({
               title="关注列表"
               summary={summary}
               module={summary.watchlist}
-              streamed={pushedModules.watchlist}
+              pushedFields={Object.keys(pushed.watchlist).length}
               to="/watchlist"
             >
-              <WatchlistBody summary={summary} />
+              <WatchlistBody summary={summary} pushed={pushed.watchlist} />
             </ModuleCard>
             <ModuleCard
               name="alerts"
               title="提醒"
               summary={summary}
               module={summary.alerts}
-              streamed={false}
+              pushedFields={0}
               to="/journal"
             >
               <AlertsBody summary={summary} />
@@ -184,7 +189,7 @@ export function OverviewView({
               title="策略运行"
               summary={summary}
               module={summary.strategies}
-              streamed={false}
+              pushedFields={0}
               to="/strategies"
             >
               <StrategiesBody summary={summary} />
@@ -194,7 +199,7 @@ export function OverviewView({
               title="最近活动"
               summary={summary}
               module={summary.activity}
-              streamed={false}
+              pushedFields={0}
               to="/journal"
             >
               <ActivityBody summary={summary} />

@@ -111,7 +111,14 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(response.status, await failureMessage(response));
   }
   if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
+  try {
+    return (await response.json()) as T;
+  } catch {
+    throw new ApiError(
+      response.status,
+      `请求失败（HTTP ${response.status}，响应不是有效的 JSON）`,
+    );
+  }
 }
 
 function send<T>(path: string, method: string, body: unknown): Promise<T> {

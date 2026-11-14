@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   fetchDashboardSummary,
   withStreamUpdates,
+  type DashboardPushed,
   type DashboardSummary,
 } from "../lib/dashboard";
 import { streamLiveness } from "../lib/stream";
@@ -61,18 +62,16 @@ export default function OverviewPage() {
     [summary, quoteStream.quotes, positionStream.positions, positionStream.account],
   );
 
+  const pushed: DashboardPushed = merged?.pushed ?? { account: null, positions: {}, watchlist: {} };
+
   return (
     <OverviewView
-      summary={merged}
+      summary={merged?.summary ?? null}
       error={error}
       loading={loading}
       priceLiveness={streamLiveness(streamState, "public_ws")}
       accountLiveness={streamLiveness(streamState, "private_ws")}
-      pushedModules={{
-        account: merged !== null && summary !== null && merged.account !== summary.account,
-        positions: merged !== null && summary !== null && merged.positions !== summary.positions,
-        watchlist: merged !== null && summary !== null && merged.watchlist !== summary.watchlist,
-      }}
+      pushed={pushed}
       onRefresh={() => setReloadToken((token) => token + 1)}
     />
   );

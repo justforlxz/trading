@@ -253,13 +253,14 @@ describe("枚举与数值文案", () => {
 describe("推送值合并", () => {
   it("没有推送时返回原对象，页面据此标注 HTTP 快照", () => {
     const base = summary();
-    const merged = withStreamUpdates(base, { quotes: {}, positions: {}, account: null });
-    expect(merged).toBe(base);
+    const result = withStreamUpdates(base, { quotes: {}, positions: {}, account: null });
+    expect(result.summary).toBe(base);
+    expect(result.pushed).toEqual({ account: null, positions: {}, watchlist: {} });
   });
 
   it("账户、持仓与关注价格按推送更新，其余字段保留 HTTP 值", () => {
     const base = summary();
-    const merged = withStreamUpdates(base, {
+    const result = withStreamUpdates(base, {
       quotes: {
         "AAPL-USDT-SWAP": {
           inst_id: "AAPL-USDT-SWAP",
@@ -311,26 +312,67 @@ describe("推送值合并", () => {
       },
     });
 
+    const merged = result.summary;
+
     expect(merged.account.data?.equity).toBe("1260.00");
     expect(merged.account.data?.source).toBe("okx_ws");
     expect(merged.account.data?.day_pnl_basis).toBe("equity_only");
     expect(merged.account.data?.day_pnl).toBeNull();
-    expect(merged.account.as_of).toBe("2026-11-13T09:10:00Z");
 
     expect(merged.positions.data?.items[0].mark_price).toBe("233.10");
     expect(merged.positions.data?.items[0].unrealized_pnl).toBe("50.40");
     expect(merged.positions.data?.items[0].notional).toBe("1851.36");
     expect(merged.positions.data?.items[1].mark_price).toBe("64880");
-    expect(merged.positions.as_of).toBe("2026-11-13T09:10:00Z");
 
     expect(merged.watchlist.data?.items[0].last_price).toBe("233.10");
     expect(merged.watchlist.data?.items[0].change_pct_24h).toBe("1.86");
-    expect(merged.watchlist.as_of).toBe("2026-11-13T09:10:00Z");
+
+    // 模块时间保持 HTTP 快照，不被推送推进。
+    expect(merged.account.as_of).toBe(base.account.as_of);
+    expect(merged.positions.as_of).toBe(base.positions.as_of);
+    expect(merged.watchlist.as_of).toBe(base.watchlist.as_of);
+
+    // 推送只覆盖部分字段，各字段的时刻单独记录。
+    expect(result.pushed).toEqual({
+      account: "2026-11-13T09:10:00Z",
+      positions: { "exchange:okx-main:123456": "2026-11-13T09:10:00Z" },
+      watchlist: { "AAPL-USDT-SWAP": "2026-11-13T09:10:00Z" },
+    });
+  });
+
+  it("价格推送不改写日涨跌与 RSI，模块时间保持快照时刻", () => {
+    const base = summary();
+    const result = withStreamUpdates(base, {
+      quotes: {
+        "AAPL-USDT-SWAP": {
+          inst_id: "AAPL-USDT-SWAP",
+          last: "355.76",
+          mark: null,
+          index: null,
+          source: "okx_ws",
+          stale: false,
+          snapshot: false,
+          as_of: "2026-11-15T07:07:00Z",
+          received_at: "2026-11-15T07:07:01Z",
+        },
+      },
+      positions: {},
+      account: null,
+    });
+
+    const item = result.summary.watchlist.data?.items[0];
+    expect(item?.last_price).toBe("355.76");
+    // 同一行其余字段仍是 HTTP 快照，不能被价格推送带着一起「变新」。
+    expect(item?.change_pct_24h).toBe("1.86");
+    expect(item?.rsi_14).toBe("61.4");
+    expect(item?.trend).toBe("bullish");
+    expect(result.summary.watchlist.as_of).toBe(base.watchlist.as_of);
+    expect(result.pushed.watchlist["AAPL-USDT-SWAP"]).toBe("2026-11-15T07:07:00Z");
   });
 
   it("早于模块时刻的推送不覆盖，避免同步后回退", () => {
     const base = summary();
-    const merged = withStreamUpdates(base, {
+    const result = withStreamUpdates(base, {
       quotes: {
         "AAPL-USDT-SWAP": {
           inst_id: "AAPL-USDT-SWAP",
@@ -361,7 +403,8 @@ describe("推送值合并", () => {
         received_at: "2026-11-11T09:00:01Z",
       },
     });
-    expect(merged).toBe(base);
+    expect(result.summary).toBe(base);
+    expect(result.pushed).toEqual({ account: null, positions: {}, watchlist: {} });
   });
 
   it("降级模块不接收推送值", () => {
@@ -369,7 +412,7 @@ describe("推送值合并", () => {
       ...summary(),
       account: { status: "unavailable", as_of: null, error: "账户不可用", data: null },
     };
-    const merged = withStreamUpdates(base, {
+    const result = withStreamUpdates(base, {
       quotes: {},
       positions: {},
       account: {
@@ -388,6 +431,7 @@ describe("推送值合并", () => {
         received_at: "2026-11-13T09:10:01Z",
       },
     });
-    expect(merged.account).toBe(base.account);
+    expect(result.summary.account).toBe(base.account);
+    expect(result.pushed.account).toBeNull();
   });
 });

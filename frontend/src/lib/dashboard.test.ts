@@ -10,7 +10,8 @@ import {
   exchangeStatusLabel,
   marketSessionLabel,
   moduleStatusView,
-  percentText,
+  dayPnlBasisLabel,
+  percentOrMissingText,
   ratioPercentText,
   signedRatioPercentText,
   withStreamUpdates,
@@ -225,8 +226,15 @@ describe("枚举与数值文案", () => {
     expect(signedRatioPercentText("-0.031")).toBe("-3.1%");
     expect(ratioPercentText("0.061")).toBe("6.1%");
     expect(signedRatioPercentText(null)).toBe("未提供");
-    expect(percentText("45.36")).toBe("45.36%");
-    expect(percentText(undefined)).toBe("未提供");
+    expect(percentOrMissingText("45.36")).toBe("45.36%");
+    expect(percentOrMissingText(undefined)).toBe("未提供");
+    expect(percentOrMissingText("  ")).toBe("未提供");
+    expect(percentOrMissingText("5.970149253731")).toBe("5.97%");
+    expect(percentOrMissingText("100")).toBe("100%");
+    expect(percentOrMissingText("abc")).toBe("abc%");
+    expect(dayPnlBasisLabel("equity_only")).toBe("仅账户权益");
+    expect(dayPnlBasisLabel(undefined)).toBe("未提供");
+    expect(dayPnlBasisLabel("cash_flow_adjusted")).toBe("未知基准（cash_flow_adjusted）");
     expect(countText(0)).toBe("0");
     expect(countText(null)).toBe("未提供");
     expect(amountText("1248.60", "USDT")).toBe("1248.60 USDT");

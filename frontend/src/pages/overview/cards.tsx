@@ -11,9 +11,10 @@ import {
   clampedPercent,
   countText,
   dataSourceLabel,
+  dayPnlBasisLabel,
   exchangeStatusLabel,
   marketSessionLabel,
-  percentText,
+  percentOrMissingText,
   ratioPercentText,
   signedRatioPercentText,
   type DashboardSummary,
@@ -76,7 +77,7 @@ export function AccountBody({ summary }: { summary: DashboardSummary }) {
               : `${signedValue(data.day_pnl)} ${data.currency}`}
           </p>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            日盈亏基准：仅账户权益
+            日盈亏基准：{dayPnlBasisLabel(data.day_pnl_basis)}
           </p>
         </div>
       </div>
@@ -100,7 +101,7 @@ export function AccountBody({ summary }: { summary: DashboardSummary }) {
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>保证金使用率</span>
           <span className="font-mono text-foreground tabular-nums">
-            {percentText(data.margin_usage_pct)}
+            {percentOrMissingText(data.margin_usage_pct)}
           </span>
         </div>
         <div
@@ -157,14 +158,14 @@ export function RiskBody({ summary }: { summary: DashboardSummary }) {
           <dd className="font-mono tabular-nums">{countText(data.missing_stop_count)} 个</dd>
         </div>
         <div className="flex items-center justify-between gap-2">
-          <dt className="text-muted-foreground">单标的权重上限</dt>
+          <dt className="text-muted-foreground">最大单标的敞口</dt>
           <dd className="font-mono tabular-nums">
-            {percentText(data.max_single_instrument_weight_pct)}
+            {percentOrMissingText(data.max_single_instrument_weight_pct)}
           </dd>
         </div>
         <div className="flex items-center justify-between gap-2">
           <dt className="text-muted-foreground">保证金使用率</dt>
-          <dd className="font-mono tabular-nums">{percentText(data.margin_usage_pct)}</dd>
+          <dd className="font-mono tabular-nums">{percentOrMissingText(data.margin_usage_pct)}</dd>
         </div>
       </dl>
       <p className="border-t pt-3 text-[11px] leading-5 text-muted-foreground">
@@ -241,9 +242,10 @@ export function PositionsBody({ summary }: { summary: DashboardSummary }) {
                   </td>
                   <td className="py-3 pl-2 text-xs">
                     {item.stop_distance_pct === null ||
-                    item.stop_distance_pct === undefined
-                      ? "未设置止损"
-                      : `距止损 ${item.stop_distance_pct}%`}
+                    item.stop_distance_pct === undefined ||
+                    item.stop_distance_pct.trim() === ""
+                      ? "后端未返回止损距离"
+                      : `距止损 ${percentOrMissingText(item.stop_distance_pct)}`}
                   </td>
                 </tr>
               ))}
@@ -301,7 +303,7 @@ export function WatchlistBody({ summary }: { summary: DashboardSummary }) {
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">
         共 {countText(data.summary.total)} 个 · 偏多 {countText(data.summary.bullish)} · 偏空{" "}
-        {countText(data.summary.bearish)} · 日线覆盖率 {percentText(data.summary.coverage_pct)}
+        {countText(data.summary.bearish)} · 日线覆盖率 {percentOrMissingText(data.summary.coverage_pct)}
       </p>
       {data.items.length === 0 ? (
         <p className="text-sm text-muted-foreground">自选列表为空。</p>

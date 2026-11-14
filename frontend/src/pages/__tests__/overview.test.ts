@@ -204,6 +204,57 @@ describe("首页 v6", () => {
     expect(html).toContain("1851.36 USDT");
   });
 
+  it("风险卡把最大实际占比写成敞口，不写成上限", () => {
+    const html = render();
+    expect(html).toContain("最大单标的敞口");
+    expect(html).not.toContain("单标的权重上限");
+    expect(html).toContain("100%");
+  });
+
+  it("止损距离为空时写后端未返回，不写未设置止损", () => {
+    const html = render();
+    const positionsStart = html.indexOf('data-module="positions"');
+    const positionsEnd = html.indexOf('data-module="watchlist"', positionsStart);
+    const section = html.slice(positionsStart, positionsEnd);
+    expect(section).toContain("后端未返回止损距离");
+    expect(section).not.toContain("未设置止损");
+
+    const base = summary();
+    const withStop = render({
+      summary: {
+        ...base,
+        positions: {
+          ...base.positions,
+          data: {
+            ...base.positions.data!,
+            items: [{ ...base.positions.data!.items[0], stop_distance_pct: "3.2" }],
+          },
+        },
+      },
+    });
+    expect(withStop).toContain("距止损 3.2%");
+  });
+
+  it("日盈亏基准读契约字段，不写死口径", () => {
+    const base = summary();
+    const html = render({
+      summary: {
+        ...base,
+        account: {
+          ...base.account,
+          data: { ...base.account.data!, day_pnl_basis: "equity_only" },
+        },
+      },
+    });
+    expect(html).toContain("日盈亏基准：仅账户权益");
+    expect(html).not.toContain("现金流水调整");
+  });
+
+  it("市场概况卡没有对应页面时不渲染跳转入口", () => {
+    const html = render();
+    expect(html).not.toContain("打开市场概况所在页面");
+  });
+
   it("单个模块失效只降级自己，其余模块照常渲染", () => {
     const base = summary();
     const html = render({

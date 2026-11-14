@@ -146,10 +146,22 @@ export function signedRatioPercentText(value: string | null | undefined): string
   return formatted.startsWith("-") ? formatted : `+${formatted}`;
 }
 
-/** 后端已按百分数返回的字段（权重、覆盖率、保证金使用率）；这里只补单位。 */
-export function percentText(value: string | null | undefined): string {
+/**
+ * 后端已按百分数返回的字段（权重、覆盖率、保证金使用率、止损距离）；这里只补单位。
+ * 超过两位的小数按显示精度截断，不做四舍五入以外的换算。
+ */
+export function percentOrMissingText(value: string | null | undefined): string {
   if (value === null || value === undefined || value.trim() === "") return "未提供";
-  return `${value}%`;
+  const number = Number(value);
+  if (!Number.isFinite(number)) return `${value}%`;
+  return `${number.toFixed(2).replace(/\.?0+$/, "")}%`;
+}
+
+/** 契约里的 `day_pnl_basis`；未知取值原样标注，不猜测基准。 */
+export function dayPnlBasisLabel(basis: string | null | undefined): string {
+  if (basis === "equity_only") return "仅账户权益";
+  if (basis === null || basis === undefined || basis.trim() === "") return "未提供";
+  return `未知基准（${basis}）`;
 }
 
 export function countText(value: number | null | undefined): string {

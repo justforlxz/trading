@@ -45,7 +45,7 @@ export function ModuleCard({
   summary: DashboardSummary;
   module: ModuleEnvelope<unknown>;
   streamed: boolean;
-  to: string;
+  to?: string;
   className?: string;
   children: ReactNode;
 }) {
@@ -56,13 +56,15 @@ export function ModuleCard({
           <CardTitle>{title}</CardTitle>
           <div className="flex shrink-0 items-center gap-2">
             <StatusBadge status={module.status} />
-            <Link
-              to={to}
-              aria-label={`打开${title}所在页面`}
-              className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-            >
-              <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
+            {to ? (
+              <Link
+                to={to}
+                aria-label={`打开${title}所在页面`}
+                className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              >
+                <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+            ) : null}
           </div>
         </div>
         <CardDescription className="flex flex-wrap items-center gap-x-2 gap-y-1">

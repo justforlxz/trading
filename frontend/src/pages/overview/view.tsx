@@ -106,7 +106,6 @@ export function OverviewView({
             summary={summary}
             module={summary.market}
             streamed={false}
-            to="/watchlist"
           >
             <MarketBody summary={summary} />
           </ModuleCard>

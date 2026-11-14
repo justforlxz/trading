@@ -11,8 +11,9 @@ import {
 import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 
-import { fetchHealth } from "../../lib/api";
 import { currentSection, isNavActive, type NavItem } from "../../lib/navigation";
+import { streamClient, streamStatusLabel } from "../../lib/stream";
+import { useStreamState } from "../../lib/stream-hooks";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { ThemeToggle } from "./theme-toggle";
@@ -26,44 +27,19 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/settings", label: "设置", icon: Settings2 },
 ];
 
-const HEALTH_POLL_MS = 30_000;
-
-/** 顶栏的数据连接状态来自真实健康检查；未知或失败一律显示「未连接」。 */
-function useDataConnection(): boolean {
-  const [connected, setConnected] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    let timer: number | undefined;
-
-    const check = async () => {
-      try {
-        const health = await fetchHealth();
-        if (active) setConnected(health.status === "ok");
-      } catch {
-        if (active) setConnected(false);
-      }
-      if (active) timer = window.setTimeout(() => void check(), HEALTH_POLL_MS);
-    };
-
-    void check();
-    return () => {
-      active = false;
-      if (timer !== undefined) window.clearTimeout(timer);
-    };
-  }, []);
-
-  return connected;
-}
-
 const NAV_LINK_CLASS =
   "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export function AppShell() {
   const { pathname } = useLocation();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const connected = useDataConnection();
+  const streamState = useStreamState();
   const section = currentSection(pathname, NAV_ITEMS);
+
+  useEffect(() => {
+    streamClient.start();
+    return () => streamClient.stop();
+  }, []);
 
   useEffect(() => {
     setDrawerOpen(false);
@@ -162,17 +138,21 @@ export function AppShell() {
             <span
               className="inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs text-muted-foreground"
               aria-live="polite"
-              title={connected ? "后端健康检查正常" : "后端健康检查不可用"}
+              title={`实时推送：${streamStatusLabel(streamState.status)}`}
               data-testid="data-connection"
             >
               <span
                 className={cn(
                   "h-1.5 w-1.5 rounded-full",
-                  connected ? "bg-emerald-500" : "bg-muted-foreground",
+                  streamState.status === "connected"
+                    ? "bg-emerald-500"
+                    : streamState.status === "disconnected" || streamState.status === "idle"
+                      ? "bg-muted-foreground"
+                      : "bg-amber-500",
                 )}
                 aria-hidden="true"
               />
-              {connected ? "已连接" : "未连接"}
+              {streamStatusLabel(streamState.status)}
             </span>
             <ThemeToggle />
           </div>

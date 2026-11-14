@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "../../components/ui/card";
+import { StreamNotice, StreamTag } from "../../components/ui/stream-status";
 import {
   addWatchlistItem,
   fetchMarketOverview,
@@ -24,6 +25,8 @@ import {
   type WatchlistResponse,
 } from "../../lib/api";
 import { instTypeLabel, signedTone, signedValue } from "../../lib/display";
+import { useQuoteStream } from "../../lib/stream-hooks";
+import type { QuoteUpdate } from "../../lib/stream";
 import {
   assetTypeLabel,
   coverageText,
@@ -233,12 +236,14 @@ function SearchResults({
 
 function WatchlistTable({
   items,
+  quotes,
   busy,
   groupResetToken,
   onRemove,
   onMove,
 }: {
   items: WatchlistItem[];
+  quotes: Record<string, QuoteUpdate>;
   busy: string | null;
   groupResetToken: number;
   onRemove: (instId: string) => void;
@@ -267,6 +272,7 @@ function WatchlistTable({
         <tbody>
           {items.map((item) => {
             const { instrument } = item;
+            const live = quotes[instrument.inst_id];
             return (
               <tr
                 key={instrument.inst_id}
@@ -305,9 +311,10 @@ function WatchlistTable({
                   />
                 </td>
                 <td className="px-1.5 py-3 text-right align-top font-mono tabular-nums sm:px-2">
-                  {metricText(item.last_price, item.data_status)}
+                  {metricText(live?.last ?? item.last_price, item.data_status)}
                 </td>
                 <td
+                  title="日涨跌来自 HTTP 快照；推送消息只提供价格"
                   className={cn(
                     "px-1.5 py-3 text-right align-top font-mono tabular-nums sm:px-2",
                     item.change_pct_24h === null ? "" : signedTone(item.change_pct_24h),
@@ -487,6 +494,9 @@ export default function WatchlistPage() {
 
   const items = data?.items ?? [];
   const visibleItems = items.filter((item) => matchesCategory(item.instrument, category));
+  const { quotes, liveness } = useQuoteStream(
+    visibleItems.map((item) => item.instrument.inst_id),
+  );
   const tracked = new Set(items.map((item) => item.instrument.inst_id));
   const groupNames = [...new Set([DEFAULT_GROUP, ...(data?.groups ?? [])])];
 
@@ -584,13 +594,20 @@ export default function WatchlistPage() {
               <div>
                 <CardTitle>自选列表</CardTitle>
                 <CardDescription>
-                  {visibleItems.length} 个标的 · 日线 · RSI(14) · ATR(14)
+                  {visibleItems.length} 个标的 · 日线 · RSI(14) · ATR(14) ·
+                  价格由推送更新，其余字段来自 HTTP 快照
                 </CardDescription>
               </div>
-              <span className="text-xs text-muted-foreground">点击标的进入技术分析</span>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <StreamTag liveness={liveness} />
+                <span>点击标的进入技术分析</span>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="px-3 pb-3 sm:px-6">
+            <div className="mb-3">
+              <StreamNotice liveness={liveness} subject="价格" />
+            </div>
             {visibleItems.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">
                 当前分类下没有标的。
@@ -606,6 +623,7 @@ export default function WatchlistPage() {
             ) : (
               <WatchlistTable
                 items={visibleItems}
+                quotes={quotes}
                 busy={busy}
                 groupResetToken={groupResetToken}
                 onRemove={(instId) => void handleRemove(instId)}

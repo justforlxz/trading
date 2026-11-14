@@ -19,12 +19,6 @@ export class ApiError extends Error {
   }
 }
 
-export type Health = {
-  status: "ok";
-  version: string;
-  env: string;
-};
-
 export type WatchlistResponse = components["schemas"]["WatchlistResponse"];
 export type WatchlistItem = components["schemas"]["WatchlistItem"];
 export type WatchlistStrategy = components["schemas"]["WatchlistStrategy"];
@@ -125,10 +119,6 @@ function send<T>(path: string, method: string, body: unknown): Promise<T> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-}
-
-export function fetchHealth(): Promise<Health> {
-  return request<Health>("/health");
 }
 
 export function fetchWatchlist(): Promise<WatchlistResponse> {

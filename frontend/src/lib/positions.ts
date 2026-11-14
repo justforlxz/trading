@@ -8,6 +8,12 @@
 import type { components } from "../api/types";
 import { request } from "./api";
 import { percentValue, signedValue } from "./display";
+import {
+  isAtLeast,
+  updateTime,
+  type AccountUpdate,
+  type PositionUpdate,
+} from "./stream";
 
 export type AccountSummary = components["schemas"]["AccountSummaryResponse"];
 export type AccountSync = components["schemas"]["AccountSyncResponse"];
@@ -76,4 +82,60 @@ export function uplRatioText(value: string | null | undefined): string {
 export function pnlText(value: string | null | undefined): string {
   if (value === null || value === undefined || value.trim() === "") return MISSING_VALUE;
   return signedValue(value);
+}
+
+/** 用推送里的持仓字段覆盖 HTTP 快照；推送没有的字段继续保留快照值。 */
+export function mergePositionUpdates(
+  positions: ExchangePositions,
+  updates: Record<string, PositionUpdate>,
+): ExchangePositions {
+  let changed = false;
+  const snapshotAsOf = positions.as_of ?? null;
+  let asOf = snapshotAsOf;
+  const items = positions.items.map((item) => {
+    const update = updates[item.pos_id];
+    if (update === undefined) return item;
+    const moment = updateTime(update);
+    if (!isAtLeast(moment, snapshotAsOf)) return item;
+    const timeMoved = moment !== null && (asOf === null || moment > asOf);
+    if (timeMoved) asOf = moment;
+    const merged = {
+      ...item,
+      mark_px: update.mark_px ?? item.mark_px,
+      upl: update.upl ?? item.upl,
+      upl_ratio: update.upl_ratio ?? item.upl_ratio,
+    };
+    const valuesMoved =
+      merged.mark_px !== item.mark_px ||
+      merged.upl !== item.upl ||
+      merged.upl_ratio !== item.upl_ratio;
+    if (!valuesMoved && !timeMoved) return item;
+    changed = true;
+    return valuesMoved ? merged : item;
+  });
+  return changed ? { ...positions, items, as_of: asOf } : positions;
+}
+
+/** 推送账户快照只覆盖它携带的字段；日盈亏基准等 HTTP 字段继续保留。 */
+export function mergeAccountUpdate(
+  account: AccountSummary,
+  update: AccountUpdate | null,
+): AccountSummary {
+  if (update === null) return account;
+  const moment = updateTime(update);
+  if (!isAtLeast(moment, account.captured_at ?? null)) return account;
+  return {
+    ...account,
+    account_id: update.account_id || account.account_id,
+    currency: update.currency ?? account.currency,
+    equity: update.equity ?? account.equity,
+    available_equity: update.available_equity ?? account.available_equity,
+    cash_balance: update.cash_balance ?? account.cash_balance,
+    unrealized_pnl: update.unrealized_pnl ?? account.unrealized_pnl,
+    used_margin: update.used_margin ?? account.used_margin,
+    available_margin: update.available_margin ?? account.available_margin,
+    margin_usage_pct: update.margin_usage_pct ?? account.margin_usage_pct,
+    captured_at: moment ?? account.captured_at,
+    source: update.source ?? account.source,
+  };
 }

@@ -75,6 +75,7 @@ export type BacktestDetailResponse = components["schemas"]["BacktestDetailRespon
 export type BacktestLeg = BacktestDetailResponse["legs"][number];
 export type BacktestTradeRow = BacktestDetailResponse["trades"][number];
 export type BacktestRequest = components["schemas"]["BacktestRequest"];
+export type BacktestBatchResponse = components["schemas"]["BacktestBatchResponse"];
 export type BacktestTargets = components["schemas"]["BacktestTargets"];
 export type BacktestCosts = components["schemas"]["BacktestCosts"];
 export type BacktestMetrics = components["schemas"]["BacktestMetrics"];
@@ -277,14 +278,19 @@ export function fetchInstrumentStrategies(
   );
 }
 
-/** 发起一次批量回测：每个被选中的标的各落一条运行。 */
-export function createBacktest(body: BacktestRequest): Promise<BacktestRunSummary> {
-  return send<BacktestRunSummary>("/backtests", "POST", body);
+/** 发起一次批量回测：每个被选中的标的各落一条运行，同时返回等权组合净值。 */
+export function createBacktest(body: BacktestRequest): Promise<BacktestBatchResponse> {
+  return send<BacktestBatchResponse>("/backtests", "POST", body);
 }
 
 /** 该数据源的历史回测，新到旧。数据源必填，不做跨源聚合。 */
-export function fetchBacktests(dataSource: BacktestDataSource): Promise<BacktestRunListResponse> {
-  return request<BacktestRunListResponse>(`/backtests?data_source=${dataSource}`);
+export function fetchBacktests(
+  dataSource: BacktestDataSource,
+  limit?: number,
+): Promise<BacktestRunListResponse> {
+  const query = new URLSearchParams({ data_source: dataSource });
+  if (limit !== undefined) query.set("limit", String(limit));
+  return request<BacktestRunListResponse>(`/backtests?${query.toString()}`);
 }
 
 export function fetchBacktestRanking(

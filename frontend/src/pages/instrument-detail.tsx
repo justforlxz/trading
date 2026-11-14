@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { CandlestickChart } from "../components/chart/candlestick-chart";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { StreamNotice, StreamTag } from "../components/ui/stream-status";
 import {
   fetchInstrumentAnalysis,
   fetchWatchlist,
@@ -24,6 +25,7 @@ import {
   signedValue,
 } from "../lib/display";
 import { resolveAvailableBar } from "../lib/instrument";
+import { useQuoteStream } from "../lib/stream-hooks";
 import { cn } from "../lib/utils";
 
 const BAR_OPTIONS: Array<{ bar: InstrumentAnalysisBar; label: string }> = [
@@ -42,6 +44,8 @@ const DATA_SOURCE_LABELS: Record<string, string> = {
   okx: "OKX",
   okx_spot: "OKX 现货",
   okx_swap: "OKX 永续",
+  okx_ws: "OKX WebSocket 推送",
+  okx_rest: "OKX REST 快照",
   us_equity_proxy: "美股代理行情",
 };
 
@@ -366,6 +370,7 @@ export default function InstrumentDetailPage() {
   const [watchlist, setWatchlist] = useState<WatchlistResponse | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const { quotes, liveness } = useQuoteStream(instId ? [instId] : []);
 
   useEffect(() => {
     fetchWatchlist()
@@ -435,6 +440,14 @@ export default function InstrumentDetailPage() {
   const instrument = analysis?.instrument;
   const quote = analysis?.quote;
   const last = quote?.last ?? null;
+  const liveQuote = instId ? quotes[instId] : undefined;
+  const livePrice = liveQuote?.last ?? last?.price ?? null;
+  const liveMark = liveQuote?.mark ?? quote?.mark?.price ?? null;
+  const liveIndex = liveQuote?.index ?? quote?.index?.price ?? null;
+  const liveSource = liveQuote?.source ?? last?.source ?? null;
+  const liveAt = liveQuote?.last
+    ? (liveQuote.as_of ?? liveQuote.received_at ?? last?.as_of ?? null)
+    : (last?.as_of ?? null);
   const currentCoverage = coverageByBar.get(bar);
   const candles = analysis?.candles;
   const indicators = analysis?.indicators;
@@ -547,6 +560,7 @@ export default function InstrumentDetailPage() {
 
       {analysis && instrument ? (
         <div className="grid grid-cols-1 gap-6">
+          <StreamNotice liveness={liveness} subject="最新价、标记价与指数价" />
           <section className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">
@@ -563,16 +577,26 @@ export default function InstrumentDetailPage() {
             <div className="grid min-w-0 gap-3 lg:justify-items-end">
               <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                    最新价 last
+                  <p className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                    <span>最新价 last</span>
+                    <StreamTag liveness={liveness} />
                   </p>
                   <p className="font-mono text-3xl font-semibold tabular-nums">
-                    {last ? last.price : NOT_SYNCED}
+                    {livePrice ?? NOT_SYNCED}
                   </p>
                   {last ? (
-                    <p className={cn("text-sm font-medium", valueTone(last.change_pct))}>
+                    <p
+                      title="涨跌幅来自 HTTP 分析快照；推送消息只提供价格"
+                      className={cn("text-sm font-medium", valueTone(last.change_pct))}
+                    >
                       {last.change == null ? PLACEHOLDER : priceChangeValue(last.change, last.price)}
                       {last.change_pct == null ? "" : ` (${percentLabel(last.change_pct)})`}
+                    </p>
+                  ) : null}
+                  {liveQuote ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      价格由推送更新于 {liveAt ? formatBeijingTime(liveAt) : "未知时间"}
+                      {last ? `；涨跌幅沿用 ${formatBeijingTime(last.as_of)} 的 HTTP 快照` : ""}
                     </p>
                   ) : null}
                 </div>
@@ -604,21 +628,21 @@ export default function InstrumentDetailPage() {
               <dl className="grid w-full gap-x-4 gap-y-1 text-xs sm:grid-cols-2 lg:w-[24rem]">
                 <div className="flex min-w-0 gap-2">
                   <dt className="shrink-0 text-muted-foreground">标记价 mark</dt>
-                  <dd className="font-mono">{quote?.mark?.price ?? "尚未提供"}</dd>
+                  <dd className="font-mono">{liveMark ?? "尚未提供"}</dd>
                 </div>
                 <div className="flex min-w-0 gap-2">
                   <dt className="shrink-0 text-muted-foreground">指数价 index</dt>
-                  <dd className="font-mono">{quote?.index?.price ?? "尚未提供"}</dd>
+                  <dd className="font-mono">{liveIndex ?? "尚未提供"}</dd>
                 </div>
                 <div className="flex min-w-0 gap-2">
                   <dt className="shrink-0 text-muted-foreground">数据时间</dt>
                   <dd className="font-mono">
-                    {last ? `${formatBeijingTime(last.as_of)}（北京时间）` : NOT_SYNCED}
+                    {liveAt ? `${formatBeijingTime(liveAt)}（北京时间）` : NOT_SYNCED}
                   </dd>
                 </div>
                 <div className="flex min-w-0 gap-2">
                   <dt className="shrink-0 text-muted-foreground">价格来源</dt>
-                  <dd className="font-mono">{last ? sourceLabel(last.source) : NOT_SYNCED}</dd>
+                  <dd className="font-mono">{liveSource ? sourceLabel(liveSource) : NOT_SYNCED}</dd>
                 </div>
               </dl>
             </div>

@@ -35,8 +35,6 @@ __all__ = [
     "message_key",
 ]
 
-#: 私有频道的默认地址（模拟盘与实盘同一地址，登录签名决定账户）。
-DEFAULT_WS_URL = "wss://ws.okx.com:8443/ws/v5/private"
 #: 连续失败多少次之后放弃重连，把错误抛给上层。
 MAX_RECONNECT_ATTEMPTS = 5
 #: 首次重连的等待秒数，之后按 2 的幂递增。
@@ -47,7 +45,8 @@ DEDUPE_WINDOW = 1024
 DEFAULT_CHANNELS: tuple[dict[str, str], ...] = (
     {"channel": "orders"},
     {"channel": "fills"},
-    {"channel": "positions"},
+    # `positions` 频道必须声明 instType；缺省时上游返回 60018「频道不存在」。
+    {"channel": "positions", "instType": "SWAP"},
     {"channel": "account"},
 )
 
@@ -112,7 +111,7 @@ class OkxWebSocket:
         *,
         settings: Settings | None = None,
         channels: Sequence[dict[str, str]] | None = None,
-        url: str = DEFAULT_WS_URL,
+        url: str | None = None,
         connect: Callable[..., Any] = ws_connect,
         clock: Clock | None = None,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
@@ -123,7 +122,8 @@ class OkxWebSocket:
     ) -> None:
         self._settings = settings or get_settings()
         self._channels = tuple(channels) if channels is not None else DEFAULT_CHANNELS
-        self._url = url
+        # 未显式给地址时按 `okx_demo` 推导：模拟盘连 `wspap`，实盘连 `ws`。
+        self._url = url or self._settings.ws_private_url
         self._connect = connect
         self._clock = clock or SystemClock()
         self._sleep = sleep

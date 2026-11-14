@@ -8,6 +8,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # 后端包所在目录：`.env` 与 `alembic.ini` 按包路径定位，不依赖进程 cwd。
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 
+#: OKX 私有 WebSocket 地址：模拟盘与实盘不是同一个域名。
+OKX_WS_PRIVATE_URL_DEMO = "wss://wspap.okx.com:8443/ws/v5/private"
+OKX_WS_PRIVATE_URL_PROD = "wss://ws.okx.com:8443/ws/v5/private"
+
 
 class Settings(BaseSettings):
     """运行期配置。
@@ -50,6 +54,18 @@ class Settings(BaseSettings):
     # 请求头 `x-simulated-trading: 1`：模拟盘（demo trading）与实盘的唯一区别。
     # 默认打开模拟盘，实盘必须由外部显式改配置。
     okx_demo: bool = True
+    # 私有 WebSocket 地址。留空按 `okx_demo` 推导：模拟盘 `wspap`、实盘 `ws`；
+    # 只有上游迁移地址时才需要显式覆盖。
+    okx_ws_private_url: str = ""
+
+    @property
+    def ws_private_url(self) -> str:
+        """私有 WebSocket 地址：显式覆盖优先，否则按模拟盘/实盘选择。"""
+
+        override = self.okx_ws_private_url.strip()
+        if override:
+            return override
+        return OKX_WS_PRIVATE_URL_DEMO if self.okx_demo else OKX_WS_PRIVATE_URL_PROD
 
     # 美股代理行情上游（只读公开接口）：正常交易时段的参考价格来源。
     us_equity_rest_base_url: str = "https://query1.finance.yahoo.com"

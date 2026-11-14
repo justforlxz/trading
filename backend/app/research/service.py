@@ -16,12 +16,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.activity import record_activity
-from app.backtest import get_run
+from app.backtest import BacktestRunRow
 from app.core import Clock, NotFound, SystemClock, ValidationError
 from app.db import session_scope
 from app.instrument import Instrument
 from app.research.model import ResearchNoteRow
-from app.strategy import get_user_strategy
+from app.strategy import UserStrategyRow
 
 __all__ = [
     "NOTE_TYPES",
@@ -242,10 +242,10 @@ def _require_links(
     if instrument is not None and session.get(Instrument, instrument) is None:
         raise NotFound(f"未找到标的 {instrument}")
     strategy = _clean_optional(strategy_id)
-    if strategy is not None and get_user_strategy(strategy) is None:
+    if strategy is not None and session.get(UserStrategyRow, strategy) is None:
         raise NotFound(f"未找到策略 {strategy}")
     backtest = _clean_optional(backtest_id)
-    if backtest is not None and get_run(backtest) is None:
+    if backtest is not None and session.get(BacktestRunRow, backtest) is None:
         raise NotFound(f"未找到回测 {backtest}")
 
 

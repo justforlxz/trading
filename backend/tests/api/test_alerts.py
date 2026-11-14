@@ -6,10 +6,13 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
-from app.alerts import AlertEventRow
+from app.alerts import AlertEventRow, scan_alerts, update_alert_status
+from app.core import Conflict
 from app.db import session_scope
 
 
@@ -136,3 +139,49 @@ def test_activity_is_filtered_and_paginated_by_cursor(market_data: TestClient) -
         "items"
     ]
     assert [item["event_type"] for item in moved] == ["watchlist.item.moved"]
+
+
+def test_concurrent_scans_keep_one_alert_per_rule(market_data: TestClient) -> None:
+    """两个扫描同时落库时，唯一约束由数据库兜住，不抛 500。"""
+
+    _open_position(market_data)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = [future.result() for future in [pool.submit(scan_alerts) for _ in range(2)]]
+
+    assert _alert_count() == 2
+    assert sum(outcome.created for outcome in outcomes) == 2
+    with session_scope() as session:
+        keys = list(session.scalars(select(AlertEventRow.dedup_key)))
+    assert len(keys) == len(set(keys))
+
+
+def test_concurrent_status_update_only_one_wins(market_data: TestClient) -> None:
+    """并发处置同一条提醒时，行锁让后到的请求读到新状态并返回冲突。"""
+
+    _open_position(market_data)
+    items = market_data.get("/api/alerts").json()["items"]
+    alert = next(item for item in items if item["rule_id"] == "stop_missing")
+
+    def confirm() -> str:
+        try:
+            record = update_alert_status(alert["id"], "acknowledged")
+        except Conflict:
+            return "conflict"
+        return "missing" if record is None else record.status
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = [future.result() for future in [pool.submit(confirm) for _ in range(2)]]
+
+    assert sorted(outcomes) == ["acknowledged", "conflict"]
+    activity = market_data.get("/api/activity", params={"event_type": "alert.acknowledged"}).json()[
+        "items"
+    ]
+    assert [item["object_id"] for item in activity] == [alert["id"]]
+
+
+def test_naive_activity_time_range_is_rejected(market_data: TestClient) -> None:
+    """不带时区的 `from`/`to` 在请求校验阶段返回 422，而不是 500。"""
+
+    assert market_data.get("/api/activity", params={"from": "2026-11-01"}).status_code == 422
+    assert market_data.get("/api/activity", params={"to": "2026-11-10"}).status_code == 422

@@ -5,9 +5,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import AwareDatetime
 
 from app.api.schemas import (
     ResearchNoteCreatedResponse,
@@ -37,8 +36,8 @@ def get_research_notes(
     related_instrument_id: str | None = Query(None),
     related_strategy_id: str | None = Query(None),
     related_backtest_id: str | None = Query(None),
-    start: datetime | None = Query(None, alias="from"),
-    end: datetime | None = Query(None, alias="to"),
+    start: AwareDatetime | None = Query(None, alias="from"),
+    end: AwareDatetime | None = Query(None, alias="to"),
     limit: int = Query(50, ge=1, le=200),
     cursor: str | None = Query(None),
     sort: str = Query("created_at_desc"),

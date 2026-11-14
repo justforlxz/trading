@@ -33,6 +33,7 @@ from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
 from app.activity import record_activity
 from app.backtest.costs import CostModel, decimal_text
@@ -239,38 +240,50 @@ def save_run(
     return save_runs([BacktestRunPlan(request=request, spec=spec, result=result)])[0]
 
 
-def save_runs(plans: Sequence[BacktestRunPlan]) -> tuple[BacktestRunRecord, ...]:
+def save_runs(
+    plans: Sequence[BacktestRunPlan], *, session: Session | None = None
+) -> tuple[BacktestRunRecord, ...]:
     """把一批回测写进**同一个事务**：要么全部落库，要么一行都不留。
 
     指标、逐腿交易与逐 bar 曲线在动手写库之前算好：输入自相矛盾时还没有任何一行进入
     数据库。写库阶段整批共用一个事务，最后一条失败会连同前面几条一起回滚，因此「接口
     返回错误但库里多了几条」不会发生。
+
+    传入 `session` 时复用调用方的事务：调用方可以把「回测开始」活动与运行行放在同一次
+    提交里，失败时两者一起回滚。
     """
 
     if not plans:
         raise ValidationError("回测批次不能为空")
     prepared = [_prepare(plan) for plan in plans]
-    with session_scope() as session:
-        for item in prepared:
-            session.add(item.run_row)
-            # 先落运行行：交易与净值两表按 run_id 做外键，父子顺序不能靠数据库碰运气。
-            session.flush()
-            session.add_all(item.trade_rows)
-            session.add_all(item.equity_rows)
-            session.add(item.link_row)
-            record_activity(
-                session=session,
-                event_type="backtest.completed",
-                object_type="backtest",
-                object_id=item.run_row.run_id,
-                summary=f"回测 {item.run_row.run_id} 完成",
-                payload={
-                    "run_id": item.run_row.run_id,
-                    "strategy_version_id": item.run_row.strategy_instance_id,
-                    "inst_id": item.run_row.inst_id,
-                },
-            )
+    if session is not None:
+        _write_prepared(session, prepared)
+    else:
+        with session_scope() as own_session:
+            _write_prepared(own_session, prepared)
     return tuple(item.record for item in prepared)
+
+
+def _write_prepared(session: Session, prepared: Sequence[_PreparedRun]) -> None:
+    for item in prepared:
+        session.add(item.run_row)
+        # 先落运行行：交易与净值两表按 run_id 做外键，父子顺序不能靠数据库碰运气。
+        session.flush()
+        session.add_all(item.trade_rows)
+        session.add_all(item.equity_rows)
+        session.add(item.link_row)
+        record_activity(
+            session=session,
+            event_type="backtest.completed",
+            object_type="backtest",
+            object_id=item.run_row.run_id,
+            summary=f"回测 {item.run_row.run_id} 完成",
+            payload={
+                "run_id": item.run_row.run_id,
+                "strategy_version_id": item.run_row.strategy_instance_id,
+                "inst_id": item.run_row.inst_id,
+            },
+        )
 
 
 @dataclass(frozen=True, slots=True)

@@ -10,11 +10,12 @@ from __future__ import annotations
 import json
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.activity import record_activity
@@ -55,6 +56,8 @@ __all__ = [
 MAX_LIMIT = 200
 RISK_RULE_VERSION = "b3-exposure-v1"
 RISK_BAR = "1d"
+# 技术指标最多回看 60 根日线，180 个自然日足够覆盖并留出停牌与周末的余量。
+TECHNICAL_LOOKBACK_DAYS = 180
 _RISK_TITLES = {
     RULE_STOP_MISSING: "持仓缺少止损",
     RULE_STOP_DISTANCE: "止损距离过近",
@@ -156,7 +159,7 @@ def update_alert_status(
         raise ValidationError("提醒状态只能改成 acknowledged 或 ignored")
     moment = (clock or SystemClock()).now()
     with session_scope() as session:
-        row = session.get(AlertEventRow, alert_id)
+        row = session.get(AlertEventRow, alert_id, with_for_update=True)
         if row is None:
             return None
         if row.status != "pending":
@@ -187,25 +190,28 @@ def scan_alerts(*, clock: Clock | None = None) -> ScanResult:
     new_groups: set[tuple[str, str, str | None]] = set()
     with session_scope() as session:
         for candidate in unique.values():
-            existing = session.scalar(
-                select(AlertEventRow).where(AlertEventRow.dedup_key == candidate.dedup_key)
+            # 并发扫描会同时看到「不存在」并同时插入；唯一约束是最终保证，
+            # `ON CONFLICT DO NOTHING` 让后到的请求安静地跳过，而不是抛 500。
+            statement = (
+                pg_insert(AlertEventRow)
+                .values(**_row_values(candidate))
+                .on_conflict_do_nothing(index_elements=[AlertEventRow.dedup_key])
+                .returning(AlertEventRow.id)
             )
-            if existing is not None:
+            inserted_id = session.scalar(statement)
+            if inserted_id is None:
                 continue
-            row = _row(candidate)
-            session.add(row)
-            session.flush()
             record_activity(
                 session=session,
                 event_type="alert.created",
                 object_type="alert",
-                object_id=row.id,
-                summary=f"新提醒「{row.title}」",
+                object_id=inserted_id,
+                summary=f"新提醒「{candidate.title}」",
                 payload={
-                    "alert_id": row.id,
-                    "type": row.type,
-                    "rule_id": row.rule_id,
-                    "instrument_id": row.instrument_id,
+                    "alert_id": inserted_id,
+                    "type": candidate.type,
+                    "rule_id": candidate.rule_id,
+                    "instrument_id": candidate.instrument_id,
                 },
                 clock=clock,
             )
@@ -249,8 +255,9 @@ def _risk_candidates(moment: datetime) -> list[AlertCandidate]:
 
 def _instrument_candidates(moment: datetime) -> list[AlertCandidate]:
     found: list[AlertCandidate] = []
+    start = moment - timedelta(days=TECHNICAL_LOOKBACK_DAYS)
     for symbol in _tracked_symbols():
-        bars = load_candles(symbol, RISK_BAR)
+        bars = load_candles(symbol, RISK_BAR, start=start)
         if not bars:
             continue
         found.extend(technical_candidates(symbol, bars, moment=moment))
@@ -282,11 +289,11 @@ def _expire_stale(
     active_groups = {
         (candidate.type, candidate.rule_id, candidate.instrument_id) for candidate in candidates
     }
-    rows = list(
-        session.scalars(
-            select(AlertEventRow).where(AlertEventRow.status.in_(("pending", "acknowledged")))
-        )
-    )
+    statement = select(AlertEventRow).where(AlertEventRow.status.in_(("pending", "acknowledged")))
+    if current_keys:
+        statement = statement.where(AlertEventRow.dedup_key.notin_(current_keys))
+    # 行锁让并发扫描串行处理同一批旧提醒，避免同一条恢复记录写两次活动。
+    rows = list(session.scalars(statement.order_by(AlertEventRow.id).with_for_update()))
     expired = 0
     for row in rows:
         if row.dedup_key in current_keys:
@@ -318,23 +325,25 @@ def _expire_stale(
     return expired
 
 
-def _row(candidate: AlertCandidate) -> AlertEventRow:
-    return AlertEventRow(
-        id="al_" + uuid4().hex[:24],
-        type=candidate.type,
-        severity=candidate.severity,
-        instrument_id=candidate.instrument_id,
-        rule_id=candidate.rule_id,
-        rule_version=candidate.rule_version,
-        title=candidate.title,
-        detail=candidate.detail,
-        payload_json=json.dumps(candidate.payload, ensure_ascii=False, sort_keys=True, default=str),
-        status="pending",
-        dedup_key=candidate.dedup_key,
-        triggered_at=candidate.triggered_at,
-        expires_at=candidate.expires_at,
-        updated_at=candidate.triggered_at,
-    )
+def _row_values(candidate: AlertCandidate) -> dict[str, object]:
+    return {
+        "id": "al_" + uuid4().hex[:24],
+        "type": candidate.type,
+        "severity": candidate.severity,
+        "instrument_id": candidate.instrument_id,
+        "rule_id": candidate.rule_id,
+        "rule_version": candidate.rule_version,
+        "title": candidate.title,
+        "detail": candidate.detail,
+        "payload_json": json.dumps(
+            candidate.payload, ensure_ascii=False, sort_keys=True, default=str
+        ),
+        "status": "pending",
+        "dedup_key": candidate.dedup_key,
+        "triggered_at": candidate.triggered_at,
+        "expires_at": candidate.expires_at,
+        "updated_at": candidate.triggered_at,
+    }
 
 
 def _record(row: AlertEventRow) -> AlertRecord:

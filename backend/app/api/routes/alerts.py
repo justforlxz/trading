@@ -7,9 +7,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import AwareDatetime
 
 from app.activity import list_activity
 from app.alerts import AlertRecord, list_alerts, scan_alerts, update_alert_status
@@ -64,8 +63,8 @@ def patch_alert(alert_id: str, payload: AlertStatusUpdateRequest) -> AlertItem:
 def get_activity(
     event_type: str | None = Query(None),
     object_type: str | None = Query(None),
-    start: datetime | None = Query(None, alias="from"),
-    end: datetime | None = Query(None, alias="to"),
+    start: AwareDatetime | None = Query(None, alias="from"),
+    end: AwareDatetime | None = Query(None, alias="to"),
     limit: int = Query(50, ge=1, le=200),
     cursor: str | None = Query(None),
 ) -> ActivityListResponse:

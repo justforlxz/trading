@@ -252,4 +252,12 @@ def test_backtest_start_and_failure_append_activity(client: TestClient) -> None:
 
     failures = client.get("/api/activity", params={"event_type": "backtest.failed"}).json()["items"]
     assert [item["object_id"] for item in failures] == ["sv_missing"]
-    assert "sv_missing" in failures[0]["payload"]["error"]
+    assert failures[0]["payload"]["error_code"] == "HTTPException"
+    assert "error" not in failures[0]["payload"]
+
+
+def test_naive_research_note_time_range_is_rejected(client: TestClient) -> None:
+    """不带时区的 `from`/`to` 在请求校验阶段返回 422，而不是 500。"""
+
+    assert client.get("/api/research-notes", params={"from": "2026-11-01"}).status_code == 422
+    assert client.get("/api/research-notes", params={"to": "2026-11-10"}).status_code == 422

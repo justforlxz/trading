@@ -36,7 +36,7 @@ const DOMAINS = [
   "strategy",
   "backtest",
   "settings",
-  "overview",
+  "dashboard",
   "correlation",
   "opportunity",
   "approval",

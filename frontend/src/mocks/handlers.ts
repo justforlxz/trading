@@ -16,6 +16,7 @@ import getBacktestsRanking from "./fixtures/backtest/get-backtests-ranking.json"
 import getBacktestsRunId from "./fixtures/backtest/get-backtests-run_id.json";
 import getCorrelationMatrix from "./fixtures/correlation/get-correlation-matrix.json";
 import getCorrelationSeries from "./fixtures/correlation/get-correlation-series.json";
+import getDashboardSummary from "./fixtures/dashboard/get-dashboard-summary.json";
 import getHealth from "./fixtures/health/get-health.json";
 import getIndicators from "./fixtures/indicators/get-indicators.json";
 import getIndicatorsSeries from "./fixtures/indicators/get-indicators-series.json";
@@ -33,7 +34,6 @@ import getMarketOverview from "./fixtures/market/get-market-overview.json";
 import getOpportunities from "./fixtures/opportunity/get-opportunities.json";
 import getOpportunitiesOpportunityId from "./fixtures/opportunity/get-opportunities-opportunity_id.json";
 import patchOpportunitiesOpportunityId from "./fixtures/opportunity/patch-opportunities-opportunity_id.json";
-import getOverview from "./fixtures/overview/get-overview.json";
 import getPositionsExchange from "./fixtures/positions/get-positions-exchange.json";
 import putPositionsPositionRefRiskConfig from "./fixtures/risk/put-positions-position_ref-risk-config.json";
 import getRiskEvents from "./fixtures/risk/get-risk-events.json";
@@ -70,6 +70,7 @@ export const handlers = [
   http.delete("*/api/backtests/:run_id", () => new HttpResponse(null, { status: 204 })),
   http.get("*/api/correlation/matrix", () => HttpResponse.json(getCorrelationMatrix)),
   http.get("*/api/correlation/series", () => HttpResponse.json(getCorrelationSeries)),
+  http.get("*/api/dashboard/summary", () => HttpResponse.json(getDashboardSummary)),
   http.get("*/api/health", () => HttpResponse.json(getHealth)),
   http.get("*/api/indicators", () => HttpResponse.json(getIndicators)),
   http.get("*/api/indicators/series", () => HttpResponse.json(getIndicatorsSeries)),
@@ -88,7 +89,6 @@ export const handlers = [
   http.get("*/api/opportunities", () => HttpResponse.json(getOpportunities)),
   http.get("*/api/opportunities/:opportunity_id", () => HttpResponse.json(getOpportunitiesOpportunityId)),
   http.patch("*/api/opportunities/:opportunity_id", () => HttpResponse.json(patchOpportunitiesOpportunityId)),
-  http.get("*/api/overview", () => HttpResponse.json(getOverview)),
   http.get("*/api/positions/exchange", () => HttpResponse.json(getPositionsExchange)),
   http.put("*/api/positions/:position_ref/risk-config", () => HttpResponse.json(putPositionsPositionRefRiskConfig)),
   http.get("*/api/risk/events", () => HttpResponse.json(getRiskEvents)),

@@ -201,6 +201,43 @@ def list_risk_events(
     return records, total
 
 
+def list_unresolved_risk_events(*, limit: int = 50) -> tuple[RiskEventRecord, ...]:
+    """按时间倒序列出尚未处置的风险事件。
+
+    首页只展示待处理的提醒；已处置事件不能把较早的未处置事件挤出首页窗口，
+    因此过滤条件落在 SQL 上，而不是先取一页再在内存里筛选。
+    """
+
+    if not 1 <= limit <= MAX_LIMIT:
+        raise ValidationError(f"limit 必须在 1..{MAX_LIMIT} 之间, 实际 {limit}")
+
+    with session_scope() as session:
+        rows = list(
+            session.scalars(
+                select(RiskEventRow)
+                .where(RiskEventRow.resolved_at.is_(None))
+                .order_by(RiskEventRow.created_at.desc(), RiskEventRow.event_id.desc())
+                .limit(limit)
+            )
+        )
+    return tuple(
+        RiskEventRecord(
+            event_id=row.event_id,
+            instance_id=row.instance_id,
+            inst_id=row.inst_id,
+            rule=row.rule,
+            detail=row.detail,
+            created_at=row.created_at,
+            resolved_at=row.resolved_at,
+            severity=row.severity,
+            action=row.action,
+            target_product_key=row.target_product_key,
+            overridden_approval_id=row.overridden_approval_id,
+        )
+        for row in rows
+    )
+
+
 def resolve_risk_event(event_id: str, *, at: datetime | None = None) -> RiskEventRecord | None:
     """把一条风险事件标记为已处置；不存在返回 `None`，重复标记保持第一次的时间。"""
 

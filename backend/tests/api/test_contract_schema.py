@@ -49,7 +49,7 @@ DOMAIN_PREFIXES = (
     "/api/backtests",
     "/api/trades",
     "/api/settings",
-    "/api/overview",
+    "/api/dashboard",
     "/api/correlation",
     "/api/market",
     "/api/opportunities",

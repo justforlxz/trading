@@ -255,6 +255,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dashboard/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Dashboard Summary
+         * @description 首页一次请求返回八个模块；单个模块失败只把它自己标成不可用。
+         */
+        get: operations["get_dashboard_summary_api_dashboard_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/execution": {
         parameters: {
             query?: never;
@@ -577,26 +597,6 @@ export interface paths {
         head?: never;
         /** Update Opportunity Status */
         patch: operations["update_opportunity_status_api_opportunities__opportunity_id__patch"];
-        trace?: never;
-    };
-    "/api/overview": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Overview
-         * @description 市场驾驶舱聚合；同一 `as_of` 与同一份库状态返回相同 JSON。
-         */
-        get: operations["get_overview_api_overview_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
         trace?: never;
     };
     "/api/positions/exchange": {
@@ -2119,6 +2119,584 @@ export interface components {
             /** Taker Fee Bps */
             taker_fee_bps: string;
         };
+        /**
+         * DashboardAccountData
+         * @description 账户卡内容；派生字段由 `app.positions` 给出，聚合层不重算。
+         */
+        DashboardAccountData: {
+            /** Account Id */
+            account_id: string;
+            /** Available Equity */
+            available_equity?: string | null;
+            /** Available Margin */
+            available_margin?: string | null;
+            /** Captured At */
+            captured_at?: string | null;
+            /** Cash Balance */
+            cash_balance?: string | null;
+            /** Currency */
+            currency: string;
+            /** Day Pnl */
+            day_pnl?: string | null;
+            /**
+             * Day Pnl Basis
+             * @default equity_only
+             * @constant
+             */
+            day_pnl_basis: "equity_only";
+            /** Equity */
+            equity?: string | null;
+            /** Margin Usage Pct */
+            margin_usage_pct?: string | null;
+            /** Source */
+            source?: string | null;
+            /** Unrealized Pnl */
+            unrealized_pnl?: string | null;
+            /** Used Margin */
+            used_margin?: string | null;
+        };
+        /** DashboardAccountModule */
+        DashboardAccountModule: {
+            /** As Of */
+            as_of?: string | null;
+            data?: components["schemas"]["DashboardAccountData"] | null;
+            /** Error */
+            error?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "stale" | "unavailable" | "unconfigured";
+        };
+        /** DashboardActivityItem */
+        DashboardActivityItem: {
+            /** Created At */
+            created_at: string;
+            /** Event Type */
+            event_type: string;
+            /** Id */
+            id: string;
+            /** Object Id */
+            object_id: string;
+            /** Object Type */
+            object_type: string;
+            /** Summary */
+            summary: string;
+        };
+        /** DashboardActivityModule */
+        DashboardActivityModule: {
+            /** As Of */
+            as_of?: string | null;
+            /** Data */
+            data?: components["schemas"]["DashboardActivityItem"][] | null;
+            /** Error */
+            error?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "stale" | "unavailable" | "unconfigured";
+        };
+        /**
+         * DashboardAlertItem
+         * @description 待处理提醒；当前来源是 B3 的未处置风险事件，B8 合并后换成提醒事件表。
+         */
+        DashboardAlertItem: {
+            /** Detail */
+            detail: string;
+            /** Id */
+            id: string;
+            /** Instrument Id */
+            instrument_id?: string | null;
+            /** Rule Id */
+            rule_id: string;
+            /** Severity */
+            severity?: string | null;
+            /**
+             * Status
+             * @constant
+             */
+            status: "pending";
+            /** Title */
+            title: string;
+            /** Triggered At */
+            triggered_at: string;
+            /**
+             * Type
+             * @constant
+             */
+            type: "risk";
+        };
+        /** DashboardAlertsModule */
+        DashboardAlertsModule: {
+            /** As Of */
+            as_of?: string | null;
+            /** Data */
+            data?: components["schemas"]["DashboardAlertItem"][] | null;
+            /** Error */
+            error?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "stale" | "unavailable" | "unconfigured";
+        };
+        /** DashboardDegradedItem */
+        DashboardDegradedItem: {
+            /** Last Success At */
+            last_success_at?: string | null;
+            /** Module */
+            module: string;
+            /** Reason */
+            reason: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "stale" | "unavailable" | "unconfigured";
+        };
+        /** DashboardMarketData */
+        DashboardMarketData: {
+            /** Items */
+            items: components["schemas"]["DashboardMarketItem"][];
+            /**
+             * Session
+             * @enum {string}
+             */
+            session: "pre" | "regular" | "post" | "closed";
+        };
+        /**
+         * DashboardMarketItem
+         * @description 一个标的类别在首页上的市场状态、广度与共振。
+         */
+        DashboardMarketItem: {
+            /** As Of */
+            as_of: string;
+            /**
+             * Bar
+             * @enum {string}
+             */
+            bar: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+            breadth: components["schemas"]["MarketBreadth"];
+            /**
+             * Inst Type
+             * @enum {string}
+             */
+            inst_type: "SPOT" | "SWAP";
+            /**
+             * Primary Source
+             * @enum {string}
+             */
+            primary_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+            resonance: components["schemas"]["MarketResonance"];
+            /**
+             * Session
+             * @enum {string}
+             */
+            session: "pre" | "regular" | "post" | "closed";
+        };
+        /** DashboardMarketModule */
+        DashboardMarketModule: {
+            /** As Of */
+            as_of?: string | null;
+            data?: components["schemas"]["DashboardMarketData"] | null;
+            /** Error */
+            error?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "stale" | "unavailable" | "unconfigured";
+        };
+        /**
+         * DashboardPositionItem
+         * @description 首页持仓行：只保留展示需要的字段，完整明细走各自的域接口。
+         */
+        DashboardPositionItem: {
+            /** Display Symbol */
+            display_symbol: string;
+            /** Inst Id */
+            inst_id: string;
+            /** Leverage */
+            leverage?: string | null;
+            /** Mark Price */
+            mark_price?: string | null;
+            /** Notional */
+            notional?: string | null;
+            /** Position Ref */
+            position_ref: string;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "long" | "short";
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "exchange" | "manual";
+            /** Stop Distance Pct */
+            stop_distance_pct?: string | null;
+            /** Unrealized Pnl */
+            unrealized_pnl?: string | null;
+        };
+        /** DashboardPositionsData */
+        DashboardPositionsData: {
+            /** Exchange Count */
+            exchange_count: number;
+            /**
+             * Exchange Status
+             * @enum {string}
+             */
+            exchange_status: "ok" | "stale" | "unconfigured";
+            /** Items */
+            items: components["schemas"]["DashboardPositionItem"][];
+            /** Manual Count */
+            manual_count: number;
+            /** Total */
+            total: number;
+        };
+        /** DashboardPositionsModule */
+        DashboardPositionsModule: {
+            /** As Of */
+            as_of?: string | null;
+            data?: components["schemas"]["DashboardPositionsData"] | null;
+            /** Error */
+            error?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "stale" | "unavailable" | "unconfigured";
+        };
+        /**
+         * DashboardRecentBacktest
+         * @description 最近 30 天内创建的一次回测；一次回测只代表一个标的，不跨标的求和。
+         */
+        DashboardRecentBacktest: {
+            /** As Of */
+            as_of: string;
+            /**
+             * Data Source
+             * @enum {string}
+             */
+            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+            /** Max Drawdown */
+            max_drawdown: string;
+            /** Run Id */
+            run_id: string;
+            /** Total Return */
+            total_return: string;
+            /** Trade Count */
+            trade_count: number;
+            /** Window Days */
+            window_days: number;
+        };
+        /**
+         * DashboardRiskData
+         * @description 风险卡：组合级数值与规则命中数量，不重复展开每条持仓的规则明细。
+         */
+        DashboardRiskData: {
+            /** Currency */
+            currency: string;
+            /** Gross Notional */
+            gross_notional: string;
+            /** High Leverage Count */
+            high_leverage_count: number;
+            /** Long Notional */
+            long_notional: string;
+            /** Margin Usage Basis */
+            margin_usage_basis?: ("margin_ratio" | "used_margin") | null;
+            /** Margin Usage Pct */
+            margin_usage_pct?: string | null;
+            /** Max Single Instrument Weight Pct */
+            max_single_instrument_weight_pct?: string | null;
+            /** Missing Stop Count */
+            missing_stop_count: number;
+            /** Near Stop Count */
+            near_stop_count: number;
+            /** Net Notional */
+            net_notional: string;
+            /** Position Count */
+            position_count: number;
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "low" | "medium" | "high";
+            /** Short Notional */
+            short_notional: string;
+        };
+        /** DashboardRiskModule */
+        DashboardRiskModule: {
+            /** As Of */
+            as_of?: string | null;
+            data?: components["schemas"]["DashboardRiskData"] | null;
+            /** Error */
+            error?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "stale" | "unavailable" | "unconfigured";
+        };
+        /** DashboardStrategiesData */
+        DashboardStrategiesData: {
+            /** Enabled */
+            enabled: number;
+            /** Pending Signals */
+            pending_signals?: number | null;
+            recent_backtest?: components["schemas"]["DashboardRecentBacktest"] | null;
+            /** Running */
+            running: number;
+            /** Total */
+            total: number;
+        };
+        /** DashboardStrategiesModule */
+        DashboardStrategiesModule: {
+            /** As Of */
+            as_of?: string | null;
+            data?: components["schemas"]["DashboardStrategiesData"] | null;
+            /** Error */
+            error?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "stale" | "unavailable" | "unconfigured";
+        };
+        /**
+         * DashboardSummaryResponse
+         * @description 首页一次请求返回八个模块；任一模块失败只影响它自己。
+         * @example {
+         *       "account": {
+         *         "as_of": "2026-11-13T09:00:00Z",
+         *         "data": {
+         *           "account_id": "okx-main",
+         *           "available_equity": "682.30",
+         *           "available_margin": "682.30",
+         *           "captured_at": "2026-11-13T09:00:00Z",
+         *           "cash_balance": "0",
+         *           "currency": "USDT",
+         *           "day_pnl_basis": "equity_only",
+         *           "equity": "1248.60",
+         *           "margin_usage_pct": "45.36",
+         *           "source": "okx_rest",
+         *           "unrealized_pnl": "31.84",
+         *           "used_margin": "566.30"
+         *         },
+         *         "status": "ok"
+         *       },
+         *       "activity": {
+         *         "as_of": "2026-11-13T09:00:00Z",
+         *         "data": [],
+         *         "status": "ok"
+         *       },
+         *       "alerts": {
+         *         "data": [],
+         *         "status": "ok"
+         *       },
+         *       "as_of": "2026-11-13T09:00:00Z",
+         *       "degraded": [],
+         *       "market": {
+         *         "as_of": "2026-11-13T09:00:00Z",
+         *         "data": {
+         *           "items": [
+         *             {
+         *               "as_of": "2026-11-13T09:00:00Z",
+         *               "bar": "1d",
+         *               "breadth": {
+         *                 "advancers": 8,
+         *                 "decliners": 2,
+         *                 "participants": 11,
+         *                 "ratio": "4",
+         *                 "unchanged": 1
+         *               },
+         *               "inst_type": "SPOT",
+         *               "primary_source": "okx_spot",
+         *               "resonance": {
+         *                 "participants": 11,
+         *                 "strength": "0.62",
+         *                 "window": 20
+         *               },
+         *               "session": "regular"
+         *             },
+         *             {
+         *               "as_of": "2026-11-13T09:00:00Z",
+         *               "bar": "1d",
+         *               "breadth": {
+         *                 "advancers": 5,
+         *                 "decliners": 5,
+         *                 "participants": 10,
+         *                 "ratio": "1",
+         *                 "unchanged": 0
+         *               },
+         *               "inst_type": "SWAP",
+         *               "primary_source": "us_equity_proxy",
+         *               "resonance": {
+         *                 "participants": 10,
+         *                 "strength": "0",
+         *                 "window": 20
+         *               },
+         *               "session": "pre"
+         *             }
+         *           ],
+         *           "session": "pre"
+         *         },
+         *         "status": "ok"
+         *       },
+         *       "positions": {
+         *         "as_of": "2026-11-13T09:00:00Z",
+         *         "data": {
+         *           "exchange_count": 1,
+         *           "exchange_status": "ok",
+         *           "items": [
+         *             {
+         *               "display_symbol": "AAPL-USDT",
+         *               "inst_id": "AAPL-USDT-SWAP",
+         *               "leverage": "3",
+         *               "mark_price": "231.42",
+         *               "notional": "1851.36",
+         *               "position_ref": "exchange:okx-main:123456",
+         *               "side": "long",
+         *               "source": "exchange",
+         *               "unrealized_pnl": "36.96"
+         *             }
+         *           ],
+         *           "manual_count": 0,
+         *           "total": 1
+         *         },
+         *         "status": "ok"
+         *       },
+         *       "risk": {
+         *         "as_of": "2026-11-13T09:00:00Z",
+         *         "data": {
+         *           "currency": "USDT",
+         *           "gross_notional": "1851.36",
+         *           "high_leverage_count": 0,
+         *           "long_notional": "1851.36",
+         *           "margin_usage_basis": "margin_ratio",
+         *           "margin_usage_pct": "45.36",
+         *           "max_single_instrument_weight_pct": "100",
+         *           "missing_stop_count": 1,
+         *           "near_stop_count": 0,
+         *           "net_notional": "1851.36",
+         *           "position_count": 1,
+         *           "risk_level": "medium",
+         *           "short_notional": "0"
+         *         },
+         *         "status": "ok"
+         *       },
+         *       "strategies": {
+         *         "as_of": "2026-11-13T09:00:00Z",
+         *         "data": {
+         *           "enabled": 1,
+         *           "recent_backtest": {
+         *             "as_of": "2026-11-12T10:00:00Z",
+         *             "data_source": "okx_swap",
+         *             "max_drawdown": "0.061",
+         *             "run_id": "bt_0001",
+         *             "total_return": "0.124",
+         *             "trade_count": 18,
+         *             "window_days": 30
+         *           },
+         *           "running": 0,
+         *           "total": 2
+         *         },
+         *         "status": "ok"
+         *       },
+         *       "watchlist": {
+         *         "as_of": "2026-11-12T16:00:00Z",
+         *         "data": {
+         *           "items": [
+         *             {
+         *               "change_pct_24h": "1.86",
+         *               "data_status": "ok",
+         *               "display_symbol": "AAPL",
+         *               "inst_id": "XAAPL-USDT",
+         *               "last_price": "231.42",
+         *               "name": "Apple",
+         *               "rsi_14": "61.4",
+         *               "trend": "bullish"
+         *             }
+         *           ],
+         *           "summary": {
+         *             "bearish": 0,
+         *             "bullish": 1,
+         *             "coverage_pct": "100",
+         *             "total": 1
+         *           }
+         *         },
+         *         "status": "ok"
+         *       }
+         *     }
+         */
+        DashboardSummaryResponse: {
+            account: components["schemas"]["DashboardAccountModule"];
+            activity: components["schemas"]["DashboardActivityModule"];
+            alerts: components["schemas"]["DashboardAlertsModule"];
+            /** As Of */
+            as_of: string;
+            /** Degraded */
+            degraded: components["schemas"]["DashboardDegradedItem"][];
+            market: components["schemas"]["DashboardMarketModule"];
+            positions: components["schemas"]["DashboardPositionsModule"];
+            risk: components["schemas"]["DashboardRiskModule"];
+            strategies: components["schemas"]["DashboardStrategiesModule"];
+            watchlist: components["schemas"]["DashboardWatchlistModule"];
+        };
+        /** DashboardWatchlistData */
+        DashboardWatchlistData: {
+            /** Items */
+            items: components["schemas"]["DashboardWatchlistItem"][];
+            summary: components["schemas"]["DashboardWatchlistSummary"];
+        };
+        /** DashboardWatchlistItem */
+        DashboardWatchlistItem: {
+            /** Change Pct 24H */
+            change_pct_24h?: string | null;
+            /**
+             * Data Status
+             * @enum {string}
+             */
+            data_status: "ok" | "partial" | "missing";
+            /** Display Symbol */
+            display_symbol: string;
+            /** Inst Id */
+            inst_id: string;
+            /** Last Price */
+            last_price?: string | null;
+            /** Name */
+            name: string;
+            /** Rsi 14 */
+            rsi_14?: string | null;
+            /** Trend */
+            trend?: ("bullish" | "bearish" | "neutral") | null;
+        };
+        /** DashboardWatchlistModule */
+        DashboardWatchlistModule: {
+            /** As Of */
+            as_of?: string | null;
+            data?: components["schemas"]["DashboardWatchlistData"] | null;
+            /** Error */
+            error?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "stale" | "unavailable" | "unconfigured";
+        };
+        /** DashboardWatchlistSummary */
+        DashboardWatchlistSummary: {
+            /** Bearish */
+            bearish: number;
+            /** Bullish */
+            bullish: number;
+            /** Coverage Pct */
+            coverage_pct: string;
+            /** Total */
+            total: number;
+        };
         /** DataSettings */
         DataSettings: {
             /** Proxy Configured */
@@ -3230,30 +3808,6 @@ export interface components {
             /** Window */
             window: number;
         };
-        /**
-         * MarketState
-         * @description 一个类别在 `as_of` 时刻的资产时段与参考行情来源。
-         *
-         *     类别只是展示分组：`SPOT` / `SWAP` 内部可能同时含有多种资产，类别层级没有
-         *     唯一的 `asset_type`，因此这里与 T1.7 一致地使用类别规则作为兜底取值。
-         */
-        MarketState: {
-            /**
-             * Inst Type
-             * @enum {string}
-             */
-            inst_type: "SPOT" | "SWAP";
-            /**
-             * Primary Source
-             * @enum {string}
-             */
-            primary_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
-            /**
-             * Session
-             * @enum {string}
-             */
-            session: "pre" | "regular" | "post" | "closed";
-        };
         /** MomentumIndicators */
         MomentumIndicators: {
             /** Macd */
@@ -3530,116 +4084,6 @@ export interface components {
             total: number;
         };
         /**
-         * OverviewResponse
-         * @description 首页市场驾驶舱：市场状态、共振、组合、机会流与风险告警。
-         * @example {
-         *       "as_of": "2026-11-10T08:00:00Z",
-         *       "market": [
-         *         {
-         *           "as_of": "2026-11-10T08:00:00Z",
-         *           "bar": "1d",
-         *           "breadth": {
-         *             "advancers": 8,
-         *             "decliners": 2,
-         *             "participants": 11,
-         *             "ratio": "4",
-         *             "unchanged": 1
-         *           },
-         *           "inst_type": "SPOT",
-         *           "resonance": {
-         *             "participants": 11,
-         *             "strength": "0.62",
-         *             "window": 20
-         *           }
-         *         },
-         *         {
-         *           "as_of": "2026-11-10T08:00:00Z",
-         *           "bar": "1d",
-         *           "breadth": {
-         *             "advancers": 5,
-         *             "decliners": 5,
-         *             "participants": 10,
-         *             "ratio": "1",
-         *             "unchanged": 0
-         *           },
-         *           "inst_type": "SWAP",
-         *           "resonance": {
-         *             "participants": 10,
-         *             "strength": "0",
-         *             "window": 20
-         *           }
-         *         }
-         *       ],
-         *       "market_states": [
-         *         {
-         *           "inst_type": "SPOT",
-         *           "primary_source": "okx_spot",
-         *           "session": "regular"
-         *         },
-         *         {
-         *           "inst_type": "SWAP",
-         *           "primary_source": "us_equity_proxy",
-         *           "session": "post"
-         *         }
-         *       ],
-         *       "portfolio": {
-         *         "gross_exposure": "3510.40",
-         *         "net_exposure": "1997.15",
-         *         "open_positions": 3,
-         *         "strategies": [
-         *           {
-         *             "instance_id": "si_0001",
-         *             "name": "AAPL 均线趋势",
-         *             "open_positions": 1
-         *           }
-         *         ]
-         *       },
-         *       "recent_opportunities": [
-         *         {
-         *           "anchor_product_key": "AAPL",
-         *           "as_of": "2026-11-10T00:00:00Z",
-         *           "evidence": "{\"correlation\":0.87,\"breadth\":0.8,\"resonance\":0.62}",
-         *           "legs": [
-         *             {
-         *               "direction": "long",
-         *               "inst_id": "MSFT-USDT-SWAP",
-         *               "inst_type": "SWAP",
-         *               "product_key": "MSFT",
-         *               "score": "0.82"
-         *             }
-         *           ],
-         *           "mode": "target",
-         *           "opportunity_id": "opp_0001",
-         *           "score": "0.78",
-         *           "status": "new"
-         *         }
-         *       ],
-         *       "risk_events": [
-         *         {
-         *           "created_at": "2026-11-10T07:00:00Z",
-         *           "detail": "杠杆 25 超过上限 20",
-         *           "event_id": "re_0001",
-         *           "inst_id": "AAPL-USDT-SWAP",
-         *           "instance_id": "si_0001",
-         *           "rule": "max_leverage"
-         *         }
-         *       ]
-         *     }
-         */
-        OverviewResponse: {
-            /** As Of */
-            as_of: string;
-            /** Market */
-            market: components["schemas"]["MarketOverviewResponse"][];
-            /** Market States */
-            market_states: components["schemas"]["MarketState"][];
-            portfolio: components["schemas"]["PortfolioSummary"];
-            /** Recent Opportunities */
-            recent_opportunities: components["schemas"]["Opportunity"][];
-            /** Risk Events */
-            risk_events: components["schemas"]["RiskEvent"][];
-        };
-        /**
          * ParamSpec
          * @description 指标或策略的可配置参数定义。
          */
@@ -3659,32 +4103,6 @@ export interface components {
             name: string;
             /** Title */
             title: string;
-        };
-        /**
-         * PortfolioStrategyBrief
-         * @description 单个策略实例的当前持仓数。
-         */
-        PortfolioStrategyBrief: {
-            /** Instance Id */
-            instance_id: string;
-            /** Name */
-            name: string;
-            /** Open Positions */
-            open_positions: number;
-        };
-        /**
-         * PortfolioSummary
-         * @description 全局组合概览；各策略明细来自 T7.1 的策略组合列表。
-         */
-        PortfolioSummary: {
-            /** Gross Exposure */
-            gross_exposure: string;
-            /** Net Exposure */
-            net_exposure: string;
-            /** Open Positions */
-            open_positions: number;
-            /** Strategies */
-            strategies: components["schemas"]["PortfolioStrategyBrief"][];
         };
         /** Position */
         Position: {
@@ -5417,6 +5835,26 @@ export interface operations {
             };
         };
     };
+    get_dashboard_summary_api_dashboard_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardSummaryResponse"];
+                };
+            };
+        };
+    };
     get_execution_state_api_execution_get: {
         parameters: {
             query?: never;
@@ -6012,37 +6450,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Opportunity"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_overview_api_overview_get: {
-        parameters: {
-            query?: {
-                as_of?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OverviewResponse"];
                 };
             };
             /** @description Validation Error */

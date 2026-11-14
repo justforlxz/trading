@@ -9,6 +9,7 @@ from app.watchlist.service import (
     AlertSnapshot,
     RelatedCandidate,
     WatchlistEntry,
+    WatchlistSummary,
     add_item,
     clear_alert,
     group_of,
@@ -18,6 +19,7 @@ from app.watchlist.service import (
     related_instruments,
     remove_item,
     set_alert,
+    summarize_entries,
     tracked_instruments,
 )
 
@@ -26,6 +28,7 @@ __all__ = [
     "RelatedCandidate",
     "WatchlistEntry",
     "WatchlistItemRow",
+    "WatchlistSummary",
     "add_item",
     "clear_alert",
     "group_of",
@@ -35,5 +38,6 @@ __all__ = [
     "related_instruments",
     "remove_item",
     "set_alert",
+    "summarize_entries",
     "tracked_instruments",
 ]

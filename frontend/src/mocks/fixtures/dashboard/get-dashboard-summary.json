@@ -1,0 +1,162 @@
+{
+  "account": {
+    "as_of": "2026-11-13T09:00:00Z",
+    "data": {
+      "account_id": "okx-main",
+      "available_equity": "682.30",
+      "available_margin": "682.30",
+      "captured_at": "2026-11-13T09:00:00Z",
+      "cash_balance": "0",
+      "currency": "USDT",
+      "day_pnl_basis": "equity_only",
+      "equity": "1248.60",
+      "margin_usage_pct": "45.36",
+      "source": "okx_rest",
+      "unrealized_pnl": "31.84",
+      "used_margin": "566.30"
+    },
+    "status": "ok"
+  },
+  "activity": {
+    "as_of": "2026-11-13T09:00:00Z",
+    "data": [],
+    "status": "ok"
+  },
+  "alerts": {
+    "data": [],
+    "status": "ok"
+  },
+  "as_of": "2026-11-13T09:00:00Z",
+  "degraded": [],
+  "market": {
+    "as_of": "2026-11-13T09:00:00Z",
+    "data": {
+      "items": [
+        {
+          "as_of": "2026-11-13T09:00:00Z",
+          "bar": "1d",
+          "breadth": {
+            "advancers": 8,
+            "decliners": 2,
+            "participants": 11,
+            "ratio": "4",
+            "unchanged": 1
+          },
+          "inst_type": "SPOT",
+          "primary_source": "okx_spot",
+          "resonance": {
+            "participants": 11,
+            "strength": "0.62",
+            "window": 20
+          },
+          "session": "regular"
+        },
+        {
+          "as_of": "2026-11-13T09:00:00Z",
+          "bar": "1d",
+          "breadth": {
+            "advancers": 5,
+            "decliners": 5,
+            "participants": 10,
+            "ratio": "1",
+            "unchanged": 0
+          },
+          "inst_type": "SWAP",
+          "primary_source": "us_equity_proxy",
+          "resonance": {
+            "participants": 10,
+            "strength": "0",
+            "window": 20
+          },
+          "session": "pre"
+        }
+      ],
+      "session": "pre"
+    },
+    "status": "ok"
+  },
+  "positions": {
+    "as_of": "2026-11-13T09:00:00Z",
+    "data": {
+      "exchange_count": 1,
+      "exchange_status": "ok",
+      "items": [
+        {
+          "display_symbol": "AAPL-USDT",
+          "inst_id": "AAPL-USDT-SWAP",
+          "leverage": "3",
+          "mark_price": "231.42",
+          "notional": "1851.36",
+          "position_ref": "exchange:okx-main:123456",
+          "side": "long",
+          "source": "exchange",
+          "unrealized_pnl": "36.96"
+        }
+      ],
+      "manual_count": 0,
+      "total": 1
+    },
+    "status": "ok"
+  },
+  "risk": {
+    "as_of": "2026-11-13T09:00:00Z",
+    "data": {
+      "currency": "USDT",
+      "gross_notional": "1851.36",
+      "high_leverage_count": 0,
+      "long_notional": "1851.36",
+      "margin_usage_basis": "margin_ratio",
+      "margin_usage_pct": "45.36",
+      "max_single_instrument_weight_pct": "100",
+      "missing_stop_count": 1,
+      "near_stop_count": 0,
+      "net_notional": "1851.36",
+      "position_count": 1,
+      "risk_level": "medium",
+      "short_notional": "0"
+    },
+    "status": "ok"
+  },
+  "strategies": {
+    "as_of": "2026-11-13T09:00:00Z",
+    "data": {
+      "enabled": 1,
+      "recent_backtest": {
+        "as_of": "2026-11-12T10:00:00Z",
+        "data_source": "okx_swap",
+        "max_drawdown": "0.061",
+        "run_id": "bt_0001",
+        "total_return": "0.124",
+        "trade_count": 18,
+        "window_days": 30
+      },
+      "running": 0,
+      "total": 2
+    },
+    "status": "ok"
+  },
+  "watchlist": {
+    "as_of": "2026-11-12T16:00:00Z",
+    "data": {
+      "items": [
+        {
+          "change_pct_24h": "1.86",
+          "data_status": "ok",
+          "display_symbol": "AAPL",
+          "inst_id": "XAAPL-USDT",
+          "last_price": "231.42",
+          "name": "Apple",
+          "rsi_14": "61.4",
+          "trend": "bullish"
+        }
+      ],
+      "summary": {
+        "bearish": 0,
+        "bullish": 1,
+        "coverage_pct": "100",
+        "total": 1
+      }
+    },
+    "status": "ok"
+  }
+}

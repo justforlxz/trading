@@ -24,7 +24,7 @@ const DOMAIN_PROBES = [
   ["strategy", "/api/strategy-instances"],
   ["backtest", "/api/backtests?data_source=okx"],
   ["settings", "/api/settings"],
-  ["overview", "/api/overview"],
+  ["dashboard", "/api/dashboard/summary"],
   ["correlation", "/api/correlation/matrix?bar=1d&window=60&product_keys=AAPL"],
   ["opportunity", "/api/opportunities"],
   ["approval", "/api/approvals"],

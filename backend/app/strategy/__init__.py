@@ -65,6 +65,7 @@ from app.strategy.service import (
     InstanceRecord,
     ReplayOutcome,
     ReplayRecord,
+    StrategySummary,
     TemplateDefinition,
     create_instance,
     delete_instance,
@@ -75,6 +76,7 @@ from app.strategy.service import (
     prepare_replay,
     project_templates,
     save_replay,
+    summarize_instances,
     update_instance,
 )
 from app.strategy.target import (
@@ -119,6 +121,7 @@ __all__ = [
     "StrategyInstanceRow",
     "StrategyMeta",
     "StrategyReplayRow",
+    "StrategySummary",
     "StrategyTemplateRow",
     "TargetLeg",
     "TargetPortfolio",
@@ -154,6 +157,7 @@ __all__ = [
     "register_template",
     "resolve_params",
     "save_replay",
+    "summarize_instances",
     "target_quantity",
     "update_instance",
 ]

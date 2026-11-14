@@ -54,6 +54,7 @@ __all__ = [
     "ReplayOutcome",
     "ReplayPoint",
     "ReplayRecord",
+    "StrategySummary",
     "TemplateDefinition",
     "create_instance",
     "delete_instance",
@@ -64,6 +65,7 @@ __all__ = [
     "prepare_replay",
     "project_templates",
     "save_replay",
+    "summarize_instances",
     "update_instance",
 ]
 
@@ -78,6 +80,10 @@ DEFAULT_EXECUTION_MODE = "manual"
 # 不是同一个参数，因此不跟随实例参数（模板协议也没有声明它需要多长的相关性窗口）。
 # 20 与模板默认窗口同量级：样本够多才有稳定的系数，又不会把窗口推到超出常见历史。
 REPLAY_CORRELATION_WINDOW = 20
+
+#: 首页把这两种阶段算作「运行中」：策略已经进入模拟或实盘观察，而不是仍在草稿、
+#: 审核或回测阶段。取值来自 `app.strategy.approval.LIFECYCLE_STAGES`。
+RUNNING_STATUSES: tuple[str, ...] = ("paper_trading", "live_running")
 
 # 一次回放允许的时点数上限。回放的每个时点都要重建一次视图与相关性矩阵（这两步在
 # `app.strategy.view` / `app.market.matrix` 里，各按该时点的全部历史走一遍），因此
@@ -106,6 +112,15 @@ class TemplateDefinition:
     summary: str
     params: tuple[Param, ...]
     bars: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class StrategySummary:
+    """策略实例的数量分布；首页只需要计数，不读每条实例的完整参数。"""
+
+    total: int
+    enabled: int
+    running: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -267,6 +282,33 @@ def list_instances(
         counted = select(func.count()).select_from(StrategyInstanceRow).where(*conditions)
         total = session.scalar(counted)
     return tuple(_instance_record(row) for row in rows), total or 0
+
+
+def summarize_instances() -> StrategySummary:
+    """统计策略总数、启用数与运行中数量；计数在 SQL 里完成。"""
+
+    with session_scope() as session:
+        total = int(session.scalar(select(func.count()).select_from(StrategyInstanceRow)) or 0)
+        enabled = int(
+            session.scalar(
+                select(func.count())
+                .select_from(StrategyInstanceRow)
+                .where(StrategyInstanceRow.enabled.is_(True))
+            )
+            or 0
+        )
+        running = int(
+            session.scalar(
+                select(func.count())
+                .select_from(StrategyInstanceRow)
+                .where(
+                    StrategyInstanceRow.enabled.is_(True),
+                    StrategyInstanceRow.lifecycle_status.in_(RUNNING_STATUSES),
+                )
+            )
+            or 0
+        )
+    return StrategySummary(total=total, enabled=enabled, running=running)
 
 
 def get_instance(instance_id: str) -> InstanceRecord | None:

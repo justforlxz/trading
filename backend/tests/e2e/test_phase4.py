@@ -30,6 +30,7 @@ from app.core import MarketDataPort
 from app.exchange import create_market_data
 from app.instrument import sync_instruments
 from app.market import CRYPTO, sync_candles
+from tests.factories.strategies import make_instance, patch_instance
 from tests.fakes.okx.server import start_server
 from tests.fakes.okx.store import OkxStore
 
@@ -161,18 +162,12 @@ def seeded(client: TestClient, fake_okx_settings: Settings) -> Iterator[SeededMa
     port = create_market_data(settings=fake_okx_settings)
     try:
         bar_count = seed_market(port)
-        created = client.post(
-            "/api/strategy-instances",
-            json={
-                "strategy_id": "relative_value",
-                "name": "BTC/ETH 相对价值",
-                "bar": "1d",
-                "params": PARAMS,
-                "inst_ids": list(INST_IDS),
-            },
+        instance = make_instance(
+            name="BTC/ETH 相对价值",
+            params=PARAMS,
+            inst_ids=INST_IDS,
         )
-        assert created.status_code == 201, created.text
-        yield SeededMarket(created.json()["instance_id"], bar_count)
+        yield SeededMarket(instance.instance_id, bar_count)
     finally:
         port.close()
 
@@ -311,11 +306,7 @@ def test_phase4_parameter_runs_are_comparable(client: TestClient, instance_id: s
     assert baseline.status_code == 202, baseline.text
 
     changed_params = {"reversion_window": 2, "strength_window": 2, "pair_count": 1}
-    patched = client.patch(
-        f"/api/strategy-instances/{instance_id}",
-        json={"params": changed_params},
-    )
-    assert patched.status_code == 200, patched.text
+    assert patch_instance(instance_id, params=changed_params) is not None
 
     changed = client.post("/api/backtests", json=request_body(instance_id))
     assert changed.status_code == 202, changed.text

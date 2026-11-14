@@ -1,262 +1,364 @@
-"""策略契约：策略模板定义（Definition）与可启停的实例（Instance）严格分离。
+"""v6 用户策略契约：策略、不可变版本、标的集合与回测关联。
 
-模板目录来自代码注册表，实例是用户配置；回放（`StrategyReplay`）是「按历史行情把
-模板重算一遍」的执行记录，目标组合直接复用 `TargetPortfolio`，不另立一套形状。
+策略是身份与展示属性，版本才是可复现输入。列表返回当前版本与最近回测摘要；详情
+返回当前版本的规则、参数、标的与版本目录；版本接口新建下一版，旧版本不提供修改
+入口。这里不发布审批、执行或旧实例字段。
 """
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from datetime import date
+from typing import Any, Literal
 
-from app.api.schemas.common import (
-    Bar,
-    DecimalString,
-    ExecutionMode,
-    ParamSpec,
-    ParamValue,
-    SignalAction,
-    StrategyStatus,
-    TargetPortfolio,
-    UtcDatetime,
-)
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from app.api.schemas.common import Bar, DataSource, DecimalString, UtcDatetime
 
 __all__ = [
-    "StrategyCatalogResponse",
-    "StrategyDefinition",
-    "StrategyInstance",
-    "StrategyInstanceCreateRequest",
-    "StrategyInstanceListResponse",
-    "StrategyInstanceUpdateRequest",
-    "StrategyReplay",
-    "StrategyReplayListResponse",
-    "StrategyReplayPoint",
-    "StrategyReplayRequest",
+    "InstrumentStrategy",
+    "InstrumentStrategyListResponse",
+    "StrategyBacktestSummary",
+    "StrategyCreateRequest",
+    "StrategyCreatedResponse",
+    "StrategyDetail",
+    "StrategyDirection",
+    "StrategyInstrumentUpdateRequest",
+    "StrategyListResponse",
+    "StrategyRecordStatus",
+    "StrategySummary",
+    "StrategyUpdateRequest",
+    "StrategyUpdatedResponse",
+    "StrategyVersionCreateRequest",
+    "StrategyVersionDetail",
+    "StrategyVersionListResponse",
+    "StrategyVersionSummary",
 ]
 
+StrategyRecordStatus = Literal["draft", "validated", "enabled", "paused", "archived"]
+StrategyDirection = Literal["long_only", "short_only", "long_short"]
 
-class StrategyDefinition(BaseModel):
-    """策略模板：一个模板可派生多个独立配置的实例。"""
 
-    strategy_id: str
+_EXAMPLE_BACKTEST = {
+    "run_id": "bt_0001",
+    "strategy_version_id": "sv_0001",
+    "data_source": "okx_spot",
+    "total_return_pct": "12.4055",
+    "max_drawdown_pct": "6.12",
+    "trade_count": 37,
+    "backtest_start_date": "2026-10-01",
+    "backtest_end_date": "2026-11-01",
+    "created_at": "2026-11-10T01:20:00Z",
+}
+
+_EXAMPLE_VERSION = {
+    "version_id": "sv_0001",
+    "version": 1,
+    "timeframe": "1d",
+    "direction": "long_only",
+    "change_note": "初始版本",
+    "created_at": "2026-11-08T02:15:00Z",
+}
+
+_EXAMPLE_SUMMARY = {
+    "id": "st_0001",
+    "name": "AAPL 趋势",
+    "category": "directional",
+    "description": "均线趋势跟随",
+    "status": "draft",
+    "current_version_id": "sv_0001",
+    "current_version": 1,
+    "timeframe": "1d",
+    "direction": "long_only",
+    "instrument_count": 1,
+    "latest_backtest": _EXAMPLE_BACKTEST,
+    "created_at": "2026-11-08T02:15:00Z",
+    "updated_at": "2026-11-10T07:00:00Z",
+}
+
+_RULE = {
+    "timeframe": "1d",
+    "direction": "long_only",
+    "entry": {"all": [{"left": "MA(20)", "op": ">", "right": "MA(60)"}]},
+    "exit": {"any": [{"left": "MA(20)", "op": "<", "right": "MA(60)"}]},
+    "position_sizing": {"type": "equal_weight", "weight": 0.3333, "max_positions": 3},
+}
+
+_EXAMPLE_VERSION_DETAIL = {
+    "version_id": "sv_0001",
+    "strategy_id": "st_0001",
+    "version": 1,
+    "timeframe": "1d",
+    "direction": "long_only",
+    "rule_json": _RULE,
+    "parameters": {"fast": 20, "slow": 60},
+    "position_sizing": {"type": "equal_weight", "weight": 0.3333, "max_positions": 3},
+    "cost_model": {"fee_bps": "10", "slippage_bps": "5"},
+    "change_note": "初始版本",
+    "instrument_ids": ["XAAPL-USDT"],
+    "created_at": "2026-11-08T02:15:00Z",
+}
+
+_EXAMPLE_DETAIL = {
+    "id": "st_0001",
+    "name": "AAPL 趋势",
+    "category": "directional",
+    "description": "均线趋势跟随",
+    "status": "draft",
+    "current_version_id": "sv_0001",
+    "current_version": 1,
+    "timeframe": "1d",
+    "direction": "long_only",
+    "rule_json": _RULE,
+    "parameters": {"fast": 20, "slow": 60},
+    "position_sizing": {"type": "equal_weight", "weight": 0.3333, "max_positions": 3},
+    "cost_model": {"fee_bps": "10", "slippage_bps": "5"},
+    "instrument_ids": ["XAAPL-USDT"],
+    "versions": [_EXAMPLE_VERSION],
+    "latest_backtest": _EXAMPLE_BACKTEST,
+    "created_at": "2026-11-08T02:15:00Z",
+    "updated_at": "2026-11-10T07:00:00Z",
+}
+
+
+class StrategyBacktestSummary(BaseModel):
+    """列表与详情里的最近一次回测摘要；指标已是百分数。"""
+
+    run_id: str
+    strategy_version_id: str
+    data_source: DataSource
+    total_return_pct: DecimalString
+    max_drawdown_pct: DecimalString
+    trade_count: int
+    backtest_start_date: date
+    backtest_end_date: date
+    created_at: UtcDatetime
+
+
+class StrategyVersionSummary(BaseModel):
+    version_id: str
+    version: int
+    timeframe: Bar
+    direction: StrategyDirection
+    change_note: str | None = None
+    created_at: UtcDatetime
+
+
+class StrategySummary(BaseModel):
+    id: str
     name: str
-    version: str
-    summary: str
-    params: list[ParamSpec]
-    required_indicators: list[str]
-    required_bars: list[Bar]
-    emitted_actions: list[SignalAction]
+    category: str
+    description: str | None = None
+    status: StrategyRecordStatus
+    current_version_id: str
+    current_version: int
+    timeframe: Bar
+    direction: StrategyDirection
+    instrument_count: int
+    latest_backtest: StrategyBacktestSummary | None = None
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
 
 
-class StrategyCatalogResponse(BaseModel):
-    items: list[StrategyDefinition]
+class StrategyListResponse(BaseModel):
+    items: list[StrategySummary]
+    next_cursor: str | None = None
+
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"items": [_EXAMPLE_SUMMARY], "next_cursor": None}]}
+    )
+
+
+class StrategyDetail(BaseModel):
+    id: str
+    name: str
+    category: str
+    description: str | None = None
+    status: StrategyRecordStatus
+    current_version_id: str
+    current_version: int
+    timeframe: Bar
+    direction: StrategyDirection
+    rule_json: dict[str, Any]
+    parameters: dict[str, Any]
+    position_sizing: dict[str, Any] | None = None
+    cost_model: dict[str, Any] | None = None
+    instrument_ids: list[str]
+    versions: list[StrategyVersionSummary]
+    latest_backtest: StrategyBacktestSummary | None = None
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
+
+    model_config = ConfigDict(json_schema_extra={"examples": [_EXAMPLE_DETAIL]})
+
+
+class StrategyVersionDetail(BaseModel):
+    version_id: str
+    strategy_id: str
+    version: int
+    timeframe: Bar
+    direction: StrategyDirection
+    rule_json: dict[str, Any]
+    parameters: dict[str, Any]
+    position_sizing: dict[str, Any] | None = None
+    cost_model: dict[str, Any] | None = None
+    change_note: str | None = None
+    instrument_ids: list[str]
+    created_at: UtcDatetime
+
+    model_config = ConfigDict(json_schema_extra={"examples": [_EXAMPLE_VERSION_DETAIL]})
+
+
+class StrategyVersionListResponse(BaseModel):
+    items: list[StrategyVersionDetail]
+    total: int
+
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"items": [_EXAMPLE_VERSION_DETAIL], "total": 1}]}
+    )
+
+
+class StrategyCreatedResponse(BaseModel):
+    id: str
+    version_id: str
+    status: StrategyRecordStatus
+    created_at: UtcDatetime
 
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
                 {
-                    "items": [
-                        {
-                            "strategy_id": "ma_cross",
-                            "name": "MA Cross",
-                            "version": "1.0.0",
-                            "summary": "快慢均线交叉产生多空信号。",
-                            "params": [
-                                {
-                                    "name": "fast",
-                                    "title": "快线周期",
-                                    "kind": "int",
-                                    "default": 20,
-                                    "minimum": 2,
-                                    "maximum": 200,
-                                },
-                                {
-                                    "name": "slow",
-                                    "title": "慢线周期",
-                                    "kind": "int",
-                                    "default": 60,
-                                    "minimum": 3,
-                                    "maximum": 500,
-                                },
-                            ],
-                            "required_indicators": ["sma"],
-                            "required_bars": ["1h", "4h", "1d"],
-                            "emitted_actions": ["BUY", "SELL", "HOLD"],
-                        }
-                    ]
+                    "id": "st_0001",
+                    "version_id": "sv_0001",
+                    "status": "draft",
+                    "created_at": "2026-11-08T02:15:00Z",
                 }
             ]
         }
     )
 
 
-_EXAMPLE_INSTANCE = {
-    "instance_id": "si_0001",
-    "strategy_id": "ma_cross",
-    "strategy_version": "1.0.0",
-    "name": "AAPL 均线趋势",
-    "bar": "1h",
-    "params": {"fast": 20, "slow": 60},
-    "inst_ids": ["XAAPL-USDT"],
-    "status": "paper_trading",
-    "enabled": True,
-    "execution_mode": "paper",
-    "latest_signal_at": "2026-11-10T07:00:00Z",
-    "created_at": "2026-11-08T02:15:00Z",
-    "updated_at": "2026-11-10T07:00:00Z",
-}
-
-
-class StrategyInstance(BaseModel):
-    instance_id: str
-    strategy_id: str
-    strategy_version: str
-    name: str
-    bar: Bar
-    params: dict[str, ParamValue]
-    inst_ids: list[str]
-    status: StrategyStatus
-    enabled: bool = True
-    execution_mode: ExecutionMode
-    latest_signal_at: UtcDatetime | None = None
-    created_at: UtcDatetime
+class StrategyUpdatedResponse(BaseModel):
+    id: str
+    version_id: str
+    status: StrategyRecordStatus
     updated_at: UtcDatetime
 
-    model_config = ConfigDict(json_schema_extra={"examples": [_EXAMPLE_INSTANCE]})
-
-
-class StrategyInstanceListResponse(BaseModel):
-    items: list[StrategyInstance]
-    total: int
-
     model_config = ConfigDict(
-        json_schema_extra={"examples": [{"items": [_EXAMPLE_INSTANCE], "total": 1}]}
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": "st_0001",
+                    "version_id": "sv_0002",
+                    "status": "draft",
+                    "updated_at": "2026-11-10T07:00:00Z",
+                }
+            ]
+        }
     )
 
 
-class StrategyInstanceCreateRequest(BaseModel):
-    strategy_id: str
+class StrategyCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
-    bar: Bar
-    params: dict[str, ParamValue] = Field(default_factory=dict)
-    inst_ids: list[str]
+    category: str
+    description: str | None = None
+    timeframe: Bar
+    direction: StrategyDirection
+    rule_json: dict[str, Any]
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    instrument_ids: list[str]
+    cost_model: dict[str, Any] | None = None
+    position_sizing: dict[str, Any] | None = None
+    change_note: str | None = None
 
 
-class StrategyInstanceUpdateRequest(BaseModel):
-    """PATCH 语义：只落显式提交的字段。
-
-    生命周期阶段**不在这条端点上改**：阶段推进只经 `/api/approvals` 的状态机，
-    否则一次 PATCH 就能从草稿跳到实盘运行，绕过人工审核、历史回测与量化验证
-    （`docs/prd/v2.md` §三.5「任何阶段都不能被跳过」）。提交 `status` 会因
-    `extra="forbid"` 直接 422，不会静默忽略。
-
-    `enabled` 是实例的启停开关，只决定它是否产出信号，不改变生命周期阶段。
-    """
+class StrategyUpdateRequest(BaseModel):
+    """只改提交的字段；出现任一版本字段时新建下一版。"""
 
     model_config = ConfigDict(extra="forbid")
 
     name: str | None = None
-    params: dict[str, ParamValue] | None = None
-    inst_ids: list[str] | None = None
-    enabled: bool | None = None
+    category: str | None = None
+    description: str | None = None
+    status: StrategyRecordStatus | None = None
+    timeframe: Bar | None = None
+    direction: StrategyDirection | None = None
+    rule_json: dict[str, Any] | None = None
+    parameters: dict[str, Any] | None = None
+    instrument_ids: list[str] | None = None
+    cost_model: dict[str, Any] | None = None
+    position_sizing: dict[str, Any] | None = None
+    change_note: str | None = None
+
+    @model_validator(mode="after")
+    def _at_least_one_field(self) -> StrategyUpdateRequest:
+        if not self.model_fields_set:
+            raise ValueError("更新请求至少需要一项字段")
+        return self
 
 
-class StrategyReplayRequest(BaseModel):
-    """回放区间：左闭右闭，`end` 那一根已收盘 K 线也在内。
+class StrategyVersionCreateRequest(BaseModel):
+    """新建下一版：未提交的字段沿用当前版本。"""
 
-    周期不由请求决定：回放始终用实例配置的周期，避免「实例按日线建、回放却按小时跑」
-    这种对不上配置的结果。
-    """
+    model_config = ConfigDict(extra="forbid")
 
-    start: UtcDatetime
-    end: UtcDatetime
+    timeframe: Bar | None = None
+    direction: StrategyDirection | None = None
+    rule_json: dict[str, Any] | None = None
+    parameters: dict[str, Any] | None = None
+    instrument_ids: list[str] | None = None
+    cost_model: dict[str, Any] | None = None
+    position_sizing: dict[str, Any] | None = None
+    change_note: str | None = None
 
-
-class StrategyReplayPoint(BaseModel):
-    """回放曲线上的一个点：该时点的目标组合有几条腿、净敞口是多少。
-
-    `as_of` 是**该根 K 线的开盘时刻**，不是决策时刻：回放在这个时点构造的视图包含
-    这根已收盘的 K 线，因此它表达的是「这根 K 线收盘之后」的目标组合。下游不要把它
-    当成「开盘前只知道历史」的时刻。
-
-    净值需要资金与成本假设，属于回测；这里画的是目标组合本身的净敞口走势。
-    """
-
-    as_of: UtcDatetime
-    net_exposure: DecimalString
-    leg_count: int
+    @model_validator(mode="after")
+    def _at_least_one_field(self) -> StrategyVersionCreateRequest:
+        if not self.model_fields_set:
+            raise ValueError("版本请求至少需要一项字段")
+        return self
 
 
-_EXAMPLE_REPLAY_TARGET = {
-    "legs": [
-        {
-            "inst_id": "XAAPL-USDT",
-            "inst_type": "SPOT",
-            "direction": "long",
-            "target_weight": "0.5",
-            "qty": None,
-            "unit": None,
-        },
-        {
-            "inst_id": "XMSFT-USDT",
-            "inst_type": "SPOT",
-            "direction": "short",
-            "target_weight": "0.5",
-            "qty": None,
-            "unit": None,
-        },
-    ],
-    "net_exposure": "0",
-}
+class StrategyInstrumentUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
-_EXAMPLE_REPLAY = {
-    "replay_id": "srp_0001",
-    "instance_id": "si_0001",
-    "strategy_id": "relative_value",
-    "bar": "1d",
-    "start": "2026-10-10T00:00:00Z",
-    "end": "2026-11-10T00:00:00Z",
-    "target": _EXAMPLE_REPLAY_TARGET,
-    "canonical_json": (
-        '{"legs":[{"product_key":"AAPL","side":"long","target_weight":"0.5"},'
-        '{"product_key":"MSFT","side":"short","target_weight":"0.5"}],'
-        '"net_exposure":"0"}'
-    ),
-    "target_hash": "0f3c8c1a2b7d4e5f60718293a4b5c6d7e8f90123a4b5c6d7e8f90123a4b5c6d7",
-    "points": [
-        {"as_of": "2026-11-09T00:00:00Z", "net_exposure": "0.12", "leg_count": 2},
-        {"as_of": "2026-11-10T00:00:00Z", "net_exposure": "0", "leg_count": 2},
-    ],
-    "created_at": "2026-11-10T09:30:00Z",
+    instrument_ids: list[str]
+
+
+_EXAMPLE_INSTRUMENT_STRATEGY = {
+    "strategy_id": "st_0001",
+    "name": "AAPL 趋势",
+    "category": "directional",
+    "status": "draft",
+    "current_version_id": "sv_0001",
+    "current_version": 1,
+    "timeframe": "1d",
+    "direction": "long_only",
+    "instrument_ids": ["XAAPL-USDT"],
+    "linked_version_ids": ["sv_0001"],
+    "recent_backtest": _EXAMPLE_BACKTEST,
+    "updated_at": "2026-11-10T07:00:00Z",
 }
 
 
-class StrategyReplay(BaseModel):
-    """一次目标组合回放：目标组合 + 逐点净敞口 + 可复现的规范化 JSON 与哈希。
-
-    `target` 用 `TargetPortfolio` 的既有形状；`canonical_json` 是它的规范化序列化
-    （腿按 `product_key` 排序、键排序、无多余空白），`target_hash` 是这段文本的
-    sha256——同一历史区间回放两次，两者都相同。
-    """
-
-    replay_id: str
-    instance_id: str
+class InstrumentStrategy(BaseModel):
     strategy_id: str
-    bar: Bar
-    start: UtcDatetime
-    end: UtcDatetime
-    target: TargetPortfolio
-    canonical_json: str
-    target_hash: str
-    points: list[StrategyReplayPoint]
-    created_at: UtcDatetime
+    name: str
+    category: str
+    status: StrategyRecordStatus
+    current_version_id: str
+    current_version: int
+    timeframe: Bar
+    direction: StrategyDirection
+    instrument_ids: list[str]
+    linked_version_ids: list[str]
+    recent_backtest: StrategyBacktestSummary | None = None
+    updated_at: UtcDatetime
 
-    model_config = ConfigDict(json_schema_extra={"examples": [_EXAMPLE_REPLAY]})
 
-
-class StrategyReplayListResponse(BaseModel):
-    items: list[StrategyReplay]
-    total: int
+class InstrumentStrategyListResponse(BaseModel):
+    items: list[InstrumentStrategy]
 
     model_config = ConfigDict(
-        json_schema_extra={"examples": [{"items": [_EXAMPLE_REPLAY], "total": 1}]}
+        json_schema_extra={"examples": [{"items": [_EXAMPLE_INSTRUMENT_STRATEGY]}]}
     )

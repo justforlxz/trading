@@ -28,7 +28,6 @@ from app.api.schemas import (
     InstrumentRef,
     OpportunityStatusUpdateRequest,
     StrategyApprovalRequest,
-    StrategyInstanceUpdateRequest,
     WatchlistResponse,
 )
 from app.api.schemas.common import AssetType, DataSource, StrategyStatus
@@ -45,7 +44,7 @@ _MODEL_SOURCES = ("app.api.schemas", "app.api.health")
 DOMAIN_PREFIXES = (
     "/api/watchlist",
     "/api/indicators",
-    "/api/strategy-instances",
+    "/api/strategies",
     "/api/backtests",
     "/api/trades",
     "/api/settings",
@@ -279,19 +278,6 @@ def test_strategy_status_matches_lifecycle_document() -> None:
     section = _decision_section(DECISIONS_PATH.read_text(encoding="utf-8"), "D7")
     missing = [value for value in values if f"`{value}`" not in section]
     assert not missing, f"decisions.md D7 与枚举不一致, 缺少: {missing}"
-
-
-def test_lifecycle_can_only_be_advanced_through_approvals() -> None:
-    """实例 PATCH 不接受生命周期取值：阶段只能经 `/api/approvals` 的状态机推进。"""
-
-    fields = StrategyInstanceUpdateRequest.model_fields
-    assert "status" not in fields, "PATCH 仍能写生命周期, 审批状态机可被绕过"
-    assert "enabled" in fields, "启停开关缺失, T3.3 没有可用的显式字段"
-
-    StrategyInstanceUpdateRequest.model_validate({"enabled": False})
-    for value in get_args(StrategyStatus):
-        with pytest.raises(ValidationError):
-            StrategyInstanceUpdateRequest.model_validate({"status": value})
 
 
 def test_as_of_requires_timezone(client: TestClient) -> None:

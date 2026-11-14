@@ -22,7 +22,14 @@ from app.positions import (  # noqa: F401
     ManualTradeRow,
     PositionRiskConfigRow,
 )
-from app.strategy import StrategyInstanceRow, StrategyTemplateRow  # noqa: F401
+from app.strategy import (  # noqa: F401
+    StrategyInstanceRow,
+    StrategyInstrumentRow,
+    StrategyLinkedBacktestRow,
+    StrategyTemplateRow,
+    StrategyVersionRow,
+    UserStrategyRow,
+)
 from app.watchlist import WatchlistItemRow  # noqa: F401
 
 target_metadata = Base.metadata

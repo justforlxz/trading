@@ -25,6 +25,7 @@ import getInstrumentsSearch from "./fixtures/instruments/get-instruments-search.
 import getInstrumentsInstId from "./fixtures/instruments/get-instruments-inst_id.json";
 import getInstrumentsInstIdAnalysis from "./fixtures/instruments/get-instruments-inst_id-analysis.json";
 import getInstrumentsInstIdCandles from "./fixtures/instruments/get-instruments-inst_id-candles.json";
+import getInstrumentsInstIdStrategies from "./fixtures/strategy/get-instruments-inst_id-strategies.json";
 import getManualPositions from "./fixtures/positions/get-manual-positions.json";
 import postManualPositions from "./fixtures/positions/post-manual-positions.json";
 import patchManualPositionsPositionId from "./fixtures/positions/patch-manual-positions-position_id.json";
@@ -42,12 +43,12 @@ import getRiskExposure from "./fixtures/risk/get-risk-exposure.json";
 import getSettings from "./fixtures/settings/get-settings.json";
 import putSettings from "./fixtures/settings/put-settings.json";
 import getStrategies from "./fixtures/strategy/get-strategies.json";
-import getStrategyInstances from "./fixtures/strategy/get-strategy-instances.json";
-import postStrategyInstances from "./fixtures/strategy/post-strategy-instances.json";
-import getStrategyInstancesInstanceId from "./fixtures/strategy/get-strategy-instances-instance_id.json";
-import patchStrategyInstancesInstanceId from "./fixtures/strategy/patch-strategy-instances-instance_id.json";
-import getStrategyInstancesInstanceIdReplays from "./fixtures/strategy/get-strategy-instances-instance_id-replays.json";
-import postStrategyInstancesInstanceIdReplays from "./fixtures/strategy/post-strategy-instances-instance_id-replays.json";
+import postStrategies from "./fixtures/strategy/post-strategies.json";
+import getStrategiesStrategyId from "./fixtures/strategy/get-strategies-strategy_id.json";
+import putStrategiesStrategyId from "./fixtures/strategy/put-strategies-strategy_id.json";
+import getStrategiesStrategyIdVersions from "./fixtures/strategy/get-strategies-strategy_id-versions.json";
+import postStrategiesStrategyIdVersions from "./fixtures/strategy/post-strategies-strategy_id-versions.json";
+import putStrategiesStrategyIdVersionsVersionInstruments from "./fixtures/strategy/put-strategies-strategy_id-versions-version-instruments.json";
 import getWatchlist from "./fixtures/watchlist/get-watchlist.json";
 import postWatchlist from "./fixtures/watchlist/post-watchlist.json";
 import patchWatchlistInstId from "./fixtures/watchlist/patch-watchlist-inst_id.json";
@@ -79,6 +80,7 @@ export const handlers = [
   http.get("*/api/instruments/:inst_id", () => HttpResponse.json(getInstrumentsInstId)),
   http.get("*/api/instruments/:inst_id/analysis", () => HttpResponse.json(getInstrumentsInstIdAnalysis)),
   http.get("*/api/instruments/:inst_id/candles", () => HttpResponse.json(getInstrumentsInstIdCandles)),
+  http.get("*/api/instruments/:inst_id/strategies", () => HttpResponse.json(getInstrumentsInstIdStrategies)),
   http.get("*/api/manual-positions", () => HttpResponse.json(getManualPositions)),
   http.post("*/api/manual-positions", () => HttpResponse.json(postManualPositions, { status: 201 })),
   http.patch("*/api/manual-positions/:position_id", () => HttpResponse.json(patchManualPositionsPositionId)),
@@ -97,13 +99,12 @@ export const handlers = [
   http.get("*/api/settings", () => HttpResponse.json(getSettings)),
   http.put("*/api/settings", () => HttpResponse.json(putSettings)),
   http.get("*/api/strategies", () => HttpResponse.json(getStrategies)),
-  http.get("*/api/strategy-instances", () => HttpResponse.json(getStrategyInstances)),
-  http.post("*/api/strategy-instances", () => HttpResponse.json(postStrategyInstances, { status: 201 })),
-  http.get("*/api/strategy-instances/:instance_id", () => HttpResponse.json(getStrategyInstancesInstanceId)),
-  http.patch("*/api/strategy-instances/:instance_id", () => HttpResponse.json(patchStrategyInstancesInstanceId)),
-  http.delete("*/api/strategy-instances/:instance_id", () => new HttpResponse(null, { status: 204 })),
-  http.get("*/api/strategy-instances/:instance_id/replays", () => HttpResponse.json(getStrategyInstancesInstanceIdReplays)),
-  http.post("*/api/strategy-instances/:instance_id/replays", () => HttpResponse.json(postStrategyInstancesInstanceIdReplays, { status: 201 })),
+  http.post("*/api/strategies", () => HttpResponse.json(postStrategies, { status: 201 })),
+  http.get("*/api/strategies/:strategy_id", () => HttpResponse.json(getStrategiesStrategyId)),
+  http.put("*/api/strategies/:strategy_id", () => HttpResponse.json(putStrategiesStrategyId)),
+  http.get("*/api/strategies/:strategy_id/versions", () => HttpResponse.json(getStrategiesStrategyIdVersions)),
+  http.post("*/api/strategies/:strategy_id/versions", () => HttpResponse.json(postStrategiesStrategyIdVersions, { status: 201 })),
+  http.put("*/api/strategies/:strategy_id/versions/:version/instruments", () => HttpResponse.json(putStrategiesStrategyIdVersionsVersionInstruments)),
   http.get("*/api/watchlist", () => HttpResponse.json(getWatchlist)),
   http.post("*/api/watchlist", () => HttpResponse.json(postWatchlist, { status: 201 })),
   http.patch("*/api/watchlist/:inst_id", () => HttpResponse.json(patchWatchlistInstId)),

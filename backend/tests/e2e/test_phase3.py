@@ -1,8 +1,9 @@
-"""Phase 3 端到端：模板目录 → 建实例 → 改参 → 回放 → 结果落库 → 再回放。
+"""Phase 3 端到端：建实例 → 改参 → 回放 → 结果落库 → 再回放。
 
-只走 HTTP 端点与业务写入路径（`sync_instruments` + `upsert_candles`），不直接查库里
-的回放表：「结果落库」由读回 `GET /strategy-instances/{instance_id}/replays` 验证，
-与界面看到的是同一条路径。行情用两个加密现货标的，回放时每个时点解析出的来源恒定。
+v6 删除了策略实例的 HTTP 增删改查，回放端点也随之不再对外暴露；这条链路改为直接
+走域层写入路径（`create_instance` / `prepare_replay` / `save_replay` / `list_replays`），
+仍然覆盖「实例配置 → 目标组合 → 同一区间重算一致 → 执行记录落库」这一组真实行为。
+行情用两个加密现货标的，回放时每个时点解析出的来源恒定。
 """
 
 from __future__ import annotations
@@ -14,9 +15,16 @@ from decimal import Decimal
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core import Bar, Timeframe
+from app.core import Bar, Conflict, Timeframe
 from app.instrument import sync_instruments
 from app.market import upsert_candles
+from app.strategy import (
+    create_instance,
+    list_replays,
+    prepare_replay,
+    save_replay,
+    update_instance,
+)
 from tests.factories.instruments import make_ref
 
 DAY = timedelta(days=1)
@@ -25,7 +33,8 @@ CLOSES = {
     "BTC-USDT": ["100", "101", "102", "103", "104", "105"],
     "ETH-USDT": ["50", "51", "52", "53", "55", "58"],
 }
-WINDOW = {"start": "2026-11-05T00:00:00Z", "end": "2026-11-10T23:00:00Z"}
+START = datetime(2026, 11, 5, 0, 0, tzinfo=UTC)
+END = AS_OF
 SCALE = Decimal("0.000000001")
 
 
@@ -61,82 +70,53 @@ def seed_market(inst_ids: Sequence[str]) -> None:
 
 
 @pytest.fixture()
-def market(client: TestClient) -> TestClient:
+def instance(client: TestClient) -> str:
+    del client
     seed_market(["BTC-USDT", "ETH-USDT"])
-    return client
-
-
-def test_phase3_replay_round_trip(market: TestClient) -> None:
-    """一条链路走完：目录给参数默认值 → 建实例 → 改参 → 回放 → 落库 → 再回放。"""
-
-    catalog = market.get("/api/strategies")
-    assert catalog.status_code == 200, catalog.text
-    template = next(
-        item for item in catalog.json()["items"] if item["strategy_id"] == "relative_value"
+    created = create_instance(
+        strategy_id="relative_value",
+        name="BTC/ETH 相对价值",
+        bar="1d",
+        # 模板默认窗口要二十根日线，这里只有六根：改参是这条链路真实会出现的一步。
+        params={"reversion_window": 3, "strength_window": 2, "pair_count": 1},
+        inst_ids=["BTC-USDT", "ETH-USDT"],
     )
-    defaults = {param["name"]: param["default"] for param in template["params"]}
-    assert defaults == {"reversion_window": 20, "strength_window": 10, "pair_count": 1}
+    return created.instance_id
 
-    created = market.post(
-        "/api/strategy-instances",
-        json={
-            "strategy_id": template["strategy_id"],
-            "name": "BTC/ETH 相对价值",
-            "bar": "1d",
-            "params": defaults,
-            "inst_ids": ["BTC-USDT", "ETH-USDT"],
-        },
-    )
-    assert created.status_code == 201, created.text
-    instance = created.json()
-    instance_id = instance["instance_id"]
-    assert instance["strategy_version"] == template["version"]
-    assert instance["status"] == "strategy_generation"
-    assert instance["enabled"] is True
 
-    # 模板默认窗口要二十根日线，这里只有六根：改参是这条链路真实会出现的一步。
-    patched = market.patch(
-        f"/api/strategy-instances/{instance_id}",
-        json={"params": {"reversion_window": 3, "strength_window": 2}, "enabled": True},
-    )
-    assert patched.status_code == 200, patched.text
-    assert patched.json()["params"] == {
-        "reversion_window": 3,
-        "strength_window": 2,
-        "pair_count": 1,
-    }
+def test_phase3_replay_round_trip(instance: str) -> None:
+    """一条链路走完：回放 → 落库 → 再回放，同一区间得到同一份目标组合。"""
 
-    path = f"/api/strategy-instances/{instance_id}/replays"
-    first = market.post(path, json=WINDOW)
-    assert first.status_code == 201, first.text
-    replay = first.json()
+    first = prepare_replay(instance, start=START, end=END, source="okx_spot")
+    assert first is not None
+    save_replay(first)
 
-    legs = replay["target"]["legs"]
-    assert {leg["direction"] for leg in legs} == {"long", "short"}
-    assert {leg["inst_id"] for leg in legs} == {"BTC-USDT", "ETH-USDT"}
-    weights = sum(Decimal(leg["target_weight"]) for leg in legs)
+    legs = first.legs
+    assert {leg.side for leg in legs} == {"long", "short"}
+    assert {leg.inst_id for leg in legs} == {"BTC-USDT", "ETH-USDT"}
+    weights = sum(leg.target_weight for leg in legs)
     assert abs(weights - Decimal(1)) <= SCALE
-    net = sum(
-        Decimal(leg["target_weight"]) * (1 if leg["direction"] == "long" else -1) for leg in legs
-    )
-    assert Decimal(replay["target"]["net_exposure"]) == net
-    assert replay["points"][-1]["as_of"] == "2026-11-10T23:00:00Z"
+    net = sum(leg.target_weight * (1 if leg.side == "long" else -1) for leg in legs)
+    assert first.net_exposure == net
+    assert first.points[-1].as_of == END
 
-    # 结果落库：读回来的记录与写回的响应逐字段相同。
-    stored = market.get(path)
-    assert stored.status_code == 200, stored.text
-    assert stored.json()["total"] == 1
-    assert stored.json()["items"][0] == replay
+    # 结果落库：读回来的记录与写回的一致。
+    stored = list_replays(instance)
+    assert stored is not None
+    items, total = stored
+    assert total == 1
+    assert items[0] == first
 
     # 再回放：同一区间得到同一份目标组合，规范化 JSON 与哈希都不变。
-    second = market.post(path, json=WINDOW)
-    assert second.status_code == 201, second.text
-    assert second.json()["canonical_json"] == replay["canonical_json"]
-    assert second.json()["target_hash"] == replay["target_hash"]
-    assert market.get(path).json()["total"] == 2
+    second = prepare_replay(instance, start=START, end=END, source="okx_spot")
+    assert second is not None
+    assert second.canonical_json == first.canonical_json
+    assert second.target_hash == first.target_hash
+    save_replay(second)
+    assert list_replays(instance)[1] == 2  # type: ignore[index]
 
     # 停用之后不能再回放，但已经落库的记录还在。
-    market.patch(f"/api/strategy-instances/{instance_id}", json={"enabled": False})
-    blocked = market.post(path, json=WINDOW)
-    assert blocked.status_code == 409, blocked.text
-    assert market.get(path).json()["total"] == 2
+    assert update_instance(instance, enabled=False) is not None
+    with pytest.raises(Conflict):
+        prepare_replay(instance, start=START, end=END, source="okx_spot")
+    assert list_replays(instance)[1] == 2  # type: ignore[index]

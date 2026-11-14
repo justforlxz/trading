@@ -3,34 +3,34 @@ import { useSearchParams } from "react-router-dom";
 
 import { PageHeading } from "../../components/layout/page-parts";
 import {
-  createBacktest,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../../components/ui/card";
+import {
   deleteBacktest,
   fetchBacktest,
   fetchBacktestRanking,
   fetchBacktests,
-  fetchStrategyInstances,
   type BacktestDataSource,
   type BacktestDetailResponse,
   type BacktestMetric,
   type BacktestRankingResponse,
-  type BacktestRequest,
   type BacktestRunSummary,
-  type StrategyInstance,
 } from "../../lib/api";
 import { BacktestDetailPanel } from "./backtest-detail";
-import { BacktestForm } from "./backtest-form";
 import { BacktestHistoryPanel } from "./backtest-history";
 import { BacktestRankingPanel } from "./backtest-ranking";
 
 /**
- * 回测页：发起 → 排名 → 历史结果 → 单条结果。
+ * 回测页：排名 → 历史结果 → 单条结果。
  *
  * 页面只负责取数与组织交互：指标、逐腿贡献、净敞口都由后端算好返回，前端不做派生计算，
  * 也不给任何一条结果贴「最优」标签。
  */
 export default function BacktestsPage() {
-  const [instances, setInstances] = useState<StrategyInstance[]>([]);
-  const [instanceId, setInstanceId] = useState<string | null>(null);
   const [dataSource, setDataSource] = useState<BacktestDataSource>("okx_spot");
   const [metric, setMetric] = useState<BacktestMetric>("total_return_pct");
   const [runs, setRuns] = useState<BacktestRunSummary[]>([]);
@@ -38,26 +38,9 @@ export default function BacktestsPage() {
   const [ranking, setRanking] = useState<BacktestRankingResponse | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [detail, setDetail] = useState<BacktestDetailResponse | null>(null);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
   const queryRunId = searchParams.get("run");
-
-  useEffect(() => {
-    let active = true;
-    fetchStrategyInstances()
-      .then((listing) => {
-        if (!active) return;
-        setInstances(listing.items);
-        setInstanceId((current) => current ?? listing.items[0]?.instance_id ?? null);
-      })
-      .catch((reason: unknown) => {
-        if (active) setError(reason instanceof Error ? reason.message : "策略实例加载失败");
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   const reload = useCallback(
     (source: BacktestDataSource, rankingMetric: BacktestMetric) =>
@@ -82,7 +65,6 @@ export default function BacktestsPage() {
   }, [dataSource, metric, reload]);
 
   const openDetail = useCallback((runId: string) => {
-    setBusy(true);
     setError(null);
     fetchBacktest(runId)
       .then((value) => {
@@ -91,8 +73,7 @@ export default function BacktestsPage() {
       })
       .catch((reason: unknown) => {
         setError(reason instanceof Error ? reason.message : "回测结果加载失败");
-      })
-      .finally(() => setBusy(false));
+      });
   }, []);
 
   useEffect(() => {
@@ -100,24 +81,8 @@ export default function BacktestsPage() {
     openDetail(queryRunId);
   }, [queryRunId, openDetail]);
 
-  const submit = (request: BacktestRequest) => {
-    setBusy(true);
-    setError(null);
-    createBacktest(request)
-      .then((created) => {
-        setDataSource(request.data_source);
-        return reload(request.data_source, metric).then(() => created);
-      })
-      .then((created) => openDetail(created.run_id))
-      .catch((reason: unknown) => {
-        setError(reason instanceof Error ? reason.message : "回测失败");
-      })
-      .finally(() => setBusy(false));
-  };
-
   const remove = (runId: string) => {
     if (!window.confirm(`删除回测记录 ${runId}？`)) return;
-    setBusy(true);
     setError(null);
     deleteBacktest(runId)
       .then(() => {
@@ -129,8 +94,7 @@ export default function BacktestsPage() {
       })
       .catch((reason: unknown) => {
         setError(reason instanceof Error ? reason.message : "删除失败");
-      })
-      .finally(() => setBusy(false));
+      });
   };
 
   return (
@@ -138,7 +102,7 @@ export default function BacktestsPage() {
       <PageHeading
         eyebrow="Backtests"
         title="回测"
-        description="选策略实例与标的集合，设成本与资金，跑批量回测；结果按标的各一条，可排序、可逐腿回放，同一份请求重跑得到同一组数值。"
+        description="查看已保存的回测结果：按指标排序、按标的逐条打开，数值全部来自后端。按策略版本发起回测在 B7 交付。"
       />
 
       {error ? (
@@ -148,15 +112,35 @@ export default function BacktestsPage() {
       ) : null}
 
       <div className="grid gap-6">
-        <BacktestForm
-          instances={instances}
-          instanceId={instanceId}
-          dataSource={dataSource}
-          busy={busy}
-          onInstanceChange={setInstanceId}
-          onDataSourceChange={setDataSource}
-          onSubmit={submit}
-        />
+        <label className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-muted-foreground">数据源</span>
+          <select
+            className="h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            value={dataSource}
+            onChange={(event) => setDataSource(event.target.value as BacktestDataSource)}
+          >
+            <option value="okx_spot">OKX 现货（okx_spot）</option>
+            <option value="okx_swap">OKX 永续（okx_swap）</option>
+            <option value="us_equity_proxy">美股代理（us_equity_proxy）</option>
+            <option value="okx">未区分形态的旧数据（okx）</option>
+          </select>
+          <span className="text-xs text-muted-foreground">只影响读取哪些已保存的结果，不做跨源聚合。</span>
+        </label>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>发起回测</CardTitle>
+            <CardDescription>
+              旧策略实例接口已由 B6 删除；按策略版本发起的回测在 B7 与 S4-3 交付。历史结果、
+              排名与单条详情仍可查看。
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              当前页只读：不能新建回测，已保存的结果不受影响。
+            </p>
+          </CardContent>
+        </Card>
 
         <BacktestRankingPanel
           ranking={ranking}

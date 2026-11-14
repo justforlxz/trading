@@ -39,8 +39,12 @@ from app.positions import (  # noqa: F401
 from app.strategy import (  # noqa: F401
     StrategyApprovalRow,
     StrategyInstanceRow,
+    StrategyInstrumentRow,
+    StrategyLinkedBacktestRow,
     StrategyReplayRow,
     StrategyTemplateRow,
+    StrategyVersionRow,
+    UserStrategyRow,
 )
 from app.watchlist import WatchlistItemRow  # noqa: F401
 
@@ -154,3 +158,26 @@ def test_positions_migration_creates_snapshot_and_manual_tables() -> None:
             )
         ).scalar_one_or_none()
     assert sector == "sector"
+
+
+def test_strategies_migration_creates_versions_instruments_and_links() -> None:
+    """0016 建出用户策略、版本、标的关联与回测关联四张表。"""
+
+    init_db()
+
+    assert {
+        "strategies",
+        "strategy_versions",
+        "strategy_instruments",
+        "strategy_linked_backtests",
+    } <= _tables()
+    with session_scope() as session:
+        unique = session.execute(
+            text(
+                "SELECT COUNT(*) FROM information_schema.table_constraints "
+                "WHERE table_schema = current_schema() "
+                "AND table_name = 'strategy_versions' "
+                "AND constraint_type = 'UNIQUE'"
+            )
+        ).scalar_one()
+    assert unique >= 1

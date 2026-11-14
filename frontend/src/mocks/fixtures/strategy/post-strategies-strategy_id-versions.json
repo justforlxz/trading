@@ -1,0 +1,52 @@
+{
+  "change_note": "初始版本",
+  "cost_model": {
+    "fee_bps": "10",
+    "slippage_bps": "5"
+  },
+  "created_at": "2026-11-08T02:15:00Z",
+  "direction": "long_only",
+  "instrument_ids": [
+    "XAAPL-USDT"
+  ],
+  "parameters": {
+    "fast": 20,
+    "slow": 60
+  },
+  "position_sizing": {
+    "max_positions": 3,
+    "type": "equal_weight",
+    "weight": 0.3333
+  },
+  "rule_json": {
+    "direction": "long_only",
+    "entry": {
+      "all": [
+        {
+          "left": "MA(20)",
+          "op": ">",
+          "right": "MA(60)"
+        }
+      ]
+    },
+    "exit": {
+      "any": [
+        {
+          "left": "MA(20)",
+          "op": "<",
+          "right": "MA(60)"
+        }
+      ]
+    },
+    "position_sizing": {
+      "max_positions": 3,
+      "type": "equal_weight",
+      "weight": 0.3333
+    },
+    "timeframe": "1d"
+  },
+  "strategy_id": "st_0001",
+  "timeframe": "1d",
+  "version": 1,
+  "version_id": "sv_0001"
+}

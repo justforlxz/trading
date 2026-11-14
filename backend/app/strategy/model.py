@@ -1,4 +1,9 @@
-"""策略模板与策略实例两张表：模板只读，实例是用户配置。
+"""策略的持久化模型：v6 用户策略四张表，以及保留给自动化阶段的模板与实例表。
+
+v6 新增的四张表是 `strategies`、`strategy_versions`、`strategy_instruments` 与
+`strategy_linked_backtests`：策略是身份，版本是不可变的规则与参数快照，标的挂在
+版本上，回测通过关联表指向版本。本段的其余说明仍描述模板与实例那两张旧表，它们
+保留给执行与审批阶段，不再通过 HTTP 暴露。
 
 模板的内容来自代码注册表（`app/strategy/registry.py` 的 import-time 登记），表里的行
 是它的只读投影。投影的写入方不是本域：本域不碰会话，也没有写模板的入口；把登记表
@@ -26,16 +31,31 @@
 
 from __future__ import annotations
 
-from sqlalchemy import BigInteger, Boolean, ForeignKey, Identity, Integer, String, Text
+from datetime import datetime
+
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    ForeignKey,
+    Identity,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db import Base
+from app.db import Base, UtcDateTime
 
 __all__ = [
     "StrategyApprovalRow",
     "StrategyInstanceRow",
+    "StrategyInstrumentRow",
+    "StrategyLinkedBacktestRow",
     "StrategyReplayRow",
     "StrategyTemplateRow",
+    "StrategyVersionRow",
+    "UserStrategyRow",
 ]
 
 
@@ -153,3 +173,91 @@ class StrategyApprovalRow(Base):
     at: Mapped[int] = mapped_column(Integer, nullable=False)
     note: Mapped[str | None] = mapped_column(String(512), nullable=True)
     evidence: Mapped[str | None] = mapped_column(String(256), nullable=True)
+
+
+class UserStrategyRow(Base):
+    """v6 用户策略：名称、类别与状态；具体规则在版本行里。
+
+    策略本身不是可执行配置：它只有身份与展示属性。规则、参数、周期、方向和标的都
+    落在版本上，改规则必须新建版本，历史回测引用的那一版因此不会被后续修改覆盖。
+    状态取 `draft` / `validated` / `enabled` / `paused` / `archived`，只控制页面展示与
+    后续自动化阶段的启用范围，本版本不据此下单。
+    """
+
+    __tablename__ = "strategies"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    category: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+
+
+class StrategyVersionRow(Base):
+    """策略的一个不可变版本：规则、参数、周期、方向、仓位规则与成本假设。
+
+    `version` 从 1 开始按策略递增，`(strategy_id, version)` 唯一。版本行创建后不再
+    修改；需要换规则时新建下一版。历史回测通过 `strategy_linked_backtests` 指向
+    具体版本，因此回测结论始终能追到当时那一套规则。
+    """
+
+    __tablename__ = "strategy_versions"
+    __table_args__ = (UniqueConstraint("strategy_id", "version", name="uq_strategy_versions"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    strategy_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("strategies.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    timeframe: Mapped[str] = mapped_column(String(8), nullable=False)
+    direction: Mapped[str] = mapped_column(String(16), nullable=False)
+    rule_json: Mapped[str] = mapped_column(Text, nullable=False)
+    parameters_json: Mapped[str] = mapped_column(Text, nullable=False)
+    position_sizing_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cost_model_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    change_note: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+
+
+class StrategyInstrumentRow(Base):
+    """策略版本关联的标的集合；主键保证同一版本不会重复登记同一标的。"""
+
+    __tablename__ = "strategy_instruments"
+
+    strategy_version_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("strategy_versions.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    instrument_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("instruments.symbol", ondelete="CASCADE"),
+        primary_key=True,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+
+
+class StrategyLinkedBacktestRow(Base):
+    """策略版本与回测运行的多对多关联：回测记录由此反查策略，不用名称模糊匹配。"""
+
+    __tablename__ = "strategy_linked_backtests"
+
+    strategy_version_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("strategy_versions.id", ondelete="CASCADE"),
+        primary_key=True,
+        index=True,
+    )
+    backtest_run_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("backtest_runs.run_id", ondelete="CASCADE"),
+        primary_key=True,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)

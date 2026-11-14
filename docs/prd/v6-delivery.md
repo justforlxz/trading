@@ -293,7 +293,7 @@ flowchart TD
 | 迁移 | 唯一负责包 | 内容归属 |
 | --- | --- | --- |
 | 0015 | B2 | 账户快照、交易所持仓快照、手动持仓、手动流水 |
-| 0016 | B6 | 策略、策略版本、策略标的关联、策略信号 |
+| 0016 | B6 | 策略、策略版本、策略标的关联、回测关联 |
 | 0017 | B8 | 研究记录、提醒事件、活动事件 |
 | 0018 | B9 | 市场事件、新闻条目、数据同步任务、设置扩展 |
 
@@ -336,7 +336,7 @@ flowchart TD
 | GET | `/api/strategies` | `status`、`category`、`limit`、`cursor`（均可选） | `items[{id,name,category,status,current_version_id,timeframe,updated_at}]`、`next_cursor` | 400 | B6 |
 | POST | `/api/strategies` | `name`、`category`、`description`（可选）、`timeframe`、`direction`、`rule_json`、`parameters`、`instrument_ids`、`cost_model`（可选）、`position_sizing`（可选） | 201：`id`、`version_id`、`status`、`created_at` | 400、404、409 | B6 |
 | GET | `/api/strategies/{id}` | 路径参数 `id` | `id`、`name`、`category`、`description`、`status`、`current_version_id`、`timeframe`、`direction`、`rule_json`、`parameters`、`cost_model`、`position_sizing`、`instrument_ids`、`versions[{version_id,created_at,change_note}]`、`created_at`、`updated_at` | 404 | B6 |
-| PUT | `/api/strategies/{id}` | 路径参数 `id`；`name`、`description`、`rule_json`、`parameters`、`instrument_ids`、`status`（均可选，至少一项） | 200：`id`、`version_id`（新版本）、`status`、`updated_at` | 400、404、409 | B6 |
+| PUT | `/api/strategies/{id}` | 路径参数 `id`；`name`、`category`、`description`、`status`、`timeframe`、`direction`、`rule_json`、`parameters`、`instrument_ids`、`cost_model`、`position_sizing`、`change_note`（均可选，至少一项） | 200：`id`、`version_id`（只改名称、类别、描述和状态时是当前版本；提交任一版本字段时是新版本）、`status`、`updated_at` | 400、404、409 | B6 |
 | POST | `/api/backtests` | `strategy_version_id`、`instrument_ids`、`timeframe`、`start_date`、`end_date`、`initial_capital`、`quote_currency`、`fee_model`、`slippage_model`、`funding_model`、`signal_timing`、`allow_short`、`position_rules`、`risk_constraints` | 202：`backtest_id`、`status`、`job_id` | 400、404、409、503 | B7 |
 | GET | `/api/backtests/{id}` | 路径参数 `id` | `id`、`strategy_version_id`、`status`、`params_snapshot`、`data_version`、`cost_model`、`started_at`、`finished_at`、`metrics{total_return,annualized_return,max_drawdown,sharpe,win_rate,profit_factor,trade_count,avg_holding_period,max_consecutive_losses}`、`warnings`、`reproducibility` | 404 | B7 |
 | GET | `/api/backtests/{id}/equity` | 路径参数 `id` | `items[{ts,equity,benchmark_equity,drawdown}]` | 404 | B7 |

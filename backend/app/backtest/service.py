@@ -51,6 +51,7 @@ from app.backtest.model import BacktestEquityRow, BacktestRunRow, BacktestTradeR
 from app.core import Bar, ValidationError
 from app.db import session_scope
 from app.shared import CANONICAL_BARS
+from app.strategy import StrategyLinkedBacktestRow
 
 __all__ = [
     "BacktestRunHeader",
@@ -60,6 +61,7 @@ __all__ = [
     "data_fingerprint",
     "delete_run",
     "get_run",
+    "latest_linked_backtests",
     "latest_run",
     "list_runs",
     "save_run",
@@ -495,6 +497,41 @@ def list_instrument_runs(
     with session_scope() as session:
         rows = list(session.scalars(statement))
     return tuple(_header(row) for row in rows)
+
+
+def latest_linked_backtests(
+    version_ids: Sequence[str],
+    *,
+    created_since: datetime | None = None,
+) -> dict[str, BacktestRunHeader]:
+    """每个策略版本最近一次关联回测；只读 `strategy_linked_backtests` 的正式关联。
+
+    不用策略名称或实例名做模糊匹配：关联由写入方在回测创建成功后登记，一条运行
+    可以指向一个确定的版本。`created_since` 用于详情页的「最近一个月」窗口；时间
+    下限作用在回测创建时刻上，不按回测区间过滤。
+    """
+
+    if not version_ids:
+        return {}
+    if created_since is not None and created_since.tzinfo is None:
+        raise ValidationError("关联回测的创建时间下限必须带时区")
+    statement = (
+        select(StrategyLinkedBacktestRow.strategy_version_id, BacktestRunRow)
+        .join(
+            BacktestRunRow,
+            BacktestRunRow.run_id == StrategyLinkedBacktestRow.backtest_run_id,
+        )
+        .where(StrategyLinkedBacktestRow.strategy_version_id.in_(list(version_ids)))
+        .order_by(BacktestRunRow.created_at.desc(), BacktestRunRow.run_id.desc())
+    )
+    if created_since is not None:
+        statement = statement.where(BacktestRunRow.created_at >= _epoch(created_since))
+    with session_scope() as session:
+        rows = session.execute(statement).all()
+    latest: dict[str, BacktestRunHeader] = {}
+    for version_id, row in rows:
+        latest.setdefault(version_id, _header(row))
+    return latest
 
 
 def delete_run(run_id: str) -> bool:

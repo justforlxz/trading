@@ -249,8 +249,8 @@ export function fetchStrategyVersions(
 export function createStrategyVersion(
   strategyId: string,
   body: StrategyVersionCreateRequest,
-): Promise<StrategyUpdatedResponse> {
-  return send<StrategyUpdatedResponse>(
+): Promise<StrategyVersionDetail> {
+  return send<StrategyVersionDetail>(
     `/strategies/${encodeURIComponent(strategyId)}/versions`,
     "POST",
     body,

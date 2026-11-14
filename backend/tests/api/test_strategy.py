@@ -338,3 +338,59 @@ def test_unknown_strategy_is_404(market: TestClient) -> None:
 def test_old_instance_routes_are_gone(market: TestClient) -> None:
     assert market.get("/api/strategy-instances").status_code == 404
     assert market.post("/api/strategy-instances", json={}).status_code == 404
+
+
+@pytest.mark.parametrize("field", ["instrument_ids", "rule_json", "parameters"])
+def test_null_version_fields_are_rejected(market: TestClient, field: str) -> None:
+    """版本字段显式传 null 属于不合法输入，不能 500，也不能静默新建一版。"""
+
+    created = create(market)
+    before = detail(market, created["id"])
+
+    for response in (
+        market.put(f"/api/strategies/{created['id']}", json={field: None}),
+        market.post(f"/api/strategies/{created['id']}/versions", json={field: None}),
+    ):
+        assert response.status_code == 400, response.text
+        assert field in response.json()["detail"]
+
+    assert detail(market, created["id"])["versions"] == before["versions"]
+
+
+def test_out_of_range_cursor_is_rejected(market: TestClient) -> None:
+    response = market.get("/api/strategies", params={"cursor": "99999999999999999999:st_x"})
+
+    assert response.status_code == 400, response.text
+    assert "游标" in response.json()["detail"]
+
+
+def test_version_position_sizing_conflict_is_rejected(market: TestClient) -> None:
+    """顶层仓位规则与规则 JSON 内的值不一致时报 400，不静默覆盖。"""
+
+    created = create(market)
+    rule = {**RULES, "position_sizing": {"type": "equal_weight", "weight": 0.5}}
+
+    response = market.post(
+        f"/api/strategies/{created['id']}/versions",
+        json={
+            "rule_json": rule,
+            "position_sizing": {"type": "equal_weight", "weight": 0.25},
+        },
+    )
+
+    assert response.status_code == 400, response.text
+    assert "不一致" in response.json()["detail"]
+    assert detail(market, created["id"])["current_version"] == 1
+
+
+def test_version_position_sizing_matches_rule_json(market: TestClient) -> None:
+    created = create(market)
+    sizing = {"type": "equal_weight", "weight": 0.5}
+
+    response = market.post(
+        f"/api/strategies/{created['id']}/versions",
+        json={"rule_json": {**RULES, "position_sizing": sizing}, "position_sizing": sizing},
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["position_sizing"] == sizing

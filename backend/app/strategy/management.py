@@ -73,6 +73,10 @@ _VERSION_FIELDS = frozenset(
 )
 _METADATA_FIELDS = frozenset({"name", "category", "description", "status"})
 
+# 这三个字段没有「清空」语义，显式传 null 与省略不同：省略表示沿用当前版本，
+# null 说明调用方想写一个空值。按不合法输入拒绝，避免把 None 迭代或当成继承。
+_REQUIRED_VERSION_VALUES = frozenset({"rule_json", "parameters", "instrument_ids"})
+
 
 @dataclass(frozen=True, slots=True)
 class StrategyVersionRecord:
@@ -240,6 +244,7 @@ def update_strategy(strategy_id: str, changes: Mapping[str, Any]) -> StrategyRec
         raise ValidationError("更新请求至少需要一项字段")
 
     version_changes = {key: value for key, value in changes.items() if key in _VERSION_FIELDS}
+    _reject_null_version_values(version_changes)
     now = _now()
     with session_scope() as session:
         strategy = session.get(UserStrategyRow, strategy_id, with_for_update=True)
@@ -292,6 +297,7 @@ def create_version(strategy_id: str, changes: Mapping[str, Any]) -> StrategyReco
         raise ValidationError(f"版本请求含未知字段: {', '.join(unknown)}")
     if not changes:
         raise ValidationError("版本请求至少需要一项字段")
+    _reject_null_version_values(changes)
 
     now = _now()
     with session_scope() as session:
@@ -478,13 +484,25 @@ def _insert_version(
     rule_source = rule if rule is not None else _object(current.rule_json) if current else {}
     if not isinstance(rule_source, Mapping):
         raise ValidationError("rule_json 必须是 JSON 对象")
+    embedded_sizing = (
+        rule_source.get("position_sizing") if "position_sizing" in rule_source else None
+    )
+    if embedded_sizing is not None:
+        embedded_sizing = validate_position_sizing(embedded_sizing)
     if sizing is _UNSET:
-        effective_sizing = _optional_object(current.position_sizing_json) if current else None
+        effective_sizing = (
+            embedded_sizing
+            if "position_sizing" in rule_source
+            else _optional_object(current.position_sizing_json)
+            if current
+            else None
+        )
     else:
+        if sizing is not None:
+            sizing = validate_position_sizing(sizing)
+            if embedded_sizing is not None and embedded_sizing != sizing:
+                raise ValidationError("position_sizing 与 rule_json.position_sizing 不一致")
         effective_sizing = sizing
-    if "position_sizing" in rule_source and sizing is _UNSET:
-        rule_sizing = rule_source.get("position_sizing")
-        effective_sizing = None if rule_sizing is None else validate_position_sizing(rule_sizing)
     rule_payload = dict(rule_source)
     if rule is not None:
         stated_timeframe = rule_payload.get("timeframe")
@@ -689,6 +707,8 @@ def _prepare_rule(
 def _resolve_instruments(instrument_ids: Sequence[str]) -> tuple[str, ...]:
     if isinstance(instrument_ids, str):
         raise ValidationError("instrument_ids 必须是数组")
+    if not isinstance(instrument_ids, Sequence):
+        raise ValidationError("instrument_ids 必须是数组")
     ordered: list[str] = []
     for item in instrument_ids:
         if not isinstance(item, str) or not item.strip():
@@ -787,11 +807,23 @@ def _require_change_note(value: Any) -> str | None:
     return text or None
 
 
+def _reject_null_version_values(changes: Mapping[str, Any]) -> None:
+    """版本字段里的 null 一律按不合法输入拒绝，不做「当作省略」的静默处理。"""
+
+    nulls = sorted(
+        key for key in _REQUIRED_VERSION_VALUES if key in changes and changes[key] is None
+    )
+    if nulls:
+        raise ValidationError(f"这些字段不能为 null: {', '.join(nulls)}")
+
+
 def _parse_cursor(cursor: str) -> tuple[datetime, str]:
+    raw_time, _, strategy_id = cursor.partition(":")
+    if not raw_time.isdigit() or len(raw_time) > 12:
+        raise ValidationError(f"无效的分页游标: {cursor!r}")
     try:
-        raw_time, strategy_id = cursor.split(":", 1)
         return datetime.fromtimestamp(int(raw_time), tz=UTC), strategy_id
-    except (ValueError, TypeError, OSError) as exc:
+    except (ValueError, TypeError, OSError, OverflowError) as exc:
         raise ValidationError(f"无效的分页游标: {cursor!r}") from exc
 
 

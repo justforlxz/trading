@@ -32,19 +32,12 @@ TIMEFRAMES = ("1m", "5m", "15m", "1h", "4h", "1d")
 DIRECTIONS = ("long_only", "short_only", "long_short")
 OPERATORS = (">", ">=", "<", "<=", "==")
 
-# 常见的展示名 → 注册表名。注册名本身也接受，大小写不敏感。
+# 常见的展示名 → 注册表名。注册名本身直接接受（大小写不敏感），所以注册表新增指标
+# 不需要同步这张表；这里只放与注册名不同的展示写法。
 _INDICATOR_ALIASES = {
     "ma": "sma",
-    "sma": "sma",
-    "ema": "ema",
-    "rsi": "rsi",
-    "macd": "macd",
-    "atr": "atr",
     "boll": "bollinger",
-    "bollinger": "bollinger",
-    "vwap": "vwap",
     "vol_ma": "volume_ma",
-    "volume_ma": "volume_ma",
 }
 
 _EXPRESSION = re.compile(
@@ -213,12 +206,9 @@ def _validate_operand(value: Any, path: str) -> Any:
     if match is None:
         raise ValidationError(f"rule_json.{path} 的指标表达式格式应为 NAME(参数): {value!r}")
     raw_name = match.group(1).lower()
-    name = _INDICATOR_ALIASES.get(raw_name)
-    if name is None:
-        raise ValidationError(f"rule_json.{path} 的指标未注册: {match.group(1)!r}")
+    name = _INDICATOR_ALIASES.get(raw_name, raw_name)
     definition = {item.name: item for item in list_definitions()}.get(name)
     if definition is None:
-        # 别名表与注册表不同步属于装配错误，但对调用方仍按不合法指标处理。
         raise ValidationError(f"rule_json.{path} 的指标未注册: {match.group(1)!r}")
     raw_args = match.group(2)
     args = [] if not raw_args else [int(item.strip()) for item in raw_args.split(",")]

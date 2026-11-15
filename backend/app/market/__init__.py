@@ -110,6 +110,7 @@ from app.market.sync import (
     upsert_candles,
 )
 from app.market.sync_jobs import (
+    SyncJobView,
     finish_sync_job,
     latest_sync_job,
     start_sync_job,
@@ -152,6 +153,7 @@ __all__ = [
     "ProviderRateLimited",
     "ProviderTimeout",
     "Quote",
+    "SyncJobView",
     "advance_decline",
     "aligned_pairs",
     "asset_session",

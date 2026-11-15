@@ -68,6 +68,15 @@ export type BacktestDataSource = BacktestRunSummary["data_source"];
 export type BacktestDetailResponse = components["schemas"]["BacktestDetailResponse"];
 export type BacktestLeg = BacktestDetailResponse["legs"][number];
 export type BacktestTradeRow = BacktestDetailResponse["trades"][number];
+export type BacktestChartResponse = components["schemas"]["BacktestChartResponse"];
+export type BacktestChartCandle = BacktestChartResponse["candles"][number];
+export type BacktestMarker = BacktestChartResponse["markers"][number];
+export type BacktestEquityResponse = components["schemas"]["BacktestEquityResponse"];
+export type BacktestEquityPoint = BacktestEquityResponse["points"][number];
+export type BacktestReplayResponse = components["schemas"]["BacktestReplayResponse"];
+export type BacktestReplayPoint = BacktestReplayResponse["points"][number];
+export type BacktestReplayTrade = BacktestReplayResponse["trades"][number];
+export type BacktestTradeListResponse = components["schemas"]["BacktestTradeListResponse"];
 export type BacktestRequest = components["schemas"]["BacktestRequest"];
 export type BacktestBatchResponse = components["schemas"]["BacktestBatchResponse"];
 export type BacktestTargets = components["schemas"]["BacktestTargets"];
@@ -301,6 +310,67 @@ export function fetchBacktestRanking(
 
 export function fetchBacktest(runId: string): Promise<BacktestDetailResponse> {
   return request<BacktestDetailResponse>(`/backtests/${encodeURIComponent(runId)}`);
+}
+
+export type BacktestTradeFilters = {
+  side?: "long" | "short";
+  result?: "profit" | "loss";
+  instId?: string;
+};
+
+function tradeQuery(filters: BacktestTradeFilters): URLSearchParams {
+  const query = new URLSearchParams();
+  if (filters.side !== undefined) query.set("side", filters.side);
+  if (filters.result !== undefined) query.set("result", filters.result);
+  if (filters.instId !== undefined) query.set("inst_id", filters.instId);
+  return query;
+}
+
+/** 本次回测保存的 K 线、买卖标记与均线叠加；不访问实时行情。 */
+export function fetchBacktestChart(runId: string): Promise<BacktestChartResponse> {
+  return request<BacktestChartResponse>(`/backtests/${encodeURIComponent(runId)}/chart`);
+}
+
+/** 策略净值与回撤序列；基准未保存时 `benchmark` 为 null。 */
+export function fetchBacktestEquity(runId: string): Promise<BacktestEquityResponse> {
+  return request<BacktestEquityResponse>(`/backtests/${encodeURIComponent(runId)}/equity`);
+}
+
+/** 已保存的回放序列；播放与单步只在这个数组里移动，不请求任何行情。 */
+export function fetchBacktestReplay(runId: string): Promise<BacktestReplayResponse> {
+  return request<BacktestReplayResponse>(`/backtests/${encodeURIComponent(runId)}/replay`);
+}
+
+/** 按方向与盈亏结果筛选的交易明细；分页参数原样交给后端。 */
+export function fetchBacktestTrades(
+  runId: string,
+  filters: BacktestTradeFilters = {},
+  limit = 500,
+  offset = 0,
+): Promise<BacktestTradeListResponse> {
+  const query = tradeQuery(filters);
+  query.set("limit", String(limit));
+  query.set("offset", String(offset));
+  return request<BacktestTradeListResponse>(
+    `/backtests/${encodeURIComponent(runId)}/trades?${query.toString()}`,
+  );
+}
+
+/** 与表格同筛选条件的 CSV 原文；日期筛选由调用方按同一规则再裁剪。 */
+export async function fetchBacktestTradesCsv(
+  runId: string,
+  filters: BacktestTradeFilters = {},
+): Promise<string> {
+  const query = tradeQuery(filters);
+  const suffix = query.toString();
+  const response = await fetch(
+    `${BASE}/backtests/${encodeURIComponent(runId)}/trades.csv${suffix === "" ? "" : `?${suffix}`}`,
+    { headers: { accept: "text/csv" } },
+  );
+  if (!response.ok) {
+    throw new ApiError(response.status, await failureMessage(response));
+  }
+  return response.text();
 }
 
 export function deleteBacktest(runId: string): Promise<void> {

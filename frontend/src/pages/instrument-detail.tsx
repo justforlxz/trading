@@ -40,6 +40,7 @@ import {
 import { useQuoteStream } from "../lib/stream-hooks";
 import { cn } from "../lib/utils";
 import { InstrumentAlertsCard } from "./instrument-detail/alerts-card";
+import { InstrumentEventsCard } from "./instrument-detail/events-card";
 import { BacktestLaunchForm } from "./strategies/backtest-launch-form";
 
 const BAR_OPTIONS: Array<{ bar: InstrumentAnalysisBar; label: string }> = [
@@ -1075,6 +1076,8 @@ export default function InstrumentDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          <InstrumentEventsCard ticker={instrument.product_key} />
 
           <InstrumentAlertsCard instId={instId} />
 

@@ -10,20 +10,20 @@ import {
   type DashboardPushed,
   type DashboardSummary,
 } from "../../lib/dashboard";
+import type { AiSummary, MarketSnapshot } from "../../lib/market";
 import type { StreamLiveness } from "../../lib/stream";
 import type { AlertStatusUpdate } from "../../lib/alerts";
 import {
   AccountBody,
   ActivityBody,
   AlertsBody,
-  MarketBody,
-  MarketSummaryBody,
   PositionsBody,
   RiskBody,
   StrategiesBody,
   WatchlistBody,
 } from "./cards";
-import { ModuleCard, StatusBadge } from "./module-card";
+import { MarketOverviewCard, MarketSummaryCard } from "./market-cards";
+import { ModuleCard } from "./module-card";
 
 export type OverviewViewProps = {
   summary: DashboardSummary | null;
@@ -32,6 +32,12 @@ export type OverviewViewProps = {
   priceLiveness: StreamLiveness;
   accountLiveness: StreamLiveness;
   pushed: DashboardPushed;
+  marketOverview: MarketSnapshot | null;
+  marketOverviewError: string | null;
+  marketOverviewLoading: boolean;
+  aiSummary: AiSummary | null;
+  aiSummaryError: string | null;
+  aiSummaryLoading: boolean;
   onRefresh: () => void;
   onResolveAlert?: (alertId: string, status: AlertStatusUpdate) => void;
   resolvingAlertId?: string | null;
@@ -45,10 +51,32 @@ export function OverviewView({
   priceLiveness,
   accountLiveness,
   pushed,
+  marketOverview,
+  marketOverviewError,
+  marketOverviewLoading,
+  aiSummary,
+  aiSummaryError,
+  aiSummaryLoading,
   onRefresh,
   onResolveAlert,
   resolvingAlertId = null,
 }: OverviewViewProps) {
+  const degraded = summary?.degraded.filter((item) => item.module !== "market") ?? [];
+  const marketOverviewCard = (
+    <MarketOverviewCard
+      overview={marketOverview}
+      error={marketOverviewError}
+      loading={marketOverviewLoading}
+    />
+  );
+  const marketSummaryCard = (
+    <MarketSummaryCard
+      summary={aiSummary}
+      dataAsOf={marketOverview?.as_of ?? null}
+      error={aiSummaryError}
+      loading={aiSummaryLoading}
+    />
+  );
   return (
     <>
       <PageHeading
@@ -89,36 +117,32 @@ export function OverviewView({
       </div>
 
       {summary === null ? (
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">
-              {loading ? "正在读取首页汇总…" : "首页汇总不可用，请重试。"}
-            </p>
-          </CardContent>
-        </Card>
+        <div className="grid gap-4">
+          {marketOverviewCard}
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground">
+                {loading ? "正在读取首页汇总…" : "首页汇总不可用，请重试。"}
+              </p>
+            </CardContent>
+          </Card>
+          {marketSummaryCard}
+        </div>
       ) : (
         <div className="grid gap-4">
-          {summary.degraded.length > 0 ? (
+          {degraded.length > 0 ? (
             <p
               role="status"
               className="rounded-md border border-amber-600/40 bg-amber-500/5 px-3 py-2 text-sm text-amber-700 dark:text-amber-400"
             >
               以下模块降级：
-              {summary.degraded
+              {degraded
                 .map((item) => `${moduleTitle(item.module)}（${item.reason}）`)
                 .join("；")}
             </p>
           ) : null}
 
-          <ModuleCard
-            name="market"
-            title="市场概况"
-            summary={summary}
-            module={summary.market}
-            pushedFields={0}
-          >
-            <MarketBody summary={summary} />
-          </ModuleCard>
+          {marketOverviewCard}
 
           <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(280px,1fr)]">
             <ModuleCard
@@ -154,15 +178,7 @@ export function OverviewView({
             >
               <PositionsBody summary={summary} pushed={pushed.positions} />
             </ModuleCard>
-            <Card className="min-w-0" data-module="market_summary" data-status="unavailable">
-              <CardContent className="space-y-3 pt-6">
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="text-base font-semibold tracking-tight">市场摘要</h3>
-                  <StatusBadge status="unavailable" />
-                </div>
-                <MarketSummaryBody />
-              </CardContent>
-            </Card>
+            {marketSummaryCard}
           </div>
 
           <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.65fr)_minmax(280px,1fr)]">

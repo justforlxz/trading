@@ -6,6 +6,7 @@
  */
 
 import type { components } from "../api/types";
+import { researchNoteQuery, type ResearchNoteFilters } from "./journal";
 
 const BASE = "/api";
 
@@ -23,6 +24,7 @@ export type WatchlistResponse = components["schemas"]["WatchlistResponse"];
 export type WatchlistItem = components["schemas"]["WatchlistItem"];
 export type WatchlistStrategy = components["schemas"]["WatchlistStrategy"];
 export type InstrumentRef = components["schemas"]["InstrumentRef"];
+export type InstrumentListResponse = components["schemas"]["InstrumentListResponse"];
 export type InstrumentSearchResponse = components["schemas"]["InstrumentSearchResponse"];
 export type InstrumentDetailResponse = components["schemas"]["InstrumentDetailResponse"];
 export type InstrumentAnalysisResponse = components["schemas"]["InstrumentAnalysisResponse"];
@@ -91,6 +93,13 @@ export type BacktestSettings = SettingsResponse["backtest"];
 export type DataSettings = SettingsResponse["data"];
 export type ExchangeSettings = SettingsResponse["exchange"];
 export type MarketOverviewResponse = components["schemas"]["MarketOverviewResponse"];
+export type ResearchNoteItem = components["schemas"]["ResearchNoteItem"];
+export type ResearchNoteListResponse = components["schemas"]["ResearchNoteListResponse"];
+export type ResearchNoteCreateRequest = components["schemas"]["ResearchNoteCreateRequest"];
+export type ResearchNoteUpdateRequest = components["schemas"]["ResearchNoteUpdateRequest"];
+export type ResearchNoteCreatedResponse = components["schemas"]["ResearchNoteCreatedResponse"];
+export type ResearchNoteUpdatedResponse = components["schemas"]["ResearchNoteUpdatedResponse"];
+export type { ResearchNoteFilters, ResearchNoteSort, ResearchNoteType } from "./journal";
 
 /** 后端错误体的形状：`detail` 是字符串，或 FastAPI 校验错误的条目数组。 */
 type ErrorBody = { detail?: string | Array<{ msg?: string }> };
@@ -140,6 +149,14 @@ function send<T>(path: string, method: string, body: unknown): Promise<T> {
 
 export function fetchWatchlist(): Promise<WatchlistResponse> {
   return request<WatchlistResponse>("/watchlist");
+}
+
+/** 某一类别的可交易标的；类别必须显式指定，现货与永续不混排。 */
+export function fetchTradableInstruments(
+  instType: "SPOT" | "SWAP",
+): Promise<InstrumentListResponse> {
+  const query = new URLSearchParams({ inst_type: instType });
+  return request<InstrumentListResponse>(`/instruments?${query.toString()}`);
 }
 
 /** 某一类别在某一周期上的市场广度与共振；类别没有默认值，必须显式指定。 */
@@ -375,6 +392,39 @@ export async function fetchBacktestTradesCsv(
 
 export function deleteBacktest(runId: string): Promise<void> {
   return request<void>(`/backtests/${encodeURIComponent(runId)}`, { method: "DELETE" });
+}
+
+/** 研究记录列表：筛选、排序与游标全部交给后端，前端只决定页码大小。 */
+export function fetchResearchNotes(
+  filters: ResearchNoteFilters = {},
+  limit = 200,
+  cursor?: string,
+): Promise<ResearchNoteListResponse> {
+  const query = researchNoteQuery(filters);
+  query.set("limit", String(limit));
+  if (cursor !== undefined && cursor !== "") query.set("cursor", cursor);
+  return request<ResearchNoteListResponse>(`/research-notes?${query.toString()}`);
+}
+
+export function createResearchNote(
+  body: ResearchNoteCreateRequest,
+): Promise<ResearchNoteCreatedResponse> {
+  return send<ResearchNoteCreatedResponse>("/research-notes", "POST", body);
+}
+
+export function updateResearchNote(
+  noteId: string,
+  body: ResearchNoteUpdateRequest,
+): Promise<ResearchNoteUpdatedResponse> {
+  return send<ResearchNoteUpdatedResponse>(
+    `/research-notes/${encodeURIComponent(noteId)}`,
+    "PUT",
+    body,
+  );
+}
+
+export function deleteResearchNote(noteId: string): Promise<void> {
+  return request<void>(`/research-notes/${encodeURIComponent(noteId)}`, { method: "DELETE" });
 }
 
 /** 设置文档：分组配置、凭证状态与执行模式。API Key 只写不读。 */

@@ -1,3 +1,6 @@
+import { Link } from "react-router-dom";
+
+import { Button } from "../../components/ui/button";
 import {
   Card,
   CardContent,
@@ -100,6 +103,16 @@ export function BacktestSummary({ detail }: BacktestSummaryProps) {
           资金费覆盖率与缺口数未随本版结果落库；资金费结算接入回测主循环由后续节点承接，
           当前资金费合计恒为 0，不代表「没有资金费」。
         </p>
+        <div className="flex flex-wrap items-center gap-3 border-t pt-4">
+          <Button asChild variant="outline" size="sm">
+            <Link to={`/journal?new=1&type=review&backtest=${encodeURIComponent(run.run_id)}`}>
+              写复盘
+            </Link>
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            打开记录页并预填一条关联本次回测的复盘记录。
+          </span>
+        </div>
       </CardContent>
     </Card>
   );

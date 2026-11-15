@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { PageHeading } from "../../components/layout/page-parts";
 import {
@@ -37,6 +38,8 @@ import { StrategyListPanel } from "./strategy-list";
 type DialogKind = "create" | "metadata" | "version" | "instruments" | null;
 
 export default function StrategiesPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryStrategy = searchParams.get("strategy");
   const [strategies, setStrategies] = useState<StrategySummary[]>([]);
   const [strategiesLoading, setStrategiesLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -106,6 +109,15 @@ export default function StrategiesPage() {
   useEffect(() => {
     void reloadStrategies();
   }, [reloadStrategies]);
+
+  useEffect(() => {
+    if (queryStrategy === null) return;
+    if (!strategies.some((item) => item.id === queryStrategy)) return;
+    setSelectedId(queryStrategy);
+    const next = new URLSearchParams(searchParams);
+    next.delete("strategy");
+    setSearchParams(next, { replace: true });
+  }, [queryStrategy, strategies, searchParams, setSearchParams]);
 
   useEffect(() => {
     fetchSettings()

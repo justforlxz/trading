@@ -8669,7 +8669,6 @@
             "reduce_only": false,
             "side": "buy",
             "status": "filled",
-            "strategy_instance_id": "si_0001",
             "updated_at": "2026-11-09T14:00:02Z"
           }
         ],
@@ -8772,17 +8771,6 @@
             ],
             "title": "Status",
             "type": "string"
-          },
-          "strategy_instance_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Strategy Instance Id"
           },
           "updated_at": {
             "title": "Updated At",
@@ -8897,7 +8885,6 @@
                 "reduce_only": false,
                 "side": "buy",
                 "status": "filled",
-                "strategy_instance_id": "si_0001",
                 "updated_at": "2026-11-09T14:00:02Z"
               }
             ],
@@ -9070,17 +9057,6 @@
             "title": "Side",
             "type": "string"
           },
-          "strategy_instance_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Strategy Instance Id"
-          },
           "unrealized_pnl": {
             "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
             "title": "Unrealized Pnl",
@@ -9120,7 +9096,6 @@
                 "product_key": "AAPL",
                 "qty": "8.63",
                 "side": "long",
-                "strategy_instance_id": "si_0001",
                 "unrealized_pnl": "28.64"
               }
             ],

@@ -45,7 +45,6 @@ class Position(BaseModel):
     leverage: DecimalString
     liquidation_price: DecimalString | None = None
     mode: ExecutionMode
-    strategy_instance_id: str | None = None
     opened_at: UtcDatetime
 
 
@@ -72,7 +71,6 @@ class PositionListResponse(BaseModel):
                             "leverage": "1",
                             "liquidation_price": None,
                             "mode": "paper",
-                            "strategy_instance_id": "si_0001",
                             "opened_at": "2026-11-09T14:00:00Z",
                         }
                     ],
@@ -96,7 +94,6 @@ _EXAMPLE_ORDER = {
     "status": "filled",
     "reduce_only": False,
     "mode": "paper",
-    "strategy_instance_id": "si_0001",
     "created_at": "2026-11-09T13:59:40Z",
     "updated_at": "2026-11-09T14:00:02Z",
 }
@@ -116,7 +113,6 @@ class Order(BaseModel):
     status: OrderStatus
     reduce_only: bool
     mode: ExecutionMode
-    strategy_instance_id: str | None = None
     created_at: UtcDatetime
     updated_at: UtcDatetime
 

@@ -5181,7 +5181,6 @@ export interface components {
          *       "reduce_only": false,
          *       "side": "buy",
          *       "status": "filled",
-         *       "strategy_instance_id": "si_0001",
          *       "updated_at": "2026-11-09T14:00:02Z"
          *     }
          */
@@ -5229,8 +5228,6 @@ export interface components {
              * @enum {string}
              */
             status: "pending" | "open" | "partially_filled" | "filled" | "cancelled" | "rejected";
-            /** Strategy Instance Id */
-            strategy_instance_id?: string | null;
             /** Updated At */
             updated_at: string;
         };
@@ -5287,7 +5284,6 @@ export interface components {
          *           "reduce_only": false,
          *           "side": "buy",
          *           "status": "filled",
-         *           "strategy_instance_id": "si_0001",
          *           "updated_at": "2026-11-09T14:00:02Z"
          *         }
          *       ],
@@ -5356,8 +5352,6 @@ export interface components {
              * @enum {string}
              */
             side: "long" | "short";
-            /** Strategy Instance Id */
-            strategy_instance_id?: string | null;
             /** Unrealized Pnl */
             unrealized_pnl: string;
         };
@@ -5377,7 +5371,6 @@ export interface components {
          *           "product_key": "AAPL",
          *           "qty": "8.63",
          *           "side": "long",
-         *           "strategy_instance_id": "si_0001",
          *           "unrealized_pnl": "28.64"
          *         }
          *       ],

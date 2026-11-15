@@ -430,13 +430,13 @@ flowchart TD
 | `GET /api/overview`、`OverviewResponse`、`frontend/src/pages/overview.tsx` | B5 的 `GET /api/dashboard/summary`、S4-1 首页 | B5 删除接口，S4-1 删除页面 |
 | `price_alerts` 表、`PUT` 和 `DELETE /api/watchlist/{inst_id}/alert`、`PriceAlert` schema、`app/watchlist` 的旧提醒函数 | B8 的 `alert_events` 和 `/api/alerts` | B8 |
 | 旧策略模板目录、旧策略实例 CRUD、旧策略页面 | B6 的策略与版本接口、S4-2 策略与回测页 | B6 删除接口，S4-2 删除页面 |
-| 回测里的 `strategy_instance_id` 字段和旧回测入口 | B7 的 `strategy_version_id` | B7 |
+| 回测里的 `strategy_instance_id` 字段和旧回测入口 | B7 的 `strategy_version_id` | B7 删除接口字段与旧入口；`backtest_runs.strategy_instance_id` 列保留为历史事实，不新增迁移；S7-1 从 `Position`、`Order` 对外契约删除同名字段，`Signal` 契约按 §8.3 允许清单保留 |
 | 设置页里 v6 不展示的执行模式、紧急停止、成本、回测默认值、代理分组 | B9 的设置接口、S6-2 设置页 | B9 删除接口字段与设置页旧控件；S6-2 继续交付设置页的完整分组与健康展示 |
 | `execution.auto_trading_enabled` 自动执行开关 | 规格 §3.8 要求保留：v6 默认关闭，只保存状态，不实现真实下单 | 保留；B9 提供字段，S6-2 显示开关 |
 
 ### 8.3 S7-1 全站残留检查
 
-以下命令写进 S7-1 的验收。每条要么无输出，要么只命中迁移里的历史说明、测试 fixture 或本文档：
+以下命令写进 S7-1 的验收。每条要么无输出，要么只命中代码里的历史列与后续自动化契约、测试 fixture 或本文档：
 
 ```bash
 rg -n "RelationsPage|PortfolioPage|TradesPage|fetchRelationGraph|fetchPortfolio|fetchJournal|/api/relations|/api/portfolio|/api/journal" frontend/src backend --glob '!**/__pycache__/**'
@@ -446,6 +446,20 @@ rg -n "/api/overview|OverviewResponse|overview_router" backend/app frontend/src 
 rg -n "feature[_ -]?[Ff]lag|enableV6|v6Enabled" frontend/src backend/app --glob '!**/__pycache__/**'
 rg -n "useDemoData|mockData|demoData" frontend/src --glob '!**/__tests__/**'
 ```
+
+第 3 条在 S7-1 执行后的命中与处置如下。除下表列出的项外，其余命中都是历史列或后续自动化阶段的执行信号契约；`Position`、`Order` 契约里的同名字段已删除，未出现在 `backend/contracts/openapi.json` 和 `frontend/src/api/types.ts` 的对应类型中。
+
+| 文件 | 命中数 | 处置 | 理由 |
+| --- | ---: | --- | --- |
+| `backend/app/backtest/model.py` | 2 | 保留 | `backtest_runs.strategy_instance_id` 是历史列；删除列需要新增 0019 迁移，本版本不新增迁移 |
+| `backend/app/backtest/service.py` | 3 | 保留 | 写入历史列；读接口对外返回 `strategy_version_id`，不再暴露旧字段名 |
+| `backend/app/journal/service.py` | 5 | 保留 | 流水读模型按历史列关联回测，只在后端内部使用 |
+| `backend/app/api/schemas/common.py` | 1 | 保留 | `Signal.strategy_instance_id` 是执行信号契约，属于后续自动化阶段 |
+| `backend/app/api/routes/watchlist.py` | 1 | 保留 | 从执行快照构造 `Signal`，字段来自上述契约 |
+| `backend/app/api/schemas/watchlist.py` | 1 | 保留 | 自选响应中 `Signal` 的 OpenAPI 示例 |
+| `backend/app/api/schemas/trades.py` | 1 | 保留 | `SignalListResponse` 的 OpenAPI 示例，属于执行信号契约 |
+| `frontend/src/api/types.ts` | 5 | 保留 | 由契约生成的 `Signal` 类型与示例；生成物不手改 |
+| `frontend/src/mocks/fixtures/` | 4 | 保留 | MSW 测试用 fixture；来自自选与详情响应的 `Signal` 示例，只用于开发与测试 |
 
 ## 9. 变更规则
 

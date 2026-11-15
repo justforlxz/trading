@@ -289,3 +289,13 @@ def test_as_of_requires_timezone(client: TestClient) -> None:
 
     params["as_of"] = "2026-11-10T00:00:00Z"
     assert client.get("/api/market/breadth", params=params).status_code == 200
+
+
+def test_legacy_strategy_instance_id_is_not_exposed_by_execution_contracts() -> None:
+    """v6 对外契约不再暴露旧字段名；执行信号契约按 S7-1 的允许清单保留。"""
+
+    schemas = json.loads(_rendered_contract())["components"]["schemas"]
+
+    for name in ("Position", "Order"):
+        assert "strategy_instance_id" not in schemas[name]["properties"], name
+    assert "strategy_instance_id" in schemas["Signal"]["properties"]

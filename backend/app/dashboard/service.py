@@ -27,13 +27,9 @@ from app.activity import list_activity
 from app.alerts import list_alerts
 from app.backtest import BacktestRunHeader, latest_run
 from app.core import Clock, DataUnavailable, SystemClock, UpstreamError, ValidationError
+from app.dashboard.positions import merge_positions
 from app.market import asset_session, market_overview, primary_source
-from app.positions import (
-    DEFAULT_ACCOUNT_ID,
-    account_summary,
-    exchange_positions,
-    list_manual_positions,
-)
+from app.positions import account_summary
 from app.risk import (
     RULE_HIGH_LEVERAGE,
     RULE_STOP_DISTANCE,
@@ -350,67 +346,45 @@ def _risk(exposure_once: _ExposureOnce) -> Module:
 
 
 def _positions(exposure_once: _ExposureOnce) -> Module:
-    exchange = exchange_positions()
-    manual = [item for item in list_manual_positions() if item.status == "open"]
-
     # 止损距离与名义价值只在 B3 的敞口结果里，本模块只借用它的输出；敞口读取失败
     # 时这两列留空，持仓本身仍然返回，不能因为风险模块失败而把持仓一并判成不可用。
-    try:
-        exposure = exposure_once.get()
-        stops = {item.position_ref: item.stop_distance_pct for item in exposure.positions}
-        notionals = {item.position_ref: item.notional for item in exposure.positions}
-    except Exception:  # 可选补充信息，失败就留空
-        stops = {}
-        notionals = {}
-
-    rows: list[PositionItem] = []
-    for item in exchange.items:
-        ref = f"exchange:{DEFAULT_ACCOUNT_ID}:{item.pos_id}"
-        rows.append(
-            PositionItem(
-                position_ref=ref,
-                source="exchange",
-                inst_id=item.inst_id,
-                display_symbol=item.display_symbol,
-                side=item.pos_side,
-                leverage=item.lever,
-                mark_price=item.mark_px,
-                notional=notionals.get(ref),
-                stop_distance_pct=stops.get(ref),
-                unrealized_pnl=item.upl,
-            )
+    snapshot = merge_positions(_optional_exposure(exposure_once))
+    items = tuple(
+        PositionItem(
+            position_ref=item.position_ref,
+            source=item.source,
+            inst_id=item.inst_id,
+            display_symbol=item.display_symbol,
+            side=item.side,
+            leverage=item.lever,
+            mark_price=item.mark_px,
+            notional=item.notional,
+            stop_distance_pct=item.stop_distance_pct,
+            unrealized_pnl=item.upl,
         )
-    for item in manual:
-        ref = f"manual:{item.id}"
-        rows.append(
-            PositionItem(
-                position_ref=ref,
-                source="manual",
-                inst_id=item.inst_id,
-                display_symbol=item.display_symbol,
-                side=item.side,
-                leverage=item.leverage,
-                mark_price=item.price,
-                notional=notionals.get(ref, item.market_value),
-                stop_distance_pct=stops.get(ref),
-                unrealized_pnl=item.unrealized_pnl,
-            )
-        )
-
-    times = [exchange.as_of, *(item.updated_at for item in manual)]
-    latest = max((time for time in times if time is not None), default=None)
+        for item in snapshot.items[:TOP_ROWS]
+    )
     return Module(
         status=STATUS_OK,
-        as_of=latest,
+        as_of=snapshot.as_of,
         error=None,
         data=PositionsData(
-            total=len(rows),
-            exchange_count=len(exchange.items),
-            manual_count=len(manual),
-            exchange_status=exchange.status,
-            items=tuple(rows[:TOP_ROWS]),
+            total=len(snapshot.items),
+            exchange_count=snapshot.exchange_count,
+            manual_count=snapshot.manual_count,
+            exchange_status=snapshot.exchange_status,
+            items=items,
         ),
     )
+
+
+def _optional_exposure(exposure_once: _ExposureOnce) -> RiskExposure | None:
+    """敞口只是持仓摘要的可选补充；读取失败时不影响持仓本身。"""
+
+    try:
+        return exposure_once.get()
+    except Exception:
+        return None
 
 
 def _watchlist() -> Module:

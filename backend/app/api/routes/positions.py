@@ -6,6 +6,7 @@ OKX 端点只读：同步只调用账户与持仓查询，不提供任何下单�
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException
 
@@ -22,7 +23,10 @@ from app.api.schemas.positions import (
     ManualTradeItem,
     ManualTradeListResponse,
     ManualTradeRequest,
+    MergedPositionItem,
+    MergedPositionsResponse,
 )
+from app.dashboard import MergedPosition, load_merged_positions
 from app.positions import (
     AccountSyncView,
     AccountView,
@@ -68,6 +72,25 @@ def get_exchange_positions() -> ExchangePositionsResponse:
         as_of=view.as_of,
         status=view.status,  # type: ignore[arg-type]
         items=[_exchange_position(item) for item in view.items],
+    )
+
+
+@positions_router.get("/positions", response_model=MergedPositionsResponse)
+def get_positions(
+    source: Literal["exchange", "manual"] | None = None,
+) -> MergedPositionsResponse:
+    """OKX 与手动持仓的合并视图；`source` 可按来源过滤。"""
+
+    view = load_merged_positions()
+    items = (
+        view.items
+        if source is None
+        else tuple(item for item in view.items if item.source == source)
+    )
+    return MergedPositionsResponse(
+        as_of=view.as_of,
+        exchange_status=view.exchange_status,  # type: ignore[arg-type]
+        items=[_merged_position(item) for item in items],
     )
 
 
@@ -210,6 +233,32 @@ def _exchange_position(view: ExchangePositionView) -> ExchangePositionItem:
         mgn_mode=view.mgn_mode,
         liq_px=_optional_text(view.liq_px),
         margin=_optional_text(view.margin),
+    )
+
+
+def _merged_position(item: MergedPosition) -> MergedPositionItem:
+    return MergedPositionItem(
+        position_ref=item.position_ref,
+        source=item.source,  # type: ignore[arg-type]
+        inst_id=item.inst_id,
+        display_symbol=item.display_symbol,
+        name=item.name,
+        asset_class=item.asset_class,
+        side=item.side,  # type: ignore[arg-type]
+        size=decimal_str(item.size),
+        avg_px=decimal_str(item.avg_px),
+        mark_px=_optional_text(item.mark_px),
+        upl=_optional_text(item.upl),
+        upl_ratio=_optional_text(item.upl_ratio),
+        lever=_optional_text(item.lever),
+        mgn_mode=item.mgn_mode,
+        liq_px=_optional_text(item.liq_px),
+        margin=_optional_text(item.margin),
+        notional=_optional_text(item.notional),
+        stop_px=_optional_text(item.stop_px),
+        stop_distance_pct=_optional_text(item.stop_distance_pct),
+        price_status=item.price_status,  # type: ignore[arg-type]
+        updated_at=item.updated_at,
     )
 
 

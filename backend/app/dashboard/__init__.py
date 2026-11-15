@@ -6,6 +6,10 @@
 from __future__ import annotations
 
 from app.dashboard.ai_summary import build_ai_summary
+from app.dashboard.positions import (
+    MergedPosition,
+    load_merged_positions,
+)
 from app.dashboard.service import (
     ActivityItem,
     AlertItem,
@@ -25,6 +29,7 @@ __all__ = [
     "AlertItem",
     "DashboardSummary",
     "MarketData",
+    "MergedPosition",
     "Module",
     "PositionItem",
     "PositionsData",
@@ -32,5 +37,6 @@ __all__ = [
     "StrategiesData",
     "WatchlistData",
     "build_ai_summary",
+    "load_merged_positions",
     "load_summary",
 ]

@@ -8253,6 +8253,300 @@
         "title": "MarketSnapshotResponse",
         "type": "object"
       },
+      "MergedPositionItem": {
+        "description": "`GET /api/positions` 的一行：两种来源统一字段，来源专属字段可为空。",
+        "properties": {
+          "asset_class": {
+            "title": "Asset Class",
+            "type": "string"
+          },
+          "avg_px": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Avg Px",
+            "type": "string"
+          },
+          "display_symbol": {
+            "title": "Display Symbol",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "lever": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lever"
+          },
+          "liq_px": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Liq Px"
+          },
+          "margin": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin"
+          },
+          "mark_px": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mark Px"
+          },
+          "mgn_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mgn Mode"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "notional": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notional"
+          },
+          "position_ref": {
+            "title": "Position Ref",
+            "type": "string"
+          },
+          "price_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ok",
+                  "unavailable"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Status"
+          },
+          "side": {
+            "enum": [
+              "long",
+              "short"
+            ],
+            "title": "Side",
+            "type": "string"
+          },
+          "size": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Size",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "exchange",
+              "manual"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "stop_distance_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Distance Pct"
+          },
+          "stop_px": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Px"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "upl": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upl"
+          },
+          "upl_ratio": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upl Ratio"
+          }
+        },
+        "required": [
+          "position_ref",
+          "source",
+          "inst_id",
+          "display_symbol",
+          "name",
+          "asset_class",
+          "side",
+          "size",
+          "avg_px"
+        ],
+        "title": "MergedPositionItem",
+        "type": "object"
+      },
+      "MergedPositionsResponse": {
+        "description": "OKX 与手动持仓的合并视图；`exchange_status` 只说明交易所同步状态。",
+        "examples": [
+          {
+            "as_of": "2026-11-13T09:00:00Z",
+            "exchange_status": "ok",
+            "items": [
+              {
+                "asset_class": "tokenized_equity",
+                "avg_px": "226.80",
+                "display_symbol": "AAPL-USDT",
+                "inst_id": "AAPL-USDT-SWAP",
+                "lever": "3",
+                "liq_px": "151.20",
+                "margin": "604.80",
+                "mark_px": "231.42",
+                "mgn_mode": "cross",
+                "name": "AAPL",
+                "notional": "1851.36",
+                "position_ref": "exchange:okx-main:123456",
+                "side": "long",
+                "size": "8",
+                "source": "exchange",
+                "updated_at": "2026-11-13T09:00:00Z",
+                "upl": "36.96",
+                "upl_ratio": "0.0204"
+              },
+              {
+                "asset_class": "tokenized_equity",
+                "avg_px": "55",
+                "display_symbol": "AAPL-USDT",
+                "inst_id": "AAPL-USDT-SWAP",
+                "lever": "2",
+                "mark_px": "60.5",
+                "name": "AAPL",
+                "notional": "121",
+                "position_ref": "manual:0f6f6f0e-5b6f-4f0c-9b7a-7e5f8a1d2c34",
+                "price_status": "ok",
+                "side": "long",
+                "size": "2",
+                "source": "manual",
+                "stop_distance_pct": "4.132231404959",
+                "stop_px": "58",
+                "updated_at": "2026-11-13T09:00:00Z",
+                "upl": "11"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "exchange_status": {
+            "enum": [
+              "ok",
+              "stale",
+              "unconfigured"
+            ],
+            "title": "Exchange Status",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MergedPositionItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "exchange_status",
+          "items"
+        ],
+        "title": "MergedPositionsResponse",
+        "type": "object"
+      },
       "MomentumIndicators": {
         "properties": {
           "macd": {
@@ -15338,6 +15632,60 @@
         "summary": "Update Opportunity Status",
         "tags": [
           "opportunity"
+        ]
+      }
+    },
+    "/api/positions": {
+      "get": {
+        "description": "OKX 与手动持仓的合并视图；`source` 可按来源过滤。",
+        "operationId": "get_positions_api_positions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "exchange",
+                    "manual"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MergedPositionsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Positions",
+        "tags": [
+          "positions"
         ]
       }
     },

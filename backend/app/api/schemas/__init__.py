@@ -169,6 +169,8 @@ from app.api.schemas.positions import (
     ManualTradeItem,
     ManualTradeListResponse,
     ManualTradeRequest,
+    MergedPositionItem,
+    MergedPositionsResponse,
 )
 from app.api.schemas.research import (
     ResearchNoteCreatedResponse,
@@ -378,6 +380,8 @@ __all__ = [
     "MarketResonance",
     "MarketSession",
     "MarketSnapshotResponse",
+    "MergedPositionItem",
+    "MergedPositionsResponse",
     "MomentumIndicators",
     "NewsItem",
     "NewsListResponse",

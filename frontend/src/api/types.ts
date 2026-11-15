@@ -827,6 +827,26 @@ export interface paths {
         patch: operations["update_opportunity_status_api_opportunities__opportunity_id__patch"];
         trace?: never;
     };
+    "/api/positions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Positions
+         * @description OKX 与手动持仓的合并视图；`source` 可按来源过滤。
+         */
+        get: operations["get_positions_api_positions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/positions/exchange": {
         parameters: {
             query?: never;
@@ -4972,6 +4992,120 @@ export interface components {
             /** Stale Reason */
             stale_reason: string | null;
         };
+        /**
+         * MergedPositionItem
+         * @description `GET /api/positions` 的一行：两种来源统一字段，来源专属字段可为空。
+         */
+        MergedPositionItem: {
+            /** Asset Class */
+            asset_class: string;
+            /** Avg Px */
+            avg_px: string;
+            /** Display Symbol */
+            display_symbol: string;
+            /** Inst Id */
+            inst_id: string;
+            /** Lever */
+            lever?: string | null;
+            /** Liq Px */
+            liq_px?: string | null;
+            /** Margin */
+            margin?: string | null;
+            /** Mark Px */
+            mark_px?: string | null;
+            /** Mgn Mode */
+            mgn_mode?: string | null;
+            /** Name */
+            name: string;
+            /** Notional */
+            notional?: string | null;
+            /** Position Ref */
+            position_ref: string;
+            /** Price Status */
+            price_status?: ("ok" | "unavailable") | null;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "long" | "short";
+            /** Size */
+            size: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "exchange" | "manual";
+            /** Stop Distance Pct */
+            stop_distance_pct?: string | null;
+            /** Stop Px */
+            stop_px?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+            /** Upl */
+            upl?: string | null;
+            /** Upl Ratio */
+            upl_ratio?: string | null;
+        };
+        /**
+         * MergedPositionsResponse
+         * @description OKX 与手动持仓的合并视图；`exchange_status` 只说明交易所同步状态。
+         * @example {
+         *       "as_of": "2026-11-13T09:00:00Z",
+         *       "exchange_status": "ok",
+         *       "items": [
+         *         {
+         *           "asset_class": "tokenized_equity",
+         *           "avg_px": "226.80",
+         *           "display_symbol": "AAPL-USDT",
+         *           "inst_id": "AAPL-USDT-SWAP",
+         *           "lever": "3",
+         *           "liq_px": "151.20",
+         *           "margin": "604.80",
+         *           "mark_px": "231.42",
+         *           "mgn_mode": "cross",
+         *           "name": "AAPL",
+         *           "notional": "1851.36",
+         *           "position_ref": "exchange:okx-main:123456",
+         *           "side": "long",
+         *           "size": "8",
+         *           "source": "exchange",
+         *           "updated_at": "2026-11-13T09:00:00Z",
+         *           "upl": "36.96",
+         *           "upl_ratio": "0.0204"
+         *         },
+         *         {
+         *           "asset_class": "tokenized_equity",
+         *           "avg_px": "55",
+         *           "display_symbol": "AAPL-USDT",
+         *           "inst_id": "AAPL-USDT-SWAP",
+         *           "lever": "2",
+         *           "mark_px": "60.5",
+         *           "name": "AAPL",
+         *           "notional": "121",
+         *           "position_ref": "manual:0f6f6f0e-5b6f-4f0c-9b7a-7e5f8a1d2c34",
+         *           "price_status": "ok",
+         *           "side": "long",
+         *           "size": "2",
+         *           "source": "manual",
+         *           "stop_distance_pct": "4.132231404959",
+         *           "stop_px": "58",
+         *           "updated_at": "2026-11-13T09:00:00Z",
+         *           "upl": "11"
+         *         }
+         *       ]
+         *     }
+         */
+        MergedPositionsResponse: {
+            /** As Of */
+            as_of?: string | null;
+            /**
+             * Exchange Status
+             * @enum {string}
+             */
+            exchange_status: "ok" | "stale" | "unconfigured";
+            /** Items */
+            items: components["schemas"]["MergedPositionItem"][];
+        };
         /** MomentumIndicators */
         MomentumIndicators: {
             /** Macd */
@@ -8376,6 +8510,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Opportunity"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_positions_api_positions_get: {
+        parameters: {
+            query?: {
+                source?: ("exchange" | "manual") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MergedPositionsResponse"];
                 };
             };
             /** @description Validation Error */

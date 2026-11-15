@@ -18,7 +18,12 @@ from app.db import session_scope
 from app.exchange.okx.instruments import parse_instruments
 from app.instrument import sync_instruments
 from app.main import create_app
-from app.positions import account_summary, exchange_positions, record_exchange_snapshot
+from app.positions import (
+    DEFAULT_ACCOUNT_ID,
+    account_summary,
+    exchange_positions,
+    record_exchange_snapshot,
+)
 from app.positions.model import AccountSnapshotRow, ManualPositionRow
 from tests.api.conftest import seed_daily
 from tests.exchange.conftest import SPOT_INSTRUMENT, SWAP_INST_ID, SWAP_INSTRUMENT
@@ -579,6 +584,129 @@ def test_position_batch_can_be_replaced_and_shrunk_at_one_captured_at(
     )
     view = exchange_positions()
     assert [item.pos_id for item in view.items] == ["1"]
+
+
+def test_positions_endpoint_merges_exchange_and_manual_sources(
+    api: TestClient,
+    fake_okx_server: FakeOkxServer,
+) -> None:
+    """`GET /api/positions` 同时返回交易所与手动持仓，并保留 `source`。"""
+
+    book = fake_okx_server.store.book
+    book.set_account(
+        equity="1248.60",
+        available_equity="682.30",
+        used_margin="566.30",
+        unrealized_pnl="31.84",
+        margin_ratio="0.4536",
+    )
+    book.set_balance("USDT", available="682.30")
+    book.set_position(
+        SWAP_INST_ID,
+        qty="8",
+        pos_side="long",
+        avg_price="226.80",
+        pos_id="123456",
+        mark_px="231.42",
+        upl="36.96",
+        upl_ratio="0.0204",
+        lever="3",
+        liq_px="151.20",
+        margin="604.80",
+    )
+    synced = api.post("/api/account/sync")
+    assert synced.status_code == 200, synced.text
+
+    created = api.post(
+        "/api/manual-positions",
+        json={
+            "inst_id": SWAP_INST_ID,
+            "side": "long",
+            "quantity": "2",
+            "avg_cost": "55",
+            "stop_px": "58",
+            "leverage": "2",
+            "idempotency_key": "merged-positions-1",
+        },
+    )
+    assert created.status_code == 201, created.text
+    manual_id = created.json()["id"]
+
+    response = api.get("/api/positions")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["exchange_status"] == "ok"
+    assert body["as_of"] is not None
+    assert len(body["items"]) == 2
+
+    exchange_ref = f"exchange:{DEFAULT_ACCOUNT_ID}:123456"
+    manual_ref = f"manual:{manual_id}"
+    by_ref = {item["position_ref"]: item for item in body["items"]}
+    assert set(by_ref) == {exchange_ref, manual_ref}
+
+    exchange_item = by_ref[exchange_ref]
+    assert exchange_item["source"] == "exchange"
+    assert Decimal(exchange_item["size"]) == Decimal("8")
+    assert Decimal(exchange_item["avg_px"]) == Decimal("226.80")
+    assert Decimal(exchange_item["mark_px"]) == Decimal("231.42")
+    assert Decimal(exchange_item["upl"]) == Decimal("36.96")
+    assert Decimal(exchange_item["lever"]) == Decimal("3")
+    assert exchange_item["mgn_mode"] == "cross"
+    assert Decimal(exchange_item["notional"]) == Decimal("8") * Decimal("231.42")
+    assert exchange_item["price_status"] is None
+    assert exchange_item["updated_at"] == synced.json()["captured_at"]
+
+    manual_item = by_ref[manual_ref]
+    assert manual_item["source"] == "manual"
+    assert Decimal(manual_item["size"]) == Decimal("2")
+    assert Decimal(manual_item["avg_px"]) == Decimal("55")
+    assert Decimal(manual_item["mark_px"]) == Decimal("60.5")
+    assert Decimal(manual_item["upl"]) == Decimal("11")
+    assert Decimal(manual_item["notional"]) == Decimal("2") * Decimal("60.5")
+    assert Decimal(manual_item["stop_px"]) == Decimal("58")
+    assert Decimal(manual_item["stop_distance_pct"]) == (
+        (Decimal("60.5") - Decimal("58")) / Decimal("60.5") * Decimal("100")
+    ).quantize(Decimal("0.000000000001"))
+    assert manual_item["price_status"] == "ok"
+    assert manual_item["updated_at"] == created.json()["updated_at"]
+
+    exchange_only = api.get("/api/positions?source=exchange")
+    assert exchange_only.status_code == 200, exchange_only.text
+    assert [item["source"] for item in exchange_only.json()["items"]] == ["exchange"]
+
+    manual_only = api.get("/api/positions?source=manual")
+    assert manual_only.status_code == 200, manual_only.text
+    assert [item["source"] for item in manual_only.json()["items"]] == ["manual"]
+
+
+def test_positions_endpoint_keeps_manual_positions_when_exchange_unconfigured(
+    bare_client: TestClient,
+) -> None:
+    """交易所未配置时仍返回手动持仓，来源与同步状态分别标注。"""
+
+    sync_instruments(parse_instruments([SPOT_INSTRUMENT, SWAP_INSTRUMENT]))
+    seed_daily(SWAP_INST_ID, ["50", "55", "60.5"])
+    created = bare_client.post(
+        "/api/manual-positions",
+        json={
+            "inst_id": SWAP_INST_ID,
+            "side": "long",
+            "quantity": "2",
+            "avg_cost": "55",
+            "idempotency_key": "merged-positions-unconfigured",
+        },
+    )
+    assert created.status_code == 201, created.text
+
+    response = bare_client.get("/api/positions")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["exchange_status"] == "unconfigured"
+    assert len(body["items"]) == 1
+    assert body["items"][0]["source"] == "manual"
+    assert body["items"][0]["position_ref"] == f"manual:{created.json()['id']}"
 
 
 def _exchange_position(pos_id: str, size: str, *, mark_px: str) -> ExchangePosition:

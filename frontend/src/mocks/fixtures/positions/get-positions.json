@@ -1,0 +1,45 @@
+{
+  "as_of": "2026-11-13T09:00:00Z",
+  "exchange_status": "ok",
+  "items": [
+    {
+      "asset_class": "tokenized_equity",
+      "avg_px": "226.80",
+      "display_symbol": "AAPL-USDT",
+      "inst_id": "AAPL-USDT-SWAP",
+      "lever": "3",
+      "liq_px": "151.20",
+      "margin": "604.80",
+      "mark_px": "231.42",
+      "mgn_mode": "cross",
+      "name": "AAPL",
+      "notional": "1851.36",
+      "position_ref": "exchange:okx-main:123456",
+      "side": "long",
+      "size": "8",
+      "source": "exchange",
+      "updated_at": "2026-11-13T09:00:00Z",
+      "upl": "36.96",
+      "upl_ratio": "0.0204"
+    },
+    {
+      "asset_class": "tokenized_equity",
+      "avg_px": "55",
+      "display_symbol": "AAPL-USDT",
+      "inst_id": "AAPL-USDT-SWAP",
+      "lever": "2",
+      "mark_px": "60.5",
+      "name": "AAPL",
+      "notional": "121",
+      "position_ref": "manual:0f6f6f0e-5b6f-4f0c-9b7a-7e5f8a1d2c34",
+      "price_status": "ok",
+      "side": "long",
+      "size": "2",
+      "source": "manual",
+      "stop_distance_pct": "4.132231404959",
+      "stop_px": "58",
+      "updated_at": "2026-11-13T09:00:00Z",
+      "upl": "11"
+    }
+  ]
+}

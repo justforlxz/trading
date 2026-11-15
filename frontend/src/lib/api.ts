@@ -93,6 +93,8 @@ export type ExecutionSettings = SettingsResponse["execution"];
 export type RiskDefaults = SettingsResponse["risk_defaults"];
 export type DataSourceSettings = SettingsResponse["data_sources"];
 export type SecretSettings = SettingsResponse["secrets"];
+export type SystemHealthResponse = components["schemas"]["SystemHealthResponse"];
+export type SystemComponent = components["schemas"]["SystemComponent"];
 export type MarketBreadthResponse = components["schemas"]["MarketBreadthResponse"];
 export type ResearchNoteItem = components["schemas"]["ResearchNoteItem"];
 export type ResearchNoteListResponse = components["schemas"]["ResearchNoteListResponse"];
@@ -474,4 +476,9 @@ export function fetchSettings(): Promise<SettingsResponse> {
 
 export function updateSettings(body: SettingsUpdateRequest): Promise<SettingsResponse> {
   return send<SettingsResponse>("/settings", "PATCH", body);
+}
+
+/** 系统健康：六项都来自后端已有事实，页面只展示，不补造时间或推断状态。 */
+export function fetchSystemHealth(): Promise<SystemHealthResponse> {
+  return request<SystemHealthResponse>("/system/health");
 }

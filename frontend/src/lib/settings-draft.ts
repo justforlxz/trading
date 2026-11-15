@@ -6,6 +6,32 @@
  * 因此解析只在保存时发生，页面拿到的是纯函数结果。
  */
 
+import type {
+  DisplaySettings,
+  ExecutionSettings,
+  RiskDefaults,
+  SettingsResponse,
+} from "./api";
+
+/** 设置页的草稿：只放可编辑字段，订阅标的原文由页面单独持有。 */
+export type SettingsDraft = {
+  display: DisplaySettings;
+  risk_defaults: RiskDefaults;
+  execution: ExecutionSettings;
+  data_sources: { provider: string | null };
+};
+
+export function toSettingsDraft(settings: SettingsResponse): SettingsDraft {
+  return {
+    display: settings.display,
+    risk_defaults: settings.risk_defaults,
+    execution: settings.execution,
+    data_sources: {
+      provider: settings.data_sources.provider ?? null,
+    },
+  };
+}
+
 /** 接口返回的标的数组 → 输入框文本。 */
 export function instrumentsToText(instruments: readonly string[]): string {
   return instruments.join(", ");

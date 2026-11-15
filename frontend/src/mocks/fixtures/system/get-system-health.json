@@ -1,0 +1,18 @@
+{
+  "checked_at": "2026-11-15T06:10:00Z",
+  "components": [
+    {
+      "last_success_at": "2026-11-15T06:10:00Z",
+      "name": "database",
+      "status": "ok"
+    },
+    {
+      "detail": "market_data_provider / market_overview",
+      "error": "Provider 超时",
+      "last_success_at": "2026-11-14T06:00:00Z",
+      "name": "external_provider",
+      "status": "stale"
+    }
+  ],
+  "status": "degraded"
+}

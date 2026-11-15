@@ -88,13 +88,12 @@ export type BacktestCosts = components["schemas"]["BacktestCosts"];
 export type BacktestMetrics = components["schemas"]["BacktestMetrics"];
 export type SettingsResponse = components["schemas"]["SettingsResponse"];
 export type SettingsUpdateRequest = components["schemas"]["SettingsUpdateRequest"];
+export type DisplaySettings = SettingsResponse["display"];
 export type ExecutionSettings = SettingsResponse["execution"];
-export type RiskSettings = SettingsResponse["risk"];
-export type CostSettings = SettingsResponse["costs"];
-export type BacktestSettings = SettingsResponse["backtest"];
-export type DataSettings = SettingsResponse["data"];
-export type ExchangeSettings = SettingsResponse["exchange"];
-export type MarketOverviewResponse = components["schemas"]["MarketOverviewResponse"];
+export type RiskDefaults = SettingsResponse["risk_defaults"];
+export type DataSourceSettings = SettingsResponse["data_sources"];
+export type SecretSettings = SettingsResponse["secrets"];
+export type MarketBreadthResponse = components["schemas"]["MarketBreadthResponse"];
 export type ResearchNoteItem = components["schemas"]["ResearchNoteItem"];
 export type ResearchNoteListResponse = components["schemas"]["ResearchNoteListResponse"];
 export type ResearchNoteCreateRequest = components["schemas"]["ResearchNoteCreateRequest"];
@@ -169,12 +168,12 @@ export function fetchTradableInstruments(
 }
 
 /** 某一类别在某一周期上的市场广度与共振；类别没有默认值，必须显式指定。 */
-export function fetchMarketOverview(
+export function fetchMarketBreadth(
   instType: "SPOT" | "SWAP",
   bar: "1d" = "1d",
-): Promise<MarketOverviewResponse> {
+): Promise<MarketBreadthResponse> {
   const query = new URLSearchParams({ inst_type: instType, bar });
-  return request<MarketOverviewResponse>(`/market/overview?${query.toString()}`);
+  return request<MarketBreadthResponse>(`/market/breadth?${query.toString()}`);
 }
 
 /** 按代码或产品键搜索已同步的标的；不传形态时两类一起返回。 */
@@ -468,11 +467,11 @@ export function fetchActivity(
   return request<ActivityListResponse>(`/activity?${query.toString()}`);
 }
 
-/** 设置文档：分组配置、凭证状态与执行模式。API Key 只写不读。 */
+/** 设置文档：显示偏好、风险默认值、自动执行开关、数据源与凭证状态。API Key 只写不读。 */
 export function fetchSettings(): Promise<SettingsResponse> {
   return request<SettingsResponse>("/settings");
 }
 
 export function updateSettings(body: SettingsUpdateRequest): Promise<SettingsResponse> {
-  return send<SettingsResponse>("/settings", "PUT", body);
+  return send<SettingsResponse>("/settings", "PATCH", body);
 }

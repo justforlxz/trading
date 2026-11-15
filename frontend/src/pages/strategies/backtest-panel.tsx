@@ -13,7 +13,6 @@ import {
   type BacktestDataSource,
   type BacktestDetailResponse,
   type BacktestRunSummary,
-  type SettingsResponse,
   type StrategyDetail,
   type StrategyVersionDetail,
 } from "../../lib/api";
@@ -29,7 +28,6 @@ function messageOf(reason: unknown, fallback: string): string {
 export type StrategyBacktestPanelProps = {
   detail: StrategyDetail;
   versions: StrategyVersionDetail[];
-  settings: SettingsResponse | null;
   runs: BacktestRunSummary[];
   runSource: BacktestDataSource;
   onRunSourceChange: (source: BacktestDataSource) => void;
@@ -41,7 +39,6 @@ export type StrategyBacktestPanelProps = {
 export function StrategyBacktestPanel({
   detail,
   versions,
-  settings,
   runs,
   runSource,
   onRunSourceChange,
@@ -84,10 +81,8 @@ export function StrategyBacktestPanel({
         </CardHeader>
         <CardContent>
           <BacktestLaunchForm
-            key={settings ? "settings-ready" : "settings-pending"}
             versions={versions}
             initialVersionId={detail.current_version_id}
-            settings={settings}
             runSource={runSource}
             onRunSourceChange={onRunSourceChange}
             onLaunched={(batch) => {

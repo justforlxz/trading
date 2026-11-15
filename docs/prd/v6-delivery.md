@@ -304,13 +304,13 @@ flowchart TD
 
 ## 6. API 契约表
 
-本节以 `docs/prd/v6-data-spec.md` 第 7 节为准。规格第 7 节列出 26 行、31 个方法与路径；本表另外登记 2 个已经合并的账户接口，共 33 行。
+本节以 `docs/prd/v6-data-spec.md` 第 7 节为准。规格第 7 节列出 26 行、31 个方法与路径；本表另外登记 2 个已经合并的账户接口，以及 B9 新增的广度、事件、新闻与 AI 摘要 4 条路径，共 37 行。
 
 通用约定：
 
 - 所有路径都以 `/api` 开头，JSON 字段使用 `snake_case`，时间使用 ISO-8601 UTC 并带 `Z`，`Decimal` 以字符串返回。
 - 错误响应统一为 `{"detail": "..."}`，沿用 `backend/app/api/errors.py` 的现有约定；表中的“错误码”是 HTTP 状态码。
-- 行情、账户、持仓、事件等外部数据都带 `source`、`as_of`、`received_at`、`is_delayed`、`quality_status`。`quality_status` 取 `normal`、`missing`、`delayed`、`abnormal`、`pending`。
+- 行情、账户、持仓、事件等外部数据都带 `source`、`as_of`、`received_at`、`is_delayed`、`quality_status`。`quality_status` 取 `normal`、`missing`、`delayed`、`stale`、`abnormal`、`pending`。
 - `quote` 是共享对象：`{last_price, mark_price, index_price, change, change_pct, source, as_of, received_at, is_delayed, quality_status}`，三种价格不得合并成一个 `price` 字段。
 - 分页响应使用 `{items, next_cursor}`；`next_cursor` 为空表示没有下一页。
 - 负责列写实现归属：B2 到 B9 是 §5 登记的后端包；S1-2、S1-3 是阶段 1 的前端节点，它们的后端能力属于现有模块，不新增包。
@@ -318,7 +318,10 @@ flowchart TD
 | 方法 | 路径 | 请求字段 | 响应字段 | 错误码 | 负责节点或包 |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/dashboard/summary` | 无 | `as_of`、`market`、`account`、`risk`、`positions`、`watchlist`、`alerts`、`strategies`、`activity`、`degraded[{module,status,reason,last_success_at}]` | 200（部分模块可为 `null`）、503 | B5 |
-| GET | `/api/market/overview` | 无 | `as_of`、`items[{symbol,name,value,change,change_pct,market_session,source,as_of,is_delayed,quality_status}]`，`symbol` 固定为 `NASDAQ`、`SP500`、`DOW`、`VIX`、`BTC` | 502、503 | B9 |
+| GET | `/api/market/overview` | 无 | `as_of`、`provider`、`stale`、`stale_reason`、`last_success_at`、`items[{symbol,name,value,change,change_pct,market_session,source,as_of,is_delayed,quality_status,source_url}]`，`symbol` 固定为 `NASDAQ`、`SP500`、`DOW`、`VIX`、`BTC`；Provider 失败时 `stale` 为真且不回填旧值；报价时间超过 24 小时时对应项 `quality_status=stale`，顶层 `stale` 为真并给出可读原因 | 502、503 | B9 |
+| GET | `/api/market/breadth` | `inst_type`（必填）、`bar`（可选，默认 `1d`）、`as_of`（可选） | `inst_type`、`bar`、`as_of`、`breadth{advancers,decliners,unchanged,ratio,participants}`、`resonance{strength,participants,window}` | 400 | B9（自选环境卡；由旧 `/api/market/overview` 广度实现迁移） |
+| GET | `/api/market/events` | `ticker`、`start`、`end`、`limit`（均可选） | `items[{id,event_type,title,region,ticker,scheduled_at,scheduled_at_beijing,actual,forecast,previous,importance,source,source_url,received_at}]` | 400 | B9 |
+| GET | `/api/news` | `ticker`、`industry`、`limit`（均可选） | `items[{id,title,summary,publisher,url,published_at,tickers,tags,source,received_at}]` | 400 | B9 |
 | GET | `/api/account/summary` | 无 | `status`（`ok`、`stale`、`unconfigured`）、`account_id`、`currency`、`equity`、`available_equity`、`cash_balance`、`unrealized_pnl`、`used_margin`、`available_margin`、`margin_usage_pct`、`day_pnl`、`day_pnl_basis`、`position_notional`（待 B2 补齐）、`day_pnl_pct`（待 B2 补齐）、`captured_at`、`source` | 200（未配置或没有快照时 `status` 为 `unconfigured` 或 `stale`，不用错误码） | B2 |
 | POST | `/api/account/sync` | 无 | 与 `GET /api/account/summary` 相同，另加 `positions_synced` | 200（未配置时 `status=unconfigured`）、502（上游失败） | B2 |
 | GET | `/api/instruments?query=` | `query`、`asset_class`（可选）、`limit`（可选，默认 20） | `items[{instrument_id,venue,inst_id,inst_type,base_asset,quote_asset,display_symbol,asset_class,name,state,tradable}]` | 400 | S1-2 |
@@ -348,7 +351,8 @@ flowchart TD
 | DELETE | `/api/research-notes/{id}` | 路径参数 `id` | 204，无响应体 | 404 | B8 |
 | GET | `/api/settings` | 无 | `display{color_scheme,default_bar,price_precision,home_layout}`、`risk_defaults{default_leverage,risk_budget_per_trade,warning_threshold,stop_rule}`、`execution{auto_trading_enabled}`（默认 `false`，只保存状态）、`data_sources{provider,subscribed_instruments,last_sync_at,failure_count}`、`secrets{okx_api_key_masked,okx_configured,okx_permission}`、`updated_at` | 503 | B9 |
 | PATCH | `/api/settings` | `display`、`risk_defaults`、`execution{auto_trading_enabled}`、`data_sources`（均可选，至少一项） | 200：完整设置对象，与 `GET` 相同；`secrets` 只读；修改 `auto_trading_enabled` 不产生任何真实订单 | 400 | B9 |
-| GET | `/api/system/health` | 无 | `status`、`checked_at`、`components[{name,status,last_success_at,error,detail}]`，`name` 包含 `database`、`okx_rest`、`okx_ws`、`external_provider`、`job_queue`、`candle_coverage` | 200（单项异常不影响整体响应）、503 | B9 |
+| GET | `/api/system/health` | 无 | `status`、`checked_at`、`components[{name,status,last_success_at,error,detail}]`，`name` 包含 `database`、`okx_rest`、`okx_ws`、`external_provider`、`job_queue`、`candle_coverage`；同步任务仍在 `running`、最近一次失败、同一数据集的最后成功时间或报价时间超过新鲜度阈值（外部 Provider 24 小时，OKX REST 与 K 线覆盖 3 天）时该项为 `stale` | 200（单项异常不影响整体响应）、503 | B9 |
+| POST | `/api/ai/summary` | `include_news`（可选）、`news_limit`（可选） | `generated_at`、`overall`、`points[{text,sources[{type,id,url}]}]`、`risks[{text,sources}]`、`disclaimer`、`stale`、`stale_notice`；每个事实点至少一条来源；行情报价过期时 `stale_notice` 写明原因 | 400 | B9 |
 | POST | `/api/system/sync` | `dataset`、`provider`（可选）、`instrument_ids`（可选） | 202：`job_id`、`status` | 400、409 | B9 |
 
 ### 6.1 账户与持仓接口的取舍
@@ -385,17 +389,17 @@ flowchart TD
 | 概览：账户概览 | `GET /api/dashboard/summary` 的 `account`（数据源 `GET /api/account/summary`） | S4-1 | B2、B5 |
 | 概览：风险监控 | `GET /api/dashboard/summary` 的 `risk` | S4-1、S3-2 | B3、B5 |
 | 概览：当前持仓 | `GET /api/dashboard/summary` 的 `positions` | S4-1 | B2、B5 |
-| 概览：市场摘要 | `GET /api/dashboard/summary` 的 `market.summary` | S6-1 | B9 |
+| 概览：市场摘要 | `POST /api/ai/summary` | S6-1 | B9 |
 | 概览：关注列表 | `GET /api/dashboard/summary` 的 `watchlist`，实时价格由推送更新 | S4-1 | B5、B4 |
 | 概览：提醒与活动 | `GET /api/dashboard/summary` 的 `alerts`、`activity` | S5-2 | B8 |
 | 概览：策略运行 | `GET /api/dashboard/summary` 的 `strategies` | S4-1 | B6、B5 |
 | 自选列表与增删 | `GET /api/watchlist`、`POST /api/watchlist/items`、`DELETE /api/watchlist/items/{id}` | S1-2 | 现有模块 |
 | 自选搜索 | `GET /api/instruments?query=` | S1-2 | 现有模块 |
-| 自选指标列与市场环境 | `GET /api/watchlist` 的 `items`、`summary`、`market_environment` | S1-2 | 现有模块 |
+| 自选指标列与市场环境 | `GET /api/watchlist` 的 `items`、`summary`、`market_environment`；市场环境卡的 SPOT / SWAP 广度用 `GET /api/market/breadth` | S1-2 | 现有模块、B9 |
 | 标的详情头部与 K 线 | `GET /api/instruments/{id}/analysis` | S1-3 | 现有模块 |
 | 标的详情指标、关键价位、关联资产、数据覆盖 | `GET /api/instruments/{id}/analysis` | S1-3 | 现有模块 |
 | 标的详情关联策略 | `GET /api/instruments/{id}/analysis` 的 `linked_strategies` | S4-3 | B6 |
-| 标的详情近期事件 | `GET /api/instruments/{id}/analysis` 的 `events` | S6-1 | B9 |
+| 标的详情近期事件 | `GET /api/market/events`、`GET /api/news` | S6-1 | B9 |
 | 持仓：账户概览 | `GET /api/account/summary` | S2-1 | B2 |
 | 持仓：OKX 区 | `GET /api/positions/exchange`（合并视图 `GET /api/positions?source=exchange` 交付后再替换） | S2-1 | B2 |
 | 持仓：手动区 | `GET /api/positions?source=manual`（写入与流水用 `/api/manual-positions` 系列） | S2-2 | B2 |
@@ -427,7 +431,7 @@ flowchart TD
 | `price_alerts` 表、`PUT` 和 `DELETE /api/watchlist/{inst_id}/alert`、`PriceAlert` schema、`app/watchlist` 的旧提醒函数 | B8 的 `alert_events` 和 `/api/alerts` | B8 |
 | 旧策略模板目录、旧策略实例 CRUD、旧策略页面 | B6 的策略与版本接口、S4-2 策略与回测页 | B6 删除接口，S4-2 删除页面 |
 | 回测里的 `strategy_instance_id` 字段和旧回测入口 | B7 的 `strategy_version_id` | B7 |
-| 设置页里 v6 不展示的执行模式、紧急停止、成本、回测默认值、代理分组 | B9 的设置接口、S6-2 设置页 | B9 删除接口字段，S6-2 删除页面控件 |
+| 设置页里 v6 不展示的执行模式、紧急停止、成本、回测默认值、代理分组 | B9 的设置接口、S6-2 设置页 | B9 删除接口字段与设置页旧控件；S6-2 继续交付设置页的完整分组与健康展示 |
 | `execution.auto_trading_enabled` 自动执行开关 | 规格 §3.8 要求保留：v6 默认关闭，只保存状态，不实现真实下单 | 保留；B9 提供字段，S6-2 显示开关 |
 
 ### 8.3 S7-1 全站残留检查

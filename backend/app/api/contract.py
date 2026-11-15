@@ -15,8 +15,6 @@ from app.api.schemas import (
     BacktestSweepResponse,
     CorrelationMatrixResponse,
     CorrelationSeriesResponse,
-    ExecutionModeRequest,
-    ExecutionStateResponse,
     FillListResponse,
     Order,
     OrderCreateRequest,
@@ -87,16 +85,6 @@ def list_fills() -> FillListResponse:
 @trade_contract_router.get("/signals", response_model=SignalListResponse)
 def list_signals() -> SignalListResponse:
     raise _stub("T5.4")
-
-
-@trade_contract_router.get("/execution", response_model=ExecutionStateResponse)
-def get_execution_state() -> ExecutionStateResponse:
-    raise _stub("T5.3")
-
-
-@trade_contract_router.put("/execution/mode", response_model=ExecutionStateResponse)
-def set_execution_mode(payload: ExecutionModeRequest) -> ExecutionStateResponse:
-    raise _stub("T5.3")
 
 
 # ---------------------------------------------------------------- risk

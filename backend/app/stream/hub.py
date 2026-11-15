@@ -802,6 +802,11 @@ class StreamHub:
             predicate=predicate,
         )
 
+    def status_snapshot(self) -> dict[str, Any]:
+        """公共行情连接的最新状态；健康接口读取它，不临时探测上游。"""
+
+        return self._status_payload(PUBLIC_DATASET)
+
     def _status_payload(self, dataset: str) -> dict[str, Any]:
         status = self._status[dataset]
         return {

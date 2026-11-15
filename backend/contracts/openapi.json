@@ -448,6 +448,171 @@
         "title": "ActivityListResponse",
         "type": "object"
       },
+      "AiSummaryPoint": {
+        "description": "摘要里的一个事实点；`sources` 至少一条。",
+        "properties": {
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/AiSummarySource"
+            },
+            "minItems": 1,
+            "title": "Sources",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "sources"
+        ],
+        "title": "AiSummaryPoint",
+        "type": "object"
+      },
+      "AiSummaryRequest": {
+        "additionalProperties": false,
+        "description": "摘要输入；只读取已采集的数据，不触发外部请求。",
+        "properties": {
+          "include_news": {
+            "default": true,
+            "title": "Include News",
+            "type": "boolean"
+          },
+          "news_limit": {
+            "default": 10,
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "News Limit",
+            "type": "integer"
+          }
+        },
+        "title": "AiSummaryRequest",
+        "type": "object"
+      },
+      "AiSummaryResponse": {
+        "description": "结构化摘要；没有来源的事实点不会出现在 `points` 或 `risks` 里。",
+        "examples": [
+          {
+            "disclaimer": "仅作信息归纳，不构成交易建议",
+            "generated_at": "2026-11-15T06:10:00Z",
+            "overall": "偏强，波动率抬升",
+            "points": [
+              {
+                "sources": [
+                  {
+                    "id": "NASDAQ",
+                    "type": "market_overview"
+                  }
+                ],
+                "text": "NASDAQ Composite 最新 18000.12，较前值 +1.01%。"
+              }
+            ],
+            "risks": [
+              {
+                "sources": [
+                  {
+                    "id": "alert_0123456789abcdef01234567",
+                    "type": "alert"
+                  }
+                ],
+                "text": "持仓缺少止损：AAPL-USDT-SWAP"
+              }
+            ],
+            "stale": false
+          }
+        ],
+        "properties": {
+          "disclaimer": {
+            "title": "Disclaimer",
+            "type": "string"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "overall": {
+            "title": "Overall",
+            "type": "string"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/AiSummaryPoint"
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "risks": {
+            "items": {
+              "$ref": "#/components/schemas/AiSummaryPoint"
+            },
+            "title": "Risks",
+            "type": "array"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "stale_notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stale Notice"
+          }
+        },
+        "required": [
+          "generated_at",
+          "overall",
+          "points",
+          "risks",
+          "disclaimer",
+          "stale"
+        ],
+        "title": "AiSummaryResponse",
+        "type": "object"
+      },
+      "AiSummarySource": {
+        "description": "一条可回溯的来源；`id` 对应事件、新闻或提醒的本地标识。",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "news",
+              "alert",
+              "market_overview",
+              "risk"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "type",
+          "id"
+        ],
+        "title": "AiSummarySource",
+        "type": "object"
+      },
       "AlertItem": {
         "examples": [
           {
@@ -2807,38 +2972,6 @@
         "title": "BacktestRunSummary",
         "type": "object"
       },
-      "BacktestSettings": {
-        "properties": {
-          "default_bar": {
-            "enum": [
-              "1m",
-              "5m",
-              "15m",
-              "1h",
-              "4h",
-              "1d"
-            ],
-            "title": "Default Bar",
-            "type": "string"
-          },
-          "default_initial_capital": {
-            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
-            "title": "Default Initial Capital",
-            "type": "string"
-          },
-          "funding_enabled": {
-            "title": "Funding Enabled",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "funding_enabled",
-          "default_initial_capital",
-          "default_bar"
-        ],
-        "title": "BacktestSettings",
-        "type": "object"
-      },
       "BacktestSweepCombo": {
         "properties": {
           "error_message": {
@@ -3711,38 +3844,6 @@
           "points"
         ],
         "title": "CorrelationSeriesResponse",
-        "type": "object"
-      },
-      "CostSettings": {
-        "properties": {
-          "maker_fee_bps": {
-            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
-            "title": "Maker Fee Bps",
-            "type": "string"
-          },
-          "slippage_bps": {
-            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
-            "title": "Slippage Bps",
-            "type": "string"
-          },
-          "spread_bps": {
-            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
-            "title": "Spread Bps",
-            "type": "string"
-          },
-          "taker_fee_bps": {
-            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
-            "title": "Taker Fee Bps",
-            "type": "string"
-          }
-        },
-        "required": [
-          "maker_fee_bps",
-          "taker_fee_bps",
-          "slippage_bps",
-          "spread_bps"
-        ],
-        "title": "CostSettings",
         "type": "object"
       },
       "DashboardAccountData": {
@@ -5247,22 +5348,125 @@
         "title": "DashboardWatchlistSummary",
         "type": "object"
       },
-      "DataSettings": {
+      "DataSourceSettings": {
+        "description": "数据源配置与同步状态；状态字段由服务端读取同步任务表填写。",
         "properties": {
-          "proxy_configured": {
-            "title": "Proxy Configured",
-            "type": "boolean"
+          "failure_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Failure Count",
+            "type": "integer"
           },
-          "proxy_enabled": {
-            "title": "Proxy Enabled",
-            "type": "boolean"
+          "last_sync_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sync At"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "subscribed_instruments": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Subscribed Instruments",
+            "type": "array"
           }
         },
-        "required": [
-          "proxy_enabled",
-          "proxy_configured"
-        ],
-        "title": "DataSettings",
+        "title": "DataSourceSettings",
+        "type": "object"
+      },
+      "DataSourceSettingsUpdate": {
+        "additionalProperties": false,
+        "description": "数据源可写字段；最后同步时间与失败次数只读。",
+        "properties": {
+          "provider": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "subscribed_instruments": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subscribed Instruments"
+          }
+        },
+        "title": "DataSourceSettingsUpdate",
+        "type": "object"
+      },
+      "DisplaySettings": {
+        "additionalProperties": false,
+        "description": "显示偏好；前端可缓存，后端持久化。",
+        "properties": {
+          "color_scheme": {
+            "default": "system",
+            "enum": [
+              "system",
+              "light",
+              "dark"
+            ],
+            "title": "Color Scheme",
+            "type": "string"
+          },
+          "default_bar": {
+            "default": "1d",
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h",
+              "4h",
+              "1d"
+            ],
+            "title": "Default Bar",
+            "type": "string"
+          },
+          "home_layout": {
+            "default": "cockpit",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Home Layout",
+            "type": "string"
+          },
+          "price_precision": {
+            "default": 2,
+            "maximum": 8.0,
+            "minimum": 0.0,
+            "title": "Price Precision",
+            "type": "integer"
+          }
+        },
+        "title": "DisplaySettings",
         "type": "object"
       },
       "EquityPoint": {
@@ -5483,37 +5687,9 @@
         "title": "ExchangePositionsResponse",
         "type": "object"
       },
-      "ExchangeSettings": {
-        "properties": {
-          "api_configured": {
-            "title": "Api Configured",
-            "type": "boolean"
-          },
-          "api_key_masked": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Api Key Masked"
-          },
-          "demo_trading": {
-            "title": "Demo Trading",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "demo_trading",
-          "api_configured"
-        ],
-        "title": "ExchangeSettings",
-        "type": "object"
-      },
       "ExchangeSettingsUpdate": {
-        "description": "只写字段：提交后服务端只保存，不读回明文。",
+        "additionalProperties": false,
+        "description": "API Key 只写字段；提交后服务端只保存，不读回明文。",
         "properties": {
           "api_key": {
             "anyOf": [
@@ -5533,101 +5709,17 @@
         "title": "ExchangeSettingsUpdate",
         "type": "object"
       },
-      "ExecutionModeRequest": {
-        "properties": {
-          "acknowledge_risk": {
-            "default": false,
-            "title": "Acknowledge Risk",
-            "type": "boolean"
-          },
-          "mode": {
-            "enum": [
-              "manual",
-              "paper",
-              "live"
-            ],
-            "title": "Mode",
-            "type": "string"
-          }
-        },
-        "required": [
-          "mode"
-        ],
-        "title": "ExecutionModeRequest",
-        "type": "object"
-      },
       "ExecutionSettings": {
+        "additionalProperties": false,
+        "description": "自动执行开关：v6 默认关闭，只保存状态，不产生真实订单。",
         "properties": {
           "auto_trading_enabled": {
+            "default": false,
             "title": "Auto Trading Enabled",
             "type": "boolean"
-          },
-          "emergency_stop": {
-            "title": "Emergency Stop",
-            "type": "boolean"
-          },
-          "mode": {
-            "enum": [
-              "manual",
-              "paper",
-              "live"
-            ],
-            "title": "Mode",
-            "type": "string"
           }
         },
-        "required": [
-          "mode",
-          "auto_trading_enabled",
-          "emergency_stop"
-        ],
         "title": "ExecutionSettings",
-        "type": "object"
-      },
-      "ExecutionStateResponse": {
-        "examples": [
-          {
-            "auto_trading_enabled": false,
-            "emergency_stop": false,
-            "mode": "paper"
-          }
-        ],
-        "properties": {
-          "auto_trading_enabled": {
-            "title": "Auto Trading Enabled",
-            "type": "boolean"
-          },
-          "emergency_stop": {
-            "title": "Emergency Stop",
-            "type": "boolean"
-          },
-          "live_acknowledged_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Live Acknowledged At"
-          },
-          "mode": {
-            "enum": [
-              "manual",
-              "paper",
-              "live"
-            ],
-            "title": "Mode",
-            "type": "string"
-          }
-        },
-        "required": [
-          "mode",
-          "auto_trading_enabled",
-          "emergency_stop"
-        ],
-        "title": "ExecutionStateResponse",
         "type": "object"
       },
       "ExposurePositionItem": {
@@ -7707,7 +7799,7 @@
         "title": "MarketBreadth",
         "type": "object"
       },
-      "MarketOverviewResponse": {
+      "MarketBreadthResponse": {
         "description": "某一类别（`inst_type`）的横截面总览；两类标的各自统计，互不混入。",
         "examples": [
           {
@@ -7767,7 +7859,281 @@
           "breadth",
           "resonance"
         ],
-        "title": "MarketOverviewResponse",
+        "title": "MarketBreadthResponse",
+        "type": "object"
+      },
+      "MarketEventItem": {
+        "description": "一条宏观或公司事件；`scheduled_at_beijing` 是展示用北京时间。",
+        "properties": {
+          "actual": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual"
+          },
+          "event_type": {
+            "title": "Event Type",
+            "type": "string"
+          },
+          "forecast": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "importance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Importance"
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous"
+          },
+          "received_at": {
+            "title": "Received At",
+            "type": "string"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region"
+          },
+          "scheduled_at": {
+            "title": "Scheduled At",
+            "type": "string"
+          },
+          "scheduled_at_beijing": {
+            "title": "Scheduled At Beijing",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "event_type",
+          "title",
+          "region",
+          "ticker",
+          "scheduled_at",
+          "scheduled_at_beijing",
+          "actual",
+          "forecast",
+          "previous",
+          "importance",
+          "source",
+          "source_url",
+          "received_at"
+        ],
+        "title": "MarketEventItem",
+        "type": "object"
+      },
+      "MarketEventListResponse": {
+        "description": "按时间范围与标的条件读取的事件列表。",
+        "examples": [
+          {
+            "items": [
+              {
+                "event_type": "earnings",
+                "forecast": "1.20",
+                "id": "evt_0123456789abcdef01234567",
+                "importance": "high",
+                "previous": "1.10",
+                "received_at": "2026-11-15T06:10:00Z",
+                "region": "US",
+                "scheduled_at": "2026-11-16T21:00:00Z",
+                "scheduled_at_beijing": "2026-11-17 05:00",
+                "source": "market_data_provider",
+                "ticker": "AAPL",
+                "title": "AAPL 财报"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MarketEventItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "MarketEventListResponse",
+        "type": "object"
+      },
+      "MarketOverviewItem": {
+        "description": "一个市场指标；缺数据时数值为 `null`，`quality_status` 说明原因。",
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "change": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          },
+          "is_delayed": {
+            "title": "Is Delayed",
+            "type": "boolean"
+          },
+          "market_session": {
+            "title": "Market Session",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "quality_status": {
+            "enum": [
+              "normal",
+              "missing",
+              "delayed",
+              "stale",
+              "abnormal",
+              "pending"
+            ],
+            "title": "Quality Status",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "symbol",
+          "name",
+          "value",
+          "change",
+          "change_pct",
+          "market_session",
+          "source",
+          "as_of",
+          "is_delayed",
+          "quality_status"
+        ],
+        "title": "MarketOverviewItem",
         "type": "object"
       },
       "MarketResonance": {
@@ -7800,6 +8166,91 @@
           "window"
         ],
         "title": "MarketResonance",
+        "type": "object"
+      },
+      "MarketSnapshotResponse": {
+        "description": "五个市场指标的当前快照；顶层 `stale` 表示至少一项不能当作实时值。",
+        "examples": [
+          {
+            "as_of": "2026-11-15T06:10:00Z",
+            "items": [
+              {
+                "as_of": "2026-11-15T06:00:00Z",
+                "change": "180",
+                "change_pct": "1.01",
+                "is_delayed": false,
+                "market_session": "closed",
+                "name": "NASDAQ Composite",
+                "quality_status": "normal",
+                "source": "market_data_provider",
+                "symbol": "NASDAQ",
+                "value": "18000.12"
+              }
+            ],
+            "last_success_at": "2026-11-15T06:05:00Z",
+            "provider": "market_data_provider",
+            "stale": false
+          }
+        ],
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MarketOverviewItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "stale_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stale Reason"
+          }
+        },
+        "required": [
+          "as_of",
+          "provider",
+          "stale",
+          "stale_reason",
+          "last_success_at",
+          "items"
+        ],
+        "title": "MarketSnapshotResponse",
         "type": "object"
       },
       "MomentumIndicators": {
@@ -7854,6 +8305,137 @@
           }
         },
         "title": "MomentumIndicators",
+        "type": "object"
+      },
+      "NewsItem": {
+        "description": "一条已采集新闻；标题、来源、URL 与发布时间原样保留。",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "publisher": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher"
+          },
+          "received_at": {
+            "title": "Received At",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tickers",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "summary",
+          "publisher",
+          "url",
+          "published_at",
+          "tickers",
+          "tags",
+          "source",
+          "received_at"
+        ],
+        "title": "NewsItem",
+        "type": "object"
+      },
+      "NewsListResponse": {
+        "description": "按标的或行业标签读取的新闻列表。",
+        "examples": [
+          {
+            "items": [
+              {
+                "id": "news_0123456789abcdef01234567",
+                "published_at": "2026-11-15T05:00:00Z",
+                "publisher": "Example News",
+                "received_at": "2026-11-15T06:10:00Z",
+                "source": "market_data_provider",
+                "summary": "收入高于市场预期。",
+                "tags": [
+                  "technology"
+                ],
+                "tickers": [
+                  "AAPL"
+                ],
+                "title": "AAPL 发布季度业绩"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NewsItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "NewsListResponse",
         "type": "object"
       },
       "Opportunity": {
@@ -9225,6 +9807,39 @@
         "title": "RiskConfigUpdateRequest",
         "type": "object"
       },
+      "RiskDefaults": {
+        "additionalProperties": false,
+        "description": "策略默认风险参数；不是执行风控限额。",
+        "properties": {
+          "default_leverage": {
+            "default": "3",
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Default Leverage",
+            "type": "string"
+          },
+          "risk_budget_per_trade": {
+            "default": "100",
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Risk Budget Per Trade",
+            "type": "string"
+          },
+          "stop_rule": {
+            "default": "fixed_pct",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Stop Rule",
+            "type": "string"
+          },
+          "warning_threshold": {
+            "default": "80",
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Warning Threshold",
+            "type": "string"
+          }
+        },
+        "title": "RiskDefaults",
+        "type": "object"
+      },
       "RiskEvent": {
         "examples": [
           {
@@ -9481,71 +10096,44 @@
         "title": "RiskExposureResponse",
         "type": "object"
       },
-      "RiskSettings": {
-        "description": "风控限额。`max_leverage` 的硬上限（10）不因配置抬高（decisions.md L1）。",
+      "SecretSettings": {
+        "description": "密钥状态：只读，永不返回明文。",
         "properties": {
-          "liquidation_buffer_pct": {
-            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
-            "title": "Liquidation Buffer Pct",
-            "type": "string"
+          "okx_api_key_masked": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Okx Api Key Masked"
           },
-          "max_daily_loss": {
-            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
-            "title": "Max Daily Loss",
-            "type": "string"
-          },
-          "max_leverage": {
-            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
-            "title": "Max Leverage",
-            "type": "string"
-          },
-          "max_margin_usage_pct": {
-            "default": "70",
-            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
-            "title": "Max Margin Usage Pct",
-            "type": "string"
-          },
-          "max_order_notional": {
-            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
-            "title": "Max Order Notional",
-            "type": "string"
-          },
-          "max_position_notional": {
-            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
-            "title": "Max Position Notional",
-            "type": "string"
-          },
-          "max_positions": {
-            "title": "Max Positions",
-            "type": "integer"
-          },
-          "max_single_instrument_weight_pct": {
-            "default": "35",
-            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
-            "title": "Max Single Instrument Weight Pct",
-            "type": "string"
-          },
-          "max_total_notional": {
-            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
-            "title": "Max Total Notional",
-            "type": "string"
-          },
-          "stop_loss_mandatory": {
-            "title": "Stop Loss Mandatory",
+          "okx_configured": {
+            "title": "Okx Configured",
             "type": "boolean"
+          },
+          "okx_permission": {
+            "anyOf": [
+              {
+                "enum": [
+                  "read_only",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Okx Permission"
           }
         },
         "required": [
-          "max_order_notional",
-          "max_position_notional",
-          "max_total_notional",
-          "max_positions",
-          "max_leverage",
-          "max_daily_loss",
-          "liquidation_buffer_pct",
-          "stop_loss_mandatory"
+          "okx_configured"
         ],
-        "title": "RiskSettings",
+        "title": "SecretSettings",
         "type": "object"
       },
       "SectorExposureItem": {
@@ -9576,63 +10164,46 @@
       "SettingsResponse": {
         "examples": [
           {
-            "backtest": {
-              "default_bar": "1h",
-              "default_initial_capital": "10000",
-              "funding_enabled": true
+            "data_sources": {
+              "failure_count": 0,
+              "subscribed_instruments": []
             },
-            "costs": {
-              "maker_fee_bps": "2",
-              "slippage_bps": "3",
-              "spread_bps": "2",
-              "taker_fee_bps": "5"
-            },
-            "data": {
-              "proxy_configured": false,
-              "proxy_enabled": false
-            },
-            "exchange": {
-              "api_configured": false,
-              "demo_trading": true
+            "display": {
+              "color_scheme": "system",
+              "default_bar": "1d",
+              "home_layout": "cockpit",
+              "price_precision": 2
             },
             "execution": {
-              "auto_trading_enabled": false,
-              "emergency_stop": false,
-              "mode": "paper"
+              "auto_trading_enabled": false
             },
-            "risk": {
-              "liquidation_buffer_pct": "10",
-              "max_daily_loss": "300",
-              "max_leverage": "3",
-              "max_margin_usage_pct": "70",
-              "max_order_notional": "1000",
-              "max_position_notional": "3000",
-              "max_positions": 5,
-              "max_single_instrument_weight_pct": "35",
-              "max_total_notional": "10000",
-              "stop_loss_mandatory": true
+            "risk_defaults": {
+              "default_leverage": "3",
+              "risk_budget_per_trade": "100",
+              "stop_rule": "fixed_pct",
+              "warning_threshold": "80"
             },
-            "updated_at": "2026-11-10T06:10:00Z"
+            "secrets": {
+              "okx_configured": false
+            },
+            "updated_at": "2026-11-15T06:10:00Z"
           }
         ],
         "properties": {
-          "backtest": {
-            "$ref": "#/components/schemas/BacktestSettings"
+          "data_sources": {
+            "$ref": "#/components/schemas/DataSourceSettings"
           },
-          "costs": {
-            "$ref": "#/components/schemas/CostSettings"
-          },
-          "data": {
-            "$ref": "#/components/schemas/DataSettings"
-          },
-          "exchange": {
-            "$ref": "#/components/schemas/ExchangeSettings"
+          "display": {
+            "$ref": "#/components/schemas/DisplaySettings"
           },
           "execution": {
             "$ref": "#/components/schemas/ExecutionSettings"
           },
-          "risk": {
-            "$ref": "#/components/schemas/RiskSettings"
+          "risk_defaults": {
+            "$ref": "#/components/schemas/RiskDefaults"
+          },
+          "secrets": {
+            "$ref": "#/components/schemas/SecretSettings"
           },
           "updated_at": {
             "title": "Updated At",
@@ -9640,12 +10211,11 @@
           }
         },
         "required": [
+          "display",
+          "risk_defaults",
           "execution",
-          "risk",
-          "costs",
-          "backtest",
-          "exchange",
-          "data",
+          "data_sources",
+          "secrets",
           "updated_at"
         ],
         "title": "SettingsResponse",
@@ -9653,37 +10223,22 @@
       },
       "SettingsUpdateRequest": {
         "additionalProperties": false,
-        "description": "分组级部分更新；交易所凭据只接受 API Key 写入，Secret 与 Passphrase 仍走环境变量。",
+        "description": "分组级部分更新，至少提交一项；`secrets` 只读，不在本模型里。",
         "properties": {
-          "acknowledge_risk": {
-            "default": false,
-            "title": "Acknowledge Risk",
-            "type": "boolean"
-          },
-          "backtest": {
+          "data_sources": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/BacktestSettings"
+                "$ref": "#/components/schemas/DataSourceSettingsUpdate"
               },
               {
                 "type": "null"
               }
             ]
           },
-          "costs": {
+          "display": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/CostSettings"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "data": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DataSettings"
+                "$ref": "#/components/schemas/DisplaySettings"
               },
               {
                 "type": "null"
@@ -9710,10 +10265,10 @@
               }
             ]
           },
-          "risk": {
+          "risk_defaults": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/RiskSettings"
+                "$ref": "#/components/schemas/RiskDefaults"
               },
               {
                 "type": "null"
@@ -11333,6 +11888,196 @@
         "title": "StrategyVersionSummary",
         "type": "object"
       },
+      "SystemComponent": {
+        "description": "一个系统组件的最新状态；错误只给摘要，不带上游原始应答。",
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "stale",
+              "error",
+              "unconfigured"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "last_success_at",
+          "error",
+          "detail"
+        ],
+        "title": "SystemComponent",
+        "type": "object"
+      },
+      "SystemHealthResponse": {
+        "description": "系统健康总览；单项异常不影响其他项，整体状态降为 `degraded`。",
+        "examples": [
+          {
+            "checked_at": "2026-11-15T06:10:00Z",
+            "components": [
+              {
+                "last_success_at": "2026-11-15T06:10:00Z",
+                "name": "database",
+                "status": "ok"
+              },
+              {
+                "detail": "market_data_provider / market_overview",
+                "error": "Provider 超时",
+                "last_success_at": "2026-11-14T06:00:00Z",
+                "name": "external_provider",
+                "status": "stale"
+              }
+            ],
+            "status": "degraded"
+          }
+        ],
+        "properties": {
+          "checked_at": {
+            "title": "Checked At",
+            "type": "string"
+          },
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/SystemComponent"
+            },
+            "title": "Components",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "degraded"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "checked_at",
+          "components"
+        ],
+        "title": "SystemHealthResponse",
+        "type": "object"
+      },
+      "SystemSyncRequest": {
+        "additionalProperties": false,
+        "description": "手动触发一次外部数据同步；数据集由服务端校验。",
+        "properties": {
+          "dataset": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Dataset",
+            "type": "string"
+          },
+          "instrument_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Instrument Ids",
+            "type": "array"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          }
+        },
+        "required": [
+          "dataset"
+        ],
+        "title": "SystemSyncRequest",
+        "type": "object"
+      },
+      "SystemSyncResponse": {
+        "description": "同步任务结果；任务流水同时写入 `data_sync_jobs`。",
+        "examples": [
+          {
+            "job_id": "job_0123456789abcdef01234567",
+            "rows": 4,
+            "status": "succeeded"
+          }
+        ],
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "status",
+          "rows"
+        ],
+        "title": "SystemSyncResponse",
+        "type": "object"
+      },
       "TimeSplit": {
         "properties": {
           "end_date": {
@@ -12114,6 +12859,48 @@
         "summary": "Get Activity",
         "tags": [
           "alerts"
+        ]
+      }
+    },
+    "/api/ai/summary": {
+      "post": {
+        "description": "把市场快照、新闻与待处理提醒归纳成带来源的结构化摘要。",
+        "operationId": "post_ai_summary_api_ai_summary_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiSummaryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiSummaryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Ai Summary",
+        "tags": [
+          "ai"
         ]
       }
     },
@@ -13344,68 +14131,6 @@
         ]
       }
     },
-    "/api/execution": {
-      "get": {
-        "operationId": "get_execution_state_api_execution_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExecutionStateResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Get Execution State",
-        "tags": [
-          "trades"
-        ]
-      }
-    },
-    "/api/execution/mode": {
-      "put": {
-        "operationId": "set_execution_mode_api_execution_mode_put",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ExecutionModeRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExecutionStateResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Set Execution Mode",
-        "tags": [
-          "trades"
-        ]
-      }
-    },
     "/api/health": {
       "get": {
         "description": "存活探针：进程能应答即返回 ok。",
@@ -14135,10 +14860,10 @@
         ]
       }
     },
-    "/api/market/overview": {
+    "/api/market/breadth": {
       "get": {
         "description": "该类别在 `as_of`（缺省为当前时刻）的涨跌家数与同向程度。",
-        "operationId": "get_market_overview_api_market_overview_get",
+        "operationId": "get_market_breadth_api_market_breadth_get",
         "parameters": [
           {
             "in": "query",
@@ -14194,7 +14919,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MarketOverviewResponse"
+                  "$ref": "#/components/schemas/MarketBreadthResponse"
                 }
               }
             },
@@ -14211,7 +14936,203 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Get Market Overview",
+        "summary": "Get Market Breadth",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/events": {
+      "get": {
+        "description": "按标的与时间范围读取宏观/公司事件；缺省范围为前后 30/90 天。",
+        "operationId": "get_market_events_api_market_events_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "ticker",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticker"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketEventListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Market Events",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/overview": {
+      "get": {
+        "description": "NASDAQ、SP500、DOW、VIX、BTC 的最新值、涨跌、时段与来源。",
+        "operationId": "get_market_snapshot_api_market_overview_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketSnapshotResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Market Snapshot",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/news": {
+      "get": {
+        "description": "按标的或行业标签读取已采集新闻，保留标题、来源、URL 与发布时间。",
+        "operationId": "get_news_api_news_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "ticker",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticker"
+            }
+          },
+          {
+            "in": "query",
+            "name": "industry",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Industry"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewsListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get News",
         "tags": [
           "market"
         ]
@@ -14981,7 +15902,7 @@
     },
     "/api/settings": {
       "get": {
-        "description": "当前设置：分组配置、凭证状态与执行模式。",
+        "description": "当前设置：显示偏好、风险默认值、执行开关、数据源与密钥状态。",
         "operationId": "get_settings_document_api_settings_get",
         "responses": {
           "200": {
@@ -15000,9 +15921,9 @@
           "settings"
         ]
       },
-      "put": {
+      "patch": {
         "description": "按分组部分更新；未提交的分组保持原值。",
-        "operationId": "update_settings_document_api_settings_put",
+        "operationId": "patch_settings_document_api_settings_patch",
         "requestBody": {
           "content": {
             "application/json": {
@@ -15035,7 +15956,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Update Settings Document",
+        "summary": "Patch Settings Document",
         "tags": [
           "settings"
         ]
@@ -15442,6 +16363,70 @@
         "summary": "Update Strategy Version Instruments",
         "tags": [
           "strategy"
+        ]
+      }
+    },
+    "/api/system/health": {
+      "get": {
+        "description": "数据库、OKX REST、OKX WebSocket、外部 Provider、任务队列与 K 线覆盖。",
+        "operationId": "get_system_health_api_system_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemHealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get System Health",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/system/sync": {
+      "post": {
+        "description": "手动触发一次外部数据集同步；同一 Provider 与数据集已在运行时返回 409。",
+        "operationId": "post_system_sync_api_system_sync_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SystemSyncRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemSyncResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post System Sync",
+        "tags": [
+          "system"
         ]
       }
     },

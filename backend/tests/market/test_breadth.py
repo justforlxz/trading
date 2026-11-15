@@ -361,7 +361,7 @@ def test_endpoint_returns_the_overview_as_the_contract_shapes_it(client: TestCli
     _crypto_spot(_names("CD", 2), _falling(WINDOW_BARS))
 
     response = client.get(
-        "/api/market/overview",
+        "/api/market/breadth",
         params={"inst_type": "SPOT", "bar": "1d", "as_of": _last_open().isoformat()},
     )
 
@@ -383,5 +383,5 @@ def test_endpoint_returns_the_overview_as_the_contract_shapes_it(client: TestCli
 def test_endpoint_requires_the_class(client: TestClient) -> None:
     """横截面按类别分开统计：`inst_type` 必填，缺了就 422。"""
 
-    assert client.get("/api/market/overview").status_code == 422
-    assert client.get("/api/market/overview", params={"inst_type": "SPOT"}).status_code == 200
+    assert client.get("/api/market/breadth").status_code == 422
+    assert client.get("/api/market/breadth", params={"inst_type": "SPOT"}).status_code == 200

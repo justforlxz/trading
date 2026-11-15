@@ -1,146 +1,152 @@
-"""设置契约：分组的可持久化配置。
+"""设置契约：v6 的显示偏好、风险默认值、自动执行开关、数据源与密钥状态。
 
 交易所 API Key 只写不读：响应只带「是否已配置」与全掩码，明文永不进入 HTTP。
-Secret 与 Passphrase 仍只经环境变量注入，不在本契约的可写范围内。
+Secret 与 Passphrase 仍只经环境变量注入，不在本契约的可写范围内。成本与回测默认值
+仍由服务端内部读取，但不属于本契约，前端不能读写。
 """
 
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
-from app.api.schemas.common import Bar, DecimalString, ExecutionMode, UtcDatetime
+from app.api.schemas.common import Bar, DecimalString, UtcDatetime
 
 __all__ = [
-    "BacktestSettings",
-    "CostSettings",
-    "DataSettings",
-    "ExchangeSettings",
+    "DataSourceSettings",
+    "DataSourceSettingsUpdate",
+    "DisplaySettings",
     "ExchangeSettingsUpdate",
     "ExecutionSettings",
-    "RiskSettings",
+    "RiskDefaults",
+    "SecretSettings",
     "SettingsResponse",
     "SettingsUpdateRequest",
 ]
 
-
-class ExecutionSettings(BaseModel):
-    mode: ExecutionMode
-    auto_trading_enabled: bool
-    emergency_stop: bool
+ColorScheme = Literal["system", "light", "dark"]
+OkxPermission = Literal["read_only", "unknown"]
 
 
-class RiskSettings(BaseModel):
-    """风控限额。`max_leverage` 的硬上限（10）不因配置抬高（decisions.md L1）。"""
+class DisplaySettings(BaseModel):
+    """显示偏好；前端可缓存，后端持久化。"""
 
-    max_order_notional: DecimalString
-    max_position_notional: DecimalString
-    max_total_notional: DecimalString
-    max_positions: int
-    max_leverage: DecimalString
-    max_single_instrument_weight_pct: DecimalString = "35"
-    max_margin_usage_pct: DecimalString = "70"
-    max_daily_loss: DecimalString
-    liquidation_buffer_pct: DecimalString
-    stop_loss_mandatory: bool
+    model_config = ConfigDict(extra="forbid")
+
+    color_scheme: ColorScheme = "system"
+    default_bar: Bar = "1d"
+    price_precision: int = Field(default=2, ge=0, le=8)
+    home_layout: str = Field(default="cockpit", min_length=1, max_length=32)
+
+
+class RiskDefaults(BaseModel):
+    """策略默认风险参数；不是执行风控限额。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    default_leverage: DecimalString = "3"
+    risk_budget_per_trade: DecimalString = "100"
+    warning_threshold: DecimalString = "80"
+    stop_rule: str = Field(default="fixed_pct", min_length=1, max_length=32)
 
     @model_validator(mode="after")
-    def _check_leverage(self) -> RiskSettings:
+    def _check_values(self) -> RiskDefaults:
         try:
-            leverage = Decimal(self.max_leverage)
+            leverage = Decimal(self.default_leverage)
+            budget = Decimal(self.risk_budget_per_trade)
+            threshold = Decimal(self.warning_threshold)
         except InvalidOperation as exc:
-            raise ValueError("max_leverage 必须是十进制数") from exc
+            raise ValueError("风险默认值必须是十进制数") from exc
         if not Decimal(1) <= leverage <= Decimal(10):
-            raise ValueError("max_leverage 必须在 1 到 10 之间")
-        for name in ("max_single_instrument_weight_pct", "max_margin_usage_pct"):
-            try:
-                value = Decimal(getattr(self, name))
-            except InvalidOperation as exc:
-                raise ValueError(f"{name} 必须是十进制数") from exc
-            if not Decimal(0) < value <= Decimal(100):
-                raise ValueError(f"{name} 必须在 0 到 100 之间")
+            raise ValueError("default_leverage 必须在 1 到 10 之间")
+        if budget < 0:
+            raise ValueError("risk_budget_per_trade 不能为负数")
+        if not Decimal(0) <= threshold <= Decimal(100):
+            raise ValueError("warning_threshold 必须在 0 到 100 之间")
         return self
 
 
-class CostSettings(BaseModel):
-    maker_fee_bps: DecimalString
-    taker_fee_bps: DecimalString
-    slippage_bps: DecimalString
-    spread_bps: DecimalString
+class ExecutionSettings(BaseModel):
+    """自动执行开关：v6 默认关闭，只保存状态，不产生真实订单。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    auto_trading_enabled: bool = False
 
 
-class BacktestSettings(BaseModel):
-    funding_enabled: bool
-    default_initial_capital: DecimalString
-    default_bar: Bar
+class DataSourceSettings(BaseModel):
+    """数据源配置与同步状态；状态字段由服务端读取同步任务表填写。"""
+
+    provider: str | None = None
+    subscribed_instruments: list[str] = Field(default_factory=list)
+    last_sync_at: UtcDatetime | None = None
+    failure_count: int = Field(default=0, ge=0)
 
 
-class ExchangeSettings(BaseModel):
-    demo_trading: bool
-    api_configured: bool
-    api_key_masked: str | None = None
+class DataSourceSettingsUpdate(BaseModel):
+    """数据源可写字段；最后同步时间与失败次数只读。"""
+
+    provider: str | None = Field(default=None, max_length=64)
+    subscribed_instruments: list[str] | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class SecretSettings(BaseModel):
+    """密钥状态：只读，永不返回明文。"""
+
+    okx_api_key_masked: str | None = None
+    okx_configured: bool
+    okx_permission: OkxPermission | None = None
 
 
 class ExchangeSettingsUpdate(BaseModel):
-    """只写字段：提交后服务端只保存，不读回明文。"""
+    """API Key 只写字段；提交后服务端只保存，不读回明文。"""
+
+    model_config = ConfigDict(extra="forbid")
 
     api_key: SecretStr | None = Field(default=None, min_length=1)
 
 
-class DataSettings(BaseModel):
-    proxy_enabled: bool
-    proxy_configured: bool
-
-
 class SettingsResponse(BaseModel):
+    display: DisplaySettings
+    risk_defaults: RiskDefaults
     execution: ExecutionSettings
-    risk: RiskSettings
-    costs: CostSettings
-    backtest: BacktestSettings
-    exchange: ExchangeSettings
-    data: DataSettings
+    data_sources: DataSourceSettings
+    secrets: SecretSettings
     updated_at: UtcDatetime
 
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
                 {
-                    "execution": {
-                        "mode": "paper",
-                        "auto_trading_enabled": False,
-                        "emergency_stop": False,
+                    "display": {
+                        "color_scheme": "system",
+                        "default_bar": "1d",
+                        "price_precision": 2,
+                        "home_layout": "cockpit",
                     },
-                    "risk": {
-                        "max_order_notional": "1000",
-                        "max_position_notional": "3000",
-                        "max_total_notional": "10000",
-                        "max_positions": 5,
-                        "max_leverage": "3",
-                        "max_single_instrument_weight_pct": "35",
-                        "max_margin_usage_pct": "70",
-                        "max_daily_loss": "300",
-                        "liquidation_buffer_pct": "10",
-                        "stop_loss_mandatory": True,
+                    "risk_defaults": {
+                        "default_leverage": "3",
+                        "risk_budget_per_trade": "100",
+                        "warning_threshold": "80",
+                        "stop_rule": "fixed_pct",
                     },
-                    "costs": {
-                        "maker_fee_bps": "2",
-                        "taker_fee_bps": "5",
-                        "slippage_bps": "3",
-                        "spread_bps": "2",
+                    "execution": {"auto_trading_enabled": False},
+                    "data_sources": {
+                        "provider": None,
+                        "subscribed_instruments": [],
+                        "last_sync_at": None,
+                        "failure_count": 0,
                     },
-                    "backtest": {
-                        "funding_enabled": True,
-                        "default_initial_capital": "10000",
-                        "default_bar": "1h",
+                    "secrets": {
+                        "okx_api_key_masked": None,
+                        "okx_configured": False,
+                        "okx_permission": None,
                     },
-                    "exchange": {
-                        "demo_trading": True,
-                        "api_configured": False,
-                        "api_key_masked": None,
-                    },
-                    "data": {"proxy_enabled": False, "proxy_configured": False},
-                    "updated_at": "2026-11-10T06:10:00Z",
+                    "updated_at": "2026-11-15T06:10:00Z",
                 }
             ]
         }
@@ -148,15 +154,27 @@ class SettingsResponse(BaseModel):
 
 
 class SettingsUpdateRequest(BaseModel):
-    """分组级部分更新；交易所凭据只接受 API Key 写入，Secret 与 Passphrase 仍走环境变量。"""
+    """分组级部分更新，至少提交一项；`secrets` 只读，不在本模型里。"""
 
     model_config = ConfigDict(extra="forbid")
 
+    display: DisplaySettings | None = None
+    risk_defaults: RiskDefaults | None = None
     execution: ExecutionSettings | None = None
-    risk: RiskSettings | None = None
-    costs: CostSettings | None = None
-    backtest: BacktestSettings | None = None
-    data: DataSettings | None = None
+    data_sources: DataSourceSettingsUpdate | None = None
     exchange: ExchangeSettingsUpdate | None = None
-    #: 切到实盘必须显式确认；未带 true 的请求返回 409，且不写入任何分组。
-    acknowledge_risk: bool = False
+
+    @model_validator(mode="after")
+    def _at_least_one(self) -> SettingsUpdateRequest:
+        if not any(
+            value is not None
+            for value in (
+                self.display,
+                self.risk_defaults,
+                self.execution,
+                self.data_sources,
+                self.exchange,
+            )
+        ):
+            raise ValueError("至少提交一个设置分组")
+        return self

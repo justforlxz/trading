@@ -31,7 +31,12 @@ from app.exchange import OrderSubmission  # noqa: F401
 from app.instrument import Instrument  # noqa: F401
 from app.jobs import start_equity_snapshot_scheduler
 from app.journal import ExecutionSnapshot
-from app.market import Candle  # noqa: F401
+from app.market import (  # noqa: F401
+    Candle,
+    DataSyncJobRow,
+    MarketEventRow,
+    NewsItemRow,
+)
 from app.portfolio import (  # noqa: F401
     AllocationRow,
     PortfolioAdjustmentRow,

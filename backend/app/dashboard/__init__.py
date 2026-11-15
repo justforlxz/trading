@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+from app.dashboard.ai_summary import build_ai_summary
 from app.dashboard.service import (
     ActivityItem,
     AlertItem,
@@ -30,5 +31,6 @@ __all__ = [
     "RiskData",
     "StrategiesData",
     "WatchlistData",
+    "build_ai_summary",
     "load_summary",
 ]

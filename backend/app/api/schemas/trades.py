@@ -21,8 +21,6 @@ from app.api.schemas.common import (
 )
 
 __all__ = [
-    "ExecutionModeRequest",
-    "ExecutionStateResponse",
     "Fill",
     "FillListResponse",
     "Order",
@@ -214,28 +212,3 @@ class SignalListResponse(BaseModel):
             ]
         }
     )
-
-
-class ExecutionStateResponse(BaseModel):
-    mode: ExecutionMode
-    auto_trading_enabled: bool
-    emergency_stop: bool
-    live_acknowledged_at: UtcDatetime | None = None
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "examples": [
-                {
-                    "mode": "paper",
-                    "auto_trading_enabled": False,
-                    "emergency_stop": False,
-                    "live_acknowledged_at": None,
-                }
-            ]
-        }
-    )
-
-
-class ExecutionModeRequest(BaseModel):
-    mode: ExecutionMode
-    acknowledge_risk: bool = False

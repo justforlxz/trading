@@ -92,6 +92,36 @@ class MarketOverview:
     resonance: Resonance
 
 
+@dataclass(frozen=True, slots=True)
+class CandleCoverage:
+    """K 线覆盖摘要：健康接口只读这一份事实，不临时扫描上游。"""
+
+    candle_count: int
+    symbol_count: int
+    latest_open_time: datetime | None
+    last_synced_at: datetime | None
+
+
+def candle_coverage_summary() -> CandleCoverage:
+    """库内已收盘 K 线的总量、标的数与最近时间。"""
+
+    with session_scope() as session:
+        count, symbols, latest_open, updated = session.execute(
+            select(
+                func.count(),
+                func.count(func.distinct(Candle.symbol)),
+                func.max(Candle.open_time),
+                func.max(Candle.updated_at),
+            )
+        ).one()
+    return CandleCoverage(
+        candle_count=int(count or 0),
+        symbol_count=int(symbols or 0),
+        latest_open_time=None if latest_open is None else from_epoch(int(latest_open)),
+        last_synced_at=None if updated is None else from_epoch(int(updated)),
+    )
+
+
 def integrity(symbol: str, bar: str, *, source: str | None = None) -> IntegrityReport:
     """检测库内缺口与重复；只读，不会写入任何补齐数据。
 

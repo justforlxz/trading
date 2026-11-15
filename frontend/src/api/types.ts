@@ -60,6 +60,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ai/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Ai Summary
+         * @description 把市场快照、新闻与待处理提醒归纳成带来源的结构化摘要。
+         */
+        post: operations["post_ai_summary_api_ai_summary_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/alerts": {
         parameters: {
             query?: never;
@@ -437,40 +457,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/execution": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Execution State */
-        get: operations["get_execution_state_api_execution_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/execution/mode": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Set Execution Mode */
-        put: operations["set_execution_mode_api_execution_mode_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -726,6 +712,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/market/breadth": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Market Breadth
+         * @description 该类别在 `as_of`（缺省为当前时刻）的涨跌家数与同向程度。
+         */
+        get: operations["get_market_breadth_api_market_breadth_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Market Events
+         * @description 按标的与时间范围读取宏观/公司事件；缺省范围为前后 30/90 天。
+         */
+        get: operations["get_market_events_api_market_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/market/overview": {
         parameters: {
             query?: never;
@@ -734,10 +760,30 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get Market Overview
-         * @description 该类别在 `as_of`（缺省为当前时刻）的涨跌家数与同向程度。
+         * Get Market Snapshot
+         * @description NASDAQ、SP500、DOW、VIX、BTC 的最新值、涨跌、时段与来源。
          */
-        get: operations["get_market_overview_api_market_overview_get"];
+        get: operations["get_market_snapshot_api_market_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/news": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get News
+         * @description 按标的或行业标签读取已采集新闻，保留标题、来源、URL 与发布时间。
+         */
+        get: operations["get_news_api_news_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -924,19 +970,19 @@ export interface paths {
         };
         /**
          * Get Settings Document
-         * @description 当前设置：分组配置、凭证状态与执行模式。
+         * @description 当前设置：显示偏好、风险默认值、执行开关、数据源与密钥状态。
          */
         get: operations["get_settings_document_api_settings_get"];
-        /**
-         * Update Settings Document
-         * @description 按分组部分更新；未提交的分组保持原值。
-         */
-        put: operations["update_settings_document_api_settings_put"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Patch Settings Document
+         * @description 按分组部分更新；未提交的分组保持原值。
+         */
+        patch: operations["patch_settings_document_api_settings_patch"];
         trace?: never;
     };
     "/api/signals": {
@@ -1039,6 +1085,46 @@ export interface paths {
          */
         put: operations["update_strategy_version_instruments_api_strategies__strategy_id__versions__version__instruments_put"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/system/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get System Health
+         * @description 数据库、OKX REST、OKX WebSocket、外部 Provider、任务队列与 K 线覆盖。
+         */
+        get: operations["get_system_health_api_system_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/system/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post System Sync
+         * @description 手动触发一次外部数据集同步；同一 Provider 与数据集已在运行时返回 409。
+         */
+        post: operations["post_system_sync_api_system_sync_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1359,6 +1445,95 @@ export interface components {
             items: components["schemas"]["ActivityItem"][];
             /** Next Cursor */
             next_cursor?: string | null;
+        };
+        /**
+         * AiSummaryPoint
+         * @description 摘要里的一个事实点；`sources` 至少一条。
+         */
+        AiSummaryPoint: {
+            /** Sources */
+            sources: components["schemas"]["AiSummarySource"][];
+            /** Text */
+            text: string;
+        };
+        /**
+         * AiSummaryRequest
+         * @description 摘要输入；只读取已采集的数据，不触发外部请求。
+         */
+        AiSummaryRequest: {
+            /**
+             * Include News
+             * @default true
+             */
+            include_news: boolean;
+            /**
+             * News Limit
+             * @default 10
+             */
+            news_limit: number;
+        };
+        /**
+         * AiSummaryResponse
+         * @description 结构化摘要；没有来源的事实点不会出现在 `points` 或 `risks` 里。
+         * @example {
+         *       "disclaimer": "仅作信息归纳，不构成交易建议",
+         *       "generated_at": "2026-11-15T06:10:00Z",
+         *       "overall": "偏强，波动率抬升",
+         *       "points": [
+         *         {
+         *           "sources": [
+         *             {
+         *               "id": "NASDAQ",
+         *               "type": "market_overview"
+         *             }
+         *           ],
+         *           "text": "NASDAQ Composite 最新 18000.12，较前值 +1.01%。"
+         *         }
+         *       ],
+         *       "risks": [
+         *         {
+         *           "sources": [
+         *             {
+         *               "id": "alert_0123456789abcdef01234567",
+         *               "type": "alert"
+         *             }
+         *           ],
+         *           "text": "持仓缺少止损：AAPL-USDT-SWAP"
+         *         }
+         *       ],
+         *       "stale": false
+         *     }
+         */
+        AiSummaryResponse: {
+            /** Disclaimer */
+            disclaimer: string;
+            /** Generated At */
+            generated_at: string;
+            /** Overall */
+            overall: string;
+            /** Points */
+            points: components["schemas"]["AiSummaryPoint"][];
+            /** Risks */
+            risks: components["schemas"]["AiSummaryPoint"][];
+            /** Stale */
+            stale: boolean;
+            /** Stale Notice */
+            stale_notice?: string | null;
+        };
+        /**
+         * AiSummarySource
+         * @description 一条可回溯的来源；`id` 对应事件、新闻或提醒的本地标识。
+         */
+        AiSummarySource: {
+            /** Id */
+            id: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "news" | "alert" | "market_overview" | "risk";
+            /** Url */
+            url?: string | null;
         };
         /**
          * AlertItem
@@ -2484,18 +2659,6 @@ export interface components {
             /** Symbol Count */
             symbol_count: number;
         };
-        /** BacktestSettings */
-        BacktestSettings: {
-            /**
-             * Default Bar
-             * @enum {string}
-             */
-            default_bar: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
-            /** Default Initial Capital */
-            default_initial_capital: string;
-            /** Funding Enabled */
-            funding_enabled: boolean;
-        };
         /** BacktestSweepCombo */
         BacktestSweepCombo: {
             /** Error Message */
@@ -2902,17 +3065,6 @@ export interface components {
             product_key_b: string;
             /** Window */
             window: number;
-        };
-        /** CostSettings */
-        CostSettings: {
-            /** Maker Fee Bps */
-            maker_fee_bps: string;
-            /** Slippage Bps */
-            slippage_bps: string;
-            /** Spread Bps */
-            spread_bps: string;
-            /** Taker Fee Bps */
-            taker_fee_bps: string;
         };
         /**
          * DashboardAccountData
@@ -3492,12 +3644,60 @@ export interface components {
             /** Total */
             total: number;
         };
-        /** DataSettings */
-        DataSettings: {
-            /** Proxy Configured */
-            proxy_configured: boolean;
-            /** Proxy Enabled */
-            proxy_enabled: boolean;
+        /**
+         * DataSourceSettings
+         * @description 数据源配置与同步状态；状态字段由服务端读取同步任务表填写。
+         */
+        DataSourceSettings: {
+            /**
+             * Failure Count
+             * @default 0
+             */
+            failure_count: number;
+            /** Last Sync At */
+            last_sync_at?: string | null;
+            /** Provider */
+            provider?: string | null;
+            /** Subscribed Instruments */
+            subscribed_instruments?: string[];
+        };
+        /**
+         * DataSourceSettingsUpdate
+         * @description 数据源可写字段；最后同步时间与失败次数只读。
+         */
+        DataSourceSettingsUpdate: {
+            /** Provider */
+            provider?: string | null;
+            /** Subscribed Instruments */
+            subscribed_instruments?: string[] | null;
+        };
+        /**
+         * DisplaySettings
+         * @description 显示偏好；前端可缓存，后端持久化。
+         */
+        DisplaySettings: {
+            /**
+             * Color Scheme
+             * @default system
+             * @enum {string}
+             */
+            color_scheme: "system" | "light" | "dark";
+            /**
+             * Default Bar
+             * @default 1d
+             * @enum {string}
+             */
+            default_bar: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+            /**
+             * Home Layout
+             * @default cockpit
+             */
+            home_layout: string;
+            /**
+             * Price Precision
+             * @default 2
+             */
+            price_precision: number;
         };
         /** EquityPoint */
         EquityPoint: {
@@ -3579,68 +3779,24 @@ export interface components {
              */
             status: "ok" | "stale" | "unconfigured";
         };
-        /** ExchangeSettings */
-        ExchangeSettings: {
-            /** Api Configured */
-            api_configured: boolean;
-            /** Api Key Masked */
-            api_key_masked?: string | null;
-            /** Demo Trading */
-            demo_trading: boolean;
-        };
         /**
          * ExchangeSettingsUpdate
-         * @description 只写字段：提交后服务端只保存，不读回明文。
+         * @description API Key 只写字段；提交后服务端只保存，不读回明文。
          */
         ExchangeSettingsUpdate: {
             /** Api Key */
             api_key?: string | null;
         };
-        /** ExecutionModeRequest */
-        ExecutionModeRequest: {
+        /**
+         * ExecutionSettings
+         * @description 自动执行开关：v6 默认关闭，只保存状态，不产生真实订单。
+         */
+        ExecutionSettings: {
             /**
-             * Acknowledge Risk
+             * Auto Trading Enabled
              * @default false
              */
-            acknowledge_risk: boolean;
-            /**
-             * Mode
-             * @enum {string}
-             */
-            mode: "manual" | "paper" | "live";
-        };
-        /** ExecutionSettings */
-        ExecutionSettings: {
-            /** Auto Trading Enabled */
             auto_trading_enabled: boolean;
-            /** Emergency Stop */
-            emergency_stop: boolean;
-            /**
-             * Mode
-             * @enum {string}
-             */
-            mode: "manual" | "paper" | "live";
-        };
-        /**
-         * ExecutionStateResponse
-         * @example {
-         *       "auto_trading_enabled": false,
-         *       "emergency_stop": false,
-         *       "mode": "paper"
-         *     }
-         */
-        ExecutionStateResponse: {
-            /** Auto Trading Enabled */
-            auto_trading_enabled: boolean;
-            /** Emergency Stop */
-            emergency_stop: boolean;
-            /** Live Acknowledged At */
-            live_acknowledged_at?: string | null;
-            /**
-             * Mode
-             * @enum {string}
-             */
-            mode: "manual" | "paper" | "live";
         };
         /** ExposurePositionItem */
         ExposurePositionItem: {
@@ -4636,7 +4792,7 @@ export interface components {
             unchanged: number;
         };
         /**
-         * MarketOverviewResponse
+         * MarketBreadthResponse
          * @description 某一类别（`inst_type`）的横截面总览；两类标的各自统计，互不混入。
          * @example {
          *       "as_of": "2026-11-10T00:00:00Z",
@@ -4656,7 +4812,7 @@ export interface components {
          *       }
          *     }
          */
-        MarketOverviewResponse: {
+        MarketBreadthResponse: {
             /** As Of */
             as_of: string;
             /**
@@ -4673,6 +4829,97 @@ export interface components {
             resonance: components["schemas"]["MarketResonance"];
         };
         /**
+         * MarketEventItem
+         * @description 一条宏观或公司事件；`scheduled_at_beijing` 是展示用北京时间。
+         */
+        MarketEventItem: {
+            /** Actual */
+            actual: string | null;
+            /** Event Type */
+            event_type: string;
+            /** Forecast */
+            forecast: string | null;
+            /** Id */
+            id: string;
+            /** Importance */
+            importance: string | null;
+            /** Previous */
+            previous: string | null;
+            /** Received At */
+            received_at: string;
+            /** Region */
+            region: string | null;
+            /** Scheduled At */
+            scheduled_at: string;
+            /** Scheduled At Beijing */
+            scheduled_at_beijing: string;
+            /** Source */
+            source: string;
+            /** Source Url */
+            source_url: string | null;
+            /** Ticker */
+            ticker: string | null;
+            /** Title */
+            title: string;
+        };
+        /**
+         * MarketEventListResponse
+         * @description 按时间范围与标的条件读取的事件列表。
+         * @example {
+         *       "items": [
+         *         {
+         *           "event_type": "earnings",
+         *           "forecast": "1.20",
+         *           "id": "evt_0123456789abcdef01234567",
+         *           "importance": "high",
+         *           "previous": "1.10",
+         *           "received_at": "2026-11-15T06:10:00Z",
+         *           "region": "US",
+         *           "scheduled_at": "2026-11-16T21:00:00Z",
+         *           "scheduled_at_beijing": "2026-11-17 05:00",
+         *           "source": "market_data_provider",
+         *           "ticker": "AAPL",
+         *           "title": "AAPL 财报"
+         *         }
+         *       ]
+         *     }
+         */
+        MarketEventListResponse: {
+            /** Items */
+            items: components["schemas"]["MarketEventItem"][];
+        };
+        /**
+         * MarketOverviewItem
+         * @description 一个市场指标；缺数据时数值为 `null`，`quality_status` 说明原因。
+         */
+        MarketOverviewItem: {
+            /** As Of */
+            as_of: string | null;
+            /** Change */
+            change: string | null;
+            /** Change Pct */
+            change_pct: string | null;
+            /** Is Delayed */
+            is_delayed: boolean;
+            /** Market Session */
+            market_session: string;
+            /** Name */
+            name: string;
+            /**
+             * Quality Status
+             * @enum {string}
+             */
+            quality_status: "normal" | "missing" | "delayed" | "stale" | "abnormal" | "pending";
+            /** Source */
+            source: string;
+            /** Source Url */
+            source_url?: string | null;
+            /** Symbol */
+            symbol: string;
+            /** Value */
+            value: string | null;
+        };
+        /**
          * MarketResonance
          * @description 同一类别内部的同向程度：全部同向上涨为 1，涨跌各半为 0，恒在 [0, 1]。
          *
@@ -4687,6 +4934,44 @@ export interface components {
             /** Window */
             window: number;
         };
+        /**
+         * MarketSnapshotResponse
+         * @description 五个市场指标的当前快照；顶层 `stale` 表示至少一项不能当作实时值。
+         * @example {
+         *       "as_of": "2026-11-15T06:10:00Z",
+         *       "items": [
+         *         {
+         *           "as_of": "2026-11-15T06:00:00Z",
+         *           "change": "180",
+         *           "change_pct": "1.01",
+         *           "is_delayed": false,
+         *           "market_session": "closed",
+         *           "name": "NASDAQ Composite",
+         *           "quality_status": "normal",
+         *           "source": "market_data_provider",
+         *           "symbol": "NASDAQ",
+         *           "value": "18000.12"
+         *         }
+         *       ],
+         *       "last_success_at": "2026-11-15T06:05:00Z",
+         *       "provider": "market_data_provider",
+         *       "stale": false
+         *     }
+         */
+        MarketSnapshotResponse: {
+            /** As Of */
+            as_of: string;
+            /** Items */
+            items: components["schemas"]["MarketOverviewItem"][];
+            /** Last Success At */
+            last_success_at: string | null;
+            /** Provider */
+            provider: string | null;
+            /** Stale */
+            stale: boolean;
+            /** Stale Reason */
+            stale_reason: string | null;
+        };
         /** MomentumIndicators */
         MomentumIndicators: {
             /** Macd */
@@ -4697,6 +4982,59 @@ export interface components {
             macd_signal?: string | null;
             /** Rsi14 */
             rsi14?: string | null;
+        };
+        /**
+         * NewsItem
+         * @description 一条已采集新闻；标题、来源、URL 与发布时间原样保留。
+         */
+        NewsItem: {
+            /** Id */
+            id: string;
+            /** Published At */
+            published_at: string | null;
+            /** Publisher */
+            publisher: string | null;
+            /** Received At */
+            received_at: string;
+            /** Source */
+            source: string;
+            /** Summary */
+            summary: string | null;
+            /** Tags */
+            tags: string[];
+            /** Tickers */
+            tickers: string[];
+            /** Title */
+            title: string;
+            /** Url */
+            url: string | null;
+        };
+        /**
+         * NewsListResponse
+         * @description 按标的或行业标签读取的新闻列表。
+         * @example {
+         *       "items": [
+         *         {
+         *           "id": "news_0123456789abcdef01234567",
+         *           "published_at": "2026-11-15T05:00:00Z",
+         *           "publisher": "Example News",
+         *           "received_at": "2026-11-15T06:10:00Z",
+         *           "source": "market_data_provider",
+         *           "summary": "收入高于市场预期。",
+         *           "tags": [
+         *             "technology"
+         *           ],
+         *           "tickers": [
+         *             "AAPL"
+         *           ],
+         *           "title": "AAPL 发布季度业绩"
+         *         }
+         *       ]
+         *     }
+         */
+        NewsListResponse: {
+            /** Items */
+            items: components["schemas"]["NewsItem"][];
         };
         /**
          * Opportunity
@@ -5301,6 +5639,32 @@ export interface components {
             warning_threshold_pct?: string | null;
         };
         /**
+         * RiskDefaults
+         * @description 策略默认风险参数；不是执行风控限额。
+         */
+        RiskDefaults: {
+            /**
+             * Default Leverage
+             * @default 3
+             */
+            default_leverage: string;
+            /**
+             * Risk Budget Per Trade
+             * @default 100
+             */
+            risk_budget_per_trade: string;
+            /**
+             * Stop Rule
+             * @default fixed_pct
+             */
+            stop_rule: string;
+            /**
+             * Warning Threshold
+             * @default 80
+             */
+            warning_threshold: string;
+        };
+        /**
          * RiskEvent
          * @example {
          *       "action": "warn",
@@ -5430,36 +5794,16 @@ export interface components {
             summary: components["schemas"]["ExposureSummary"];
         };
         /**
-         * RiskSettings
-         * @description 风控限额。`max_leverage` 的硬上限（10）不因配置抬高（decisions.md L1）。
+         * SecretSettings
+         * @description 密钥状态：只读，永不返回明文。
          */
-        RiskSettings: {
-            /** Liquidation Buffer Pct */
-            liquidation_buffer_pct: string;
-            /** Max Daily Loss */
-            max_daily_loss: string;
-            /** Max Leverage */
-            max_leverage: string;
-            /**
-             * Max Margin Usage Pct
-             * @default 70
-             */
-            max_margin_usage_pct: string;
-            /** Max Order Notional */
-            max_order_notional: string;
-            /** Max Position Notional */
-            max_position_notional: string;
-            /** Max Positions */
-            max_positions: number;
-            /**
-             * Max Single Instrument Weight Pct
-             * @default 35
-             */
-            max_single_instrument_weight_pct: string;
-            /** Max Total Notional */
-            max_total_notional: string;
-            /** Stop Loss Mandatory */
-            stop_loss_mandatory: boolean;
+        SecretSettings: {
+            /** Okx Api Key Masked */
+            okx_api_key_masked?: string | null;
+            /** Okx Configured */
+            okx_configured: boolean;
+            /** Okx Permission */
+            okx_permission?: ("read_only" | "unknown") | null;
         };
         /** SectorExposureItem */
         SectorExposureItem: {
@@ -5473,71 +5817,50 @@ export interface components {
         /**
          * SettingsResponse
          * @example {
-         *       "backtest": {
-         *         "default_bar": "1h",
-         *         "default_initial_capital": "10000",
-         *         "funding_enabled": true
+         *       "data_sources": {
+         *         "failure_count": 0,
+         *         "subscribed_instruments": []
          *       },
-         *       "costs": {
-         *         "maker_fee_bps": "2",
-         *         "slippage_bps": "3",
-         *         "spread_bps": "2",
-         *         "taker_fee_bps": "5"
-         *       },
-         *       "data": {
-         *         "proxy_configured": false,
-         *         "proxy_enabled": false
-         *       },
-         *       "exchange": {
-         *         "api_configured": false,
-         *         "demo_trading": true
+         *       "display": {
+         *         "color_scheme": "system",
+         *         "default_bar": "1d",
+         *         "home_layout": "cockpit",
+         *         "price_precision": 2
          *       },
          *       "execution": {
-         *         "auto_trading_enabled": false,
-         *         "emergency_stop": false,
-         *         "mode": "paper"
+         *         "auto_trading_enabled": false
          *       },
-         *       "risk": {
-         *         "liquidation_buffer_pct": "10",
-         *         "max_daily_loss": "300",
-         *         "max_leverage": "3",
-         *         "max_margin_usage_pct": "70",
-         *         "max_order_notional": "1000",
-         *         "max_position_notional": "3000",
-         *         "max_positions": 5,
-         *         "max_single_instrument_weight_pct": "35",
-         *         "max_total_notional": "10000",
-         *         "stop_loss_mandatory": true
+         *       "risk_defaults": {
+         *         "default_leverage": "3",
+         *         "risk_budget_per_trade": "100",
+         *         "stop_rule": "fixed_pct",
+         *         "warning_threshold": "80"
          *       },
-         *       "updated_at": "2026-11-10T06:10:00Z"
+         *       "secrets": {
+         *         "okx_configured": false
+         *       },
+         *       "updated_at": "2026-11-15T06:10:00Z"
          *     }
          */
         SettingsResponse: {
-            backtest: components["schemas"]["BacktestSettings"];
-            costs: components["schemas"]["CostSettings"];
-            data: components["schemas"]["DataSettings"];
-            exchange: components["schemas"]["ExchangeSettings"];
+            data_sources: components["schemas"]["DataSourceSettings"];
+            display: components["schemas"]["DisplaySettings"];
             execution: components["schemas"]["ExecutionSettings"];
-            risk: components["schemas"]["RiskSettings"];
+            risk_defaults: components["schemas"]["RiskDefaults"];
+            secrets: components["schemas"]["SecretSettings"];
             /** Updated At */
             updated_at: string;
         };
         /**
          * SettingsUpdateRequest
-         * @description 分组级部分更新；交易所凭据只接受 API Key 写入，Secret 与 Passphrase 仍走环境变量。
+         * @description 分组级部分更新，至少提交一项；`secrets` 只读，不在本模型里。
          */
         SettingsUpdateRequest: {
-            /**
-             * Acknowledge Risk
-             * @default false
-             */
-            acknowledge_risk: boolean;
-            backtest?: components["schemas"]["BacktestSettings"] | null;
-            costs?: components["schemas"]["CostSettings"] | null;
-            data?: components["schemas"]["DataSettings"] | null;
+            data_sources?: components["schemas"]["DataSourceSettingsUpdate"] | null;
+            display?: components["schemas"]["DisplaySettings"] | null;
             exchange?: components["schemas"]["ExchangeSettingsUpdate"] | null;
             execution?: components["schemas"]["ExecutionSettings"] | null;
-            risk?: components["schemas"]["RiskSettings"] | null;
+            risk_defaults?: components["schemas"]["RiskDefaults"] | null;
         };
         /**
          * SiblingQuote
@@ -6281,6 +6604,89 @@ export interface components {
             /** Version Id */
             version_id: string;
         };
+        /**
+         * SystemComponent
+         * @description 一个系统组件的最新状态；错误只给摘要，不带上游原始应答。
+         */
+        SystemComponent: {
+            /** Detail */
+            detail: string | null;
+            /** Error */
+            error: string | null;
+            /** Last Success At */
+            last_success_at: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "stale" | "error" | "unconfigured";
+        };
+        /**
+         * SystemHealthResponse
+         * @description 系统健康总览；单项异常不影响其他项，整体状态降为 `degraded`。
+         * @example {
+         *       "checked_at": "2026-11-15T06:10:00Z",
+         *       "components": [
+         *         {
+         *           "last_success_at": "2026-11-15T06:10:00Z",
+         *           "name": "database",
+         *           "status": "ok"
+         *         },
+         *         {
+         *           "detail": "market_data_provider / market_overview",
+         *           "error": "Provider 超时",
+         *           "last_success_at": "2026-11-14T06:00:00Z",
+         *           "name": "external_provider",
+         *           "status": "stale"
+         *         }
+         *       ],
+         *       "status": "degraded"
+         *     }
+         */
+        SystemHealthResponse: {
+            /** Checked At */
+            checked_at: string;
+            /** Components */
+            components: components["schemas"]["SystemComponent"][];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "degraded";
+        };
+        /**
+         * SystemSyncRequest
+         * @description 手动触发一次外部数据同步；数据集由服务端校验。
+         */
+        SystemSyncRequest: {
+            /** Dataset */
+            dataset: string;
+            /** Instrument Ids */
+            instrument_ids?: string[];
+            /** Provider */
+            provider?: string | null;
+        };
+        /**
+         * SystemSyncResponse
+         * @description 同步任务结果；任务流水同时写入 `data_sync_jobs`。
+         * @example {
+         *       "job_id": "job_0123456789abcdef01234567",
+         *       "rows": 4,
+         *       "status": "succeeded"
+         *     }
+         */
+        SystemSyncResponse: {
+            /** Error */
+            error?: string | null;
+            /** Job Id */
+            job_id: string;
+            /** Rows */
+            rows: number;
+            /** Status */
+            status: string;
+        };
         /** TimeSplit */
         TimeSplit: {
             /**
@@ -6598,6 +7004,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActivityListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_ai_summary_api_ai_summary_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiSummaryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiSummaryResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7284,59 +7723,6 @@ export interface operations {
             };
         };
     };
-    get_execution_state_api_execution_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ExecutionStateResponse"];
-                };
-            };
-        };
-    };
-    set_execution_mode_api_execution_mode_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ExecutionModeRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ExecutionStateResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     health_api_health_get: {
         parameters: {
             query?: never;
@@ -7790,7 +8176,7 @@ export interface operations {
             };
         };
     };
-    get_market_overview_api_market_overview_get: {
+    get_market_breadth_api_market_breadth_get: {
         parameters: {
             query: {
                 inst_type: "SPOT" | "SWAP";
@@ -7809,7 +8195,94 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MarketOverviewResponse"];
+                    "application/json": components["schemas"]["MarketBreadthResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_market_events_api_market_events_get: {
+        parameters: {
+            query?: {
+                ticker?: string | null;
+                start?: string | null;
+                end?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketEventListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_market_snapshot_api_market_overview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketSnapshotResponse"];
+                };
+            };
+        };
+    };
+    get_news_api_news_get: {
+        parameters: {
+            query?: {
+                ticker?: string | null;
+                industry?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewsListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -8250,7 +8723,7 @@ export interface operations {
             };
         };
     };
-    update_settings_document_api_settings_put: {
+    patch_settings_document_api_settings_patch: {
         parameters: {
             query?: never;
             header?: never;
@@ -8525,6 +8998,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StrategyVersionDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_system_health_api_system_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemHealthResponse"];
+                };
+            };
+        };
+    };
+    post_system_sync_api_system_sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SystemSyncRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemSyncResponse"];
                 };
             };
             /** @description Validation Error */

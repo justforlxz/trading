@@ -5,6 +5,7 @@ import { HttpResponse, http } from "msw";
 import getAccountSummary from "./fixtures/positions/get-account-summary.json";
 import postAccountSync from "./fixtures/positions/post-account-sync.json";
 import getActivity from "./fixtures/alerts/get-activity.json";
+import postAiSummary from "./fixtures/ai/post-ai-summary.json";
 import getAlerts from "./fixtures/alerts/get-alerts.json";
 import patchAlertsAlertId from "./fixtures/alerts/patch-alerts-alert_id.json";
 import getApprovals from "./fixtures/approval/get-approvals.json";
@@ -38,7 +39,10 @@ import postManualPositions from "./fixtures/positions/post-manual-positions.json
 import patchManualPositionsPositionId from "./fixtures/positions/patch-manual-positions-position_id.json";
 import getManualPositionsPositionIdTrades from "./fixtures/positions/get-manual-positions-position_id-trades.json";
 import postManualPositionsPositionIdTrades from "./fixtures/positions/post-manual-positions-position_id-trades.json";
+import getMarketBreadth from "./fixtures/market/get-market-breadth.json";
+import getMarketEvents from "./fixtures/market/get-market-events.json";
 import getMarketOverview from "./fixtures/market/get-market-overview.json";
+import getNews from "./fixtures/market/get-news.json";
 import getOpportunities from "./fixtures/opportunity/get-opportunities.json";
 import getOpportunitiesOpportunityId from "./fixtures/opportunity/get-opportunities-opportunity_id.json";
 import patchOpportunitiesOpportunityId from "./fixtures/opportunity/patch-opportunities-opportunity_id.json";
@@ -52,7 +56,7 @@ import getRiskEvents from "./fixtures/risk/get-risk-events.json";
 import patchRiskEventsEventIdResolve from "./fixtures/risk/patch-risk-events-event_id-resolve.json";
 import getRiskExposure from "./fixtures/risk/get-risk-exposure.json";
 import getSettings from "./fixtures/settings/get-settings.json";
-import putSettings from "./fixtures/settings/put-settings.json";
+import patchSettings from "./fixtures/settings/patch-settings.json";
 import getStrategies from "./fixtures/strategy/get-strategies.json";
 import postStrategies from "./fixtures/strategy/post-strategies.json";
 import getStrategiesStrategyId from "./fixtures/strategy/get-strategies-strategy_id.json";
@@ -60,6 +64,8 @@ import putStrategiesStrategyId from "./fixtures/strategy/put-strategies-strategy
 import getStrategiesStrategyIdVersions from "./fixtures/strategy/get-strategies-strategy_id-versions.json";
 import postStrategiesStrategyIdVersions from "./fixtures/strategy/post-strategies-strategy_id-versions.json";
 import putStrategiesStrategyIdVersionsVersionInstruments from "./fixtures/strategy/put-strategies-strategy_id-versions-version-instruments.json";
+import getSystemHealth from "./fixtures/system/get-system-health.json";
+import postSystemSync from "./fixtures/system/post-system-sync.json";
 import getWatchlist from "./fixtures/watchlist/get-watchlist.json";
 import postWatchlist from "./fixtures/watchlist/post-watchlist.json";
 import patchWatchlistInstId from "./fixtures/watchlist/patch-watchlist-inst_id.json";
@@ -69,6 +75,7 @@ export const handlers = [
   http.get("*/api/account/summary", () => HttpResponse.json(getAccountSummary)),
   http.post("*/api/account/sync", () => HttpResponse.json(postAccountSync)),
   http.get("*/api/activity", () => HttpResponse.json(getActivity)),
+  http.post("*/api/ai/summary", () => HttpResponse.json(postAiSummary)),
   http.get("*/api/alerts", () => HttpResponse.json(getAlerts)),
   http.patch("*/api/alerts/:alert_id", () => HttpResponse.json(patchAlertsAlertId)),
   http.get("*/api/approvals", () => HttpResponse.json(getApprovals)),
@@ -105,7 +112,10 @@ export const handlers = [
   http.delete("*/api/manual-positions/:position_id", () => new HttpResponse(null, { status: 204 })),
   http.get("*/api/manual-positions/:position_id/trades", () => HttpResponse.json(getManualPositionsPositionIdTrades)),
   http.post("*/api/manual-positions/:position_id/trades", () => HttpResponse.json(postManualPositionsPositionIdTrades, { status: 201 })),
+  http.get("*/api/market/breadth", () => HttpResponse.json(getMarketBreadth)),
+  http.get("*/api/market/events", () => HttpResponse.json(getMarketEvents)),
   http.get("*/api/market/overview", () => HttpResponse.json(getMarketOverview)),
+  http.get("*/api/news", () => HttpResponse.json(getNews)),
   http.get("*/api/opportunities", () => HttpResponse.json(getOpportunities)),
   http.get("*/api/opportunities/:opportunity_id", () => HttpResponse.json(getOpportunitiesOpportunityId)),
   http.patch("*/api/opportunities/:opportunity_id", () => HttpResponse.json(patchOpportunitiesOpportunityId)),
@@ -120,7 +130,7 @@ export const handlers = [
   http.patch("*/api/risk/events/:event_id/resolve", () => HttpResponse.json(patchRiskEventsEventIdResolve)),
   http.get("*/api/risk/exposure", () => HttpResponse.json(getRiskExposure)),
   http.get("*/api/settings", () => HttpResponse.json(getSettings)),
-  http.put("*/api/settings", () => HttpResponse.json(putSettings)),
+  http.patch("*/api/settings", () => HttpResponse.json(patchSettings)),
   http.get("*/api/strategies", () => HttpResponse.json(getStrategies)),
   http.post("*/api/strategies", () => HttpResponse.json(postStrategies, { status: 201 })),
   http.get("*/api/strategies/:strategy_id", () => HttpResponse.json(getStrategiesStrategyId)),
@@ -128,6 +138,8 @@ export const handlers = [
   http.get("*/api/strategies/:strategy_id/versions", () => HttpResponse.json(getStrategiesStrategyIdVersions)),
   http.post("*/api/strategies/:strategy_id/versions", () => HttpResponse.json(postStrategiesStrategyIdVersions, { status: 201 })),
   http.put("*/api/strategies/:strategy_id/versions/:version/instruments", () => HttpResponse.json(putStrategiesStrategyIdVersionsVersionInstruments)),
+  http.get("*/api/system/health", () => HttpResponse.json(getSystemHealth)),
+  http.post("*/api/system/sync", () => HttpResponse.json(postSystemSync, { status: 202 })),
   http.get("*/api/watchlist", () => HttpResponse.json(getWatchlist)),
   http.post("*/api/watchlist", () => HttpResponse.json(postWatchlist, { status: 201 })),
   http.patch("*/api/watchlist/:inst_id", () => HttpResponse.json(patchWatchlistInstId)),

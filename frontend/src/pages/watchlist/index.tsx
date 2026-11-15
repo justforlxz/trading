@@ -14,13 +14,13 @@ import {
 import { StreamNotice, StreamTag } from "../../components/ui/stream-status";
 import {
   addWatchlistItem,
-  fetchMarketOverview,
+  fetchMarketBreadth,
   fetchWatchlist,
   removeWatchlistItem,
   searchInstruments,
   updateWatchlistItem,
   type InstrumentRef,
-  type MarketOverviewResponse,
+  type MarketBreadthResponse,
   type WatchlistItem,
   type WatchlistResponse,
 } from "../../lib/api";
@@ -83,7 +83,7 @@ function MarketRegimeCard({
   market,
   error,
 }: {
-  market: MarketOverviewResponse[] | null;
+  market: MarketBreadthResponse[] | null;
   error: string | null;
 }) {
   return (
@@ -388,7 +388,7 @@ export default function WatchlistPage() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [results, setResults] = useState<InstrumentRef[] | null>(null);
 
-  const [market, setMarket] = useState<MarketOverviewResponse[] | null>(null);
+  const [market, setMarket] = useState<MarketBreadthResponse[] | null>(null);
   const [marketError, setMarketError] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -408,7 +408,7 @@ export default function WatchlistPage() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([fetchMarketOverview("SPOT"), fetchMarketOverview("SWAP")])
+    Promise.all([fetchMarketBreadth("SPOT"), fetchMarketBreadth("SWAP")])
       .then((value) => {
         if (active) setMarket(value);
       })

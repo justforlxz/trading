@@ -16,12 +16,15 @@ from app.api.mapping import decimal_str
 from app.api.schemas import (
     InstrumentStrategy,
     InstrumentStrategyListResponse,
+    StrategyAutoExecutionRuntime,
     StrategyBacktestSummary,
     StrategyCreatedResponse,
     StrategyCreateRequest,
     StrategyDetail,
     StrategyInstrumentUpdateRequest,
     StrategyListResponse,
+    StrategyRuntimeResponse,
+    StrategySignalScanRuntime,
     StrategySummary,
     StrategyUpdatedResponse,
     StrategyUpdateRequest,
@@ -31,6 +34,8 @@ from app.api.schemas import (
     StrategyVersionSummary,
 )
 from app.backtest import BacktestRunHeader, latest_linked_backtests
+from app.core import SystemClock
+from app.settings import load_settings
 from app.strategy import (
     InstrumentStrategyRecord,
     StrategyRecord,
@@ -98,6 +103,29 @@ def create_strategy_endpoint(payload: StrategyCreateRequest) -> StrategyCreatedR
         version_id=record.current_version_id,
         status=record.status,
         created_at=record.created_at,
+    )
+
+
+@strategy_router.get("/strategies/runtime", response_model=StrategyRuntimeResponse)
+def get_strategy_runtime() -> StrategyRuntimeResponse:
+    """策略页运行状态：扫描未实现、自动执行开关与后端检查时间。"""
+
+    settings = load_settings()
+    enabled = bool(settings.execution.get("auto_trading_enabled", False))
+    return StrategyRuntimeResponse(
+        checked_at=SystemClock().now(),
+        signal_scan=StrategySignalScanRuntime(
+            status="not_implemented",
+            detail="策略信号扫描尚未实现",
+        ),
+        auto_execution=StrategyAutoExecutionRuntime(
+            enabled=enabled,
+            detail=(
+                "自动执行默认关闭，只保存开关，不产生真实订单"
+                if not enabled
+                else "开关已开启，但 v6 只保存状态，不产生真实订单"
+            ),
+        ),
     )
 
 

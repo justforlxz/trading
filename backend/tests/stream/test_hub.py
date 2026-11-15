@@ -226,6 +226,46 @@ def test_status_changes_append_data_source_activity() -> None:
     assert [event.summary for event in reconnected] == ["行情数据源已重连"]
 
 
+def test_status_subscription_reports_both_data_sources_without_starting_upstreams() -> None:
+    """只订阅状态时立即回公共与私有通道状态，但不启动行情上游连接。"""
+
+    async def scenario() -> None:
+        events: list[dict[str, Any]] = []
+        hub = _hub()
+        client = hub.register(events.append)
+
+        await hub.subscribe(client, [{"type": "status"}])
+        statuses = [e for e in events if e["type"] == "data_source.status.updated"]
+
+        assert {event["data"]["dataset"] for event in statuses} == {"public_ws", "private_ws"}
+        assert all(event["data"]["connected"] is False for event in statuses)
+        assert hub._public_task is None
+        await hub.stop()
+
+    asyncio.run(scenario())
+
+
+def test_status_subscription_receives_later_connection_changes() -> None:
+    """状态订阅不是一次性快照：上游连接变化后继续推送。"""
+
+    async def scenario() -> None:
+        events: list[dict[str, Any]] = []
+        hub = _hub()
+        client = hub.register(events.append)
+        await hub.subscribe(client, [{"type": "status"}])
+        events.clear()
+
+        hub._set_status("public_ws", True, "")
+        statuses = [e for e in events if e["type"] == "data_source.status.updated"]
+
+        assert len(statuses) == 1
+        assert statuses[0]["data"]["dataset"] == "public_ws"
+        assert statuses[0]["data"]["connected"] is True
+        await hub.stop()
+
+    asyncio.run(scenario())
+
+
 def test_private_push_is_delivered_even_when_the_database_write_fails() -> None:
     async def scenario() -> None:
         events: list[dict[str, Any]] = []

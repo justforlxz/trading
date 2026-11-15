@@ -1,0 +1,11 @@
+{
+  "auto_execution": {
+    "detail": "自动执行默认关闭，只保存开关，不产生真实订单",
+    "enabled": false
+  },
+  "checked_at": "2026-11-16T01:30:00Z",
+  "signal_scan": {
+    "detail": "策略信号扫描尚未实现",
+    "status": "not_implemented"
+  }
+}

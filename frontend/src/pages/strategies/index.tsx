@@ -14,15 +14,19 @@ import {
   fetchBacktests,
   fetchStrategies,
   fetchStrategy,
+  fetchStrategyRuntime,
   fetchStrategyVersions,
   type BacktestBatchResponse,
   type BacktestDataSource,
   type BacktestRunSummary,
   type StrategyDetail,
+  type StrategyRuntimeResponse,
   type StrategySummary,
   type StrategyVersionDetail,
 } from "../../lib/api";
 import { backtestsForVersions } from "../../lib/strategies";
+import { marketSubscriptionStatus } from "../../lib/strategy-runtime";
+import { useDataSourceStatus } from "../../lib/stream-hooks";
 import { StrategyBacktestPanel } from "./backtest-panel";
 import { StrategyDetailPanel } from "./strategy-detail";
 import {
@@ -32,6 +36,7 @@ import {
   NewVersionDialog,
 } from "./strategy-form";
 import { StrategyListPanel } from "./strategy-list";
+import { StrategyRuntimeStatusCard } from "./runtime-status";
 
 type DialogKind = "create" | "metadata" | "version" | "instruments" | null;
 
@@ -48,6 +53,11 @@ export default function StrategiesPage() {
   const [runSource, setRunSource] = useState<BacktestDataSource>("okx_spot");
   const [dialog, setDialog] = useState<DialogKind>(null);
   const [error, setError] = useState<string | null>(null);
+  const [runtime, setRuntime] = useState<StrategyRuntimeResponse | null>(null);
+  const [runtimeLoading, setRuntimeLoading] = useState(true);
+  const [runtimeError, setRuntimeError] = useState<string | null>(null);
+  const streamState = useDataSourceStatus();
+  const marketSubscription = marketSubscriptionStatus(streamState.datasets);
 
   const reloadStrategies = useCallback(async () => {
     try {
@@ -106,6 +116,27 @@ export default function StrategiesPage() {
   useEffect(() => {
     void reloadStrategies();
   }, [reloadStrategies]);
+
+  useEffect(() => {
+    let active = true;
+    setRuntimeLoading(true);
+    fetchStrategyRuntime()
+      .then((payload) => {
+        if (!active) return;
+        setRuntime(payload);
+        setRuntimeError(null);
+      })
+      .catch((reason: unknown) => {
+        if (!active) return;
+        setRuntimeError(reason instanceof Error ? reason.message : "运行状态加载失败");
+      })
+      .finally(() => {
+        if (active) setRuntimeLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (queryStrategy === null) return;
@@ -179,6 +210,15 @@ export default function StrategiesPage() {
           {error}
         </p>
       ) : null}
+
+      <div className="mb-6">
+        <StrategyRuntimeStatusCard
+          runtime={runtime}
+          loading={runtimeLoading}
+          error={runtimeError}
+          marketSubscription={marketSubscription}
+        />
+      </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
         <StrategyListPanel

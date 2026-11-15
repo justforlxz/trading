@@ -4,6 +4,7 @@
  * 协议来源在后端 `backend/app/stream/hub.py`：
  * - 订阅消息 `{action: "subscribe", topics: [...]}`：`hub.py:282-332`
  * - 行情订阅 `{type: "quote", inst_ids: [...]}`：`hub.py:304-313`
+ * - 状态订阅 `{type: "status"}`：只回数据源连接状态，不启动上游连接
  * - 事件信封 `{type, as_of, received_at, data}`：`hub.py:861-872`
  * - 行情数据 `{inst_id, last, mark, index, source, stale, snapshot}`：`hub.py:157-166`
  * - 账户数据：`hub.py:895-930`；持仓数据：`hub.py:932-955`
@@ -91,6 +92,7 @@ export type TimedUpdate = {
 
 export type StreamSubscription = {
   quotes?: readonly string[];
+  status?: boolean;
   account?: boolean;
   positions?: boolean;
 };
@@ -104,9 +106,14 @@ export type SocketLike = Pick<WebSocket, "readyState" | "send" | "close"> & {
 
 export type SocketFactory = (url: string) => SocketLike;
 
-type Normalized = { quotes: string[]; account: boolean; positions: boolean };
+type Normalized = {
+  quotes: string[];
+  status: boolean;
+  account: boolean;
+  positions: boolean;
+};
 
-const EMPTY: Normalized = { quotes: [], account: false, positions: false };
+const EMPTY: Normalized = { quotes: [], status: false, account: false, positions: false };
 const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_MAX_MS = 15_000;
 
@@ -130,6 +137,7 @@ function text(value: unknown): string | null {
 function normalize(subscription: StreamSubscription): Normalized {
   return {
     quotes: [...new Set(subscription.quotes ?? [])].sort(),
+    status: subscription.status === true,
     account: subscription.account === true,
     positions: subscription.positions === true,
   };
@@ -137,6 +145,7 @@ function normalize(subscription: StreamSubscription): Normalized {
 
 function same(left: Normalized, right: Normalized): boolean {
   return (
+    left.status === right.status &&
     left.account === right.account &&
     left.positions === right.positions &&
     left.quotes.length === right.quotes.length &&
@@ -147,18 +156,21 @@ function same(left: Normalized, right: Normalized): boolean {
 /** 多处订阅合并成一条连接上的订阅集合。 */
 function mergedSubscription(subscriptions: Map<symbol, Normalized>): Normalized {
   const quotes = new Set<string>();
+  let status = false;
   let account = false;
   let positions = false;
   for (const item of subscriptions.values()) {
     for (const instId of item.quotes) quotes.add(instId);
+    if (item.status) status = true;
     if (item.account) account = true;
     if (item.positions) positions = true;
   }
-  return { quotes: [...quotes].sort(), account, positions };
+  return { quotes: [...quotes].sort(), status, account, positions };
 }
 
 /** 后端只能追加订阅，`outer` 包含 `inner` 时不必重连。 */
 function contains(outer: Normalized, inner: Normalized): boolean {
+  if (inner.status && !outer.status) return false;
   if (inner.account && !outer.account) return false;
   if (inner.positions && !outer.positions) return false;
   return inner.quotes.every((item) => outer.quotes.includes(item));
@@ -448,6 +460,7 @@ export class StreamClient {
     if (subscription.quotes.length > 0) {
       topics.push({ type: "quote", inst_ids: subscription.quotes });
     }
+    if (subscription.status) topics.push({ type: "status" });
     if (subscription.account) topics.push({ type: "account" });
     if (subscription.positions) topics.push({ type: "positions" });
     this.applied = subscription;

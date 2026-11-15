@@ -18,6 +18,17 @@ export function useStreamState(): StreamState {
   return useSyncExternalStore(streamClient.subscribeState, streamClient.getState);
 }
 
+/** 只订阅数据源连接状态；不在本页请求行情，也不启动上游行情连接。 */
+export function useDataSourceStatus(): StreamState {
+  const state = useStreamState();
+  const owner = useOwner();
+  useEffect(() => {
+    streamClient.setSubscription(owner, { status: true });
+    return () => streamClient.clearSubscription(owner);
+  }, [owner]);
+  return state;
+}
+
 function useStreamEvents(handler: (event: StreamEvent) => void): void {
   const latest = useRef(handler);
   latest.current = handler;

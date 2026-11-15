@@ -59,6 +59,7 @@ export type StrategyInstrumentUpdateRequest =
 export type StrategyCreatedResponse = components["schemas"]["StrategyCreatedResponse"];
 export type StrategyUpdatedResponse = components["schemas"]["StrategyUpdatedResponse"];
 export type StrategyVersionListResponse = components["schemas"]["StrategyVersionListResponse"];
+export type StrategyRuntimeResponse = components["schemas"]["StrategyRuntimeResponse"];
 export type StrategyBacktestSummary = components["schemas"]["StrategyBacktestSummary"];
 export type InstrumentStrategy = components["schemas"]["InstrumentStrategy"];
 export type InstrumentStrategyListResponse =
@@ -296,6 +297,11 @@ export function fetchStrategies(): Promise<StrategyListResponse> {
 
 export function fetchStrategy(strategyId: string): Promise<StrategyDetail> {
   return request<StrategyDetail>(`/strategies/${encodeURIComponent(strategyId)}`);
+}
+
+/** 策略页运行状态：信号扫描、自动执行与后端检查时间。 */
+export function fetchStrategyRuntime(): Promise<StrategyRuntimeResponse> {
+  return request<StrategyRuntimeResponse>("/strategies/runtime");
 }
 
 export function createStrategy(body: StrategyCreateRequest): Promise<StrategyCreatedResponse> {

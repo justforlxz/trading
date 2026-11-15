@@ -9,6 +9,7 @@
 - 浏览器只收到自己订阅的标的；同一标的的高频行情按 1 秒窗口合并，只推窗口内最后
   一条。
 - 私有频道先按 B2 的快照结构解析、写库，再推送；写库失败只记录错误，不阻断推送。
+- `status` 订阅只回数据源连接状态，不启动上游连接；页面无需请求行情也能读取状态。
 - 任何事件都不包含上游凭据或原始应答。
 """
 
@@ -114,6 +115,7 @@ class StreamClient:
     quotes: set[str] = field(default_factory=set)
     account: bool = False
     positions: bool = False
+    status: bool = False
 
     def wants(self, inst_id: str) -> bool:
         return inst_id in self.quotes
@@ -304,6 +306,7 @@ class StreamHub:
         new_quotes: set[str] = set()
         ask_account = False
         ask_positions = False
+        ask_status = False
         for topic in topics:
             if not isinstance(topic, dict):
                 self._send_error(client, "订阅项必须是对象")
@@ -324,15 +327,19 @@ class StreamHub:
             elif kind == "positions":
                 ask_positions = not client.positions
                 client.positions = True
+            elif kind == "status":
+                ask_status = True
+                client.status = True
             else:
                 self._send_error(client, f"不支持的订阅类型 {kind!r}")
 
         self._sync_upstreams()
-        if new_quotes:
+        if new_quotes or ask_status:
             self._send_status(client, PUBLIC_DATASET)
-            await self._send_quote_initial(client, new_quotes)
-        if ask_account or ask_positions:
+        if ask_account or ask_positions or ask_status:
             self._send_status(client, PRIVATE_DATASET)
+        if new_quotes:
+            await self._send_quote_initial(client, new_quotes)
         if ask_account:
             await self._send_account_initial(client)
         if ask_positions:
@@ -792,9 +799,11 @@ class StreamHub:
 
     def _broadcast_status(self, dataset: str) -> None:
         if dataset == PUBLIC_DATASET:
-            predicate = lambda client: bool(client.quotes)  # noqa: E731
+            predicate = lambda client: client.status or bool(client.quotes)  # noqa: E731
         else:
-            predicate = lambda client: client.account or client.positions  # noqa: E731
+            predicate = lambda client: (  # noqa: E731
+                client.status or client.account or client.positions
+            )
         self._broadcast_envelope(
             "data_source.status.updated",
             self._status_payload(dataset),

@@ -88,7 +88,7 @@ class AlertRecord:
 
 @dataclass(frozen=True, slots=True)
 class ScanResult:
-    """一次扫描的结果：新插入与本次过期各多少条。"""
+    """一次扫描的结果：新插入、重新激活各多少条（合并计入 created）与本次过期数。"""
 
     created: int
     expired: int
@@ -210,10 +210,13 @@ def scan_alerts(*, clock: Clock | None = None) -> ScanResult:
                 )
                 if existing is None or existing.status != "expired":
                     continue
-                existing.status = "pending"
-                existing.triggered_at = candidate.triggered_at
+                # 重新激活沿用同一 `dedup_key` 的旧行，但严重程度、说明、载荷与
+                # 规则版本都要换成本次候选的值，否则页面显示的是上一次触发的数值。
+                for field, value in _row_values(candidate).items():
+                    if field in {"id", "dedup_key", "created_at"}:
+                        continue
+                    setattr(existing, field, value)
                 existing.updated_at = moment
-                existing.expires_at = candidate.expires_at
                 queue_event(session, "alert.updated", _row_event(existing), as_of=moment)
                 record_activity(
                     session=session,
@@ -329,8 +332,6 @@ def _expire_stale(
     rows = list(session.scalars(statement.order_by(AlertEventRow.id).with_for_update()))
     expired = 0
     for row in rows:
-        if row.dedup_key in current_keys:
-            continue
         group = (row.type, row.rule_id, row.instrument_id)
         if group not in new_groups and group in active_groups:
             continue

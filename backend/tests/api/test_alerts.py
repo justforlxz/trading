@@ -17,7 +17,9 @@ from app.core import Conflict
 from app.db import session_scope
 
 
-def _open_position(client: TestClient, key: str = "alert-1") -> dict[str, object]:
+def _open_position(
+    client: TestClient, key: str = "alert-1", leverage: str = "2"
+) -> dict[str, object]:
     response = client.post(
         "/api/manual-positions",
         json={
@@ -25,7 +27,7 @@ def _open_position(client: TestClient, key: str = "alert-1") -> dict[str, object
             "side": "long",
             "quantity": "2",
             "avg_cost": "55",
-            "leverage": "2",
+            "leverage": leverage,
             "idempotency_key": key,
         },
     )
@@ -214,6 +216,30 @@ def test_reopened_alert_is_pending_again_after_condition_recovers(
         "items"
     ]
     assert [item["object_id"] for item in activity] == [alert["id"]]
+
+
+def test_reopened_alert_carries_the_new_values(market_data: TestClient) -> None:
+    """重新激活的提醒用本次候选覆盖说明文字与载荷，不再显示上一次的数值。"""
+
+    position = _open_position(market_data, key="alert-values", leverage="4")
+    pending = market_data.get("/api/alerts").json()["items"]
+    alert = next(item for item in pending if item["rule_id"] == "high_leverage")
+    assert alert["detail"] == "AAPL-USDT-SWAP 的杠杆 4，阈值 3"
+    assert alert["payload"]["value"] == "4"
+    assert alert["severity"] == "warning"
+
+    # 杠杆降回阈值内后该提醒恢复；同一天内再把杠杆调高，去重键不变，数值必须刷新。
+    market_data.patch(f"/api/manual-positions/{position['id']}", json={"leverage": "2"})
+    market_data.get("/api/alerts")
+    expired = market_data.get("/api/alerts", params={"status": "expired"}).json()["items"]
+    assert alert["id"] in {item["id"] for item in expired}
+
+    market_data.patch(f"/api/manual-positions/{position['id']}", json={"leverage": "6"})
+    reopened = market_data.get("/api/alerts").json()["items"]
+    reopened_alert = next(item for item in reopened if item["id"] == alert["id"])
+    assert reopened_alert["status"] == "pending"
+    assert reopened_alert["detail"] == "AAPL-USDT-SWAP 的杠杆 6，阈值 3"
+    assert reopened_alert["payload"]["value"] == "6"
 
 
 def test_scan_publishes_alert_and_activity_events(market_data: TestClient) -> None:

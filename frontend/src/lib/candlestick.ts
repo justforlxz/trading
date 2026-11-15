@@ -59,11 +59,43 @@ export type CandlestickGeometry = {
   candles: CandleGeometry[];
   overlays: OverlayGeometry[];
   gaps: GapGeometry[];
+  markers: MarkerGeometry[];
+  /** 没有对应 K 线的标记数量：这些标记不绘制，也不插值到相邻 K 线。 */
+  unmatchedMarkers: number;
   priceTicks: PriceTick[];
   timeTicks: TimeTick[];
 };
 
-export type CandlestickInput = Pick<InstrumentAnalysisCandles, "candles" | "overlays" | "gaps">;
+/** 回测成交在 K 线上的入场或出场标记；字段原样来自后端成交表。 */
+export type CandlestickMarker = {
+  trade_id: string;
+  kind: "entry" | "exit";
+  time: string;
+  price: string;
+  side: "buy" | "sell";
+  qty: string;
+  pnl?: string | null;
+  reason?: string | null;
+};
+
+export type MarkerGeometry = {
+  key: string;
+  tradeId: string;
+  kind: "entry" | "exit";
+  side: "buy" | "sell";
+  time: string;
+  price: string;
+  qty: string;
+  pnl: string | null;
+  reason: string | null;
+  x: number;
+  y: number;
+  label: string;
+};
+
+export type CandlestickInput = Pick<InstrumentAnalysisCandles, "candles" | "overlays" | "gaps"> & {
+  markers?: CandlestickMarker[];
+};
 
 function parseNumber(value: string): number | null {
   const trimmed = value.trim();
@@ -92,6 +124,8 @@ export function emptyCandlestickGeometry(): CandlestickGeometry {
     candles: [],
     overlays: [],
     gaps: [],
+    markers: [],
+    unmatchedMarkers: 0,
     priceTicks: [],
     timeTicks: [],
   };
@@ -208,6 +242,43 @@ export function buildCandlestickChart(input: CandlestickInput): CandlestickGeome
     gaps.push({ left: round(left), right: round(right), missing: gap.missing });
   }
 
+  let unmatchedMarkers = 0;
+  const markers: MarkerGeometry[] = [];
+  for (const marker of input.markers ?? []) {
+    const index = indexByTime.get(marker.time);
+    const price = parseNumber(marker.price);
+    if (index === undefined || price === null) {
+      unmatchedMarkers += 1;
+      continue;
+    }
+    const candle = candles[index];
+    const offset = marker.side === "buy" ? 14 : -14;
+    const label = [
+      marker.kind === "entry" ? "入场" : "出场",
+      marker.side === "buy" ? "买入" : "卖出",
+      `${marker.qty} @ ${marker.price}`,
+      marker.reason ?? null,
+      marker.pnl === null || marker.pnl === undefined ? null : `盈亏 ${marker.pnl}`,
+      `成交 ${marker.trade_id}`,
+    ]
+      .filter((part): part is string => part !== null)
+      .join(" · ");
+    markers.push({
+      key: `${marker.trade_id}:${marker.kind}:${marker.time}`,
+      tradeId: marker.trade_id,
+      kind: marker.kind,
+      side: marker.side,
+      time: marker.time,
+      price: marker.price,
+      qty: marker.qty,
+      pnl: marker.pnl ?? null,
+      reason: marker.reason ?? null,
+      x: candle.x,
+      y: round(Math.min(PRICE_BOTTOM, Math.max(PRICE_TOP, yFor(price) + offset))),
+      label,
+    });
+  }
+
   const priceStep = priceSpan / (PRICE_TICK_COUNT - 1);
   const digits = tickDigits(priceStep);
   const priceTicks = Array.from({ length: PRICE_TICK_COUNT }, (_, index) => ({
@@ -245,6 +316,8 @@ export function buildCandlestickChart(input: CandlestickInput): CandlestickGeome
     candles,
     overlays,
     gaps,
+    markers,
+    unmatchedMarkers,
     priceTicks,
     timeTicks,
   };

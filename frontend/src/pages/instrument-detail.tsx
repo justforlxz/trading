@@ -41,6 +41,7 @@ import {
 } from "../lib/strategies";
 import { useQuoteStream } from "../lib/stream-hooks";
 import { cn } from "../lib/utils";
+import { InstrumentAlertsCard } from "./instrument-detail/alerts-card";
 import { BacktestLaunchForm } from "./strategies/backtest-launch-form";
 
 const BAR_OPTIONS: Array<{ bar: InstrumentAnalysisBar; label: string }> = [
@@ -1085,6 +1086,8 @@ export default function InstrumentDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          <InstrumentAlertsCard instId={instId} />
 
           <Card>
             <CardHeader className="pb-3">

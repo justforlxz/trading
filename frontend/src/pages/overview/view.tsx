@@ -11,6 +11,7 @@ import {
   type DashboardSummary,
 } from "../../lib/dashboard";
 import type { StreamLiveness } from "../../lib/stream";
+import type { AlertStatusUpdate } from "../../lib/alerts";
 import {
   AccountBody,
   ActivityBody,
@@ -32,6 +33,8 @@ export type OverviewViewProps = {
   accountLiveness: StreamLiveness;
   pushed: DashboardPushed;
   onRefresh: () => void;
+  onResolveAlert?: (alertId: string, status: AlertStatusUpdate) => void;
+  resolvingAlertId?: string | null;
 };
 
 /** 纯展示组件：测试直接渲染它，不依赖网络、推送连接与浏览器。 */
@@ -43,6 +46,8 @@ export function OverviewView({
   accountLiveness,
   pushed,
   onRefresh,
+  onResolveAlert,
+  resolvingAlertId = null,
 }: OverviewViewProps) {
   return (
     <>
@@ -179,7 +184,11 @@ export function OverviewView({
               pushedFields={0}
               to="/journal"
             >
-              <AlertsBody summary={summary} />
+              <AlertsBody
+                summary={summary}
+                onResolve={onResolveAlert}
+                resolvingId={resolvingAlertId}
+              />
             </ModuleCard>
           </div>
 

@@ -26,6 +26,7 @@ import {
 import { JournalFilters } from "./journal/filters";
 import { JournalEditor } from "./journal/note-editor";
 import { JournalStats, ResearchNoteList } from "./journal/note-list";
+import { JournalActivitySection } from "./journal/activity-section";
 
 const PAGE_SIZE = 200;
 const MAX_PAGES = 20;
@@ -269,6 +270,8 @@ export default function JournalPage() {
             void remove(note);
           }}
         />
+
+        <JournalActivitySection />
       </div>
     </>
   );

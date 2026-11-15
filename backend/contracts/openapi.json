@@ -11977,13 +11977,45 @@
       },
       "SystemSyncRequest": {
         "additionalProperties": false,
-        "description": "手动触发一次外部数据同步；数据集由服务端校验。",
+        "description": "手动触发一次数据同步；数据集由服务端校验。\n\n`instruments` 与 `candles` 是 OKX 公共行情的产品入口；其余数据集走外部行情\nProvider。`bar` 与 `days` 只对 `candles` 生效。",
         "properties": {
+          "bar": {
+            "anyOf": [
+              {
+                "enum": [
+                  "1m",
+                  "5m",
+                  "15m",
+                  "1h",
+                  "4h",
+                  "1d"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bar"
+          },
           "dataset": {
             "maxLength": 64,
             "minLength": 1,
             "title": "Dataset",
             "type": "string"
+          },
+          "days": {
+            "anyOf": [
+              {
+                "maximum": 3650.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days"
           },
           "instrument_ids": {
             "items": {
@@ -16365,7 +16397,7 @@
     },
     "/api/system/sync": {
       "post": {
-        "description": "手动触发一次外部数据集同步；同一 Provider 与数据集已在运行时返回 409。",
+        "description": "手动触发一次数据同步；同一 Provider 与数据集已在运行时返回 409。",
         "operationId": "post_system_sync_api_system_sync_post",
         "requestBody": {
           "content": {

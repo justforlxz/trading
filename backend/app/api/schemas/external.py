@@ -11,7 +11,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.api.schemas.common import DecimalString, UtcDatetime
+from app.api.schemas.common import Bar, DecimalString, UtcDatetime
 
 __all__ = [
     "AiSummaryPoint",
@@ -305,11 +305,17 @@ class SystemHealthResponse(BaseModel):
 
 
 class SystemSyncRequest(BaseModel):
-    """手动触发一次外部数据同步；数据集由服务端校验。"""
+    """手动触发一次数据同步；数据集由服务端校验。
+
+    `instruments` 与 `candles` 是 OKX 公共行情的产品入口；其余数据集走外部行情
+    Provider。`bar` 与 `days` 只对 `candles` 生效。
+    """
 
     dataset: str = Field(min_length=1, max_length=64)
     provider: str | None = Field(default=None, max_length=64)
     instrument_ids: list[str] = Field(default_factory=list)
+    bar: Bar | None = None
+    days: int | None = Field(default=None, ge=1, le=3650)
 
     model_config = ConfigDict(extra="forbid")
 

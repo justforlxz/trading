@@ -22,10 +22,26 @@ from app.jobs.queue import (
 )
 from app.jobs.scope import SCOPE_MODES, TargetScope, resolve_scope
 from app.jobs.sweep import SweepOutcome, SweepPlan, plan_sweep, run_sweep
+from app.jobs.sync import (
+    CANDLES_DATASET,
+    DEFAULT_CANDLE_BAR,
+    DEFAULT_CANDLE_DAYS,
+    INSTRUMENTS_DATASET,
+    OKX_PROVIDER,
+    SYNC_DATASETS,
+    run_candle_sync,
+    run_instrument_sync,
+)
 
 __all__ = [
+    "CANDLES_DATASET",
+    "DEFAULT_CANDLE_BAR",
+    "DEFAULT_CANDLE_DAYS",
     "DEFAULT_MAX_CONCURRENCY",
+    "INSTRUMENTS_DATASET",
+    "OKX_PROVIDER",
     "SCOPE_MODES",
+    "SYNC_DATASETS",
     "QueueOutcome",
     "QueueReport",
     "SweepOutcome",
@@ -34,6 +50,8 @@ __all__ = [
     "next_beijing_midnight",
     "plan_sweep",
     "resolve_scope",
+    "run_candle_sync",
+    "run_instrument_sync",
     "run_sweep",
     "run_tasks",
     "start_equity_snapshot_scheduler",

@@ -94,6 +94,14 @@ export type RiskDefaults = SettingsResponse["risk_defaults"];
 export type DataSourceSettings = SettingsResponse["data_sources"];
 export type SecretSettings = SettingsResponse["secrets"];
 export type MarketBreadthResponse = components["schemas"]["MarketBreadthResponse"];
+export type MarketSnapshotResponse = components["schemas"]["MarketSnapshotResponse"];
+export type MarketOverviewItem = components["schemas"]["MarketOverviewItem"];
+export type MarketEventItem = components["schemas"]["MarketEventItem"];
+export type MarketEventListResponse = components["schemas"]["MarketEventListResponse"];
+export type NewsItem = components["schemas"]["NewsItem"];
+export type NewsListResponse = components["schemas"]["NewsListResponse"];
+export type AiSummaryRequest = components["schemas"]["AiSummaryRequest"];
+export type AiSummaryResponse = components["schemas"]["AiSummaryResponse"];
 export type ResearchNoteItem = components["schemas"]["ResearchNoteItem"];
 export type ResearchNoteListResponse = components["schemas"]["ResearchNoteListResponse"];
 export type ResearchNoteCreateRequest = components["schemas"]["ResearchNoteCreateRequest"];
@@ -174,6 +182,39 @@ export function fetchMarketBreadth(
 ): Promise<MarketBreadthResponse> {
   const query = new URLSearchParams({ inst_type: instType, bar });
   return request<MarketBreadthResponse>(`/market/breadth?${query.toString()}`);
+}
+
+/** v6 的五个市场指标；每项自带来源、时间与陈旧状态。 */
+export function fetchMarketOverview(): Promise<MarketSnapshotResponse> {
+  return request<MarketSnapshotResponse>("/market/overview");
+}
+
+/** 带来源的市场摘要；输入只选择是否包含新闻与新闻条数，不在前端生成文字。 */
+export function fetchAiSummary(
+  input?: Partial<AiSummaryRequest>,
+): Promise<AiSummaryResponse> {
+  const body: AiSummaryRequest = {
+    include_news: input?.include_news ?? true,
+    news_limit: input?.news_limit ?? 10,
+  };
+  return send<AiSummaryResponse>("/ai/summary", "POST", body);
+}
+
+/** 按标的读取已采集的宏观与公司事件；不传标的时读取全部事件。 */
+export function fetchMarketEvents(
+  ticker?: string,
+  limit = 100,
+): Promise<MarketEventListResponse> {
+  const query = new URLSearchParams({ limit: String(limit) });
+  if (ticker !== undefined && ticker.trim() !== "") query.set("ticker", ticker);
+  return request<MarketEventListResponse>(`/market/events?${query.toString()}`);
+}
+
+/** 按标的读取已采集新闻；不传标的时读取最近新闻。 */
+export function fetchNews(ticker?: string, limit = 50): Promise<NewsListResponse> {
+  const query = new URLSearchParams({ limit: String(limit) });
+  if (ticker !== undefined && ticker.trim() !== "") query.set("ticker", ticker);
+  return request<NewsListResponse>(`/news?${query.toString()}`);
 }
 
 /** 按代码或产品键搜索已同步的标的；不传形态时两类一起返回。 */

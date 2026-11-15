@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
 import type { DashboardSummary } from "../../lib/dashboard";
+import type { AiSummary, MarketSnapshot } from "../../lib/market";
 import type { OverviewViewProps } from "../overview/view";
 import { OverviewView } from "../overview/view";
 
@@ -150,6 +151,56 @@ function summary(): DashboardSummary {
   };
 }
 
+function marketOverview(): MarketSnapshot {
+  const symbols = ["NASDAQ", "SP500", "DOW", "VIX", "BTC"] as const;
+  return {
+    as_of: "2026-11-15T06:10:00Z",
+    provider: "market_data_provider",
+    stale: false,
+    stale_reason: null,
+    last_success_at: "2026-11-15T06:05:00Z",
+    items: symbols.map((symbol, index) => ({
+      symbol,
+      name: `${symbol} Composite`,
+      value: symbol === "BTC" ? "100000" : `${18000 + index}.12`,
+      change: symbol === "BTC" ? "1200" : "180",
+      change_pct: "1.01",
+      market_session: "closed",
+      source: "market_data_provider",
+      as_of: "2026-11-15T06:00:00Z",
+      is_delayed: index === 1,
+      quality_status: "normal" as const,
+      source_url: `https://example.test/${symbol.toLowerCase()}`,
+    })),
+  };
+}
+
+function aiSummary(): AiSummary {
+  return {
+    generated_at: "2026-11-15T06:10:00Z",
+    overall: "偏强，波动率抬升",
+    points: [
+      {
+        text: "NASDAQ Composite 最新 18000.12，较前值 +1.01%。",
+        sources: [{ type: "market_overview", id: "NASDAQ", url: null }],
+      },
+      {
+        text: "AAPL 发布季度业绩",
+        sources: [{ type: "news", id: "news_1", url: "https://example.test/news/1" }],
+      },
+    ],
+    risks: [
+      {
+        text: "持仓缺少止损：AAPL-USDT-SWAP",
+        sources: [{ type: "alert", id: "alert_1", url: null }],
+      },
+    ],
+    disclaimer: "仅作信息归纳，不构成交易建议",
+    stale: false,
+    stale_notice: null,
+  };
+}
+
 function render(overrides: Partial<OverviewViewProps> = {}): string {
   return renderToStaticMarkup(
     createElement(
@@ -162,6 +213,12 @@ function render(overrides: Partial<OverviewViewProps> = {}): string {
         priceLiveness: "live" as const,
         accountLiveness: "live" as const,
         pushed: { account: null, positions: {}, watchlist: {} },
+        marketOverview: marketOverview(),
+        marketOverviewError: null,
+        marketOverviewLoading: false,
+        aiSummary: aiSummary(),
+        aiSummaryError: null,
+        aiSummaryLoading: false,
         onRefresh: () => undefined,
         ...overrides,
       }),
@@ -194,6 +251,9 @@ describe("首页 v6", () => {
 
   it("数值全部来自后端，不在页面里重算", () => {
     const html = render();
+    expect(html).toContain("18000.12");
+    expect(html).toContain("100000");
+    expect(html).toContain("偏强，波动率抬升");
     expect(html).toContain("1248.60 USDT");
     expect(html).toContain("45.36%");
     expect(html).toContain("231.42");
@@ -255,6 +315,16 @@ describe("首页 v6", () => {
     expect(html).not.toContain("打开市场概况所在页面");
   });
 
+  it("摘要来源锚点在首页存在", () => {
+    const html = render();
+    expect(html).toContain('id="market-overview"');
+    expect(html).toContain('id="alerts"');
+    expect(html).toContain('id="risk"');
+    expect(html).toContain('href="#market-overview"');
+    expect(html).toContain('href="#alerts"');
+    expect(html).toContain('href="https://example.test/news/1"');
+  });
+
   it("单个模块失效只降级自己，其余模块照常渲染", () => {
     const base = summary();
     const html = render({
@@ -262,18 +332,15 @@ describe("首页 v6", () => {
         ...base,
         account: { status: "unavailable", as_of: null, error: "OKX 读取失败", data: null },
         risk: { status: "stale", as_of: "2026-11-12T09:00:00Z", error: "风险快照过期", data: null },
-        market: { status: "unconfigured", as_of: null, error: "未配置 OKX 密钥", data: null },
         degraded: [
           { module: "account", status: "unavailable", reason: "OKX 读取失败" },
           { module: "risk", status: "stale", reason: "风险快照过期" },
-          { module: "market", status: "unconfigured", reason: "未配置 OKX 密钥" },
         ],
       },
     });
 
     expect(html).toContain("不可用（OKX 读取失败）");
     expect(html).toContain("不可用（风险快照过期）");
-    expect(html).toContain("不可用（未配置 OKX 密钥）");
     expect(html).toContain("以下模块降级");
     expect(html).toContain("账户概览");
     expect(html).toContain("风险监控");
@@ -319,21 +386,107 @@ describe("首页 v6", () => {
     expect(pushed).toContain("今日盈亏仍为快照");
   });
 
-  it("整页读取失败时只显示原因，不展示任何业务数值", () => {
+  it("首页汇总失败时仍展示独立的市场模块，不展示汇总业务数值", () => {
     const html = render({ summary: null, error: "请求失败（HTTP 502）" });
     expect(html).toContain("请求失败（HTTP 502）");
+    expect(html).toContain('data-module="market"');
+    expect(html).toContain('data-module="market_summary"');
+    expect(html).toContain("100000");
     expect(html).not.toContain("1248.60");
     expect(html).not.toContain("231.42");
   });
 
   it("市场摘要没有后端数据时不拼摘要文案", () => {
-    const html = render();
+    const html = render({ aiSummary: null, aiSummaryLoading: false });
     const start = html.indexOf("市场摘要");
     const end = html.indexOf("关注列表", start);
     const section = html.slice(start, end);
-    expect(section).toContain("不可用");
-    expect(section).toContain("后端尚未提供市场摘要数据");
+    expect(section).toContain("市场摘要不可用");
     expect(section).not.toContain("市场整体偏强");
+    expect(section).not.toContain("偏强，波动率抬升");
+  });
+
+  it("市场概况展示五个指标、来源、报价时间与延迟状态", () => {
+    const html = render();
+    for (const symbol of ["NASDAQ", "SP500", "DOW", "VIX", "BTC"]) {
+      expect(html).toContain(`data-market-symbol="${symbol}"`);
+    }
+    const start = html.indexOf('data-module="market"');
+    const end = html.indexOf('data-module="account"', start);
+    const section = html.slice(start, end);
+    expect(section).toContain("market_data_provider");
+    expect(section).toContain("2026-11-15 14:00");
+    expect(section).toContain("延迟");
+    expect(section).toContain("实时");
+    expect(section).toContain("https://example.test/nasdaq");
+  });
+
+  it("市场概况读取失败时显示原因，不显示旧值", () => {
+    const html = render({
+      marketOverview: null,
+      marketOverviewError: "外部 Provider 未配置",
+      marketOverviewLoading: false,
+    });
+    expect(html).toContain("外部 Provider 未配置");
+    const start = html.indexOf('data-module="market"');
+    const end = html.indexOf('data-module="account"', start);
+    const section = html.slice(start, end);
+    expect(section).not.toContain("18000.12");
+    expect(section).not.toContain("100000");
+    expect(section).not.toContain("实时");
+    // 其它模块不受影响。
+    expect(html).toContain("1248.60 USDT");
+  });
+
+  it("摘要的每个事实点都写出来源，没有来源的句子不展示", () => {
+    const base = aiSummary();
+    const html = render({
+      aiSummary: {
+        ...base,
+        points: [
+          ...base.points,
+          { text: "这条没有来源，不应出现", sources: [] },
+          { text: "来源标识为空，也不应出现", sources: [{ type: "news", id: " ", url: null }] },
+        ],
+      },
+    });
+    expect(html).toContain("NASDAQ Composite 最新 18000.12");
+    expect(html).toContain("https://example.test/news/1");
+    expect(html).toContain("市场概况 · NASDAQ");
+    expect(html).toContain('href="#alerts"');
+    expect(html).not.toContain("这条没有来源，不应出现");
+    expect(html).not.toContain("来源标识为空，也不应出现");
+  });
+
+  it("免责声明为空时不渲染空段落", () => {
+    const base = aiSummary();
+    const html = render({ aiSummary: { ...base, disclaimer: "" } });
+    expect(html).not.toContain("data-summary-disclaimer");
+  });
+
+  it("市场概况与摘要过期时都给出显式提示", () => {
+    const overview = marketOverview();
+    const summary = aiSummary();
+    const html = render({
+      marketOverview: {
+        ...overview,
+        stale: true,
+        stale_reason: "外部行情数据已过期: NASDAQ",
+        items: overview.items.map((item) => ({
+          ...item,
+          quality_status: item.symbol === "NASDAQ" ? "stale" : item.quality_status,
+        })),
+      },
+      aiSummary: {
+        ...summary,
+        stale: true,
+        stale_notice: "外部行情数据已过期: NASDAQ",
+        overall: "数据不完整；偏强",
+      },
+    });
+    expect(html).toContain("数据已过期：外部行情数据已过期: NASDAQ");
+    expect(html).toContain("数据不完整；偏强");
+    expect(html).toContain("过期");
   });
 
   it("提醒卡展示接口字段并提供确认与忽略入口", () => {

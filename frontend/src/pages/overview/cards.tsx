@@ -16,13 +16,12 @@ import {
   dataSourceLabel,
   dayPnlBasisLabel,
   exchangeStatusLabel,
-  marketSessionLabel,
   percentOrMissingText,
   ratioPercentText,
   signedRatioPercentText,
   type DashboardSummary,
 } from "../../lib/dashboard";
-import { instTypeLabel, signedTone, signedValue } from "../../lib/display";
+import { signedTone, signedValue } from "../../lib/display";
 import { accountSourceLabel, positionSideLabel } from "../../lib/positions";
 import { marginUsageBasisLabel, riskLevelView } from "../../lib/risk";
 import { cn } from "../../lib/utils";
@@ -284,45 +283,6 @@ export function PositionsBody({
   );
 }
 
-export function MarketBody({ summary }: { summary: DashboardSummary }) {
-  const data = summary.market.data;
-  if (data == null) return null;
-  return (
-    <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">
-        当前时段：{marketSessionLabel(data.session)}
-      </p>
-      {data.items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">后端没有返回标的类别。</p>
-      ) : (
-        <dl className="grid gap-3 sm:grid-cols-2">
-          {data.items.map((item) => (
-            <div key={item.inst_type} className="rounded-md border px-3 py-2">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <dt className="text-sm font-medium">
-                  {instTypeLabel(item.inst_type)} · {marketSessionLabel(item.session)}
-                </dt>
-                <dd className="text-[11px] text-muted-foreground">
-                  {dataSourceLabel(item.primary_source)} · {item.bar}
-                </dd>
-              </div>
-              <dd className="mt-2 text-xs leading-5 text-muted-foreground">
-                上涨 {item.breadth.advancers} / 下跌 {item.breadth.decliners} / 平{" "}
-                {item.breadth.unchanged} · 参与 {item.breadth.participants} 个 · 广度比{" "}
-                {item.breadth.ratio ?? "未提供"} · 共振强度{" "}
-                {ratioPercentText(item.resonance.strength)} · 窗口 {item.resonance.window} 根
-              </dd>
-              <dd className="mt-1 text-[11px] text-muted-foreground">
-                行情时间：{asOfText(item.as_of)}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      )}
-    </div>
-  );
-}
-
 export function WatchlistBody({
   summary,
   pushed,
@@ -469,15 +429,4 @@ export function StrategiesBody({ summary }: { summary: DashboardSummary }) {
   );
 }
 
-/** 市场摘要的后端能力由 S6-1 交付；交付前如实标注不可用，不拼摘要文案。 */
-export function MarketSummaryBody() {
-  return (
-    <p
-      role="status"
-      className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground"
-    >
-      不可用（后端尚未提供市场摘要数据）
-    </p>
-  );
-}
 

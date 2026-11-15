@@ -6,13 +6,28 @@ import {
   type DashboardPushed,
   type DashboardSummary,
 } from "../lib/dashboard";
-import { updateAlertStatus, type AlertStatusUpdate } from "../lib/api";
+import {
+  fetchAiSummary,
+  fetchMarketOverview,
+  updateAlertStatus,
+  type AiSummaryResponse,
+  type AlertStatusUpdate,
+  type MarketSnapshotResponse,
+} from "../lib/api";
 import { streamLiveness } from "../lib/stream";
 import { usePositionStream, useQuoteStream, useStreamState } from "../lib/stream-hooks";
 import { OverviewView } from "./overview/view";
 
 function messageOf(reason: unknown): string {
   return reason instanceof Error ? reason.message : "读取首页汇总失败";
+}
+
+function marketMessage(reason: unknown): string {
+  return reason instanceof Error ? reason.message : "读取市场概况失败";
+}
+
+function summaryMessage(reason: unknown): string {
+  return reason instanceof Error ? reason.message : "读取市场摘要失败";
 }
 
 /** 首页 v6：一次取汇总，再按页面订阅把推送值合并到价格、持仓与账户上。 */
@@ -22,6 +37,12 @@ export default function OverviewPage() {
   const [loading, setLoading] = useState(true);
   const [reloadToken, setReloadToken] = useState(0);
   const [resolvingAlertId, setResolvingAlertId] = useState<string | null>(null);
+  const [marketOverview, setMarketOverview] = useState<MarketSnapshotResponse | null>(null);
+  const [marketOverviewError, setMarketOverviewError] = useState<string | null>(null);
+  const [marketOverviewLoading, setMarketOverviewLoading] = useState(true);
+  const [aiSummary, setAiSummary] = useState<AiSummaryResponse | null>(null);
+  const [aiSummaryError, setAiSummaryError] = useState<string | null>(null);
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -39,6 +60,45 @@ export default function OverviewPage() {
       .finally(() => {
         if (active) setLoading(false);
       });
+    return () => {
+      active = false;
+    };
+  }, [reloadToken]);
+
+  useEffect(() => {
+    let active = true;
+    setMarketOverviewLoading(true);
+    setMarketOverview(null);
+    setMarketOverviewError(null);
+    fetchMarketOverview()
+      .then((payload) => {
+        if (!active) return;
+        setMarketOverview(payload);
+      })
+      .catch((reason: unknown) => {
+        if (!active) return;
+        setMarketOverviewError(marketMessage(reason));
+      })
+      .finally(() => {
+        if (active) setMarketOverviewLoading(false);
+      });
+
+    setAiSummaryLoading(true);
+    setAiSummary(null);
+    setAiSummaryError(null);
+    fetchAiSummary()
+      .then((payload) => {
+        if (!active) return;
+        setAiSummary(payload);
+      })
+      .catch((reason: unknown) => {
+        if (!active) return;
+        setAiSummaryError(summaryMessage(reason));
+      })
+      .finally(() => {
+        if (active) setAiSummaryLoading(false);
+      });
+
     return () => {
       active = false;
     };
@@ -87,6 +147,12 @@ export default function OverviewPage() {
       priceLiveness={streamLiveness(streamState, "public_ws")}
       accountLiveness={streamLiveness(streamState, "private_ws")}
       pushed={pushed}
+      marketOverview={marketOverview}
+      marketOverviewError={marketOverviewError}
+      marketOverviewLoading={marketOverviewLoading}
+      aiSummary={aiSummary}
+      aiSummaryError={aiSummaryError}
+      aiSummaryLoading={aiSummaryLoading}
       onRefresh={() => setReloadToken((token) => token + 1)}
       onResolveAlert={(alertId, status) => {
         void resolveAlert(alertId, status);

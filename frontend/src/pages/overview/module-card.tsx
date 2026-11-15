@@ -51,7 +51,12 @@ export function ModuleCard({
   children: ReactNode;
 }) {
   return (
-    <Card className={cn("min-w-0", className)} data-module={name} data-status={module.status}>
+    <Card
+      id={name}
+      className={cn("min-w-0 scroll-mt-14", className)}
+      data-module={name}
+      data-status={module.status}
+    >
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
           <CardTitle>{title}</CardTitle>

@@ -137,6 +137,32 @@ describe("StreamClient 连接与订阅", () => {
     ]);
   });
 
+  it("状态订阅只发送 status，主题与行情订阅合并后仍只连一条连接", () => {
+    const client = createClient();
+    const statusOwner = Symbol("status");
+    const quotesOwner = Symbol("quotes");
+    client.start();
+    const socket = FakeSocket.instances[0];
+    socket.open();
+
+    client.setSubscription(statusOwner, { status: true });
+    client.setSubscription(quotesOwner, { quotes: ["BTC-USDT"] });
+
+    expect(FakeSocket.instances).toHaveLength(1);
+    expect(topicsOf(socket, 1)).toEqual([
+      { type: "quote", inst_ids: ["BTC-USDT"] },
+      { type: "status" },
+    ]);
+
+    socket.message({
+      type: "data_source.status.updated",
+      as_of: null,
+      received_at: "2026-11-16T01:30:00Z",
+      data: { dataset: "public_ws", connected: true },
+    });
+    expect(client.getState().datasets.public_ws).toBe(true);
+  });
+
   it("一处订阅卸载后保留其余订阅", () => {
     const client = createClient();
     const quotesOwner = Symbol("quotes");

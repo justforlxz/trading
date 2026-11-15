@@ -17,6 +17,7 @@ from app.api.schemas.common import Bar, DataSource, DecimalString, UtcDatetime
 __all__ = [
     "InstrumentStrategy",
     "InstrumentStrategyListResponse",
+    "StrategyAutoExecutionRuntime",
     "StrategyBacktestSummary",
     "StrategyCreateRequest",
     "StrategyCreatedResponse",
@@ -25,6 +26,8 @@ __all__ = [
     "StrategyInstrumentUpdateRequest",
     "StrategyListResponse",
     "StrategyRecordStatus",
+    "StrategyRuntimeResponse",
+    "StrategySignalScanRuntime",
     "StrategySummary",
     "StrategyUpdateRequest",
     "StrategyUpdatedResponse",
@@ -119,6 +122,18 @@ _EXAMPLE_DETAIL = {
     "updated_at": "2026-11-10T07:00:00Z",
 }
 
+_EXAMPLE_RUNTIME = {
+    "checked_at": "2026-11-16T01:30:00Z",
+    "signal_scan": {
+        "status": "not_implemented",
+        "detail": "策略信号扫描尚未实现",
+    },
+    "auto_execution": {
+        "enabled": False,
+        "detail": "自动执行默认关闭，只保存开关，不产生真实订单",
+    },
+}
+
 
 class StrategyBacktestSummary(BaseModel):
     """列表与详情里的最近一次回测摘要；指标已是百分数。"""
@@ -206,6 +221,30 @@ class StrategyVersionDetail(BaseModel):
     created_at: UtcDatetime
 
     model_config = ConfigDict(json_schema_extra={"examples": [_EXAMPLE_VERSION_DETAIL]})
+
+
+class StrategySignalScanRuntime(BaseModel):
+    """信号扫描状态；当前版本没有扫描任务，明确报告未实现。"""
+
+    status: Literal["not_implemented"]
+    detail: str
+
+
+class StrategyAutoExecutionRuntime(BaseModel):
+    """自动执行开关的真实取值；v6 只保存状态，不产生真实订单。"""
+
+    enabled: bool
+    detail: str
+
+
+class StrategyRuntimeResponse(BaseModel):
+    """策略页运行状态：信号扫描、自动执行与后端检查时间。"""
+
+    checked_at: UtcDatetime
+    signal_scan: StrategySignalScanRuntime
+    auto_execution: StrategyAutoExecutionRuntime
+
+    model_config = ConfigDict(json_schema_extra={"examples": [_EXAMPLE_RUNTIME]})
 
 
 class StrategyVersionListResponse(BaseModel):

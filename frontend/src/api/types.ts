@@ -1046,6 +1046,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/strategies/runtime": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Strategy Runtime
+         * @description 策略页运行状态：扫描未实现、自动执行开关与后端检查时间。
+         */
+        get: operations["get_strategy_runtime_api_strategies_runtime_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/strategies/{strategy_id}": {
         parameters: {
             query?: never;
@@ -6152,6 +6172,16 @@ export interface components {
             to_status: "opportunity_discovery" | "strategy_generation" | "pending_review" | "backtested" | "validated" | "paper_trading" | "live_authorized" | "live_running" | "rejected";
         };
         /**
+         * StrategyAutoExecutionRuntime
+         * @description 自动执行开关的真实取值；v6 只保存状态，不产生真实订单。
+         */
+        StrategyAutoExecutionRuntime: {
+            /** Detail */
+            detail: string;
+            /** Enabled */
+            enabled: boolean;
+        };
+        /**
          * StrategyBacktestSummary
          * @description 列表与详情里的最近一次回测摘要；指标已是百分数。
          */
@@ -6421,6 +6451,40 @@ export interface components {
             items: components["schemas"]["StrategySummary"][];
             /** Next Cursor */
             next_cursor?: string | null;
+        };
+        /**
+         * StrategyRuntimeResponse
+         * @description 策略页运行状态：信号扫描、自动执行与后端检查时间。
+         * @example {
+         *       "auto_execution": {
+         *         "detail": "自动执行默认关闭，只保存开关，不产生真实订单",
+         *         "enabled": false
+         *       },
+         *       "checked_at": "2026-11-16T01:30:00Z",
+         *       "signal_scan": {
+         *         "detail": "策略信号扫描尚未实现",
+         *         "status": "not_implemented"
+         *       }
+         *     }
+         */
+        StrategyRuntimeResponse: {
+            auto_execution: components["schemas"]["StrategyAutoExecutionRuntime"];
+            /** Checked At */
+            checked_at: string;
+            signal_scan: components["schemas"]["StrategySignalScanRuntime"];
+        };
+        /**
+         * StrategySignalScanRuntime
+         * @description 信号扫描状态；当前版本没有扫描任务，明确报告未实现。
+         */
+        StrategySignalScanRuntime: {
+            /** Detail */
+            detail: string;
+            /**
+             * Status
+             * @constant
+             */
+            status: "not_implemented";
         };
         /** StrategySummary */
         StrategySummary: {
@@ -8997,6 +9061,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_strategy_runtime_api_strategies_runtime_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyRuntimeResponse"];
                 };
             };
         };

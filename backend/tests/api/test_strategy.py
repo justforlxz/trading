@@ -416,3 +416,31 @@ def test_position_sizing_can_be_submitted_alone(market: TestClient, method: str)
     # 规则其余内容沿用当前版本，只把仓位规则换成本次提交的值。
     assert body["rule_json"]["entry"] == RULES["entry"]
     assert body["rule_json"]["position_sizing"] == sizing
+
+
+def test_runtime_reports_unimplemented_scan_and_auto_execution_off(
+    market: TestClient,
+) -> None:
+    """运行状态如实说明扫描未实现，自动执行默认关闭，检查时间由后端给出。"""
+
+    response = market.get("/api/strategies/runtime")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["signal_scan"]["status"] == "not_implemented"
+    assert "未实现" in body["signal_scan"]["detail"]
+    assert body["auto_execution"]["enabled"] is False
+    assert "不产生真实订单" in body["auto_execution"]["detail"]
+    assert body["checked_at"].endswith("Z")
+
+
+def test_runtime_reads_the_saved_auto_execution_switch(market: TestClient) -> None:
+    """设置页保存开关后，运行状态读取同一份设置文档，不另存一份状态。"""
+
+    saved = market.patch("/api/settings", json={"execution": {"auto_trading_enabled": True}})
+    assert saved.status_code == 200, saved.text
+
+    body = market.get("/api/strategies/runtime").json()
+
+    assert body["auto_execution"]["enabled"] is True
+    assert "不产生真实订单" in body["auto_execution"]["detail"]

@@ -60,6 +60,7 @@ import getSettings from "./fixtures/settings/get-settings.json";
 import patchSettings from "./fixtures/settings/patch-settings.json";
 import getStrategies from "./fixtures/strategy/get-strategies.json";
 import postStrategies from "./fixtures/strategy/post-strategies.json";
+import getStrategiesRuntime from "./fixtures/strategy/get-strategies-runtime.json";
 import getStrategiesStrategyId from "./fixtures/strategy/get-strategies-strategy_id.json";
 import putStrategiesStrategyId from "./fixtures/strategy/put-strategies-strategy_id.json";
 import getStrategiesStrategyIdVersions from "./fixtures/strategy/get-strategies-strategy_id-versions.json";
@@ -135,6 +136,7 @@ export const handlers = [
   http.patch("*/api/settings", () => HttpResponse.json(patchSettings)),
   http.get("*/api/strategies", () => HttpResponse.json(getStrategies)),
   http.post("*/api/strategies", () => HttpResponse.json(postStrategies, { status: 201 })),
+  http.get("*/api/strategies/runtime", () => HttpResponse.json(getStrategiesRuntime)),
   http.get("*/api/strategies/:strategy_id", () => HttpResponse.json(getStrategiesStrategyId)),
   http.put("*/api/strategies/:strategy_id", () => HttpResponse.json(putStrategiesStrategyId)),
   http.get("*/api/strategies/:strategy_id/versions", () => HttpResponse.json(getStrategiesStrategyIdVersions)),

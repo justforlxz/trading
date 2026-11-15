@@ -10911,6 +10911,25 @@
         "title": "StrategyApprovalTransition",
         "type": "object"
       },
+      "StrategyAutoExecutionRuntime": {
+        "description": "自动执行开关的真实取值；v6 只保存状态，不产生真实订单。",
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "detail"
+        ],
+        "title": "StrategyAutoExecutionRuntime",
+        "type": "object"
+      },
       "StrategyBacktestSummary": {
         "description": "列表与详情里的最近一次回测摘要；指标已是百分数。",
         "properties": {
@@ -11428,6 +11447,61 @@
           "items"
         ],
         "title": "StrategyListResponse",
+        "type": "object"
+      },
+      "StrategyRuntimeResponse": {
+        "description": "策略页运行状态：信号扫描、自动执行与后端检查时间。",
+        "examples": [
+          {
+            "auto_execution": {
+              "detail": "自动执行默认关闭，只保存开关，不产生真实订单",
+              "enabled": false
+            },
+            "checked_at": "2026-11-16T01:30:00Z",
+            "signal_scan": {
+              "detail": "策略信号扫描尚未实现",
+              "status": "not_implemented"
+            }
+          }
+        ],
+        "properties": {
+          "auto_execution": {
+            "$ref": "#/components/schemas/StrategyAutoExecutionRuntime"
+          },
+          "checked_at": {
+            "title": "Checked At",
+            "type": "string"
+          },
+          "signal_scan": {
+            "$ref": "#/components/schemas/StrategySignalScanRuntime"
+          }
+        },
+        "required": [
+          "checked_at",
+          "signal_scan",
+          "auto_execution"
+        ],
+        "title": "StrategyRuntimeResponse",
+        "type": "object"
+      },
+      "StrategySignalScanRuntime": {
+        "description": "信号扫描状态；当前版本没有扫描任务，明确报告未实现。",
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "status": {
+            "const": "not_implemented",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "detail"
+        ],
+        "title": "StrategySignalScanRuntime",
         "type": "object"
       },
       "StrategySummary": {
@@ -16467,6 +16541,28 @@
           }
         },
         "summary": "Create Strategy Endpoint",
+        "tags": [
+          "strategy"
+        ]
+      }
+    },
+    "/api/strategies/runtime": {
+      "get": {
+        "description": "策略页运行状态：扫描未实现、自动执行开关与后端检查时间。",
+        "operationId": "get_strategy_runtime_api_strategies_runtime_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyRuntimeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Strategy Runtime",
         "tags": [
           "strategy"
         ]

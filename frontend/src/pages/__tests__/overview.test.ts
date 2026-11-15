@@ -335,4 +335,36 @@ describe("首页 v6", () => {
     expect(section).toContain("后端尚未提供市场摘要数据");
     expect(section).not.toContain("市场整体偏强");
   });
+
+  it("提醒卡展示接口字段并提供确认与忽略入口", () => {
+    const base = summary();
+    const html = render({
+      summary: {
+        ...base,
+        alerts: {
+          status: "ok",
+          as_of: "2026-11-13T09:00:00Z",
+          error: null,
+          data: [
+            {
+              id: "al_1",
+              type: "risk",
+              severity: "critical",
+              instrument_id: "AAPL-USDT-SWAP",
+              rule_id: "stop_distance",
+              title: "止损距离过近",
+              detail: "AAPL-USDT-SWAP 的止损距离 -9.29，阈值 1",
+              status: "pending",
+              triggered_at: "2026-11-13T09:00:00Z",
+            },
+          ],
+        },
+      },
+      onResolveAlert: () => undefined,
+    });
+    expect(html).toContain("止损距离过近");
+    expect(html).toContain("AAPL-USDT-SWAP 的止损距离 -9.29，阈值 1");
+    expect(html).toContain("确认");
+    expect(html).toContain("忽略");
+  });
 });

@@ -6,6 +6,8 @@
  */
 
 import type { components } from "../api/types";
+import { activityQuery, type ActivityFilters } from "./activity";
+import { alertListQuery, type AlertFilters, type AlertStatusUpdate } from "./alerts";
 import { researchNoteQuery, type ResearchNoteFilters } from "./journal";
 
 const BASE = "/api";
@@ -99,7 +101,14 @@ export type ResearchNoteCreateRequest = components["schemas"]["ResearchNoteCreat
 export type ResearchNoteUpdateRequest = components["schemas"]["ResearchNoteUpdateRequest"];
 export type ResearchNoteCreatedResponse = components["schemas"]["ResearchNoteCreatedResponse"];
 export type ResearchNoteUpdatedResponse = components["schemas"]["ResearchNoteUpdatedResponse"];
+export type AlertListResponse = components["schemas"]["AlertListResponse"];
+export type AlertItem = components["schemas"]["AlertItem"];
+export type AlertStatusUpdateRequest = components["schemas"]["AlertStatusUpdateRequest"];
+export type ActivityListResponse = components["schemas"]["ActivityListResponse"];
+export type ActivityItem = components["schemas"]["ActivityItem"];
 export type { ResearchNoteFilters, ResearchNoteSort, ResearchNoteType } from "./journal";
+export type { ActivityFilters } from "./activity";
+export type { AlertFilters, AlertStatusUpdate } from "./alerts";
 
 /** 后端错误体的形状：`detail` 是字符串，或 FastAPI 校验错误的条目数组。 */
 type ErrorBody = { detail?: string | Array<{ msg?: string }> };
@@ -425,6 +434,38 @@ export function updateResearchNote(
 
 export function deleteResearchNote(noteId: string): Promise<void> {
   return request<void>(`/research-notes/${encodeURIComponent(noteId)}`, { method: "DELETE" });
+}
+
+/** 提醒列表：筛选与游标交给后端；默认只取待处理提醒。 */
+export function fetchAlerts(
+  filters: AlertFilters = { status: "pending" },
+  limit = 50,
+  cursor?: string,
+): Promise<AlertListResponse> {
+  const query = alertListQuery(filters);
+  query.set("limit", String(limit));
+  if (cursor !== undefined && cursor !== "") query.set("cursor", cursor);
+  return request<AlertListResponse>(`/alerts?${query.toString()}`);
+}
+
+/** 确认或忽略一条待处理提醒；成功后后端会写一条活动。 */
+export function updateAlertStatus(
+  alertId: string,
+  status: AlertStatusUpdate,
+): Promise<AlertItem> {
+  return send<AlertItem>(`/alerts/${encodeURIComponent(alertId)}`, "PATCH", { status });
+}
+
+/** 活动流水：按时间倒序，筛选与游标全部交给后端。 */
+export function fetchActivity(
+  filters: ActivityFilters = {},
+  limit = 50,
+  cursor?: string,
+): Promise<ActivityListResponse> {
+  const query = activityQuery(filters);
+  query.set("limit", String(limit));
+  if (cursor !== undefined && cursor !== "") query.set("cursor", cursor);
+  return request<ActivityListResponse>(`/activity?${query.toString()}`);
 }
 
 /** 设置文档：分组配置、凭证状态与执行模式。API Key 只写不读。 */

@@ -6,6 +6,7 @@ import {
   type DashboardPushed,
   type DashboardSummary,
 } from "../lib/dashboard";
+import { updateAlertStatus, type AlertStatusUpdate } from "../lib/api";
 import { streamLiveness } from "../lib/stream";
 import { usePositionStream, useQuoteStream, useStreamState } from "../lib/stream-hooks";
 import { OverviewView } from "./overview/view";
@@ -20,6 +21,7 @@ export default function OverviewPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [reloadToken, setReloadToken] = useState(0);
+  const [resolvingAlertId, setResolvingAlertId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -64,6 +66,19 @@ export default function OverviewPage() {
 
   const pushed: DashboardPushed = merged?.pushed ?? { account: null, positions: {}, watchlist: {} };
 
+  const resolveAlert = async (alertId: string, status: AlertStatusUpdate): Promise<void> => {
+    setResolvingAlertId(alertId);
+    setError(null);
+    try {
+      await updateAlertStatus(alertId, status);
+      setReloadToken((token) => token + 1);
+    } catch (reason: unknown) {
+      setError(messageOf(reason));
+    } finally {
+      setResolvingAlertId(null);
+    }
+  };
+
   return (
     <OverviewView
       summary={merged?.summary ?? null}
@@ -73,6 +88,10 @@ export default function OverviewPage() {
       accountLiveness={streamLiveness(streamState, "private_ws")}
       pushed={pushed}
       onRefresh={() => setReloadToken((token) => token + 1)}
+      onResolveAlert={(alertId, status) => {
+        void resolveAlert(alertId, status);
+      }}
+      resolvingAlertId={resolvingAlertId}
     />
   );
 }

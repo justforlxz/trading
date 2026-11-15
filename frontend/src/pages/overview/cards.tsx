@@ -5,6 +5,9 @@
 
 import { Link } from "react-router-dom";
 
+import { ActivityTimeline } from "../../components/ui/activity-timeline";
+import { AlertList } from "../../components/ui/alert-list";
+import type { AlertStatusUpdate } from "../../lib/alerts";
 import {
   amountText,
   asOfText,
@@ -405,52 +408,26 @@ export function WatchlistBody({
   );
 }
 
-export function AlertsBody({ summary }: { summary: DashboardSummary }) {
+export function AlertsBody({
+  summary,
+  onResolve,
+  resolvingId,
+}: {
+  summary: DashboardSummary;
+  onResolve?: (alertId: string, status: AlertStatusUpdate) => void;
+  resolvingId?: string | null;
+}) {
   const alerts = summary.alerts;
   if (alerts.data === null || alerts.data === undefined) return null;
-  if (alerts.data.length === 0) {
-    return <p className="text-sm text-muted-foreground">没有待处理提醒。</p>;
-  }
   return (
-    <ul className="space-y-2">
-      {alerts.data.map((item) => (
-        <li key={item.id} className="rounded-md border px-3 py-2">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <span className="text-sm font-medium">{item.title}</span>
-            <span className="text-[11px] text-muted-foreground">
-              {asOfText(item.triggered_at)}
-            </span>
-          </div>
-          <p className="mt-1 text-[11px] leading-5 text-muted-foreground">{item.detail}</p>
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            规则 {item.rule_id}
-            {item.instrument_id ? ` · 标的 ${item.instrument_id}` : ""}
-            {item.severity ? ` · 级别 ${item.severity}` : ""}
-          </p>
-        </li>
-      ))}
-    </ul>
+    <AlertList items={alerts.data} onResolve={onResolve} resolvingId={resolvingId} />
   );
 }
 
 export function ActivityBody({ summary }: { summary: DashboardSummary }) {
   const activity = summary.activity;
   if (activity.data === null || activity.data === undefined) return null;
-  if (activity.data.length === 0) {
-    return <p className="text-sm text-muted-foreground">没有最近活动。</p>;
-  }
-  return (
-    <ul className="space-y-1.5">
-      {activity.data.map((item) => (
-        <li key={item.id} className="flex items-baseline justify-between gap-3 text-xs">
-          <span className="min-w-0 break-words">{item.summary}</span>
-          <time className="shrink-0 text-muted-foreground">
-            {asOfText(item.created_at)}
-          </time>
-        </li>
-      ))}
-    </ul>
-  );
+  return <ActivityTimeline items={activity.data} />;
 }
 
 export function StrategiesBody({ summary }: { summary: DashboardSummary }) {

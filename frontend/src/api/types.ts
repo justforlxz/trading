@@ -1162,7 +1162,7 @@ export interface paths {
         put?: never;
         /**
          * Post System Sync
-         * @description 手动触发一次外部数据集同步；同一 Provider 与数据集已在运行时返回 409。
+         * @description 手动触发一次数据同步；同一 Provider 与数据集已在运行时返回 409。
          */
         post: operations["post_system_sync_api_system_sync_post"];
         delete?: never;
@@ -1328,6 +1328,8 @@ export interface components {
          *       "day_pnl_basis": "equity_only",
          *       "equity": "1248.60",
          *       "margin_usage_pct": "45.36",
+         *       "position_notional": "1851.36",
+         *       "position_notional_at": "2026-11-13T09:00:00Z",
          *       "source": "okx_rest",
          *       "status": "ok",
          *       "unrealized_pnl": "31.84",
@@ -1359,6 +1361,10 @@ export interface components {
             equity?: string | null;
             /** Margin Usage Pct */
             margin_usage_pct?: string | null;
+            /** Position Notional */
+            position_notional?: string | null;
+            /** Position Notional At */
+            position_notional_at?: string | null;
             /** Source */
             source?: string | null;
             /**
@@ -1384,6 +1390,8 @@ export interface components {
          *       "day_pnl_basis": "equity_only",
          *       "equity": "1248.60",
          *       "margin_usage_pct": "45.36",
+         *       "position_notional": "1851.36",
+         *       "position_notional_at": "2026-11-13T09:00:00Z",
          *       "positions_synced": 1,
          *       "source": "okx_rest",
          *       "status": "ok",
@@ -1416,6 +1424,10 @@ export interface components {
             equity?: string | null;
             /** Margin Usage Pct */
             margin_usage_pct?: string | null;
+            /** Position Notional */
+            position_notional?: string | null;
+            /** Position Notional At */
+            position_notional_at?: string | null;
             /** Positions Synced */
             positions_synced: number;
             /** Source */
@@ -6849,11 +6861,18 @@ export interface components {
         };
         /**
          * SystemSyncRequest
-         * @description 手动触发一次外部数据同步；数据集由服务端校验。
+         * @description 手动触发一次数据同步；数据集由服务端校验。
+         *
+         *     `instruments` 与 `candles` 是 OKX 公共行情的产品入口；其余数据集走外部行情
+         *     Provider。`bar` 与 `days` 只对 `candles` 生效。
          */
         SystemSyncRequest: {
+            /** Bar */
+            bar?: ("1m" | "5m" | "15m" | "1h" | "4h" | "1d") | null;
             /** Dataset */
             dataset: string;
+            /** Days */
+            days?: number | null;
             /** Instrument Ids */
             instrument_ids?: string[];
             /** Provider */

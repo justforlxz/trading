@@ -49,6 +49,8 @@ class AccountSummaryResponse(BaseModel):
     margin_usage_pct: DecimalString | None = None
     day_pnl: DecimalString | None = None
     day_pnl_basis: Literal["equity_only"] = "equity_only"
+    position_notional: DecimalString | None = None
+    position_notional_at: UtcDatetime | None = None
     captured_at: UtcDatetime | None = None
     source: str | None = None
 
@@ -68,6 +70,8 @@ class AccountSummaryResponse(BaseModel):
                     "margin_usage_pct": "45.36",
                     "day_pnl": None,
                     "day_pnl_basis": "equity_only",
+                    "position_notional": "1851.36",
+                    "position_notional_at": "2026-11-13T09:00:00Z",
                     "captured_at": "2026-11-13T09:00:00Z",
                     "source": "okx_rest",
                 }
@@ -97,6 +101,8 @@ class AccountSyncResponse(AccountSummaryResponse):
                     "margin_usage_pct": "45.36",
                     "day_pnl": None,
                     "day_pnl_basis": "equity_only",
+                    "position_notional": "1851.36",
+                    "position_notional_at": "2026-11-13T09:00:00Z",
                     "captured_at": "2026-11-13T09:00:00Z",
                     "source": "okx_rest",
                     "positions_synced": 1,

@@ -16,6 +16,7 @@ from app.instrument.service import (
     resolve_instrument,
     sync_instruments,
 )
+from app.instrument.valuation import notional_value
 
 __all__ = [
     "DEFAULT_QUOTE_CURRENCY",
@@ -28,6 +29,7 @@ __all__ = [
     "get_instrument_pair",
     "list_instruments",
     "list_tradable",
+    "notional_value",
     "okx_source",
     "resolve_instrument",
     "spot_currency",

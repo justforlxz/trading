@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   Card,
@@ -9,7 +9,7 @@ import {
 } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { StreamNotice, StreamTag } from "../../components/ui/stream-status";
-import { formatBeijingTime, signedTone } from "../../lib/display";
+import { signedTone } from "../../lib/display";
 import {
   accountSourceLabel,
   accountStatusLabel,
@@ -19,7 +19,6 @@ import {
   marginUsageText,
   mergeAccountUpdate,
   mergePositionUpdates,
-  MISSING_VALUE,
   pnlText,
   positionSideLabel,
   syncAccount,
@@ -30,43 +29,15 @@ import {
   type ExchangePosition,
   type ExchangePositions,
 } from "../../lib/positions";
-import { usePositionStream } from "../../lib/stream-hooks";
 import type { StreamLiveness } from "../../lib/stream";
+import { usePositionStream } from "../../lib/stream-hooks";
 import { cn } from "../../lib/utils";
 
-function momentText(value: string | null | undefined): string {
-  return value === null || value === undefined || value.trim() === ""
-    ? MISSING_VALUE
-    : formatBeijingTime(value);
-}
+import { Metric } from "./metric";
+import { momentText } from "./moment";
 
 function messageOf(reason: unknown, fallback: string): string {
   return reason instanceof Error ? reason.message : fallback;
-}
-
-function Metric({
-  label,
-  value,
-  note,
-  tone,
-}: {
-  label: string;
-  value: string;
-  note?: string;
-  tone?: string;
-}) {
-  return (
-    <div className="min-w-0 rounded-md border px-3 py-2">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd
-        className={cn("mt-1 truncate font-mono text-base tabular-nums", tone)}
-        title={value}
-      >
-        {value}
-      </dd>
-      {note ? <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{note}</p> : null}
-    </div>
-  );
 }
 
 function StatusNotice({
@@ -405,7 +376,11 @@ export function OkxSectionView({
   );
 }
 
-export default function OkxSection() {
+export type OkxSectionProps = {
+  onAccountChange?: (account: AccountSummary | null, loading: boolean) => void;
+};
+
+export default function OkxSection({ onAccountChange }: OkxSectionProps = {}) {
   const [account, setAccount] = useState<AccountSummary | null>(null);
   const [positions, setPositions] = useState<ExchangePositions | null>(null);
   const [loading, setLoading] = useState(true);
@@ -414,6 +389,15 @@ export default function OkxSection() {
   const [syncing, setSyncing] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
   const { positions: livePositions, account: liveAccount, liveness } = usePositionStream();
+  const mergedAccount = useMemo(
+    () => (account === null ? null : mergeAccountUpdate(account, liveAccount)),
+    [account, liveAccount],
+  );
+  const accountLoading = loading && account === null;
+
+  useEffect(() => {
+    onAccountChange?.(mergedAccount, accountLoading);
+  }, [onAccountChange, mergedAccount, accountLoading]);
 
   useEffect(() => {
     let active = true;
@@ -459,7 +443,7 @@ export default function OkxSection() {
 
   return (
     <OkxSectionView
-      account={account === null ? null : mergeAccountUpdate(account, liveAccount)}
+      account={mergedAccount}
       positions={positions === null ? null : mergePositionUpdates(positions, livePositions)}
       loading={loading}
       error={error}

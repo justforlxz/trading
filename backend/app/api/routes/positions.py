@@ -203,6 +203,8 @@ def _account(view: AccountView) -> AccountSummaryResponse:
         available_margin=_optional_text(view.available_margin),
         margin_usage_pct=_optional_text(view.margin_usage_pct),
         day_pnl=_optional_text(view.day_pnl),
+        position_notional=_optional_text(view.position_notional),
+        position_notional_at=view.position_notional_at,
         captured_at=view.captured_at,
         source=view.source,
     )

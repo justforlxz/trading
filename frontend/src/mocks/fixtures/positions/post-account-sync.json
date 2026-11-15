@@ -8,6 +8,8 @@
   "day_pnl_basis": "equity_only",
   "equity": "1248.60",
   "margin_usage_pct": "45.36",
+  "position_notional": "1851.36",
+  "position_notional_at": "2026-11-13T09:00:00Z",
   "positions_synced": 1,
   "source": "okx_rest",
   "status": "ok",

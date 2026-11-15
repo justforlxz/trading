@@ -292,7 +292,7 @@ flowchart TD
 
 | 包 | 阶段 | 交付物 | 迁移 | 依赖 | 前端消费方 | 对应 issue |
 | --- | --- | --- | --- | --- | --- | --- |
-| B2 持仓数据与 API | 2 | `GET /api/account/summary` 与 `POST /api/account/sync`、交易所持仓只读快照、手动持仓与流水；`GET /api/positions` 合并视图仍为开发中，由 B2 后续增量交付 | 0015 | 无 | 持仓页、首页账户卡 | MKACG-812 |
+| B2 持仓数据与 API | 2 | `GET /api/account/summary` 与 `POST /api/account/sync`、交易所持仓只读快照、手动持仓与流水；`GET /api/positions` 合并视图由 MKACG-845 交付 | 0015 | 无 | 持仓页、首页账户卡 | MKACG-812、MKACG-845 |
 | B3 风险与敞口 | 3 | 止损距离、ATR 距离、杠杆、单标的占比、保证金使用率、行业敞口 | 无 | B2 | 持仓页敞口区、首页风险卡 | MKACG-813 |
 | B4 实时推送 | 3 | 服务端汇总 OKX WebSocket，向浏览器推送行情、账户、持仓事件 | 无 | B2（私有频道） | 自选、详情、持仓、首页 | MKACG-814 |
 | B5 首页汇总 | 4 | `GET /api/dashboard/summary`，按模块独立降级 | 无 | B2、B3、B4 | 首页 | MKACG-815 |
@@ -342,7 +342,7 @@ flowchart TD
 | POST | `/api/watchlist/items` | `instrument_id`、`group_id`（可选）、`sort_order`（可选） | 201：`id`、`instrument_id`、`sort_order`、`created_at` | 400、404、409 | S1-2 |
 | DELETE | `/api/watchlist/items/{id}` | 路径参数 `id` | 204，无响应体 | 404 | S1-2 |
 | GET | `/api/instruments/{id}/analysis?bar=1D` | 路径参数 `id`；`bar` 取 `1m`、`5m`、`15m`、`1h`、`4h`、`1d`，默认 `1d` | `instrument`、`bar`、`quote`、`candles[{ts,open,high,low,close,volume,volume_ccy,source,is_complete}]`、`indicators{ma20,ma60,ma20_distance_pct,rsi14,macd{value,signal,histogram},atr14,atr_pct,volume_ratio_20d}`、`relative_strength{window,symbol_return,benchmark_instrument_id,benchmark_return,excess_return}`、`levels{high_20d,low_20d,distance_to_high_pct,distance_to_low_pct}`、`correlations[{instrument_id,display_symbol,window,coefficient,sample_count,computed_at}]`、`events`、`linked_strategies`、`coverage{bar,start,end,candle_count,gap_count,last_synced_at}`、`generated_at` | 400、404、503 | S1-3 |
-| GET | `/api/positions` | `source`（可选，取 `exchange` 或 `manual`） | `items[{id,source,inst_id,display_symbol,name,asset_class,pos_side,size,avg_px,mark_px,upl,upl_ratio,lever,mgn_mode,liq_px,margin,notional_value,stop_px,price_status,updated_at}]` | 503 | B2 |
+| GET | `/api/positions` | `source`（可选，取 `exchange` 或 `manual`） | `as_of`、`exchange_status`、`items[{position_ref,source,inst_id,display_symbol,name,asset_class,side,size,avg_px,mark_px,upl,upl_ratio,lever,mgn_mode,liq_px,margin,notional,stop_px,stop_distance_pct,price_status,updated_at}]` | 422 | B2、MKACG-845 |
 | POST | `/api/manual-positions` | `inst_id`、`side`、`quantity`、`avg_cost`、`stop_px`（可选）、`leverage`（可选）、`note`（可选）、`idempotency_key` | 201：`id`、`inst_id`、`display_symbol`、`name`、`asset_class`、`side`、`quantity`、`avg_cost`、`stop_px`、`leverage`、`status`、`note`、`price`、`price_status`、`price_source`、`market_value`、`unrealized_pnl`、`created_at`、`updated_at` | 400、404、409 | B2 |
 | POST | `/api/manual-positions/{id}/trades` | 路径参数 `id`；`action`（`open`、`add`、`reduce`、`close`、`correct`）、`quantity`、`price`、`fee`（默认 `"0"`）、`occurred_at`、`note`（可选）、`idempotency_key` | 201：`id`、`position_id`、`action`、`quantity`、`price`、`fee`、`realized_pnl`、`position_quantity_after`、`position_avg_cost_after`、`position_status_after`、`occurred_at`、`note`、`created_at` | 400、404、409 | B2 |
 | GET | `/api/manual-positions/{id}/trades` | 路径参数 `id` | `items[{id,position_id,action,quantity,price,fee,realized_pnl,position_quantity_after,position_avg_cost_after,position_status_after,occurred_at,note,created_at}]`（沿用已合并 B2 响应，不分页） | 404 | B2 |
@@ -371,7 +371,7 @@ flowchart TD
 ### 6.1 账户与持仓接口的取舍
 
 - `GET /api/account/summary` 是账户卡的唯一契约，负责权益、可用权益、已用保证金、未实现盈亏、今日盈亏和保证金使用率；S2-1 的账户区只读这个接口。
-- `GET /api/positions` 是 v6 的合并持仓视图，同时返回 `source=exchange` 和 `source=manual`。已经合并的 B2 代码目前提供 `GET /api/positions/exchange` 和 `GET /api/manual-positions` 两个拆分接口。合并视图尚未交付，S2-1 的 OKX 区先使用 `GET /api/positions/exchange`，S2-2 的手动区先使用 `GET /api/manual-positions`；`docs/prd/v6.md` 已把 `GET /api/positions` 登记为开发中。
+- `GET /api/positions` 是 v6 的合并持仓视图，同时返回 `source=exchange` 和 `source=manual`，并由 MKACG-845 交付。已经合并的 B2 代码仍保留 `GET /api/positions/exchange` 和 `GET /api/manual-positions` 两个明细接口。S2-1 的 OKX 区当前仍使用 `GET /api/positions/exchange`，S2-2 的手动区仍使用 `GET /api/manual-positions`；前端替换合并视图尚未进行。
 - 账户卡需要的 `position_notional` 和 `day_pnl_pct` 尚未出现在已经合并的 `GET /api/account/summary` 响应中。B2 后续增量补齐前，S2-1 显示“未提供”，不在前端计算。
 - `POST /api/account/sync` 只触发 OKX 只读快照同步，供 S2-1 的刷新操作使用；它不下单、不撤单、不改单、不平仓。
 
@@ -414,7 +414,7 @@ flowchart TD
 | 标的详情关联策略 | `GET /api/instruments/{id}/analysis` 的 `linked_strategies` | S4-3 | B6 |
 | 标的详情近期事件 | `GET /api/market/events`、`GET /api/news` | S6-1 | B9 |
 | 持仓：账户概览 | `GET /api/account/summary` | S2-1 | B2 |
-| 持仓：OKX 区 | `GET /api/positions/exchange`（合并视图 `GET /api/positions?source=exchange` 交付后再替换） | S2-1 | B2 |
+| 持仓：OKX 区 | `GET /api/positions/exchange`（合并视图 `GET /api/positions?source=exchange` 已交付，前端尚未替换） | S2-1 | B2、MKACG-845 |
 | 持仓：手动区 | `GET /api/positions?source=manual`（写入与流水用 `/api/manual-positions` 系列） | S2-2 | B2 |
 | 持仓：敞口分布 | `GET /api/dashboard/summary` 的 `risk.exposure` | S3-2 | B3 |
 | 策略与回测 | `/api/strategies` 系列 | S4-2 | B6 |

@@ -46,6 +46,7 @@ import getNews from "./fixtures/market/get-news.json";
 import getOpportunities from "./fixtures/opportunity/get-opportunities.json";
 import getOpportunitiesOpportunityId from "./fixtures/opportunity/get-opportunities-opportunity_id.json";
 import patchOpportunitiesOpportunityId from "./fixtures/opportunity/patch-opportunities-opportunity_id.json";
+import getPositions from "./fixtures/positions/get-positions.json";
 import getPositionsExchange from "./fixtures/positions/get-positions-exchange.json";
 import putPositionsPositionRefRiskConfig from "./fixtures/risk/put-positions-position_ref-risk-config.json";
 import getResearchNotes from "./fixtures/research/get-research-notes.json";
@@ -119,6 +120,7 @@ export const handlers = [
   http.get("*/api/opportunities", () => HttpResponse.json(getOpportunities)),
   http.get("*/api/opportunities/:opportunity_id", () => HttpResponse.json(getOpportunitiesOpportunityId)),
   http.patch("*/api/opportunities/:opportunity_id", () => HttpResponse.json(patchOpportunitiesOpportunityId)),
+  http.get("*/api/positions", () => HttpResponse.json(getPositions)),
   http.get("*/api/positions/exchange", () => HttpResponse.json(getPositionsExchange)),
   http.put("*/api/positions/:position_ref/risk-config", () => HttpResponse.json(putPositionsPositionRefRiskConfig)),
   http.get("*/api/research-notes", () => HttpResponse.json(getResearchNotes)),

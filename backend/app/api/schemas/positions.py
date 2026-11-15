@@ -26,6 +26,8 @@ __all__ = [
     "ManualTradeItem",
     "ManualTradeListResponse",
     "ManualTradeRequest",
+    "MergedPositionItem",
+    "MergedPositionsResponse",
 ]
 
 AccountStatus = Literal["ok", "stale", "unconfigured"]
@@ -151,6 +153,99 @@ class ExchangePositionsResponse(BaseModel):
                             "liq_px": "151.20",
                             "margin": "604.80",
                         }
+                    ],
+                }
+            ]
+        }
+    )
+
+
+class MergedPositionItem(BaseModel):
+    """`GET /api/positions` 的一行：两种来源统一字段，来源专属字段可为空。"""
+
+    position_ref: str
+    source: Literal["exchange", "manual"]
+    inst_id: str
+    display_symbol: str
+    name: str
+    asset_class: str
+    side: PositionSide
+    size: DecimalString
+    avg_px: DecimalString
+    mark_px: DecimalString | None = None
+    upl: DecimalString | None = None
+    upl_ratio: DecimalString | None = None
+    lever: DecimalString | None = None
+    mgn_mode: str | None = None
+    liq_px: DecimalString | None = None
+    margin: DecimalString | None = None
+    notional: DecimalString | None = None
+    stop_px: DecimalString | None = None
+    stop_distance_pct: DecimalString | None = None
+    price_status: Literal["ok", "unavailable"] | None = None
+    updated_at: UtcDatetime | None = None
+
+
+class MergedPositionsResponse(BaseModel):
+    """OKX 与手动持仓的合并视图；`exchange_status` 只说明交易所同步状态。"""
+
+    as_of: UtcDatetime | None = None
+    exchange_status: AccountStatus
+    items: list[MergedPositionItem]
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "as_of": "2026-11-13T09:00:00Z",
+                    "exchange_status": "ok",
+                    "items": [
+                        {
+                            "position_ref": "exchange:okx-main:123456",
+                            "source": "exchange",
+                            "inst_id": "AAPL-USDT-SWAP",
+                            "display_symbol": "AAPL-USDT",
+                            "name": "AAPL",
+                            "asset_class": "tokenized_equity",
+                            "side": "long",
+                            "size": "8",
+                            "avg_px": "226.80",
+                            "mark_px": "231.42",
+                            "upl": "36.96",
+                            "upl_ratio": "0.0204",
+                            "lever": "3",
+                            "mgn_mode": "cross",
+                            "liq_px": "151.20",
+                            "margin": "604.80",
+                            "notional": "1851.36",
+                            "stop_px": None,
+                            "stop_distance_pct": None,
+                            "price_status": None,
+                            "updated_at": "2026-11-13T09:00:00Z",
+                        },
+                        {
+                            "position_ref": "manual:0f6f6f0e-5b6f-4f0c-9b7a-7e5f8a1d2c34",
+                            "source": "manual",
+                            "inst_id": "AAPL-USDT-SWAP",
+                            "display_symbol": "AAPL-USDT",
+                            "name": "AAPL",
+                            "asset_class": "tokenized_equity",
+                            "side": "long",
+                            "size": "2",
+                            "avg_px": "55",
+                            "mark_px": "60.5",
+                            "upl": "11",
+                            "upl_ratio": None,
+                            "lever": "2",
+                            "mgn_mode": None,
+                            "liq_px": None,
+                            "margin": None,
+                            "notional": "121",
+                            "stop_px": "58",
+                            "stop_distance_pct": "4.132231404959",
+                            "price_status": "ok",
+                            "updated_at": "2026-11-13T09:00:00Z",
+                        },
                     ],
                 }
             ]

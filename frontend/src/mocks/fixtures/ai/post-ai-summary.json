@@ -1,0 +1,28 @@
+{
+  "disclaimer": "仅作信息归纳，不构成交易建议",
+  "generated_at": "2026-11-15T06:10:00Z",
+  "overall": "偏强，波动率抬升",
+  "points": [
+    {
+      "sources": [
+        {
+          "id": "NASDAQ",
+          "type": "market_overview"
+        }
+      ],
+      "text": "NASDAQ Composite 最新 18000.12，较前值 +1.01%。"
+    }
+  ],
+  "risks": [
+    {
+      "sources": [
+        {
+          "id": "alert_0123456789abcdef01234567",
+          "type": "alert"
+        }
+      ],
+      "text": "持仓缺少止损：AAPL-USDT-SWAP"
+    }
+  ],
+  "stale": false
+}

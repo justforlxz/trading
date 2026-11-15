@@ -22,11 +22,11 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Float, Index, Integer, String, TypeDecorator
+from sqlalchemy import Float, Index, Integer, String, Text, TypeDecorator, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core import Bar, Timeframe, ValidationError
-from app.db import Base
+from app.db import Base, UtcDateTime
 
 if TYPE_CHECKING:  # 只用于类型标注：值对象在 funding 模块，运行期不互相 import。
     from app.market.funding import FundingPoint
@@ -192,3 +192,71 @@ class CorrelationSnapshot(Base):
     as_of: Mapped[int] = mapped_column(Integer, primary_key=True)
     coefficient: Mapped[float | None] = mapped_column(Float, nullable=True)
     samples: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class MarketEventRow(Base):
+    """一条宏观或公司事件；时间统一保存为 UTC。"""
+
+    __tablename__ = "market_events"
+    __table_args__ = (
+        Index("ix_market_events_scheduled", "scheduled_at"),
+        Index("ix_market_events_ticker_scheduled", "ticker", "scheduled_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    event_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    title: Mapped[str] = mapped_column(String(256), nullable=False)
+    region: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    ticker: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    scheduled_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    actual: Mapped[str | None] = mapped_column(Text, nullable=True)
+    forecast: Mapped[str | None] = mapped_column(Text, nullable=True)
+    previous: Mapped[str | None] = mapped_column(Text, nullable=True)
+    importance: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    source: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    received_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+
+
+class NewsItemRow(Base):
+    """一条已采集新闻；同一来源的 `provider_id` 只保留一行。"""
+
+    __tablename__ = "news_items"
+    __table_args__ = (
+        UniqueConstraint("source", "provider_id", name="uq_news_items_source_provider"),
+        Index("ix_news_items_published", "published_at"),
+        Index("ix_news_items_source_published", "source", "published_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    provider_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    title: Mapped[str] = mapped_column(String(512), nullable=False)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    publisher: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    tickers_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    tags_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    source: Mapped[str] = mapped_column(String(64), nullable=False)
+    received_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+
+
+class DataSyncJobRow(Base):
+    """一次外部数据同步任务；健康接口读取它，不临时探测上游。"""
+
+    __tablename__ = "data_sync_jobs"
+    __table_args__ = (
+        Index("ix_data_sync_jobs_dataset_started", "dataset", "started_at"),
+        Index("ix_data_sync_jobs_provider_started", "provider", "started_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)
+    dataset: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    cursor: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rows: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_success_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)

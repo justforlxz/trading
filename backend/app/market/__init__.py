@@ -32,6 +32,31 @@ from app.market.correlation import (
     spearman,
 )
 from app.market.divergence import DEFAULT_THRESHOLD_PCT, DivergenceAlert, Quote, divergence
+from app.market.events import (
+    EventInput,
+    NewsInput,
+    NewsItem,
+    latest_news,
+    list_market_events,
+    list_news,
+    upsert_market_events,
+    upsert_news,
+)
+from app.market.external import (
+    DATASETS,
+    MarketOverviewItem,
+    MarketOverviewProvider,
+    MarketOverviewService,
+    ProviderQuote,
+    ProviderRateLimited,
+    ProviderTimeout,
+    get_provider,
+    register_provider,
+    sync_external_dataset,
+)
+from app.market.external import (
+    MarketOverview as ExternalMarketOverview,
+)
 from app.market.funding import (
     FundingPoint,
     backfill_funding,
@@ -39,8 +64,15 @@ from app.market.funding import (
     parse_funding_rows,
     upsert_funding,
 )
+from app.market.health import system_health
 from app.market.matrix import Matrix, build_matrix, correlation_matrix
-from app.market.model import Candle, CorrelationSnapshot
+from app.market.model import (
+    Candle,
+    CorrelationSnapshot,
+    DataSyncJobRow,
+    MarketEventRow,
+    NewsItemRow,
+)
 from app.market.rolling import aligned_pairs, relative_strength_ratio, rolling_correlation
 from app.market.service import (
     CandleGap,
@@ -77,10 +109,17 @@ from app.market.sync import (
     sync_candles,
     upsert_candles,
 )
+from app.market.sync_jobs import (
+    finish_sync_job,
+    latest_sync_job,
+    start_sync_job,
+    sync_summary,
+)
 
 __all__ = [
     "COMMODITY_TOKEN",
     "CRYPTO",
+    "DATASETS",
     "DEFAULT_THRESHOLD_PCT",
     "EXCHANGE_CLOSED",
     "EXCHANGE_OPEN",
@@ -95,10 +134,23 @@ __all__ = [
     "Candle",
     "CandleGap",
     "CorrelationSnapshot",
+    "DataSyncJobRow",
     "DivergenceAlert",
+    "EventInput",
+    "ExternalMarketOverview",
     "FundingPoint",
     "IntegrityReport",
+    "MarketEventRow",
+    "MarketOverviewItem",
+    "MarketOverviewProvider",
+    "MarketOverviewService",
     "Matrix",
+    "NewsInput",
+    "NewsItem",
+    "NewsItemRow",
+    "ProviderQuote",
+    "ProviderRateLimited",
+    "ProviderTimeout",
     "Quote",
     "advance_decline",
     "aligned_pairs",
@@ -117,11 +169,17 @@ __all__ = [
     "exchange_session",
     "expected_open_times",
     "find_gaps",
+    "finish_sync_job",
     "floor_open_time",
+    "get_provider",
     "integrity",
     "is_trading_day",
     "lagged_correlation",
     "latest_candle",
+    "latest_news",
+    "latest_sync_job",
+    "list_market_events",
+    "list_news",
     "load_candles",
     "load_funding",
     "load_snapshot",
@@ -131,13 +189,20 @@ __all__ = [
     "parse_funding_rows",
     "pearson",
     "primary_source",
+    "register_provider",
     "relative_strength_ratio",
     "resonance_strength",
     "rolling_correlation",
     "rolling_sign_agreement",
     "save_snapshot",
     "spearman",
+    "start_sync_job",
     "sync_candles",
+    "sync_external_dataset",
+    "sync_summary",
+    "system_health",
     "upsert_candles",
     "upsert_funding",
+    "upsert_market_events",
+    "upsert_news",
 ]

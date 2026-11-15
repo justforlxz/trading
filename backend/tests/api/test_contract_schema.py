@@ -285,7 +285,7 @@ def test_as_of_requires_timezone(client: TestClient) -> None:
 
     params = {"inst_type": "SPOT", "as_of": "2026-11-10T00:00:00"}
 
-    assert client.get("/api/market/overview", params=params).status_code == 422
+    assert client.get("/api/market/breadth", params=params).status_code == 422
 
     params["as_of"] = "2026-11-10T00:00:00Z"
-    assert client.get("/api/market/overview", params=params).status_code == 200
+    assert client.get("/api/market/breadth", params=params).status_code == 200

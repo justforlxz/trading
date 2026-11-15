@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from app.api.contract import contract_router
 from app.api.health import router as health_router
+from app.api.routes.ai import ai_router
 from app.api.routes.alerts import alerts_router
 from app.api.routes.approval import approval_router
 from app.api.routes.backtest import backtest_router
@@ -20,6 +21,7 @@ from app.api.routes.risk import risk_exposure_router
 from app.api.routes.settings import settings_router
 from app.api.routes.strategy import strategy_router
 from app.api.routes.stream import stream_router
+from app.api.routes.system import system_router
 from app.api.routes.watchlist import watchlist_router
 
 __all__ = ["include_routers"]
@@ -33,6 +35,8 @@ def include_routers(app: FastAPI) -> None:
     app.include_router(instruments_router, prefix="/api")
     app.include_router(indicators_router, prefix="/api")
     app.include_router(market_router, prefix="/api")
+    app.include_router(ai_router, prefix="/api")
+    app.include_router(system_router, prefix="/api")
     app.include_router(opportunity_router, prefix="/api")
     app.include_router(dashboard_router, prefix="/api")
     app.include_router(alerts_router, prefix="/api")

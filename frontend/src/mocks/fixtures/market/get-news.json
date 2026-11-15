@@ -1,0 +1,19 @@
+{
+  "items": [
+    {
+      "id": "news_0123456789abcdef01234567",
+      "published_at": "2026-11-15T05:00:00Z",
+      "publisher": "Example News",
+      "received_at": "2026-11-15T06:10:00Z",
+      "source": "market_data_provider",
+      "summary": "收入高于市场预期。",
+      "tags": [
+        "technology"
+      ],
+      "tickers": [
+        "AAPL"
+      ],
+      "title": "AAPL 发布季度业绩"
+    }
+  ]
+}

@@ -8,7 +8,6 @@ import { StreamNotice, StreamTag } from "../components/ui/stream-status";
 import {
   fetchInstrumentAnalysis,
   fetchInstrumentStrategies,
-  fetchSettings,
   fetchStrategyVersions,
   fetchWatchlist,
   okxCandleSource,
@@ -21,7 +20,6 @@ import {
   type InstrumentAnalysisLinkedBacktest,
   type InstrumentAnalysisResponse,
   type InstrumentStrategy,
-  type SettingsResponse,
   type StrategyVersionDetail,
   type WatchlistResponse,
 } from "../lib/api";
@@ -394,19 +392,12 @@ export default function InstrumentDetailPage() {
   const [launchError, setLaunchError] = useState<string | null>(null);
   const [launchSource, setLaunchSource] = useState<BacktestDataSource>("okx_spot");
   const [launchResult, setLaunchResult] = useState<BacktestBatchResponse | null>(null);
-  const [settings, setSettings] = useState<SettingsResponse | null>(null);
   const { quotes, liveness } = useQuoteStream(instId ? [instId] : []);
 
   useEffect(() => {
     fetchWatchlist()
       .then(setWatchlist)
       .catch(() => setWatchlist(null));
-  }, []);
-
-  useEffect(() => {
-    fetchSettings()
-      .then(setSettings)
-      .catch(() => setSettings(null));
   }, []);
 
   const linkedRequestRef = useRef(0);
@@ -1028,10 +1019,8 @@ export default function InstrumentDetailPage() {
                         ；策略版本与区间来自下面的选择。
                       </p>
                       <BacktestLaunchForm
-                        key={settings ? "settings-ready" : "settings-pending"}
                         versions={launchVersions}
                         initialVersionId={preferredVersionId}
-                        settings={settings}
                         runSource={launchSource}
                         onRunSourceChange={setLaunchSource}
                         onLaunched={handleLaunched}

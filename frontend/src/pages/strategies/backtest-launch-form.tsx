@@ -6,7 +6,6 @@ import {
   type BacktestBatchResponse,
   type BacktestCosts,
   type BacktestDataSource,
-  type SettingsResponse,
   type StrategyVersionDetail,
 } from "../../lib/api";
 import {
@@ -34,19 +33,17 @@ type LaunchFields = {
   costs: BacktestCosts;
 };
 
-function launchFieldsFrom(settings: SettingsResponse | null): LaunchFields {
+function launchFieldsFrom(): LaunchFields {
   return {
     startDate: "",
     endDate: "",
-    initialCapital: settings?.backtest.default_initial_capital ?? "",
+    initialCapital: "",
     positionSize: "",
     maxPositionPct: "",
     quoteCurrency: "USDT",
-    fundingEnabled: settings?.backtest.funding_enabled ?? true,
+    fundingEnabled: true,
     executionModel: "next_open",
-    costs: settings
-      ? { ...settings.costs }
-      : { maker_fee_bps: "", taker_fee_bps: "", slippage_bps: "", spread_bps: "" },
+    costs: { maker_fee_bps: "", taker_fee_bps: "", slippage_bps: "", spread_bps: "" },
   };
 }
 
@@ -71,7 +68,6 @@ export function Notice({ tone, children }: { tone: "error" | "info"; children: s
 export type BacktestLaunchFormProps = {
   versions: StrategyVersionDetail[];
   initialVersionId?: string;
-  settings: SettingsResponse | null;
   runSource: BacktestDataSource;
   onRunSourceChange: (source: BacktestDataSource) => void;
   onLaunched: (batch: BacktestBatchResponse) => void;
@@ -91,7 +87,6 @@ export type BacktestLaunchFormProps = {
 export function BacktestLaunchForm({
   versions,
   initialVersionId,
-  settings,
   runSource,
   onRunSourceChange,
   onLaunched,
@@ -102,7 +97,7 @@ export function BacktestLaunchForm({
 }: BacktestLaunchFormProps) {
   const [versionId, setVersionId] = useState(initialVersionId ?? versions[0]?.version_id ?? "");
   const [selectedInstruments, setSelectedInstruments] = useState<string[]>([]);
-  const [fields, setFields] = useState<LaunchFields>(() => launchFieldsFrom(settings));
+  const [fields, setFields] = useState<LaunchFields>(launchFieldsFrom);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);

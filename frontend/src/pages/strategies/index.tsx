@@ -12,14 +12,12 @@ import {
 import {
   deleteBacktest,
   fetchBacktests,
-  fetchSettings,
   fetchStrategies,
   fetchStrategy,
   fetchStrategyVersions,
   type BacktestBatchResponse,
   type BacktestDataSource,
   type BacktestRunSummary,
-  type SettingsResponse,
   type StrategyDetail,
   type StrategySummary,
   type StrategyVersionDetail,
@@ -46,7 +44,6 @@ export default function StrategiesPage() {
   const [detail, setDetail] = useState<StrategyDetail | null>(null);
   const [versions, setVersions] = useState<StrategyVersionDetail[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
-  const [settings, setSettings] = useState<SettingsResponse | null>(null);
   const [runs, setRuns] = useState<BacktestRunSummary[]>([]);
   const [runSource, setRunSource] = useState<BacktestDataSource>("okx_spot");
   const [dialog, setDialog] = useState<DialogKind>(null);
@@ -118,14 +115,6 @@ export default function StrategiesPage() {
     next.delete("strategy");
     setSearchParams(next, { replace: true });
   }, [queryStrategy, strategies, searchParams, setSearchParams]);
-
-  useEffect(() => {
-    fetchSettings()
-      .then(setSettings)
-      .catch((reason: unknown) => {
-        setError(reason instanceof Error ? reason.message : "设置加载失败");
-      });
-  }, []);
 
   useEffect(() => {
     void reloadRuns(runSource);
@@ -226,10 +215,8 @@ export default function StrategiesPage() {
                 onEditInstruments={() => setDialog("instruments")}
               />
               <StrategyBacktestPanel
-                key={settings ? "settings-ready" : "settings-pending"}
                 detail={detail}
                 versions={versions}
-                settings={settings}
                 runs={strategyRuns}
                 runSource={runSource}
                 onRunSourceChange={setRunSource}

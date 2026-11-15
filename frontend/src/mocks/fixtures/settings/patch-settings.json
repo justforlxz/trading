@@ -1,0 +1,25 @@
+{
+  "data_sources": {
+    "failure_count": 0,
+    "subscribed_instruments": []
+  },
+  "display": {
+    "color_scheme": "system",
+    "default_bar": "1d",
+    "home_layout": "cockpit",
+    "price_precision": 2
+  },
+  "execution": {
+    "auto_trading_enabled": false
+  },
+  "risk_defaults": {
+    "default_leverage": "3",
+    "risk_budget_per_trade": "100",
+    "stop_rule": "fixed_pct",
+    "warning_threshold": "80"
+  },
+  "secrets": {
+    "okx_configured": false
+  },
+  "updated_at": "2026-11-15T06:10:00Z"
+}

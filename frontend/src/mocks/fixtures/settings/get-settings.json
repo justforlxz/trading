@@ -1,39 +1,25 @@
 {
-  "backtest": {
-    "default_bar": "1h",
-    "default_initial_capital": "10000",
-    "funding_enabled": true
+  "data_sources": {
+    "failure_count": 0,
+    "subscribed_instruments": []
   },
-  "costs": {
-    "maker_fee_bps": "2",
-    "slippage_bps": "3",
-    "spread_bps": "2",
-    "taker_fee_bps": "5"
-  },
-  "data": {
-    "proxy_configured": false,
-    "proxy_enabled": false
-  },
-  "exchange": {
-    "api_configured": false,
-    "demo_trading": true
+  "display": {
+    "color_scheme": "system",
+    "default_bar": "1d",
+    "home_layout": "cockpit",
+    "price_precision": 2
   },
   "execution": {
-    "auto_trading_enabled": false,
-    "emergency_stop": false,
-    "mode": "paper"
+    "auto_trading_enabled": false
   },
-  "risk": {
-    "liquidation_buffer_pct": "10",
-    "max_daily_loss": "300",
-    "max_leverage": "3",
-    "max_margin_usage_pct": "70",
-    "max_order_notional": "1000",
-    "max_position_notional": "3000",
-    "max_positions": 5,
-    "max_single_instrument_weight_pct": "35",
-    "max_total_notional": "10000",
-    "stop_loss_mandatory": true
+  "risk_defaults": {
+    "default_leverage": "3",
+    "risk_budget_per_trade": "100",
+    "stop_rule": "fixed_pct",
+    "warning_threshold": "80"
   },
-  "updated_at": "2026-11-10T06:10:00Z"
+  "secrets": {
+    "okx_configured": false
+  },
+  "updated_at": "2026-11-15T06:10:00Z"
 }

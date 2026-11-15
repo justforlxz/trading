@@ -204,3 +204,22 @@ def test_research_alerts_activity_migration_and_legacy_price_alerts_removed() ->
             )
         ).scalar_one()
     assert unique >= 1
+
+
+def test_external_market_migration_creates_tables_and_settings_groups() -> None:
+    """0018 建出外部事件、新闻与同步任务表，并扩展设置分组。"""
+
+    init_db()
+
+    assert {"market_events", "news_items", "data_sync_jobs"} <= _tables()
+    with session_scope() as session:
+        columns = set(
+            session.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_schema = current_schema() AND table_name = 'settings'"
+                )
+            ).scalars()
+        )
+    assert {"display", "risk_defaults", "data_sources"} <= columns
+    assert "data" not in columns

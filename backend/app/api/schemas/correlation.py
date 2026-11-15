@@ -24,7 +24,7 @@ __all__ = [
     "CorrelationPoint",
     "CorrelationSeriesResponse",
     "MarketBreadth",
-    "MarketOverviewResponse",
+    "MarketBreadthResponse",
     "MarketResonance",
 ]
 
@@ -198,7 +198,7 @@ class MarketResonance(BaseModel):
     window: int
 
 
-class MarketOverviewResponse(BaseModel):
+class MarketBreadthResponse(BaseModel):
     """某一类别（`inst_type`）的横截面总览；两类标的各自统计，互不混入。"""
 
     inst_type: InstType

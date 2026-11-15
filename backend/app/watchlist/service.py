@@ -1,4 +1,4 @@
-"""自选域：分组、条目、价格提醒，以及基于已落库日线的行情与技术指标快照。
+"""自选域：分组、条目，以及基于已落库日线的行情与技术指标快照。
 
 行情口径（本域唯一出处）：取该标的已落库的 **日线**，`last_price` 是最新一根
 收盘价，`change_pct_24h` 是它与前一根收盘价的涨跌幅，`volume_24h_quote` 是
@@ -7,7 +7,8 @@
 装。趋势、RSI 与 ATR 复用 `app.indicators` 的计算，历史不足时如实留空；
 加入自选仍要求至少两根日线，列表读取则允许某一行缺数据（显式标记 `missing`）。
 
-提醒只存规则：触发时间留给后续节点的任务回填，本域不主动扫描行情。
+自选增删与换组写一条活动；价格提醒已由 B8 的 `alert_events` 取代，本域不再
+保存提醒规则。
 """
 
 from __future__ import annotations
@@ -20,28 +21,26 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.activity import record_activity
 from app.core import DataUnavailable, InvariantViolation, ValidationError
 from app.db import session_scope
 from app.instrument import Instrument
 from app.market import correlation, load_candles
 from app.watchlist.metrics import MIN_QUOTE_BARS, DailySnapshot, summarize_daily
-from app.watchlist.model import PriceAlertRow, WatchlistGroup, WatchlistItemRow
+from app.watchlist.model import WatchlistGroup, WatchlistItemRow
 
 __all__ = [
     "DEFAULT_GROUP",
     "QUOTE_BAR",
-    "AlertSnapshot",
     "RelatedCandidate",
     "WatchlistEntry",
     "WatchlistSummary",
     "add_item",
-    "clear_alert",
     "list_entries",
     "list_groups",
     "move_item",
     "related_instruments",
     "remove_item",
-    "set_alert",
     "summarize_entries",
     "tracked_instruments",
 ]
@@ -55,25 +54,13 @@ _HUNDRED = Decimal(100)
 
 
 @dataclass(frozen=True, slots=True)
-class AlertSnapshot:
-    """提醒规则的只读视图，避免调用方拿到 ORM 实例。"""
-
-    inst_id: str
-    direction: str
-    price: Decimal
-    enabled: bool
-    triggered_at: datetime | None
-
-
-@dataclass(frozen=True, slots=True)
 class WatchlistEntry:
-    """一条自选：标的元数据 + 分组 + 日线快照 + 可选提醒。"""
+    """一条自选：标的元数据 + 分组 + 日线快照。"""
 
     instrument: Instrument
     group: str
     added_at: datetime
     quote: DailySnapshot
-    alert: AlertSnapshot | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,8 +132,6 @@ def list_entries() -> list[WatchlistEntry]:
             )
         )
         instruments = {row.inst_id: session.get(Instrument, row.inst_id) for row in rows}
-        alerts = {row.inst_id: _snapshot(row) for row in session.scalars(select(PriceAlertRow))}
-
         entries: list[WatchlistEntry] = []
         for row in rows:
             instrument = instruments[row.inst_id]
@@ -158,7 +143,6 @@ def list_entries() -> list[WatchlistEntry]:
                     group=row.group_name,
                     added_at=row.added_at,
                     quote=summarize_daily(load_candles(row.inst_id, QUOTE_BAR)),
-                    alert=alerts.get(row.inst_id),
                 )
             )
         return entries
@@ -225,12 +209,19 @@ def add_item(inst_id: str, group: str = DEFAULT_GROUP) -> WatchlistEntry | None:
         added_at = datetime.now(UTC)
         _ensure_group(session, name, added_at)
         session.add(WatchlistItemRow(inst_id=symbol, group_name=name, added_at=added_at))
+        record_activity(
+            session=session,
+            event_type="watchlist.item.added",
+            object_type="watchlist_item",
+            object_id=symbol,
+            summary=f"将 {symbol} 加入自选分组「{name}」",
+            payload={"inst_id": symbol, "group": name},
+        )
         return WatchlistEntry(
             instrument=instrument,
             group=name,
             added_at=added_at,
             quote=entry_quote,
-            alert=None,
         )
 
 
@@ -254,17 +245,24 @@ def move_item(inst_id: str, group: str) -> WatchlistEntry | None:
         _ensure_group(session, name, datetime.now(UTC))
         row.group_name = name
         _drop_group_if_empty(session, previous)
+        record_activity(
+            session=session,
+            event_type="watchlist.item.moved",
+            object_type="watchlist_item",
+            object_id=symbol,
+            summary=f"将 {symbol} 从分组「{previous}」移到「{name}」",
+            payload={"inst_id": symbol, "from": previous, "to": name},
+        )
         return WatchlistEntry(
             instrument=instrument,
             group=name,
             added_at=row.added_at,
             quote=entry_quote,
-            alert=_alert_of(session, symbol),
         )
 
 
 def remove_item(inst_id: str) -> bool:
-    """删除条目及其提醒；不存在返回 `False`。"""
+    """删除自选条目；不存在返回 `False`。"""
 
     symbol = inst_id.strip()
 
@@ -274,49 +272,17 @@ def remove_item(inst_id: str) -> bool:
             return False
 
         previous = row.group_name
-        alert = session.get(PriceAlertRow, symbol)
-        if alert is not None:
-            session.delete(alert)
         session.delete(row)
         session.flush()
         _drop_group_if_empty(session, previous)
-        return True
-
-
-def set_alert(
-    inst_id: str, direction: str, price: Decimal, *, enabled: bool = True
-) -> AlertSnapshot | None:
-    """写入或覆盖提醒规则；标的不在自选里返回 `None`。"""
-
-    symbol = inst_id.strip()
-
-    with session_scope() as session:
-        if session.get(WatchlistItemRow, symbol) is None:
-            return None
-
-        row = session.get(PriceAlertRow, symbol)
-        if row is None:
-            row = PriceAlertRow(inst_id=symbol, direction=direction, price=price, enabled=enabled)
-            session.add(row)
-        else:
-            row.direction = direction
-            row.price = price
-            row.enabled = enabled
-        # 规则被改写后旧的触发时间不再成立。
-        row.triggered_at = None
-        return _snapshot(row)
-
-
-def clear_alert(inst_id: str) -> bool:
-    """删除提醒规则；本来就没有返回 `False`。"""
-
-    symbol = inst_id.strip()
-
-    with session_scope() as session:
-        row = session.get(PriceAlertRow, symbol)
-        if row is None:
-            return False
-        session.delete(row)
+        record_activity(
+            session=session,
+            event_type="watchlist.item.removed",
+            object_type="watchlist_item",
+            object_id=symbol,
+            summary=f"将 {symbol} 从自选分组「{previous}」移除",
+            payload={"inst_id": symbol, "group": previous},
+        )
         return True
 
 
@@ -378,18 +344,3 @@ def _drop_group_if_empty(session: Session, name: str) -> None:
     group = session.get(WatchlistGroup, name)
     if group is not None:
         session.delete(group)
-
-
-def _snapshot(row: PriceAlertRow) -> AlertSnapshot:
-    return AlertSnapshot(
-        inst_id=row.inst_id,
-        direction=row.direction,
-        price=row.price,
-        enabled=row.enabled,
-        triggered_at=row.triggered_at,
-    )
-
-
-def _alert_of(session: Session, inst_id: str) -> AlertSnapshot | None:
-    row = session.get(PriceAlertRow, inst_id)
-    return None if row is None else _snapshot(row)

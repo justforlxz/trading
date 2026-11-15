@@ -29,6 +29,8 @@ TESTS_ROOT = BACKEND_ROOT / "tests"
 
 # 业务包清单：与 `app/` 下的目录一一对应；新增模块必须先在此登记。
 PACKAGES: tuple[str, ...] = (
+    "activity",
+    "alerts",
     "analysis",
     "api",
     "backtest",
@@ -45,6 +47,7 @@ PACKAGES: tuple[str, ...] = (
     "opportunity",
     "portfolio",
     "positions",
+    "research",
     "risk",
     "settings",
     "shared",
@@ -64,6 +67,23 @@ INFRA: frozenset[str] = frozenset({"config", "core"})
 # 唯一真源：模块 → 允许依赖的模块集合（规划 MKACG-707 定稿，逐行即契约）。
 # `jobs` / `api` 是装配层（"全部"），`main` 是装配根，`config` / `core` 是叶子。
 ALLOWED_DEPS: dict[str, frozenset[str]] = {
+    # 活动只追加事件行，不反过来依赖写活动的业务模块。
+    "activity": frozenset({"db"}),
+    # 提醒扫描读取自选、持仓、指标与风险结果，只写提醒与活动表。
+    "alerts": frozenset(
+        {
+            "shared",
+            "db",
+            "activity",
+            "instrument",
+            "market",
+            "indicators",
+            "positions",
+            "risk",
+            "strategy",
+            "watchlist",
+        }
+    ),
     # 详情页聚合只编排已有域：行情、指标、相关性、回测与自选。它不写库，也不反向
     # 依赖接口层。
     "analysis": frozenset(
@@ -71,7 +91,9 @@ ALLOWED_DEPS: dict[str, frozenset[str]] = {
     ),
     # 首页聚合只读各域已有结果：市场、账户与持仓、风险、自选、策略与回测。它不写库，
     # 不重算指标，也不反向依赖接口层。
-    "dashboard": frozenset({"backtest", "market", "positions", "risk", "strategy", "watchlist"}),
+    "dashboard": frozenset(
+        {"activity", "alerts", "backtest", "market", "positions", "risk", "strategy", "watchlist"}
+    ),
     "core": frozenset(),
     "shared": frozenset(),
     "db": frozenset({"shared"}),
@@ -82,14 +104,14 @@ ALLOWED_DEPS: dict[str, frozenset[str]] = {
     "market": frozenset({"shared", "db", "exchange", "instrument"}),
     # 自选行要在后端补趋势、RSI 与 ATR，指标计算必须复用 `app.indicators`，
     # 不能在域内重写一套与详情页/回测不同的算法。
-    "watchlist": frozenset({"shared", "db", "instrument", "market", "indicators"}),
+    "watchlist": frozenset({"shared", "db", "activity", "instrument", "market", "indicators"}),
     "opportunity": frozenset({"db", "instrument", "market"}),
     "portfolio": frozenset({"db", "instrument", "strategy"}),
     # 持仓域读取 OKX 只读快照与已落库行情；不把账户字段塞进交易端口。
-    "positions": frozenset({"shared", "db", "instrument", "market", "exchange"}),
+    "positions": frozenset({"shared", "db", "activity", "instrument", "market", "exchange"}),
     "indicators": frozenset({"shared"}),
-    "strategy": frozenset({"shared", "db", "instrument", "market", "indicators"}),
-    "backtest": frozenset({"shared", "db", "instrument", "market", "strategy"}),
+    "strategy": frozenset({"shared", "db", "activity", "instrument", "market", "indicators"}),
+    "backtest": frozenset({"shared", "db", "activity", "instrument", "market", "strategy"}),
     # 分级处置要覆盖同标的的待批准组合申请（`portfolio_adjustments`）；风险与敞口
     # 还要读持仓快照（`positions`）、复用指标实现 ATR（`indicators`）、读风险阈值
     # （`settings`）。计算仍是纯函数，不反向依赖接口层。
@@ -107,8 +129,10 @@ ALLOWED_DEPS: dict[str, frozenset[str]] = {
         }
     ),
     "settings": frozenset({"db"}),
+    # 研究记录校验标的、策略与回测引用，写记录与活动。
+    "research": frozenset({"db", "activity", "instrument", "strategy", "backtest"}),
     # 推送层只编排交易所连接与 B2 的账户/持仓快照；行情合并与订阅过滤不放进业务域。
-    "stream": frozenset({"exchange", "positions"}),
+    "stream": frozenset({"activity", "exchange", "positions"}),
     "execution": frozenset(
         {"shared", "db", "instrument", "market", "strategy", "risk", "exchange"}
     ),

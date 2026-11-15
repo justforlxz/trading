@@ -1,4 +1,4 @@
-"""自选与标的详情契约：行情快照、K 线、相关标的、价格提醒。
+"""自选与标的详情契约：行情快照、K 线与相关标的。
 
 所有响应模型带 `examples`，它们随 `contracts/openapi.json` 一起成为前端 MSW
 fixture 的唯一来源；页面不得另造数据。
@@ -11,7 +11,6 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 from app.api.schemas.common import (
-    AlertDirection,
     AssetType,
     Bar,
     Candle,
@@ -31,8 +30,6 @@ __all__ = [
     "InstrumentDetailResponse",
     "InstrumentListResponse",
     "InstrumentSearchResponse",
-    "PriceAlert",
-    "PriceAlertRequest",
     "RelatedInstrument",
     "RelatedInstrumentsResponse",
     "WatchlistAddRequest",
@@ -71,31 +68,6 @@ _EXAMPLE_SIGNAL = {
 }
 
 
-_EXAMPLE_ALERT = {
-    "inst_id": "XAAPL-USDT",
-    "direction": "above",
-    "price": "235.00",
-    "enabled": True,
-    "triggered_at": None,
-}
-
-
-class PriceAlert(BaseModel):
-    inst_id: str
-    direction: AlertDirection
-    price: DecimalString
-    enabled: bool
-    triggered_at: UtcDatetime | None = None
-
-    model_config = ConfigDict(json_schema_extra={"examples": [_EXAMPLE_ALERT]})
-
-
-class PriceAlertRequest(BaseModel):
-    direction: AlertDirection
-    price: DecimalString
-    enabled: bool = True
-
-
 _EXAMPLE_ITEM = {
     "instrument": _EXAMPLE_INSTRUMENT,
     "group": "美股",
@@ -116,7 +88,6 @@ _EXAMPLE_ITEM = {
         "enabled": True,
     },
     "last_signal": _EXAMPLE_SIGNAL,
-    "alert": None,
 }
 
 
@@ -154,8 +125,6 @@ class WatchlistItem(BaseModel):
     data_status: DataStatus
     strategy: WatchlistStrategy | None = None
     last_signal: Signal | None = None
-    alert: PriceAlert | None = None
-
     model_config = ConfigDict(json_schema_extra={"examples": [_EXAMPLE_ITEM]})
 
 

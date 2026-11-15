@@ -17,7 +17,6 @@ from typing import Annotated, Literal
 from pydantic import AwareDatetime, BaseModel, ConfigDict, PlainSerializer, StringConstraints
 
 __all__ = [
-    "AlertDirection",
     "AssetType",
     "Bar",
     "Candle",
@@ -102,7 +101,6 @@ StrategyStatus = Literal[
 QtyUnit = Literal["base", "contract"]
 # 与上游 `state` 原文一一对应：交易所适配层不做词表翻译，契约也不能收窄。
 TradingStatus = Literal["live", "suspend", "preopen", "test", "expired", "unknown"]
-AlertDirection = Literal["above", "below"]
 
 # 策略/指标参数值：JSON 标量，不做进一步的域内校验（各指标自证其参数）。
 ParamValue = int | float | str | bool

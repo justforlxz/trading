@@ -187,10 +187,10 @@ class DashboardWatchlistModule(DashboardModule):
 
 
 class DashboardAlertItem(BaseModel):
-    """待处理提醒；当前来源是 B3 的未处置风险事件，B8 合并后换成提醒事件表。"""
+    """待处理提醒；来源是提醒事件表。"""
 
     id: str
-    type: Literal["risk"]
+    type: Literal["indicator", "price", "risk", "strategy", "data"]
     severity: str | None = None
     instrument_id: str | None = None
     rule_id: str

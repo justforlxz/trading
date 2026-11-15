@@ -9,8 +9,8 @@
 - 策略计数来自 `app.strategy` 的 `summarize_instances`；
 - 最近回测来自 `app.backtest` 的 `latest_run`。
 
-提醒暂时读取 B3 已落库的未处置风险事件；B8 的 `alert_events` 合并后，这里换成
-同一份提醒事件表。活动事件表同属 B8，交付前首页如实返回空列表，不从其他表拼造。
+提醒读取 `alert_events` 的待处理行；活动读取 `activity_events` 的最近几条。
+两者都由业务动作或提醒扫描写入，首页不在这里拼造文案，也不在读取时写库。
 
 每个模块调用都在自己的异常边界里执行。异常只转成简短的公开原因，不把上游原始
 响应或异常文本带进接口；一个模块失败不影响其他模块，接口仍返回 200。
@@ -23,6 +23,8 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any, cast
 
+from app.activity import list_activity
+from app.alerts import list_alerts
 from app.backtest import BacktestRunHeader, latest_run
 from app.core import Clock, DataUnavailable, SystemClock, UpstreamError, ValidationError
 from app.market import asset_session, market_overview, primary_source
@@ -38,7 +40,6 @@ from app.risk import (
     RULE_STOP_MISSING,
     RiskExposure,
     exposure_report,
-    list_unresolved_risk_events,
 )
 from app.strategy import StrategySummary, summarize_instances
 from app.watchlist import (
@@ -172,7 +173,7 @@ class WatchlistData:
 
 @dataclass(frozen=True, slots=True)
 class AlertItem:
-    """一条待处理提醒；当前来源是未处置的风险事件。"""
+    """一条待处理提醒；来源是提醒事件表。"""
 
     id: str
     type: str
@@ -196,7 +197,7 @@ class StrategiesData:
 
 @dataclass(frozen=True, slots=True)
 class ActivityItem:
-    """一条活动流水；B8 交付事件表前首页只返回空列表。"""
+    """一条活动流水。"""
 
     id: str
     event_type: str
@@ -428,18 +429,18 @@ def _watchlist() -> Module:
 
 
 def _alerts() -> Module:
-    records = list_unresolved_risk_events(limit=ALERT_LIMIT)
+    records, _ = list_alerts(status="pending", limit=ALERT_LIMIT)
     items = tuple(
         AlertItem(
-            id=record.event_id,
-            type="risk",
+            id=record.id,
+            type=record.type,
             severity=record.severity,
-            instrument_id=record.inst_id,
-            rule_id=record.rule,
-            title=record.rule,
+            instrument_id=record.instrument_id,
+            rule_id=record.rule_id,
+            title=record.title,
             detail=record.detail,
-            status="pending",
-            triggered_at=record.created_at,
+            status=record.status,
+            triggered_at=record.triggered_at,
         )
         for record in records
     )
@@ -468,9 +469,24 @@ def _strategies(moment: datetime) -> Module:
 
 
 def _activity(moment: datetime) -> Module:
-    # B8 的 activity_events 还没有交付。首页返回空列表并把时点标成本次读取时刻；
-    # 不从订单、成交或其他业务表临时拼一条「活动」出来。
-    return Module(status=STATUS_OK, as_of=moment, error=None, data=())
+    records, _ = list_activity(limit=ALERT_LIMIT)
+    items = tuple(
+        ActivityItem(
+            id=record.id,
+            event_type=record.event_type,
+            object_type=record.object_type,
+            object_id=record.object_id,
+            summary=record.summary,
+            created_at=record.created_at,
+        )
+        for record in records
+    )
+    return Module(
+        status=STATUS_OK,
+        as_of=items[0].created_at if items else moment,
+        error=None,
+        data=items,
+    )
 
 
 def _reason(exc: Exception) -> str:

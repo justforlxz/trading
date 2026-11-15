@@ -1,4 +1,4 @@
-"""自选域行为：分组增删、行情快照口径、价格提醒、相关标的排序。
+"""自选域行为：分组增删、行情快照口径、活动写入、相关标的排序。
 
 期望值都由「库里写了哪几根日线」反推：`last_price` 取最新收盘，
 `change_pct_24h` 是相邻两根收盘的涨跌幅，`volume_24h_quote` 是收盘 × 成交量。
@@ -9,18 +9,17 @@ from decimal import Decimal
 
 import pytest
 
+from app.activity import list_activity
 from app.core import Bar, DataUnavailable, Timeframe, ValidationError
 from app.instrument import sync_instruments
 from app.market import upsert_candles
 from app.watchlist import (
     add_item,
-    clear_alert,
     list_entries,
     list_groups,
     move_item,
     related_instruments,
     remove_item,
-    set_alert,
 )
 from tests.factories.instruments import make_ref, make_swap_ref
 
@@ -65,7 +64,6 @@ def test_add_item_returns_entry_with_quote_from_daily_candles() -> None:
     assert entry.quote.last_price == Decimal("110")
     assert entry.quote.change_pct_24h == Decimal("10.000000")
     assert entry.quote.volume_24h_quote == Decimal("1100.00")
-    assert entry.alert is None
     assert list_groups() == ["默认"]
 
 
@@ -123,47 +121,36 @@ def test_move_unknown_item_returns_none() -> None:
     assert move_item("XAAPL-USDT", "观察") is None
 
 
-def test_remove_item_drops_alerts_and_empty_group() -> None:
+def test_remove_item_drops_empty_group() -> None:
     _seed_instruments(make_ref())
     _daily("XAAPL-USDT", ["100", "110"])
     add_item("XAAPL-USDT")
-    set_alert("XAAPL-USDT", "above", Decimal("120"))
 
     assert remove_item("XAAPL-USDT") is True
     assert remove_item("XAAPL-USDT") is False
     assert list_entries() == []
     assert list_groups() == []
-    assert clear_alert("XAAPL-USDT") is False
 
 
-def test_set_alert_stores_rule_and_overwrites_in_place() -> None:
+def test_watchlist_actions_append_activity_events() -> None:
+    """加入、移动、移除各写一条活动，摘要与对象标识来自服务端。"""
+
     _seed_instruments(make_ref())
     _daily("XAAPL-USDT", ["100", "110"])
     add_item("XAAPL-USDT")
+    move_item("XAAPL-USDT", "观察")
+    remove_item("XAAPL-USDT")
 
-    created = set_alert("XAAPL-USDT", "above", Decimal("120.5"))
-    assert created is not None
-    assert created.direction == "above"
-    assert created.price == Decimal("120.5")
-    assert created.enabled is True
-    assert created.triggered_at is None
+    added, _ = list_activity(event_type="watchlist.item.added")
+    moved, _ = list_activity(event_type="watchlist.item.moved")
+    removed, _ = list_activity(event_type="watchlist.item.removed")
 
-    updated = set_alert("XAAPL-USDT", "below", Decimal("99"), enabled=False)
-    assert updated is not None
-    assert (updated.direction, updated.price, updated.enabled) == (
-        "below",
-        Decimal("99"),
-        False,
-    )
-    assert list_entries()[0].alert is not None
-    assert clear_alert("XAAPL-USDT") is True
-    assert list_entries()[0].alert is None
-
-
-def test_set_alert_requires_watchlist_item() -> None:
-    _seed_instruments(make_ref())
-
-    assert set_alert("XAAPL-USDT", "above", Decimal("120")) is None
+    assert [event.object_id for event in added] == ["XAAPL-USDT"]
+    assert added[0].payload == {"inst_id": "XAAPL-USDT", "group": "默认"}
+    assert [event.payload for event in moved] == [
+        {"inst_id": "XAAPL-USDT", "from": "默认", "to": "观察"}
+    ]
+    assert [event.payload for event in removed] == [{"inst_id": "XAAPL-USDT", "group": "观察"}]
 
 
 def test_related_instruments_ranks_by_absolute_correlation() -> None:

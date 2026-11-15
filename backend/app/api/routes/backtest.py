@@ -35,6 +35,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Response
 
+from app.activity import record_activity
 from app.api.mapping import decimal_str
 from app.api.schemas import (
     BacktestBatchResponse,
@@ -81,6 +82,7 @@ from app.backtest import (
     save_runs,
 )
 from app.core import InstrumentRef, ValidationError
+from app.db import session_scope
 from app.indicators import compute
 from app.instrument import Instrument, list_instruments
 from app.jobs import TargetScope, resolve_scope
@@ -150,6 +152,24 @@ def create_backtest(payload: BacktestRequest) -> BacktestBatchResponse:
     当时那个不可变版本。
     """
 
+    try:
+        return _create_backtest(payload)
+    except Exception as exc:
+        record_activity(
+            event_type="backtest.failed",
+            object_type="backtest",
+            object_id=payload.strategy_version_id,
+            summary=f"回测失败：策略版本 {payload.strategy_version_id}",
+            payload={
+                "strategy_version_id": payload.strategy_version_id,
+                "error_code": type(exc).__name__,
+                "status": getattr(exc, "http_status", 500),
+            },
+        )
+        raise
+
+
+def _create_backtest(payload: BacktestRequest) -> BacktestBatchResponse:
     version = get_version_by_id(payload.strategy_version_id)
     if version is None:
         raise HTTPException(status_code=404, detail=f"未找到策略版本 {payload.strategy_version_id}")
@@ -240,8 +260,24 @@ def create_backtest(payload: BacktestRequest) -> BacktestBatchResponse:
             )
         )
 
-    # 整批一个事务：要么全部落库，要么一行都不留。
-    records = save_runs(plans)
+    # 整批一个事务：开始记录、运行、交易、净值与完成记录一起提交或一起回滚。
+    with session_scope() as session:
+        record_activity(
+            session=session,
+            event_type="backtest.started",
+            object_type="backtest",
+            object_id=payload.strategy_version_id,
+            summary=f"回测开始：策略版本 {payload.strategy_version_id}",
+            payload={
+                "strategy_version_id": payload.strategy_version_id,
+                "inst_ids": list(payload.targets.inst_ids),
+                "bar": payload.bar,
+                "start_date": payload.start_date,
+                "end_date": payload.end_date,
+                "data_source": payload.data_source,
+            },
+        )
+        records = save_runs(plans, session=session)
     return BacktestBatchResponse(
         **_summary(records[0]).model_dump(),
         run_ids=[record.run_id for record in records],

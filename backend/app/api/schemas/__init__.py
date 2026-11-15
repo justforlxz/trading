@@ -4,6 +4,16 @@
 fixture 与前端类型都由 `contracts/openapi.json` 生成，不从这里手抄。
 """
 
+from app.api.schemas.alerts import (
+    ActivityItem,
+    ActivityListResponse,
+    AlertItem,
+    AlertListResponse,
+    AlertSeverity,
+    AlertStatus,
+    AlertStatusUpdateRequest,
+    AlertType,
+)
 from app.api.schemas.analysis import (
     AnalysisBar,
     AnalysisCandles,
@@ -141,6 +151,15 @@ from app.api.schemas.positions import (
     ManualTradeListResponse,
     ManualTradeRequest,
 )
+from app.api.schemas.research import (
+    ResearchNoteCreatedResponse,
+    ResearchNoteCreateRequest,
+    ResearchNoteItem,
+    ResearchNoteListResponse,
+    ResearchNoteType,
+    ResearchNoteUpdatedResponse,
+    ResearchNoteUpdateRequest,
+)
 from app.api.schemas.risk import (
     RiskEvent,
     RiskEventListResponse,
@@ -201,8 +220,6 @@ from app.api.schemas.watchlist import (
     InstrumentDetailResponse,
     InstrumentListResponse,
     InstrumentSearchResponse,
-    PriceAlert,
-    PriceAlertRequest,
     RelatedInstrument,
     RelatedInstrumentsResponse,
     WatchlistAddRequest,
@@ -216,6 +233,14 @@ __all__ = [
     "AccountStatus",
     "AccountSummaryResponse",
     "AccountSyncResponse",
+    "ActivityItem",
+    "ActivityListResponse",
+    "AlertItem",
+    "AlertListResponse",
+    "AlertSeverity",
+    "AlertStatus",
+    "AlertStatusUpdateRequest",
+    "AlertType",
     "AnalysisBar",
     "AnalysisCandles",
     "AnalysisCoverage",
@@ -343,12 +368,17 @@ __all__ = [
     "Position",
     "PositionListResponse",
     "PositionRiskConfigResponse",
-    "PriceAlert",
-    "PriceAlertRequest",
     "RankingMetric",
     "RelatedInstrument",
     "RelatedInstrumentsResponse",
     "RelativeStrengthIndicators",
+    "ResearchNoteCreateRequest",
+    "ResearchNoteCreatedResponse",
+    "ResearchNoteItem",
+    "ResearchNoteListResponse",
+    "ResearchNoteType",
+    "ResearchNoteUpdateRequest",
+    "ResearchNoteUpdatedResponse",
     "RiskConfigUpdateRequest",
     "RiskEvent",
     "RiskEventListResponse",

@@ -5,7 +5,7 @@
 
 - 任何模块异常都只把自己标成 `unavailable`，响应仍是 200；
 - 账户未配置只降级 `account`，其他模块继续返回；
-- 提醒只给未处置事件，自选只给摘要，策略没有回测时 `recent_backtest` 为 `null`；
+- 提醒只给待处理事件，自选只给摘要，策略没有回测时 `recent_backtest` 为 `null`；
 - 一次请求不写任何业务表。
 """
 
@@ -24,7 +24,6 @@ from app.core import Bar, Timeframe
 from app.db.engine import get_engine
 from app.instrument import sync_instruments
 from app.market import upsert_candles
-from app.risk import RiskContext, RiskEngine, TradeRequest, resolve_risk_event
 from app.strategy import create_instance
 from tests.api.conftest import latest_opens, seed_daily
 from tests.factories.instruments import make_ref, make_swap_ref
@@ -52,6 +51,8 @@ TRACKED_TABLES = (
     "backtest_runs",
     "risk_events",
     "account_snapshots",
+    "alert_events",
+    "activity_events",
 )
 
 
@@ -258,41 +259,46 @@ def test_populated_dashboard_aggregates_each_domain(client: TestClient) -> None:
     assert D(risk["max_single_instrument_weight_pct"]) == D("100")
 
 
-def test_alerts_only_return_unresolved_events(client: TestClient) -> None:
-    """提醒只给未处置事件；已处置事件不出现在首页。"""
+def test_alerts_come_from_alert_events_and_match_api(client: TestClient) -> None:
+    """首页提醒读取事件表；`/api/alerts` 触发的同一条提醒在首页可见。"""
 
     _swap_market()
-    rejected = RiskEngine().authorize(
-        TradeRequest(
-            instance_id="si_dashboard",
-            inst_id="XAAPL-USDT",
-            side="buy",
-            order_type="limit",
-            qty=D("100"),
-            price=D("100"),
-            ts=AS_OF,
-        ),
-        RiskContext(equity=D("10000"), available_balance=D("10000")),
+    position = client.post(
+        "/api/manual-positions",
+        json={
+            "inst_id": "AAPL-USDT-SWAP",
+            "side": "long",
+            "quantity": "2",
+            "avg_cost": "55",
+            "leverage": "2",
+            "idempotency_key": "dashboard-alert-1",
+        },
     )
-    assert not rejected.allowed
+    assert position.status_code == 201, position.text
 
-    first = client.get("/api/dashboard/summary").json()["alerts"]
-    assert first["status"] == "ok"
-    assert len(first["data"]) == len(rejected.violations) > 0
-    assert {item["type"] for item in first["data"]} == {"risk"}
-    assert {item["status"] for item in first["data"]} == {"pending"}
-    assert {item["rule_id"] for item in first["data"]} == {
-        item.rule for item in rejected.violations
-    }
-    assert first["as_of"] == "2026-11-10T23:00:00Z"
+    alerts = client.get("/api/alerts").json()["items"]
+    alert = next(item for item in alerts if item["rule_id"] == "stop_missing")
+    assert alert["type"] == "risk"
+    assert alert["severity"] == "warning"
+    assert alert["status"] == "pending"
+    assert alert["instrument_id"] == "AAPL-USDT-SWAP"
 
-    event_ids = [item["event_id"] for item in client.get("/api/risk/events").json()["items"]]
-    assert len(event_ids) == len(rejected.violations)
-    assert resolve_risk_event(event_ids[0], at=AS_OF) is not None
+    dashboard = client.get("/api/dashboard/summary").json()["alerts"]
+    assert dashboard["status"] == "ok"
+    shown = next(item for item in dashboard["data"] if item["id"] == alert["id"])
+    assert shown["title"] == alert["title"]
+    assert shown["type"] == "risk"
+    assert shown["status"] == "pending"
 
-    second = client.get("/api/dashboard/summary").json()["alerts"]
-    assert len(second["data"]) == len(first["data"]) - 1
-    assert event_ids[0] not in {item["id"] for item in second["data"]}
+    acknowledged = client.patch(f"/api/alerts/{alert['id']}", json={"status": "acknowledged"})
+    assert acknowledged.status_code == 200, acknowledged.text
+    assert acknowledged.json()["status"] == "acknowledged"
+
+    activity = client.get("/api/activity", params={"event_type": "alert.acknowledged"}).json()
+    assert [item["object_id"] for item in activity["items"]] == [alert["id"]]
+
+    after = client.get("/api/dashboard/summary").json()["alerts"]["data"]
+    assert alert["id"] not in {item["id"] for item in after}
 
 
 def test_strategies_count_and_recent_backtest(client: TestClient) -> None:

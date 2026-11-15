@@ -11,6 +11,8 @@ from decimal import Decimal
 from types import SimpleNamespace
 from typing import Any
 
+from app.activity import list_activity
+from app.db import init_db
 from app.exchange import MarketPush
 from app.instrument import sync_instruments
 from app.positions import ExchangePositionView
@@ -198,6 +200,30 @@ def test_reconnect_reconciles_with_a_rest_snapshot() -> None:
         assert hub._status["public_ws"].reconnect_count == 1
 
     asyncio.run(scenario())
+
+
+def test_status_changes_append_data_source_activity() -> None:
+    """数据源断线与重连各写一条活动；重复的同一状态不重复写。"""
+
+    init_db()
+
+    async def scenario() -> None:
+        hub = _hub()
+        hub._set_status("public_ws", True, "")
+        hub._set_status("public_ws", False, "连接中断")
+        hub._set_status("public_ws", False, "连接中断")
+        hub._set_status("public_ws", True, "")
+        await hub.stop()
+
+    asyncio.run(scenario())
+
+    events, _ = list_activity(event_type="data_source.disconnected")
+    assert [event.object_id for event in events] == ["okx:public_ws"]
+    assert events[0].payload["error"] == "连接中断"
+    connected, _ = list_activity(event_type="data_source.connected")
+    reconnected, _ = list_activity(event_type="data_source.reconnected")
+    assert len(connected) == 1
+    assert [event.summary for event in reconnected] == ["行情数据源已重连"]
 
 
 def test_private_push_is_delivered_even_when_the_database_write_fails() -> None:
@@ -468,3 +494,23 @@ def _fail_persist(**_kwargs: Any) -> None:
 
 def _no_persist(**_kwargs: Any) -> None:
     return None
+
+
+def test_publish_broadcasts_low_frequency_events() -> None:
+    """`publish` 把提醒/活动等低频事件广播给所有已连接客户端。"""
+
+    events: list[dict[str, Any]] = []
+
+    async def scenario() -> None:
+        hub = _hub()
+        hub.register(events.append)
+        await hub.publish(
+            "alert.created",
+            {"id": "al_1", "status": "pending"},
+            as_of=datetime(2026, 11, 10, tzinfo=UTC),
+        )
+        await hub.stop()
+
+    asyncio.run(scenario())
+    assert [event["type"] for event in events] == ["alert.created"]
+    assert events[0]["data"] == {"id": "al_1", "status": "pending"}

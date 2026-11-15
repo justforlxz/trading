@@ -1,4 +1,4 @@
-"""自选域端点：条目、分组、价格提醒与相关标的。
+"""自选域端点：条目、分组与相关标的。
 
 端点只做入参校验与响应组装，行情口径与持久化都在 `app.watchlist` 里。
 域层用 `None` / `False` 表示「不存在」，这一层再翻译成 404。
@@ -12,8 +12,6 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.api.mapping import decimal_str, instrument_info
 from app.api.schemas import (
-    PriceAlert,
-    PriceAlertRequest,
     RelatedInstrument,
     RelatedInstrumentsResponse,
     Signal,
@@ -26,17 +24,14 @@ from app.api.schemas import (
 from app.journal import ExecutionSnapshot, RecordedSignal
 from app.strategy import InstanceRecord, list_instances
 from app.watchlist import (
-    AlertSnapshot,
     RelatedCandidate,
     WatchlistEntry,
     add_item,
-    clear_alert,
     list_entries,
     list_groups,
     move_item,
     related_instruments,
     remove_item,
-    set_alert,
 )
 
 __all__ = ["watchlist_router"]
@@ -100,29 +95,6 @@ def get_related_instruments(
     )
 
 
-@watchlist_router.put("/watchlist/{inst_id}/alert")
-def put_price_alert(inst_id: str, payload: PriceAlertRequest) -> PriceAlert:
-    """写入或覆盖价格提醒；标的必须已在自选里。"""
-
-    snapshot = set_alert(
-        inst_id,
-        payload.direction,
-        Decimal(payload.price),
-        enabled=payload.enabled,
-    )
-    if snapshot is None:
-        raise HTTPException(status_code=404, detail=f"自选里没有标的 {inst_id}")
-    return _to_alert(snapshot)
-
-
-@watchlist_router.delete("/watchlist/{inst_id}/alert", status_code=204)
-def delete_price_alert(inst_id: str) -> None:
-    """删除价格提醒；没有提醒时按不存在处理。"""
-
-    if not clear_alert(inst_id):
-        raise HTTPException(status_code=404, detail=f"标的 {inst_id} 没有价格提醒")
-
-
 @watchlist_router.patch("/watchlist/{inst_id}")
 def update_watchlist_item(
     inst_id: str, payload: WatchlistUpdateRequest, request: Request
@@ -164,7 +136,6 @@ def _item(
         data_status=snapshot.data_status,
         strategy=None if strategy is None else _strategy(strategy),
         last_signal=_signal(signal, instances, snapshot.last_price),
-        alert=_alert(entry.alert),
     )
 
 
@@ -248,20 +219,6 @@ def _signal(
         reason=record.reason,
         generated_at=record.generated_at,
         target_weight=(None if record.target_weight is None else decimal_str(record.target_weight)),
-    )
-
-
-def _alert(snapshot: AlertSnapshot | None) -> PriceAlert | None:
-    return None if snapshot is None else _to_alert(snapshot)
-
-
-def _to_alert(snapshot: AlertSnapshot) -> PriceAlert:
-    return PriceAlert(
-        inst_id=snapshot.inst_id,
-        direction=snapshot.direction,
-        price=decimal_str(snapshot.price),
-        enabled=snapshot.enabled,
-        triggered_at=snapshot.triggered_at,
     )
 
 

@@ -139,6 +139,31 @@ export function CandlestickChart({
         />
       ))}
 
+      {geometry.markers.map((marker) => {
+        const buy = marker.side === "buy";
+        const points = buy
+          ? `${marker.x},${marker.y - 7} ${marker.x - 5},${marker.y + 4} ${marker.x + 5},${marker.y + 4}`
+          : `${marker.x},${marker.y + 7} ${marker.x - 5},${marker.y - 4} ${marker.x + 5},${marker.y - 4}`;
+        return (
+          <polygon
+            key={marker.key}
+            points={points}
+            strokeWidth={1.2}
+            className={
+              buy
+                ? marker.kind === "entry"
+                  ? "fill-emerald-600 stroke-emerald-700 dark:fill-emerald-400 dark:stroke-emerald-300"
+                  : "fill-transparent stroke-emerald-600 dark:stroke-emerald-400"
+                : marker.kind === "entry"
+                  ? "fill-rose-600 stroke-rose-700 dark:fill-rose-400 dark:stroke-rose-300"
+                  : "fill-transparent stroke-rose-600 dark:stroke-rose-400"
+            }
+          >
+            <title>{marker.label}</title>
+          </polygon>
+        );
+      })}
+
       <line
         x1={geometry.plotLeft}
         x2={geometry.plotRight}

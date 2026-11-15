@@ -6,6 +6,7 @@ import {
   CardTitle,
 } from "../../components/ui/card";
 import type { BacktestDetailResponse } from "../../lib/api";
+import { ratioToPercent } from "../../lib/backtest-detail";
 import { instTypeLabel } from "../../lib/display";
 import { formatParams } from "./format";
 import { ReadingGrid, type Reading } from "./reading";
@@ -22,6 +23,7 @@ export type BacktestSummaryProps = {
 export function BacktestSummary({ detail }: BacktestSummaryProps) {
   const { run, request, portfolio } = detail;
   const metrics = run.metrics;
+  const annualized = metrics?.annualized_return_pct ?? null;
 
   const performance: Reading[] = [
     { label: "初始资金", value: metrics?.initial_capital ?? "—" },
@@ -34,6 +36,13 @@ export function BacktestSummary({ detail }: BacktestSummaryProps) {
     { label: "最大回撤", value: metrics ? `${metrics.max_drawdown_pct}%` : "—" },
     { label: "Sharpe", value: metrics?.sharpe ?? "—" },
     { label: "交易次数", value: metrics ? String(metrics.trade_count) : "—" },
+    {
+      label: "年化收益",
+      value: annualized === null ? "—" : `${annualized}%`,
+      tone: annualized !== null,
+    },
+    { label: "胜率", value: metrics ? ratioToPercent(metrics.win_rate) : "—" },
+    { label: "盈亏比", value: metrics?.payoff_ratio ?? "—" },
   ];
 
   const combined: Reading[] = [
@@ -63,12 +72,17 @@ export function BacktestSummary({ detail }: BacktestSummaryProps) {
           {request.start_date} ~ {request.end_date} · {request.bar} · {request.data_source} ·
           执行模型 {request.execution_model}
         </CardDescription>
+        <p className="text-xs text-muted-foreground">
+          成本口径：挂单手续费 {request.costs.maker_fee_bps} bps · 吃单手续费{" "}
+          {request.costs.taker_fee_bps} bps · 滑点 {request.costs.slippage_bps} bps · 价差{" "}
+          {request.costs.spread_bps} bps
+        </p>
         <p className="break-words font-mono text-xs text-muted-foreground">
           参数：{formatParams(run.params)}
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <ReadingGrid readings={performance} />
+        <ReadingGrid readings={performance} className="sm:grid-cols-3 lg:grid-cols-5" />
         <ReadingGrid readings={combined} className="border-t pt-4 sm:grid-cols-2 lg:grid-cols-4" />
         <div className="text-xs text-muted-foreground">
           <span className="mr-2">每腿胜率</span>
@@ -77,7 +91,7 @@ export function BacktestSummary({ detail }: BacktestSummaryProps) {
           ) : (
             winRates.map(([key, value]) => (
               <span key={key} className="mr-3 font-mono tabular-nums">
-                {key}：{value}
+                {key}：{ratioToPercent(value)}
               </span>
             ))
           )}

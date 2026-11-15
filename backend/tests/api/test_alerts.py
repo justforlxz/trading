@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
+from app.activity import set_event_publisher
 from app.alerts import AlertEventRow, scan_alerts, update_alert_status
 from app.core import Conflict
 from app.db import session_scope
@@ -185,3 +186,62 @@ def test_naive_activity_time_range_is_rejected(market_data: TestClient) -> None:
 
     assert market_data.get("/api/activity", params={"from": "2026-11-01"}).status_code == 422
     assert market_data.get("/api/activity", params={"to": "2026-11-10"}).status_code == 422
+
+
+def test_reopened_alert_is_pending_again_after_condition_recovers(
+    market_data: TestClient,
+) -> None:
+    """条件恢复后同一天再次成立时，expired 行重新激活为 pending。"""
+
+    position = _open_position(market_data)
+    pending = market_data.get("/api/alerts").json()["items"]
+    alert = next(item for item in pending if item["rule_id"] == "stop_missing")
+
+    recovered = market_data.patch(f"/api/manual-positions/{position['id']}", json={"stop_px": "50"})
+    assert recovered.status_code == 200, recovered.text
+    market_data.get("/api/alerts")
+    expired = market_data.get("/api/alerts", params={"status": "expired"}).json()["items"]
+    assert alert["id"] in {item["id"] for item in expired}
+
+    reopened = market_data.patch(f"/api/manual-positions/{position['id']}", json={"stop_px": None})
+    assert reopened.status_code == 200, reopened.text
+    pending_again = market_data.get("/api/alerts").json()["items"]
+    reopened_alert = next(item for item in pending_again if item["id"] == alert["id"])
+    assert reopened_alert["status"] == "pending"
+    assert reopened_alert["expires_at"] is None
+
+    activity = market_data.get("/api/activity", params={"event_type": "alert.reopened"}).json()[
+        "items"
+    ]
+    assert [item["object_id"] for item in activity] == [alert["id"]]
+
+
+def test_scan_publishes_alert_and_activity_events(market_data: TestClient) -> None:
+    """提醒与活动提交后通过注入的推送入口发出 WebSocket 事件。"""
+
+    published: list[tuple[str, dict[str, object]]] = []
+    set_event_publisher(lambda event_type, data, as_of: published.append((event_type, data)))
+    try:
+        _open_position(market_data)
+        market_data.get("/api/alerts")
+    finally:
+        set_event_publisher(None)
+
+    types = [event_type for event_type, _ in published]
+    assert "alert.created" in types
+    assert "activity.created" in types
+    alert_events = [data for event_type, data in published if event_type == "alert.created"]
+    assert alert_events
+    assert {
+        "id",
+        "type",
+        "severity",
+        "instrument_id",
+        "rule_id",
+        "title",
+        "detail",
+        "payload",
+        "status",
+        "triggered_at",
+        "expires_at",
+    } <= set(alert_events[0])

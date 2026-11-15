@@ -494,3 +494,23 @@ def _fail_persist(**_kwargs: Any) -> None:
 
 def _no_persist(**_kwargs: Any) -> None:
     return None
+
+
+def test_publish_broadcasts_low_frequency_events() -> None:
+    """`publish` 把提醒/活动等低频事件广播给所有已连接客户端。"""
+
+    events: list[dict[str, Any]] = []
+
+    async def scenario() -> None:
+        hub = _hub()
+        hub.register(events.append)
+        await hub.publish(
+            "alert.created",
+            {"id": "al_1", "status": "pending"},
+            as_of=datetime(2026, 11, 10, tzinfo=UTC),
+        )
+        await hub.stop()
+
+    asyncio.run(scenario())
+    assert [event["type"] for event in events] == ["alert.created"]
+    assert events[0]["data"] == {"id": "al_1", "status": "pending"}

@@ -4,6 +4,17 @@
 """
 
 from app.activity.model import ActivityEventRow
-from app.activity.service import list_activity, record_activity
+from app.activity.service import (
+    list_activity,
+    queue_event,
+    record_activity,
+    set_event_publisher,
+)
 
-__all__ = ["ActivityEventRow", "list_activity", "record_activity"]
+__all__ = [
+    "ActivityEventRow",
+    "list_activity",
+    "queue_event",
+    "record_activity",
+    "set_event_publisher",
+]

@@ -4,15 +4,18 @@ v2 是单进程同步栈：一个 uvicorn 进程、一个 PostgreSQL 库、没�
 装配顺序即分层顺序：配置 → 数据库 → HTTP 协议层。
 """
 
+import asyncio
 import logging
 from collections.abc import Iterator
 from contextlib import asynccontextmanager
+from datetime import datetime
 from threading import Event
+from typing import Any
 
 from fastapi import FastAPI
 
 from app import __version__
-from app.activity import ActivityEventRow  # noqa: F401
+from app.activity import ActivityEventRow, set_event_publisher  # noqa: F401
 from app.alerts import AlertEventRow  # noqa: F401
 from app.api import include_routers, register_error_handlers
 
@@ -69,10 +72,19 @@ async def lifespan(_app: FastAPI) -> Iterator[None]:
     scheduler = start_equity_snapshot_scheduler(stop_scheduler)
     hub = StreamHub()
     _app.state.stream_hub = hub
+    loop = asyncio.get_running_loop()
+
+    def _publish(event_type: str, data: dict[str, Any], as_of: datetime | None) -> None:
+        """把业务包提交后的事件调度到推送循环；调用方不等待发送结果。"""
+
+        asyncio.run_coroutine_threadsafe(hub.publish(event_type, data, as_of=as_of), loop)
+
+    set_event_publisher(_publish)
     logger.info("trading api ready: version=%s", __version__)
     try:
         yield
     finally:
+        set_event_publisher(None)
         stop_scheduler.set()
         scheduler.join(timeout=5.0)
         await hub.stop()

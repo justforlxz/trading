@@ -8,21 +8,75 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+import logging
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.orm import Session
 
 from app.activity.model import ActivityEventRow
 from app.core import Clock, SystemClock, ValidationError
 from app.db import session_scope
 
-__all__ = ["ActivityRecord", "list_activity", "record_activity"]
+__all__ = [
+    "ActivityRecord",
+    "EventPublisher",
+    "list_activity",
+    "queue_event",
+    "record_activity",
+    "set_event_publisher",
+]
+
+logger = logging.getLogger(__name__)
 
 MAX_LIMIT = 200
+
+#: 装配根注入的推送入口：`(event_type, data, as_of) -> None`。
+EventPublisher = Callable[[str, dict[str, Any], datetime | None], None]
+
+_PENDING_EVENTS = "activity_pending_events"
+_publisher: EventPublisher | None = None
+
+
+def set_event_publisher(publisher: EventPublisher | None) -> None:
+    """由装配根注入推送入口；未注入时事件只落库，不推送。"""
+
+    global _publisher
+    _publisher = publisher
+
+
+def queue_event(
+    session: Session,
+    event_type: str,
+    data: dict[str, Any],
+    *,
+    as_of: datetime | None = None,
+) -> None:
+    """把一条待推送事件挂到当前事务：提交后统一推送，回滚则丢弃。"""
+
+    session.info.setdefault(_PENDING_EVENTS, []).append((event_type, data, as_of))
+
+
+@event.listens_for(Session, "after_commit")
+def _publish_committed(session: Session) -> None:
+    events = session.info.pop(_PENDING_EVENTS, [])
+    publisher = _publisher
+    if publisher is None:
+        return
+    for event_type, data, as_of in events:
+        try:
+            publisher(event_type, data, as_of)
+        except Exception:  # 推送失败不能回滚已经提交的业务事实
+            logger.exception("推送事件失败: %s", event_type)
+
+
+@event.listens_for(Session, "after_rollback")
+def _discard_rolled_back(session: Session) -> None:
+    session.info.pop(_PENDING_EVENTS, None)
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,11 +124,22 @@ def record_activity(
         payload_json=json.dumps(body, ensure_ascii=False, sort_keys=True, default=str),
         created_at=moment,
     )
+    event_data = {
+        "id": row.id,
+        "event_type": row.event_type,
+        "object_type": row.object_type,
+        "object_id": row.object_id,
+        "summary": row.summary,
+        "payload": body,
+        "created_at": moment.isoformat(),
+    }
     if session is None:
         with session_scope() as own_session:
             own_session.add(row)
+            queue_event(own_session, "activity.created", event_data, as_of=moment)
     else:
         session.add(row)
+        queue_event(session, "activity.created", event_data, as_of=moment)
     return _record(row)
 
 

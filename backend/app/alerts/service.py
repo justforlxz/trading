@@ -18,7 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from app.activity import record_activity
+from app.activity import queue_event, record_activity
 from app.alerts.model import AlertEventRow
 from app.alerts.rules import (
     ALERT_SEVERITIES,
@@ -166,6 +166,7 @@ def update_alert_status(
             raise Conflict(f"提醒 {alert_id} 当前状态是 {row.status}, 不能再次处置")
         row.status = status
         row.updated_at = moment
+        queue_event(session, "alert.updated", _row_event(row), as_of=moment)
         record_activity(
             session=session,
             event_type=f"alert.{status}",
@@ -200,7 +201,39 @@ def scan_alerts(*, clock: Clock | None = None) -> ScanResult:
             )
             inserted_id = session.scalar(statement)
             if inserted_id is None:
+                # 唯一约束命中：条件恢复后同一天再次成立时，把 expired 行重新
+                # 激活为 pending，而不是永远压在 expired 里。
+                existing = session.scalar(
+                    select(AlertEventRow)
+                    .where(AlertEventRow.dedup_key == candidate.dedup_key)
+                    .with_for_update()
+                )
+                if existing is None or existing.status != "expired":
+                    continue
+                existing.status = "pending"
+                existing.triggered_at = candidate.triggered_at
+                existing.updated_at = moment
+                existing.expires_at = candidate.expires_at
+                queue_event(session, "alert.updated", _row_event(existing), as_of=moment)
+                record_activity(
+                    session=session,
+                    event_type="alert.reopened",
+                    object_type="alert",
+                    object_id=existing.id,
+                    summary=f"提醒「{existing.title}」条件再次成立",
+                    payload={
+                        "alert_id": existing.id,
+                        "rule_id": existing.rule_id,
+                        "instrument_id": existing.instrument_id,
+                    },
+                    clock=clock,
+                )
+                created += 1
+                new_groups.add((existing.type, existing.rule_id, existing.instrument_id))
                 continue
+            queue_event(
+                session, "alert.created", _candidate_event(candidate, inserted_id), as_of=moment
+            )
             record_activity(
                 session=session,
                 event_type="alert.created",
@@ -307,6 +340,7 @@ def _expire_stale(
         row.status = "expired"
         row.expires_at = moment
         row.updated_at = moment
+        queue_event(session, "alert.updated", _row_event(row), as_of=moment)
         record_activity(
             session=session,
             event_type="alert.expired",
@@ -323,6 +357,48 @@ def _expire_stale(
         )
         expired += 1
     return expired
+
+
+def _candidate_event(candidate: AlertCandidate, alert_id: str) -> dict[str, object]:
+    """新提醒的推送载荷；字段与 `GET /api/alerts` 的条目一致。"""
+
+    return {
+        "id": alert_id,
+        "type": candidate.type,
+        "severity": candidate.severity,
+        "instrument_id": candidate.instrument_id,
+        "rule_id": candidate.rule_id,
+        "rule_version": candidate.rule_version,
+        "title": candidate.title,
+        "detail": candidate.detail,
+        "payload": dict(candidate.payload),
+        "status": "pending",
+        "triggered_at": candidate.triggered_at.isoformat(),
+        "expires_at": candidate.expires_at.isoformat() if candidate.expires_at else None,
+    }
+
+
+def _row_event(row: AlertEventRow) -> dict[str, object]:
+    """已落库提醒的推送载荷；字段与 `GET /api/alerts` 的条目一致。"""
+
+    try:
+        payload = json.loads(row.payload_json)
+    except (TypeError, ValueError):
+        payload = {}
+    return {
+        "id": row.id,
+        "type": row.type,
+        "severity": row.severity,
+        "instrument_id": row.instrument_id,
+        "rule_id": row.rule_id,
+        "rule_version": row.rule_version,
+        "title": row.title,
+        "detail": row.detail,
+        "payload": payload if isinstance(payload, dict) else {},
+        "status": row.status,
+        "triggered_at": row.triggered_at.isoformat(),
+        "expires_at": row.expires_at.isoformat() if row.expires_at else None,
+    }
 
 
 def _row_values(candidate: AlertCandidate) -> dict[str, object]:

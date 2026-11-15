@@ -144,6 +144,19 @@ function same(left: Normalized, right: Normalized): boolean {
   );
 }
 
+/** 多处订阅合并成一条连接上的订阅集合。 */
+function mergedSubscription(subscriptions: Map<symbol, Normalized>): Normalized {
+  const quotes = new Set<string>();
+  let account = false;
+  let positions = false;
+  for (const item of subscriptions.values()) {
+    for (const instId of item.quotes) quotes.add(instId);
+    if (item.account) account = true;
+    if (item.positions) positions = true;
+  }
+  return { quotes: [...quotes].sort(), account, positions };
+}
+
 /** 后端只能追加订阅，`outer` 包含 `inner` 时不必重连。 */
 function contains(outer: Normalized, inner: Normalized): boolean {
   if (inner.account && !outer.account) return false;
@@ -292,7 +305,7 @@ export class StreamClient {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private desired: Normalized = EMPTY;
   private applied: Normalized = EMPTY;
-  private owner: symbol | null = null;
+  private readonly subscriptions = new Map<symbol, Normalized>();
   private state: StreamState = { status: "idle", datasets: {}, lastEventAt: null };
   private readonly stateListeners = new Set<() => void>();
   private readonly eventListeners = new Set<(event: StreamEvent) => void>();
@@ -330,7 +343,7 @@ export class StreamClient {
     this.reconnectAttempt = 0;
     this.desired = EMPTY;
     this.applied = EMPTY;
-    this.owner = null;
+    this.subscriptions.clear();
     if (this.timer !== null) {
       clearTimeout(this.timer);
       this.timer = null;
@@ -339,16 +352,15 @@ export class StreamClient {
     this.setState({ status: "disconnected", datasets: {} });
   }
 
-  /** 一个页面只保留一个订阅者；`owner` 用来避免旧页面卸载时清掉新页面的订阅。 */
+  /** 同一页面可以有多处订阅（例如首页同时看行情与持仓），实际订阅取并集。 */
   setSubscription(owner: symbol, subscription: StreamSubscription): void {
-    this.owner = owner;
-    this.applySubscription(normalize(subscription));
+    this.subscriptions.set(owner, normalize(subscription));
+    this.applySubscription(mergedSubscription(this.subscriptions));
   }
 
   clearSubscription(owner: symbol): void {
-    if (this.owner !== owner) return;
-    this.owner = null;
-    this.applySubscription(EMPTY);
+    if (!this.subscriptions.delete(owner)) return;
+    this.applySubscription(mergedSubscription(this.subscriptions));
   }
 
   private applySubscription(next: Normalized): void {

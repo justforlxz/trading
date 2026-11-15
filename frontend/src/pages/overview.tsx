@@ -1,27 +1,78 @@
-import { PageHeading, PendingPanel } from "../components/layout/page-parts";
+import { useEffect, useMemo, useState } from "react";
 
-/**
- * 概览页骨架。后端聚合接口已由 `GET /api/dashboard/summary` 提供，
- * 页面本身由 S4-1 重写；这里只说明计划交付内容，不展示任何演示数值。
- */
+import {
+  fetchDashboardSummary,
+  withStreamUpdates,
+  type DashboardPushed,
+  type DashboardSummary,
+} from "../lib/dashboard";
+import { streamLiveness } from "../lib/stream";
+import { usePositionStream, useQuoteStream, useStreamState } from "../lib/stream-hooks";
+import { OverviewView } from "./overview/view";
+
+function messageOf(reason: unknown): string {
+  return reason instanceof Error ? reason.message : "读取首页汇总失败";
+}
+
+/** 首页 v6：一次取汇总，再按页面订阅把推送值合并到价格、持仓与账户上。 */
 export default function OverviewPage() {
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [reloadToken, setReloadToken] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    fetchDashboardSummary()
+      .then((payload) => {
+        if (!active) return;
+        setSummary(payload);
+        setError(null);
+      })
+      .catch((reason: unknown) => {
+        if (!active) return;
+        setError(messageOf(reason));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [reloadToken]);
+
+  const instIds = useMemo(
+    () => (summary?.watchlist.data?.items ?? []).map((item) => item.inst_id),
+    [summary],
+  );
+  const streamState = useStreamState();
+  const quoteStream = useQuoteStream(instIds);
+  const positionStream = usePositionStream();
+
+  const merged = useMemo(
+    () =>
+      summary === null
+        ? null
+        : withStreamUpdates(summary, {
+            quotes: quoteStream.quotes,
+            positions: positionStream.positions,
+            account: positionStream.account,
+          }),
+    [summary, quoteStream.quotes, positionStream.positions, positionStream.account],
+  );
+
+  const pushed: DashboardPushed = merged?.pushed ?? { account: null, positions: {}, watchlist: {} };
+
   return (
-    <>
-      <PageHeading
-        eyebrow="Overview"
-        title="概览"
-        description="一屏查看市场、账户、风险、持仓、自选、提醒、策略与最近活动。"
-      />
-      <PendingPanel
-        stage="S4-1"
-        title="概览页计划交付"
-        items={[
-          "市场概况：按标的类别展示广度、共振与当前交易时段，并标明行情来源。",
-          "账户与风险：权益、保证金使用率、综合风险等级与规则命中数量。",
-          "持仓与自选：最多显示几行摘要，完整明细分别进入持仓页与自选页。",
-          "提醒与活动：只展示未处理提醒与最近活动，由服务端事件表提供。",
-        ]}
-      />
-    </>
+    <OverviewView
+      summary={merged?.summary ?? null}
+      error={error}
+      loading={loading}
+      priceLiveness={streamLiveness(streamState, "public_ws")}
+      accountLiveness={streamLiveness(streamState, "private_ws")}
+      pushed={pushed}
+      onRefresh={() => setReloadToken((token) => token + 1)}
+    />
   );
 }

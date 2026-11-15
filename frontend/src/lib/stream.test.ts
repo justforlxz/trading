@@ -119,6 +119,58 @@ describe("StreamClient 连接与订阅", () => {
     ]);
   });
 
+  it("多处订阅合并成一条连接上的订阅集合", () => {
+    const client = createClient();
+    const quotesOwner = Symbol("quotes");
+    const positionsOwner = Symbol("positions");
+    client.start();
+    FakeSocket.instances[0].open();
+
+    client.setSubscription(quotesOwner, { quotes: ["AAPL-USDT"] });
+    client.setSubscription(positionsOwner, { account: true, positions: true });
+
+    expect(FakeSocket.instances).toHaveLength(1);
+    expect(topicsOf(FakeSocket.instances[0], 1)).toEqual([
+      { type: "quote", inst_ids: ["AAPL-USDT"] },
+      { type: "account" },
+      { type: "positions" },
+    ]);
+  });
+
+  it("一处订阅卸载后保留其余订阅", () => {
+    const client = createClient();
+    const quotesOwner = Symbol("quotes");
+    const positionsOwner = Symbol("positions");
+    client.start();
+    FakeSocket.instances[0].open();
+
+    client.setSubscription(quotesOwner, { quotes: ["AAPL-USDT"] });
+    client.setSubscription(positionsOwner, { account: true, positions: true });
+    client.clearSubscription(positionsOwner);
+
+    expect(FakeSocket.instances).toHaveLength(2);
+    FakeSocket.instances[1].open();
+    expect(topicsOf(FakeSocket.instances[1])).toEqual([
+      { type: "quote", inst_ids: ["AAPL-USDT"] },
+    ]);
+  });
+
+  it("全部订阅卸载后不残留上一个页面的订阅", () => {
+    const client = createClient();
+    const owner = Symbol("page");
+    client.start();
+    FakeSocket.instances[0].open();
+
+    client.setSubscription(owner, { quotes: ["AAPL-USDT"] });
+    client.clearSubscription(owner);
+    client.setSubscription(Symbol("next"), { quotes: ["BTC-USDT"] });
+
+    FakeSocket.instances[FakeSocket.instances.length - 1].open();
+    expect(topicsOf(FakeSocket.instances[FakeSocket.instances.length - 1])).toEqual([
+      { type: "quote", inst_ids: ["BTC-USDT"] },
+    ]);
+  });
+
   it("断线后按退避重连，恢复后重新订阅当前集合", async () => {
     const client = createClient();
     const owner = Symbol("page");

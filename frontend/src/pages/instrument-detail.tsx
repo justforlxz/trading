@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { CandlestickChart } from "../components/chart/candlestick-chart";
@@ -7,13 +7,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { StreamNotice, StreamTag } from "../components/ui/stream-status";
 import {
   fetchInstrumentAnalysis,
+  fetchInstrumentStrategies,
+  fetchSettings,
+  fetchStrategyVersions,
   fetchWatchlist,
+  okxCandleSource,
+  type BacktestBatchResponse,
+  type BacktestDataSource,
   type InstrumentAnalysisBar,
   type InstrumentAnalysisCorrelation,
   type InstrumentAnalysisCoverage,
   type InstrumentAnalysisIndicators,
   type InstrumentAnalysisLinkedBacktest,
   type InstrumentAnalysisResponse,
+  type InstrumentStrategy,
+  type SettingsResponse,
+  type StrategyVersionDetail,
   type WatchlistResponse,
 } from "../lib/api";
 import {
@@ -25,8 +34,14 @@ import {
   signedValue,
 } from "../lib/display";
 import { resolveAvailableBar } from "../lib/instrument";
+import {
+  launchVersionsForInstrument,
+  linkedStrategyState,
+  preferredLaunchVersionId,
+} from "../lib/strategies";
 import { useQuoteStream } from "../lib/stream-hooks";
 import { cn } from "../lib/utils";
+import { BacktestLaunchForm } from "./strategies/backtest-launch-form";
 
 const BAR_OPTIONS: Array<{ bar: InstrumentAnalysisBar; label: string }> = [
   { bar: "1d", label: "1D" },
@@ -370,6 +385,15 @@ export default function InstrumentDetailPage() {
   const [watchlist, setWatchlist] = useState<WatchlistResponse | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [linkedStrategies, setLinkedStrategies] = useState<InstrumentStrategy[] | null>(null);
+  const [linkedStrategiesError, setLinkedStrategiesError] = useState<string | null>(null);
+  const [launchOpen, setLaunchOpen] = useState(false);
+  const [launchVersions, setLaunchVersions] = useState<StrategyVersionDetail[] | null>(null);
+  const [launchLoading, setLaunchLoading] = useState(false);
+  const [launchError, setLaunchError] = useState<string | null>(null);
+  const [launchSource, setLaunchSource] = useState<BacktestDataSource>("okx_spot");
+  const [launchResult, setLaunchResult] = useState<BacktestBatchResponse | null>(null);
+  const [settings, setSettings] = useState<SettingsResponse | null>(null);
   const { quotes, liveness } = useQuoteStream(instId ? [instId] : []);
 
   useEffect(() => {
@@ -379,31 +403,116 @@ export default function InstrumentDetailPage() {
   }, []);
 
   useEffect(() => {
+    fetchSettings()
+      .then(setSettings)
+      .catch(() => setSettings(null));
+  }, []);
+
+  const linkedRequestRef = useRef(0);
+  const launchSourceInstrumentRef = useRef<string | null>(null);
+
+  const loadLinkedStrategies = useCallback(() => {
     if (!instId) return;
-    let active = true;
-    setLoading(true);
-    setError(null);
-    setAnalysis(null);
-    fetchInstrumentAnalysis(instId, bar)
+    const requestId = ++linkedRequestRef.current;
+    setLinkedStrategiesError(null);
+    fetchInstrumentStrategies(instId)
       .then((value) => {
-        if (!active) return;
-        const nextBar = resolveAvailableBar(value.coverage, bar);
-        if (nextBar !== bar) {
-          setBar(nextBar);
-          return;
-        }
-        setAnalysis(value);
+        if (requestId !== linkedRequestRef.current) return;
+        setLinkedStrategies(value.items);
       })
       .catch((reason: unknown) => {
-        if (active) setError(loadErrorMessage(reason));
+        if (requestId !== linkedRequestRef.current) return;
+        setLinkedStrategies(null);
+        setLinkedStrategiesError(loadErrorMessage(reason));
+      });
+  }, [instId]);
+
+  useEffect(() => {
+    setLinkedStrategies(null);
+    setLaunchOpen(false);
+    setLaunchVersions(null);
+    setLaunchError(null);
+    setLaunchResult(null);
+    loadLinkedStrategies();
+  }, [loadLinkedStrategies]);
+
+  const instrumentType = analysis?.instrument.inst_type ?? null;
+
+  useEffect(() => {
+    if (!instId || !instrumentType) return;
+    if (launchSourceInstrumentRef.current === instId) return;
+    launchSourceInstrumentRef.current = instId;
+    setLaunchSource(okxCandleSource(instrumentType));
+  }, [instId, instrumentType]);
+
+  useEffect(() => {
+    if (
+      !launchOpen ||
+      launchVersions !== null ||
+      linkedStrategies === null ||
+      linkedStrategies.length === 0
+    ) {
+      return;
+    }
+    let active = true;
+    setLaunchLoading(true);
+    setLaunchError(null);
+    Promise.all(
+      linkedStrategies.map((strategy) => fetchStrategyVersions(strategy.strategy_id)),
+    )
+      .then((listings) => {
+        if (!active) return;
+        setLaunchVersions(
+          launchVersionsForInstrument(
+            listings.flatMap((listing) => listing.items),
+            instId,
+          ),
+        );
+      })
+      .catch((reason: unknown) => {
+        if (active) setLaunchError(loadErrorMessage(reason));
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) setLaunchLoading(false);
       });
     return () => {
       active = false;
     };
-  }, [instId, bar]);
+  }, [launchOpen, launchVersions, linkedStrategies, instId]);
+
+  const loadAnalysis = useCallback(
+    (showLoading: boolean) => {
+      if (!instId) return () => {};
+      let active = true;
+      if (showLoading) {
+        setLoading(true);
+        setAnalysis(null);
+      }
+      setError(null);
+      fetchInstrumentAnalysis(instId, bar)
+        .then((value) => {
+          if (!active) return;
+          const nextBar = resolveAvailableBar(value.coverage, bar);
+          if (nextBar !== bar) {
+            setBar(nextBar);
+            return;
+          }
+          setAnalysis(value);
+        })
+        .catch((reason: unknown) => {
+          if (active) setError(loadErrorMessage(reason));
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+      return () => {
+        active = false;
+      };
+    },
+    [instId, bar],
+  );
+
+  useEffect(() => loadAnalysis(true), [loadAnalysis]);
 
   useEffect(() => {
     if (!loading) {
@@ -454,6 +563,20 @@ export default function InstrumentDetailPage() {
   const levels = analysis?.levels;
   const correlations = analysis?.correlations ?? [];
   const linked = analysis?.linked_strategies ?? [];
+  const recentLinkedVersionId = analysis?.linked_strategies?.[0]?.strategy_version_id ?? null;
+  const linkedState = linkedStrategyState(linkedStrategies, linked);
+  const preferredVersionId =
+    launchVersions === null
+      ? ""
+      : preferredLaunchVersionId(launchVersions, recentLinkedVersionId);
+  const canLaunch = linkedStrategies !== null && linkedStrategies.length > 0;
+
+  const handleLaunched = (batch: BacktestBatchResponse) => {
+    setLaunchOpen(false);
+    setLaunchResult(batch);
+    loadAnalysis(false);
+    loadLinkedStrategies();
+  };
 
   const pickInstrument = (nextId: string) => {
     setPickerOpen(false);
@@ -851,14 +974,93 @@ export default function InstrumentDetailPage() {
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle>关联策略</CardTitle>
-              <CardDescription>
-                只显示过去 30 天内该标的的回测；点一行进入回测详情。
-              </CardDescription>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <CardTitle>关联策略</CardTitle>
+                  <CardDescription>
+                    只显示过去 30 天内该标的的回测；点一行进入回测详情，或直接对当前标的发起回测。
+                  </CardDescription>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={launchOpen ? "outline" : "default"}
+                  disabled={!canLaunch}
+                  title={canLaunch ? "对当前标的发起回测" : "该标的还没有关联策略"}
+                  onClick={() => setLaunchOpen((open) => !open)}
+                >
+                  {launchOpen ? "收起" : "发起回测"}
+                </Button>
+              </div>
             </CardHeader>
-            <CardContent>
-              {linked.length === 0 ? (
-                <p className="text-sm text-muted-foreground">近 30 天没有该标的的回测记录。</p>
+            <CardContent className="grid gap-4">
+              {launchResult ? (
+                <p
+                  role="status"
+                  className="rounded-md border px-3 py-2 text-sm text-muted-foreground"
+                >
+                  已创建 {launchResult.run_ids.length} 条回测记录。
+                  <Link
+                    to={`/backtests?run=${encodeURIComponent(launchResult.run_id)}`}
+                    className="ml-2 text-primary underline-offset-4 hover:underline"
+                  >
+                    查看回测详情 →
+                  </Link>
+                </p>
+              ) : null}
+
+              {launchOpen ? (
+                <div className="rounded-lg border bg-accent/20 p-4">
+                  {launchLoading ? (
+                    <p className="text-sm text-muted-foreground">正在加载策略版本…</p>
+                  ) : launchError ? (
+                    <p role="alert" className="text-sm text-destructive">
+                      {launchError}
+                    </p>
+                  ) : launchVersions === null || launchVersions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">没有包含当前标的的策略版本。</p>
+                  ) : (
+                    <>
+                      <p className="mb-3 text-xs text-muted-foreground">
+                        回测标的固定为当前详情页的{" "}
+                        <span className="font-mono">{instId}</span>
+                        ；策略版本与区间来自下面的选择。
+                      </p>
+                      <BacktestLaunchForm
+                        key={settings ? "settings-ready" : "settings-pending"}
+                        versions={launchVersions}
+                        initialVersionId={preferredVersionId}
+                        settings={settings}
+                        runSource={launchSource}
+                        onRunSourceChange={setLaunchSource}
+                        onLaunched={handleLaunched}
+                        lockedInstrumentId={instId}
+                        dataSourceLabel="数据源"
+                        submitLabel="加入并运行回测"
+                      />
+                    </>
+                  )}
+                </div>
+              ) : null}
+
+              {linkedStrategiesError ? (
+                <p role="alert" className="text-sm text-destructive">
+                  {linkedStrategiesError}
+                </p>
+              ) : null}
+
+              {linkedState === "no_strategies" ? (
+                <p className="text-sm text-muted-foreground">
+                  该标的还没有关联策略。先到策略页把标的加入策略版本，再发起回测。
+                </p>
+              ) : linkedState === "no_recent_backtests" ? (
+                <p className="text-sm text-muted-foreground">
+                  近 30 天没有该标的的回测记录。可以点击「发起回测」创建第一条。
+                </p>
+              ) : linkedState === "loading" ? (
+                linkedStrategiesError ? null : (
+                  <p className="text-sm text-muted-foreground">正在加载关联策略…</p>
+                )
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[860px] text-left">

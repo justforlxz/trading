@@ -8,6 +8,8 @@
 import type {
   BacktestDataSource,
   BacktestRunSummary,
+  InstrumentAnalysisLinkedBacktest,
+  InstrumentStrategy,
   StrategySummary,
   StrategyVersionDetail,
 } from "./api";
@@ -159,4 +161,46 @@ export function parameterRows(
       key,
       value: typeof value === "string" ? value : JSON.stringify(value),
     }));
+}
+
+/** 详情页只保留包含当前标的的策略版本；顺序保持接口返回的顺序（新到旧）。 */
+export function launchVersionsForInstrument(
+  versions: readonly StrategyVersionDetail[],
+  instId: string,
+): StrategyVersionDetail[] {
+  return versions.filter((version) => version.instrument_ids.includes(instId));
+}
+
+/** 详情页默认选中最近一次回测使用的版本；找不到时回落到第一个可用版本。 */
+export function preferredLaunchVersionId(
+  versions: readonly StrategyVersionDetail[],
+  recentVersionId: string | null | undefined,
+): string {
+  if (recentVersionId && versions.some((version) => version.version_id === recentVersionId)) {
+    return recentVersionId;
+  }
+  return versions[0]?.version_id ?? "";
+}
+
+export type LinkedStrategyState =
+  | "loading"
+  | "no_strategies"
+  | "no_recent_backtests"
+  | "ready";
+
+/**
+ * 详情页关联策略区的空态。
+ *
+ * 已有回测时一律显示回测行，即使标的已经从全部策略版本里移除；
+ * 关联策略列表还没加载时写「加载中」；加载后没有策略写「没有关联策略」；
+ * 有策略但近 30 天没有回测时写「没有回测记录」，不显示假数值。
+ */
+export function linkedStrategyState(
+  linkedStrategies: readonly InstrumentStrategy[] | null,
+  linkedBacktests: readonly InstrumentAnalysisLinkedBacktest[],
+): LinkedStrategyState {
+  if (linkedBacktests.length > 0) return "ready";
+  if (linkedStrategies !== null && linkedStrategies.length === 0) return "no_strategies";
+  if (linkedStrategies === null) return "loading";
+  return "no_recent_backtests";
 }

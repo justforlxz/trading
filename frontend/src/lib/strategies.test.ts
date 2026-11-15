@@ -1,15 +1,23 @@
 import { describe, expect, it } from "vitest";
 
-import type { BacktestRunSummary } from "./api";
+import type {
+  BacktestRunSummary,
+  InstrumentAnalysisLinkedBacktest,
+  InstrumentStrategy,
+  StrategyVersionDetail,
+} from "./api";
 import {
   backtestsForVersions,
   categoryLabel,
   dataSourceLabel,
   directionLabel,
   joinInstrumentIds,
+  launchVersionsForInstrument,
+  linkedStrategyState,
   parameterRows,
   parseJsonObject,
   parseOptionalJsonObject,
+  preferredLaunchVersionId,
   prettyJson,
   splitInstrumentIds,
   statusLabel,
@@ -82,5 +90,68 @@ describe("策略回测记录过滤", () => {
       "bt_1",
       "bt_2",
     ]);
+  });
+});
+
+function version(
+  versionId: string,
+  versionNumber: number,
+  instrumentIds: string[],
+): StrategyVersionDetail {
+  return {
+    version_id: versionId,
+    strategy_id: "st_1",
+    version: versionNumber,
+    timeframe: "1d",
+    direction: "long_only",
+    rule_json: {},
+    parameters: {},
+    position_sizing: null,
+    cost_model: null,
+    change_note: null,
+    instrument_ids: instrumentIds,
+    created_at: "2026-11-10T00:00:00Z",
+  };
+}
+
+describe("详情页联动回测", () => {
+  it("只保留包含当前标的的策略版本，保持接口顺序", () => {
+    const versions = [
+      version("sv_3", 3, ["AAPL-USDT-SWAP"]),
+      version("sv_2", 2, ["BTC-USDT-SWAP"]),
+      version("sv_1", 1, ["AAPL-USDT-SWAP", "BTC-USDT-SWAP"]),
+    ];
+
+    expect(
+      launchVersionsForInstrument(versions, "AAPL-USDT-SWAP").map((item) => item.version_id),
+    ).toEqual(["sv_3", "sv_1"]);
+  });
+
+  it("默认选中最近回测使用的版本，找不到时回落到第一个", () => {
+    const versions = [
+      version("sv_2", 2, ["AAPL-USDT-SWAP"]),
+      version("sv_1", 1, ["AAPL-USDT-SWAP"]),
+    ];
+
+    expect(preferredLaunchVersionId(versions, "sv_1")).toBe("sv_1");
+    expect(preferredLaunchVersionId(versions, "sv_9")).toBe("sv_2");
+    expect(preferredLaunchVersionId([], "sv_1")).toBe("");
+  });
+
+  it("空态区分加载中、没有关联策略、没有近 30 天回测", () => {
+    const strategy = { strategy_id: "st_1" } as InstrumentStrategy;
+    const linkedBacktest = { run_id: "bt_1" } as InstrumentAnalysisLinkedBacktest;
+
+    expect(linkedStrategyState(null, [])).toBe("loading");
+    expect(linkedStrategyState([], [])).toBe("no_strategies");
+    expect(linkedStrategyState([strategy], [])).toBe("no_recent_backtests");
+    expect(linkedStrategyState([strategy], [linkedBacktest])).toBe("ready");
+    expect(linkedStrategyState(null, [linkedBacktest])).toBe("ready");
+  });
+
+  it("标的已从全部策略版本移除但仍有回测时，仍显示回测行", () => {
+    const linkedBacktest = { run_id: "bt_1" } as InstrumentAnalysisLinkedBacktest;
+
+    expect(linkedStrategyState([], [linkedBacktest])).toBe("ready");
   });
 });

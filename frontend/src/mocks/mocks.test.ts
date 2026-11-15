@@ -28,6 +28,7 @@ const DOMAIN_PROBES = [
   ["correlation", "/api/correlation/matrix?bar=1d&window=60&product_keys=AAPL"],
   ["opportunity", "/api/opportunities"],
   ["approval", "/api/approvals"],
+  ["research", "/api/research-notes"],
 ] as const;
 
 describe("MSW 假后端", () => {

@@ -3,19 +3,26 @@
 from __future__ import annotations
 
 import re
+import time
 from datetime import UTC, datetime
 from decimal import Decimal
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
+from app.config import Settings
 from app.core import Bar, Timeframe
 from app.db import session_scope
+from app.exchange import create_market_data
+from app.jobs import OnDemandSyncScheduler
+from app.jobs import sync as okx_jobs
 from app.journal import ExecutionSnapshot, RecordedSignal
-from app.market import upsert_candles
+from app.market import latest_sync_job, upsert_candles
 from tests.api.conftest import latest_opens, seed_daily, seed_instruments
 from tests.factories.instruments import make_ref
 from tests.factories.strategies import make_instance
+from tests.fakes.on_demand import RecordingScheduler, RejectingScheduler
 
 DECIMAL = re.compile(r"^-?\d{1,20}(\.\d{1,12})?$")
 UTC_ZULU = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
@@ -395,3 +402,67 @@ def test_watchlist_row_keeps_missing_data_explicit(client: TestClient) -> None:
     assert moved.status_code == 200, moved.text
     assert moved.json()["group"] == "科技"
     assert moved.json()["data_status"] == "missing"
+
+
+@pytest.fixture()
+def fake_okx(monkeypatch: pytest.MonkeyPatch, fake_okx_settings: Settings):
+    """把同步入口的行情适配器指向线程内假 OKX（与系统同步用例同一做法）。"""
+
+    def _market_data(*, settings: Settings | None = None, transport: object = None):
+        return create_market_data(settings=fake_okx_settings, transport=transport)
+
+    monkeypatch.setattr(okx_jobs, "create_market_data", _market_data)
+    yield
+
+
+def test_add_without_quotes_requests_daily_sync(
+    quote_less_instrument: TestClient, sync_scheduler: RecordingScheduler
+) -> None:
+    """加入自选后请求一次日线同步：参数为标的、1d、400 天。"""
+
+    response = quote_less_instrument.post("/api/watchlist", json={"inst_id": "XETH-USDT"})
+
+    assert response.status_code == 201, response.text
+    assert sync_scheduler.calls == [("XETH-USDT", "1d", 400)]
+
+
+def test_add_succeeds_when_scheduler_rejects(quote_less_instrument: TestClient) -> None:
+    """调度器提交失败不回滚自选条目，也不把加入操作变成错误。"""
+
+    quote_less_instrument.app.state.on_demand_sync = RejectingScheduler()
+
+    response = quote_less_instrument.post("/api/watchlist", json={"inst_id": "XETH-USDT"})
+
+    assert response.status_code == 201, response.text
+    assert (
+        quote_less_instrument.get("/api/watchlist").json()["items"][0]["instrument"]["inst_id"]
+        == "XETH-USDT"
+    )
+
+
+def test_add_upstream_failure_keeps_item_and_records_failed_job(
+    client: TestClient,
+    fake_okx: None,
+    fake_okx_server,
+) -> None:
+    """真实同步路径下上游 500：加入仍 201，失败原因留在 data_sync_jobs。"""
+
+    synced = client.post("/api/system/sync", json={"dataset": "instruments"})
+    assert synced.status_code == 202, synced.text
+
+    fake_okx_server.scenarios.activate("upstream_error")
+    scheduler = OnDemandSyncScheduler(max_concurrency=1)
+    client.app.state.on_demand_sync = scheduler
+
+    response = client.post("/api/watchlist", json={"inst_id": "XAAPL-USDT"})
+
+    assert response.status_code == 201, response.text
+    deadline = time.monotonic() + 10
+    job = latest_sync_job(provider="okx", dataset="candles")
+    while (job is None or job.status == "running") and time.monotonic() < deadline:
+        time.sleep(0.05)
+        job = latest_sync_job(provider="okx", dataset="candles")
+    assert job is not None
+    assert job.status == "failed"
+    assert job.error
+    assert client.get("/api/watchlist").json()["items"][0]["instrument"]["inst_id"] == "XAAPL-USDT"

@@ -8,8 +8,9 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
+from app.api.schemas.analysis import AnalysisBar
 from app.api.schemas.common import (
     AssetType,
     Bar,
@@ -30,6 +31,8 @@ __all__ = [
     "InstrumentDetailResponse",
     "InstrumentListResponse",
     "InstrumentSearchResponse",
+    "InstrumentSyncRequest",
+    "InstrumentSyncResponse",
     "RelatedInstrument",
     "RelatedInstrumentsResponse",
     "WatchlistAddRequest",
@@ -196,6 +199,37 @@ class InstrumentListResponse(BaseModel):
                             "quote_currency": "USDT",
                         }
                     ]
+                }
+            ]
+        }
+    )
+
+
+class InstrumentSyncRequest(BaseModel):
+    """单标的按需同步：周期限定详情页支持的三种，天数留给调用方覆盖默认窗口。"""
+
+    bar: AnalysisBar = "1d"
+    days: int | None = Field(default=None, ge=1, le=3650)
+
+
+class InstrumentSyncResponse(BaseModel):
+    """同步只被接受，不在请求内等待；真正的结果写在 `data_sync_jobs`。"""
+
+    inst_id: str
+    bar: AnalysisBar
+    days: int
+    status: Literal["started", "already_running", "fresh", "backoff"]
+    requested_at: UtcDatetime
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "inst_id": "XAAPL-USDT",
+                    "bar": "1d",
+                    "days": 400,
+                    "status": "started",
+                    "requested_at": "2026-11-16T08:00:00Z",
                 }
             ]
         }

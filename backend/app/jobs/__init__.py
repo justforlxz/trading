@@ -7,12 +7,20 @@
   不拖垮整批；
 - `scope`：把标的集合模式（单标的 / 手选 / Watchlist / 分组 / 全部可交易）解析成具体
   标的序列；
-- `sweep`：标的 × 参数组合 × 三段区间展开成任务，交给队列跑完并装回扫描行。
+- `sweep`：标的 × 参数组合 × 三段区间展开成任务，交给队列跑完并装回扫描行；
+- `on_demand`：用户进入某个标的时才同步对应周期，按「标的 + 周期」去重并限制并发。
 """
 
 from app.jobs.equity import (
     next_beijing_midnight,
     start_equity_snapshot_scheduler,
+)
+from app.jobs.on_demand import (
+    DEFAULT_DAYS_BY_BAR,
+    WATCHLIST_BAR,
+    WATCHLIST_DAYS,
+    OnDemandSyncScheduler,
+    SyncSubmission,
 )
 from app.jobs.queue import (
     DEFAULT_MAX_CONCURRENCY,
@@ -37,15 +45,20 @@ __all__ = [
     "CANDLES_DATASET",
     "DEFAULT_CANDLE_BAR",
     "DEFAULT_CANDLE_DAYS",
+    "DEFAULT_DAYS_BY_BAR",
     "DEFAULT_MAX_CONCURRENCY",
     "INSTRUMENTS_DATASET",
     "OKX_PROVIDER",
     "SCOPE_MODES",
     "SYNC_DATASETS",
+    "WATCHLIST_BAR",
+    "WATCHLIST_DAYS",
+    "OnDemandSyncScheduler",
     "QueueOutcome",
     "QueueReport",
     "SweepOutcome",
     "SweepPlan",
+    "SyncSubmission",
     "TargetScope",
     "next_beijing_midnight",
     "plan_sweep",

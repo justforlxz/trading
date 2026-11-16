@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.analysis import (
     Analysis,
@@ -37,6 +37,8 @@ from app.api.schemas import (
     InstrumentDetailResponse,
     InstrumentListResponse,
     InstrumentSearchResponse,
+    InstrumentSyncRequest,
+    InstrumentSyncResponse,
     LinkedBacktest,
     MomentumIndicators,
     RelativeStrengthIndicators,
@@ -48,6 +50,7 @@ from app.api.schemas import (
 from app.api.schemas import Candle as CandlePayload
 from app.api.schemas.common import Bar, DataSource, InstType
 from app.instrument import Instrument, get_instrument_pair, list_instruments, list_tradable
+from app.jobs import DEFAULT_DAYS_BY_BAR
 from app.market import data_range, integrity, load_candles
 
 __all__ = ["instruments_router"]
@@ -85,6 +88,38 @@ def list_tradable_instruments(inst_type: InstType = Query(...)) -> InstrumentLis
 
     rows = list_tradable(inst_type)
     return InstrumentListResponse(items=[instrument_ref(row) for row in rows])
+
+
+@instruments_router.post(
+    "/instruments/{inst_id}/sync",
+    response_model=InstrumentSyncResponse,
+    status_code=202,
+)
+def sync_instrument(
+    inst_id: str,
+    request: Request,
+    payload: InstrumentSyncRequest | None = None,
+) -> InstrumentSyncResponse:
+    """接受一次单标的按需 K 线同步，立即返回，不等待上游。
+
+    标的未登记直接 404；周期与天数由请求模型校验。上游失败由后台任务写入
+    `data_sync_jobs`，不会让这个接口变成 500。
+    """
+
+    row = _require_instrument(inst_id)
+    body = payload or InstrumentSyncRequest()
+    days = body.days if body.days is not None else DEFAULT_DAYS_BY_BAR[body.bar]
+    scheduler = getattr(request.app.state, "on_demand_sync", None)
+    if scheduler is None:
+        raise HTTPException(status_code=503, detail="按需同步调度器未启动")
+    submission = scheduler.submit(row.symbol, body.bar, days)
+    return InstrumentSyncResponse(
+        inst_id=row.symbol,
+        bar=body.bar,
+        days=days,
+        status=submission.status,
+        requested_at=datetime.now(UTC),
+    )
 
 
 @instruments_router.get("/instruments/{inst_id}")

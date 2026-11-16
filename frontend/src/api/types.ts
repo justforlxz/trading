@@ -643,6 +643,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/instruments/{inst_id}/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sync Instrument
+         * @description 接受一次单标的按需 K 线同步，立即返回，不等待上游。
+         *
+         *     标的未登记直接 404；周期与天数由请求模型校验。上游失败由后台任务写入
+         *     `data_sync_jobs`，不会让这个接口变成 500。
+         */
+        post: operations["sync_instrument_api_instruments__inst_id__sync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/manual-positions": {
         parameters: {
             query?: never;
@@ -816,7 +839,7 @@ export interface paths {
         };
         /**
          * Get Exchange Positions
-         * @description 最近一次同步的交易所持仓，`as_of` 与该次账户快照相同。
+         * @description 最近一次同步的交易所持仓，`as_of` 与该次账户快照相同；标的未同步时返回 503。
          */
         get: operations["get_exchange_positions_api_positions_exchange_get"];
         put?: never;
@@ -1218,7 +1241,7 @@ export interface paths {
         put?: never;
         /**
          * Add Watchlist Item
-         * @description 把标的加入自选；标的必须已同步，且已有足够的日线可算行情。
+         * @description 把标的加入自选；只要求标的已同步，行情缺失时按 `data_status` 返回。
          */
         post: operations["add_watchlist_item_api_watchlist_post"];
         delete?: never;
@@ -4465,6 +4488,49 @@ export interface components {
         InstrumentStrategyListResponse: {
             /** Items */
             items: components["schemas"]["InstrumentStrategy"][];
+        };
+        /**
+         * InstrumentSyncRequest
+         * @description 单标的按需同步：周期限定详情页支持的三种，天数留给调用方覆盖默认窗口。
+         */
+        InstrumentSyncRequest: {
+            /**
+             * Bar
+             * @default 1d
+             * @enum {string}
+             */
+            bar: "1d" | "4h" | "1h";
+            /** Days */
+            days?: number | null;
+        };
+        /**
+         * InstrumentSyncResponse
+         * @description 同步只被接受，不在请求内等待；真正的结果写在 `data_sync_jobs`。
+         * @example {
+         *       "bar": "1d",
+         *       "days": 400,
+         *       "inst_id": "XAAPL-USDT",
+         *       "requested_at": "2026-11-16T08:00:00Z",
+         *       "status": "started"
+         *     }
+         */
+        InstrumentSyncResponse: {
+            /**
+             * Bar
+             * @enum {string}
+             */
+            bar: "1d" | "4h" | "1h";
+            /** Days */
+            days: number;
+            /** Inst Id */
+            inst_id: string;
+            /** Requested At */
+            requested_at: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "started" | "already_running" | "fresh" | "backoff";
         };
         /** LinkedBacktest */
         LinkedBacktest: {
@@ -7988,6 +8054,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InstrumentStrategyListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sync_instrument_api_instruments__inst_id__sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                inst_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["InstrumentSyncRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstrumentSyncResponse"];
                 };
             };
             /** @description Validation Error */

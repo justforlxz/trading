@@ -42,6 +42,9 @@ export type InstrumentAnalysisLinkedBacktest =
   InstrumentAnalysisResponse["linked_strategies"][number];
 export type InstrumentAnalysisCoverage = InstrumentAnalysisResponse["coverage"][number];
 export type InstrumentAnalysisBar = InstrumentAnalysisResponse["bar"];
+export type InstrumentSyncRequest = components["schemas"]["InstrumentSyncRequest"];
+export type InstrumentSyncResponse = components["schemas"]["InstrumentSyncResponse"];
+export type InstrumentSyncStatus = InstrumentSyncResponse["status"];
 export type CandleSeriesResponse = components["schemas"]["CandleSeriesResponse"];
 export type CandleBar = CandleSeriesResponse["bar"];
 export type IndicatorSeries = components["schemas"]["IndicatorSeries"];
@@ -226,6 +229,20 @@ export function fetchInstrumentAnalysis(
   const query = new URLSearchParams({ bar });
   return request<InstrumentAnalysisResponse>(
     `/instruments/${encodeURIComponent(instId)}/analysis?${query.toString()}`,
+  );
+}
+
+/** 请求后台同步当前标的与周期；接口只接受任务，不等待同步完成。 */
+export function syncInstrument(
+  instId: string,
+  bar: InstrumentAnalysisBar,
+  days?: number,
+): Promise<InstrumentSyncResponse> {
+  const body: InstrumentSyncRequest = days === undefined ? { bar } : { bar, days };
+  return send<InstrumentSyncResponse>(
+    `/instruments/${encodeURIComponent(instId)}/sync`,
+    "POST",
+    body,
   );
 }
 

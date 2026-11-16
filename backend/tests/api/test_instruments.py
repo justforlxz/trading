@@ -8,7 +8,7 @@ from decimal import Decimal
 from fastapi.testclient import TestClient
 
 from app.core import Bar, Timeframe
-from app.market import upsert_candles
+from app.market import latest_sync_job, upsert_candles
 from tests.api.conftest import latest_opens, seed_daily, seed_instruments
 from tests.factories.instruments import make_ref, make_swap_ref
 
@@ -312,3 +312,27 @@ def test_list_tradable_rejects_unknown_category(market_data: TestClient) -> None
 
     assert response.status_code == 422
     assert response.json()["detail"]
+
+
+def test_search_never_reads_market_data_or_starts_sync(
+    client: TestClient, sync_scheduler, monkeypatch
+) -> None:
+    """搜索只查标的表：行情端口与按需同步调度器都不应被调用。"""
+
+    seed_instruments(make_ref(inst_id="SPCX-USDT", base_ccy="XSPCX"))
+    calls: list[str] = []
+
+    def fail(*_args, **_kwargs):
+        calls.append("market_data")
+        raise AssertionError("搜索不得访问行情端口")
+
+    monkeypatch.setattr("app.exchange.create_market_data", fail)
+    monkeypatch.setattr("app.jobs.sync.create_market_data", fail)
+
+    response = client.get("/api/instruments/search", params={"q": "SPCX"})
+
+    assert response.status_code == 200, response.text
+    assert [item["inst_id"] for item in response.json()["items"]] == ["SPCX-USDT"]
+    assert calls == []
+    assert sync_scheduler.calls == []
+    assert latest_sync_job(provider="okx", dataset="candles") is None

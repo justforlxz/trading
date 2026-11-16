@@ -170,3 +170,15 @@
 - 本节与枚举的一致性由 `backend/tests/api/test_contract_schema.py` 强制（只比对 D7 段落）：取值名称一旦冻结，T2.4 / T2.5 / T3.4 / T3.6 / T7.1 直接沿用，不再另起命名。
 
 **附注**：Q2（v1 遗留 P5 架构评审 issue 的去留）由 PL 内部处置并已关闭对应 issue，不构成产品决策，不在本文件记录。
+
+## D8 v6 详情页不展示合约元数据与另一形态价差
+
+**决策**：v6 标的详情页删除「合约元数据」与「同一产品的另一形态」两个区块，不保留开关、空组件或占位文案。`instruments` 的 `tick_size`、`lot_size`、`min_order_size`、`max_lever` 等字段与接口继续保留，只用于下单取整、持仓估值和风险判断。
+
+**依据**：2026-11-16 lxz 确认，这两块不在 v6 原型和功能规格里，先删除，后续有需要再添加。`docs/prd/v6.md` 原先把它登记为 v2 遗留能力并已实现，与实际要交付的 v6 详情页不符。
+
+**实施约束**（MKACG-857）：
+
+- 删除 `frontend/src/pages/instrument-detail/contracts-card.tsx` 及其在 `frontend/src/pages/instrument-detail.tsx` 中的引用和测试。
+- `GET /api/instruments/{id}` 的 `siblings` 字段、后端表结构、迁移和同步逻辑保持不变；本条只删除前端展示。
+- 本条不修改 v2 历史条目，只记录 v6 的展示范围。

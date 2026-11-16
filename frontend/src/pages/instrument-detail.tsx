@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { CandlestickChart } from "../components/chart/candlestick-chart";
@@ -89,6 +89,48 @@ function numberLabel(
   const number = Number(value);
   if (!Number.isFinite(number)) return value;
   return number.toFixed(places);
+}
+
+/** 头部下方的行情信息行：四项各出现一次，缺值写「尚未提供」。 */
+export function QuoteFactsLine({
+  mark,
+  index,
+  updatedAt,
+  source,
+}: {
+  mark: string | null;
+  index: string | null;
+  updatedAt: string | null;
+  source: string | null;
+}) {
+  const facts = [
+    { label: "标记价", value: mark, mono: true },
+    { label: "指数价", value: index, mono: true },
+    { label: "更新", value: updatedAt, mono: true },
+    { label: "来源", value: source, mono: false },
+  ];
+  return (
+    <div
+      data-testid="quote-facts"
+      className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground"
+    >
+      {facts.map((fact, position) => (
+        <Fragment key={fact.label}>
+          {position > 0 ? (
+            <span aria-hidden="true" className="opacity-50">
+              ·
+            </span>
+          ) : null}
+          <span className="inline-flex min-w-0 items-baseline gap-1.5">
+            <span>{fact.label}</span>
+            <span className={cn(fact.mono && "font-mono tabular-nums")}>
+              {fact.value ?? "尚未提供"}
+            </span>
+          </span>
+        </Fragment>
+      ))}
+    </div>
+  );
 }
 
 /** 后端不可达时 fetch 抛 TypeError；换成用户能看懂的中文提示。 */
@@ -690,80 +732,34 @@ export default function InstrumentDetailPage() {
                 计价 {instrument.quote_currency} · <span className="font-mono">{instrument.inst_id}</span>
               </p>
             </div>
-            <div className="grid min-w-0 gap-3 lg:justify-items-end">
-              <div className="flex flex-wrap items-end justify-between gap-4">
-                <div>
-                  <p className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                    <span>最新价 last</span>
-                    <StreamTag liveness={liveness} />
+            <div className="min-w-0 lg:justify-self-end">
+              <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>最新价</span>
+                <StreamTag liveness={liveness} />
+              </p>
+              <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <p className="font-mono text-3xl font-semibold tabular-nums">
+                  {livePrice ?? "尚未提供"}
+                </p>
+                {last ? (
+                  <p
+                    title="涨跌幅来自 HTTP 分析快照；推送消息只提供价格"
+                    className={cn("text-sm font-medium", valueTone(last.change_pct))}
+                  >
+                    {last.change == null ? PLACEHOLDER : priceChangeValue(last.change, last.price)}
+                    {last.change_pct == null ? "" : ` (${percentLabel(last.change_pct)})`}
                   </p>
-                  <p className="font-mono text-3xl font-semibold tabular-nums">
-                    {livePrice ?? NOT_SYNCED}
-                  </p>
-                  {last ? (
-                    <p
-                      title="涨跌幅来自 HTTP 分析快照；推送消息只提供价格"
-                      className={cn("text-sm font-medium", valueTone(last.change_pct))}
-                    >
-                      {last.change == null ? PLACEHOLDER : priceChangeValue(last.change, last.price)}
-                      {last.change_pct == null ? "" : ` (${percentLabel(last.change_pct)})`}
-                    </p>
-                  ) : null}
-                  {liveQuote ? (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      价格由推送更新于 {liveAt ? formatBeijingTime(liveAt) : "未知时间"}
-                      {last ? `；涨跌幅沿用 ${formatBeijingTime(last.as_of)} 的 HTTP 快照` : ""}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="flex gap-1" role="group" aria-label="周期">
-                  {BAR_OPTIONS.map((option) => {
-                    const coverage = coverageByBar.get(option.bar);
-                    const disabled = coverage ? !coverage.available : true;
-                    return (
-                      <Button
-                        key={option.bar}
-                        type="button"
-                        size="sm"
-                        variant={option.bar === bar ? "default" : "outline"}
-                        disabled={disabled}
-                        aria-pressed={option.bar === bar}
-                        title={
-                          disabled
-                            ? (coverage?.unavailable_reason ?? NOT_SYNCED)
-                            : `${BAR_LABELS[option.bar]}已同步`
-                        }
-                        onClick={() => setBar(option.bar)}
-                      >
-                        {option.label}
-                      </Button>
-                    );
-                  })}
-                </div>
+                ) : null}
               </div>
-              <dl className="grid w-full gap-x-4 gap-y-1 text-xs sm:grid-cols-2 lg:w-[24rem]">
-                <div className="flex min-w-0 gap-2">
-                  <dt className="shrink-0 text-muted-foreground">标记价 mark</dt>
-                  <dd className="font-mono">{liveMark ?? "尚未提供"}</dd>
-                </div>
-                <div className="flex min-w-0 gap-2">
-                  <dt className="shrink-0 text-muted-foreground">指数价 index</dt>
-                  <dd className="font-mono">{liveIndex ?? "尚未提供"}</dd>
-                </div>
-                <div className="flex min-w-0 gap-2">
-                  <dt className="shrink-0 text-muted-foreground">数据时间</dt>
-                  <dd className="font-mono">
-                    {liveAt ? `${formatBeijingTime(liveAt)}（北京时间）` : NOT_SYNCED}
-                  </dd>
-                </div>
-                <div className="flex min-w-0 gap-2">
-                  <dt className="shrink-0 text-muted-foreground">价格来源</dt>
-                  <dd className="font-mono">{liveSource ? sourceLabel(liveSource) : NOT_SYNCED}</dd>
-                </div>
-              </dl>
             </div>
           </section>
 
+          <QuoteFactsLine
+            mark={liveMark}
+            index={liveIndex}
+            updatedAt={liveAt ? formatBeijingTime(liveAt) : null}
+            source={liveSource ? sourceLabel(liveSource) : null}
+          />
           <p className="rounded-md border bg-muted/40 px-3 py-2 text-xs leading-5 text-muted-foreground">
             <span className="font-medium text-foreground">数据覆盖</span>
             {analysis.coverage.map((row) => (
@@ -831,30 +827,39 @@ export default function InstrumentDetailPage() {
 
           <Card>
             <CardHeader className="pb-3">
-              <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <CardTitle>K 线与均线</CardTitle>
-                  <CardDescription>
-                    {BAR_LABELS[bar]}开高低收与成交量；均线、缺口标记均来自后端。
-                  </CardDescription>
+                  <CardDescription>开高低收与成交量；均线与缺口来自后端。</CardDescription>
                 </div>
-                <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1.5">
-                    <i className="h-2 w-2 rounded-sm bg-emerald-600" aria-hidden="true" />
-                    上涨
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <i className="h-2 w-2 rounded-sm bg-rose-600" aria-hidden="true" />
-                    下跌
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <i className="h-0.5 w-4 bg-sky-500" aria-hidden="true" />
-                    MA20
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <i className="h-0.5 w-4 bg-amber-500" aria-hidden="true" />
-                    MA60
-                  </span>
+                <div
+                  className="inline-flex w-full gap-0.5 rounded-md border bg-muted/30 p-0.5 sm:w-auto"
+                  role="group"
+                  aria-label="周期"
+                >
+                  {BAR_OPTIONS.map((option) => {
+                    const coverage = coverageByBar.get(option.bar);
+                    const disabled = coverage ? !coverage.available : true;
+                    return (
+                      <Button
+                        key={option.bar}
+                        type="button"
+                        size="sm"
+                        variant={option.bar === bar ? "default" : "ghost"}
+                        className="flex-1 rounded-sm sm:flex-none"
+                        disabled={disabled}
+                        aria-pressed={option.bar === bar}
+                        title={
+                          disabled
+                            ? (coverage?.unavailable_reason ?? NOT_SYNCED)
+                            : `${BAR_LABELS[option.bar]}已同步`
+                        }
+                        onClick={() => setBar(option.bar)}
+                      >
+                        {option.label}
+                      </Button>
+                    );
+                  })}
                 </div>
               </div>
             </CardHeader>
@@ -864,18 +869,39 @@ export default function InstrumentDetailPage() {
                   {BAR_LABELS[bar]}不可用：{currentCoverage.unavailable_reason ?? NOT_SYNCED}
                 </p>
               ) : null}
-              <CandlestickChart data={candles ?? { candles: [], overlays: [], gaps: [] }} />
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span className="rounded-full border px-2 py-0.5">周期 {BAR_LABELS[bar]}</span>
-                <span className="rounded-full border px-2 py-0.5">
-                  数据源 {candles ? sourceLabel(candles.data_source) : "未生成"}
+              <div className="mb-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5">
+                  <i className="h-2 w-2 rounded-sm bg-emerald-600" aria-hidden="true" />
+                  上涨
                 </span>
-                <span className="rounded-full border px-2 py-0.5">
+                <span className="inline-flex items-center gap-1.5">
+                  <i className="h-2 w-2 rounded-sm bg-rose-600" aria-hidden="true" />
+                  下跌
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <i className="h-0.5 w-4 bg-sky-500" aria-hidden="true" />
+                  MA20
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <i className="h-0.5 w-4 bg-amber-500" aria-hidden="true" />
+                  MA60
+                </span>
+              </div>
+              <CandlestickChart data={candles ?? { candles: [], overlays: [], gaps: [] }} />
+              <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                <span>数据源 {candles ? sourceLabel(candles.data_source) : "未生成"}</span>
+                <span aria-hidden="true" className="opacity-50">
+                  ·
+                </span>
+                <span>
                   {candles && candles.candles.length > 0
                     ? `${candles.candles.length} 根 K 线`
                     : NOT_SYNCED}
                 </span>
-                <span className="rounded-full border px-2 py-0.5">
+                <span aria-hidden="true" className="opacity-50">
+                  ·
+                </span>
+                <span>
                   {candles && candles.gaps.length > 0
                     ? `${candles.gaps.length} 个缺口`
                     : "无缺口标记"}

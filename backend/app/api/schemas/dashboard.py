@@ -280,7 +280,7 @@ _EXAMPLE: dict[str, object] = {
                 {
                     "inst_type": "SWAP",
                     "session": "pre",
-                    "primary_source": "us_equity_proxy",
+                    "primary_source": "okx_swap",
                     "bar": "1d",
                     "as_of": "2026-11-13T09:00:00Z",
                     "breadth": {

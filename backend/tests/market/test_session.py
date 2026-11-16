@@ -31,11 +31,9 @@ from app.market import (
     daily_open_time,
     divergence,
     exchange_session,
-    integrity,
     is_trading_day,
     load_candles,
     primary_source,
-    sync_candles,
     upsert_candles,
 )
 from tests.factories.instruments import make_ref, make_swap_ref
@@ -208,8 +206,8 @@ def test_exchange_session_is_closed_on_holidays_and_weekends() -> None:
 # ------------------------------------------------------------- 来源优先级
 
 
-def test_primary_source_differs_for_the_two_assets_at_the_same_moment() -> None:
-    """同一时刻：代币化股票用美股代理行情，加密永续用 OKX 永续。"""
+def test_primary_source_uses_okx_for_both_assets_at_the_same_moment() -> None:
+    """同一时刻：代币化股票与加密永续都取 OKX 永续。"""
 
     moment = _et(TRADING_DAY, 12, 0)
 
@@ -218,10 +216,10 @@ def test_primary_source_differs_for_the_two_assets_at_the_same_moment() -> None:
     )
     crypto_source = primary_source(asset_session(CRYPTO, moment, inst_type="SWAP"), CRYPTO, "SWAP")
 
-    assert (equity_source, crypto_source) == ("us_equity_proxy", "okx_swap")
+    assert (equity_source, crypto_source) == ("okx_swap", "okx_swap")
 
 
-def test_closed_equity_falls_back_to_the_okx_quote() -> None:
+def test_closed_equity_still_uses_the_okx_quote() -> None:
     """美股休市时段：代币化股票永续被判为休市，但行情仍取 OKX 永续。"""
 
     moment = _et(KNOWN_HOLIDAYS[0], 12, 0)
@@ -238,9 +236,9 @@ def test_closed_equity_falls_back_to_the_okx_quote() -> None:
 @pytest.mark.parametrize(
     ("session_state", "asset_type", "inst_type", "expected"),
     [
-        (SESSION_PRE, TOKENIZED_EQUITY, "SWAP", "us_equity_proxy"),
-        (SESSION_REGULAR, TOKENIZED_EQUITY, "SPOT", "us_equity_proxy"),
-        (SESSION_POST, TOKENIZED_EQUITY, "SWAP", "us_equity_proxy"),
+        (SESSION_PRE, TOKENIZED_EQUITY, "SWAP", "okx_swap"),
+        (SESSION_REGULAR, TOKENIZED_EQUITY, "SPOT", "okx_spot"),
+        (SESSION_POST, TOKENIZED_EQUITY, "SWAP", "okx_swap"),
         (SESSION_CLOSED, TOKENIZED_EQUITY, "SPOT", "okx_spot"),
         (SESSION_REGULAR, CRYPTO, "SPOT", "okx_spot"),
         (SESSION_REGULAR, CRYPTO, "SWAP", "okx_swap"),
@@ -307,19 +305,19 @@ def _quote(source: str, price: str, *, product_key: str = "AAPL") -> Quote:
 
 
 def test_three_percent_divergence_returns_two_decimal_deviation() -> None:
-    alert = divergence(_quote("okx_swap", "100"), _quote("us_equity_proxy", "103"))
+    alert = divergence(_quote("okx_swap", "100"), _quote("okx_spot", "103"))
 
     assert isinstance(alert, DivergenceAlert)
     assert alert.product_key == "AAPL"
     assert alert.deviation_pct == Decimal("3.00")
     assert str(alert.deviation_pct) == "3.00"
     assert (alert.reference.price, alert.other.price) == (Decimal("100"), Decimal("103"))
-    assert (alert.reference.source, alert.other.source) == ("okx_swap", "us_equity_proxy")
+    assert (alert.reference.source, alert.other.source) == ("okx_swap", "okx_spot")
 
 
 def test_divergence_is_symmetric_in_magnitude() -> None:
     alert = divergence(
-        _quote("okx_swap", "103"), _quote("us_equity_proxy", "100"), threshold_pct=Decimal("2")
+        _quote("okx_swap", "103"), _quote("okx_spot", "100"), threshold_pct=Decimal("2")
     )
 
     assert alert is not None
@@ -327,12 +325,12 @@ def test_divergence_is_symmetric_in_magnitude() -> None:
 
 
 def test_below_threshold_returns_no_alert() -> None:
-    assert divergence(_quote("okx_swap", "100"), _quote("us_equity_proxy", "100.5")) is None
+    assert divergence(_quote("okx_swap", "100"), _quote("okx_spot", "100.5")) is None
 
 
 def test_threshold_is_configurable() -> None:
     alert = divergence(
-        _quote("okx_swap", "100"), _quote("us_equity_proxy", "100.5"), threshold_pct=Decimal("0.5")
+        _quote("okx_swap", "100"), _quote("okx_spot", "100.5"), threshold_pct=Decimal("0.5")
     )
 
     assert alert is not None
@@ -345,12 +343,12 @@ def test_divergence_requires_two_sources_of_one_product() -> None:
         divergence(_quote("okx_swap", "100"), _quote("okx_swap", "101"))
 
     with pytest.raises(ValidationError):
-        divergence(_quote("okx_swap", "100"), _quote("us_equity_proxy", "101", product_key="MSFT"))
+        divergence(_quote("okx_swap", "100"), _quote("okx_spot", "101", product_key="MSFT"))
 
 
 def test_divergence_rejects_non_positive_prices() -> None:
     with pytest.raises(ValidationError):
-        divergence(_quote("okx_swap", "0"), _quote("us_equity_proxy", "103"))
+        divergence(_quote("okx_swap", "0"), _quote("okx_spot", "103"))
 
 
 @pytest.mark.parametrize(
@@ -379,137 +377,9 @@ def test_negative_threshold_is_rejected() -> None:
     with pytest.raises(ValidationError):
         divergence(
             _quote("okx_swap", "100"),
-            _quote("us_equity_proxy", "103"),
+            _quote("okx_spot", "103"),
             threshold_pct=Decimal("-1"),
         )
-
-
-# ------------------------------------------------------- 日界与来源落库（读库）
-
-
-PROXY_SYMBOL = "AAPL-USDT-SWAP"
-
-
-class _EquityProxyPort:
-    """只服务本用例的美股代理行情端口：日线按交易时段开盘定界。
-
-    真实的美股代理适配器还没有，但 `sync_candles` 只要求端口提供 `history_candles`；
-    这里是唯一的替代品，用来让写入路径（窗口对齐 → 翻页 → 落库）真的跑起来，而不是
-    在用例里手算好结果再写库。
-    """
-
-    def __init__(self, bars: list[Bar]) -> None:
-        self._bars = sorted(bars, key=lambda item: item.open_time)
-
-    def history_candles(
-        self,
-        inst_id: str,
-        timeframe: Timeframe,
-        *,
-        inst_type: str,
-        after: datetime | None = None,
-        limit: int = 100,
-    ) -> list[Bar]:
-        older = [bar for bar in self._bars if after is None or bar.open_time < after]
-        return older[-limit:]
-
-
-def _proxy_daily(open_time: datetime) -> Bar:
-    """一根美股代理源日线；开盘时刻由调用方按美东 09:30 明确写出，不在此处推算。"""
-
-    price = Decimal("100")
-    return Bar(
-        inst_id=PROXY_SYMBOL,
-        timeframe=Timeframe.parse("1d"),
-        open_time=open_time,
-        open=price,
-        high=price,
-        low=price,
-        close=price,
-        volume=Decimal("10"),
-        confirm=True,
-        source="us_equity_proxy",
-        market_session=asset_session(TOKENIZED_EQUITY, open_time, inst_type="SWAP"),
-    )
-
-
-def _sync_proxy_days(anchors: list[datetime]) -> None:
-    """通过生产写入路径落库：窗口对齐、翻页、幂等 upsert 全走 `sync_candles`。"""
-
-    _seed_instruments()
-    sync_candles(
-        _EquityProxyPort([_proxy_daily(moment) for moment in anchors]),
-        PROXY_SYMBOL,
-        "1d",
-        anchors[0],
-        anchors[-1] + timedelta(days=1),
-        inst_type="SWAP",
-        asset_type=TOKENIZED_EQUITY,
-        source="us_equity_proxy",
-    )
-
-
-def test_equity_proxy_daily_bars_are_stored_on_the_session_open() -> None:
-    """美股代理源的日线落在交易时段首个 open_time 上，不落在 OKX 的 16:00 UTC。
-
-    三天的开盘时刻写死为美东 09:30（14:30 UTC）。若日界仍按 UTC+8 零点算，期望网格
-    会整体错开，这三根正确的日线会被报成缺口——所以断言缺口为 0 才能区分新旧行为。
-    """
-
-    anchors = [datetime(2026, 11, day, 14, 30, tzinfo=UTC) for day in (23, 24, 25)]
-    _sync_proxy_days(anchors)
-
-    report = integrity(PROXY_SYMBOL, "1d", source="us_equity_proxy")
-    with session_scope() as session:
-        on_okx_boundary = session.execute(
-            text(
-                "SELECT COUNT(*) FROM candles WHERE bar = '1d' "
-                "AND source = 'us_equity_proxy' AND open_time % 86400 = 57600"
-            )
-        ).scalar_one()
-        stored = session.execute(
-            text("SELECT open_time, market_session FROM candles WHERE source = 'us_equity_proxy'")
-        ).all()
-
-    assert on_okx_boundary == 0
-    assert sorted(row[0] for row in stored) == [int(moment.timestamp()) for moment in anchors]
-    assert {row[1] for row in stored} == {SESSION_REGULAR}
-    assert (report.start, report.end) == (anchors[0], anchors[-1])
-    assert (report.present, report.expected, report.missing, report.gaps) == (3, 3, 0, ())
-
-
-def test_equity_proxy_daily_grid_skips_weekends_and_holidays() -> None:
-    """美股代理源的日线只在交易日产生：跨周末与感恩节都不报缺口。"""
-
-    anchors = [
-        datetime(2026, 11, 20, 14, 30, tzinfo=UTC),  # 周五
-        datetime(2026, 11, 23, 14, 30, tzinfo=UTC),  # 周一
-        datetime(2026, 11, 24, 14, 30, tzinfo=UTC),  # 周二
-        datetime(2026, 11, 25, 14, 30, tzinfo=UTC),  # 周三
-        datetime(2026, 11, 27, 14, 30, tzinfo=UTC),  # 感恩节（26 日休市）后的周五
-    ]
-    _sync_proxy_days(anchors)
-
-    report = integrity(PROXY_SYMBOL, "1d", source="us_equity_proxy")
-
-    assert (report.present, report.expected, report.missing, report.gaps) == (5, 5, 0, ())
-
-
-def test_equity_proxy_daily_gap_is_reported_when_a_trading_day_is_missing() -> None:
-    """真缺一个交易日时必须报出来：网格按交易日排，不能因为不均匀就漏报。"""
-
-    anchors = [
-        datetime(2026, 11, 23, 14, 30, tzinfo=UTC),
-        datetime(2026, 11, 25, 14, 30, tzinfo=UTC),
-    ]
-    _sync_proxy_days(anchors)
-
-    report = integrity(PROXY_SYMBOL, "1d", source="us_equity_proxy")
-
-    assert report.missing == 1
-    assert [(gap.start, gap.missing) for gap in report.gaps] == [
-        (datetime(2026, 11, 24, 14, 30, tzinfo=UTC), 1)
-    ]
 
 
 def test_market_session_round_trips_through_the_table() -> None:
@@ -606,24 +476,22 @@ def _write_hourly(inst_id: str, open_time: datetime, *, source: str, close: str 
     )
 
 
-def test_current_bar_prefers_the_equity_proxy_during_us_regular_hours() -> None:
+def test_current_bar_uses_the_okx_quote_during_us_regular_hours() -> None:
     _seed_instruments()
     moment = _et(TRADING_DAY, 12, 0)
-    proxied = datetime(2026, 11, 25, 16, 0, tzinfo=UTC)
-    _write_hourly("AAPL-USDT-SWAP", proxied, source="us_equity_proxy")
-    _write_hourly("AAPL-USDT-SWAP", proxied, source="okx_swap")
+    quoted = datetime(2026, 11, 25, 16, 0, tzinfo=UTC)
+    _write_hourly("AAPL-USDT-SWAP", quoted, source="okx_swap")
 
     bar = current_bar("AAPL", "1h", inst_type="SWAP", at=moment)
 
     assert bar is not None
-    assert (bar.source, bar.market_session) == ("us_equity_proxy", SESSION_REGULAR)
+    assert (bar.source, bar.market_session) == ("okx_swap", SESSION_REGULAR)
 
 
-def test_current_bar_falls_back_to_the_okx_quote_when_the_us_market_is_closed() -> None:
+def test_current_bar_uses_the_okx_quote_when_the_us_market_is_closed() -> None:
     _seed_instruments()
     moment = _et(KNOWN_HOLIDAYS[0], 17, 0)
     quoted = datetime(2026, 11, 26, 22, 0, tzinfo=UTC)
-    _write_hourly("AAPL-USDT-SWAP", quoted, source="us_equity_proxy")
     _write_hourly("AAPL-USDT-SWAP", quoted, source="okx_swap")
 
     bar = current_bar("AAPL", "1h", inst_type="SWAP", at=moment)

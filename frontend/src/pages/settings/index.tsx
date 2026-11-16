@@ -259,18 +259,11 @@ export function SettingsView({
           <CardHeader>
             <CardTitle>数据连接</CardTitle>
             <CardDescription>
-              Provider 与订阅标的写入设置文档；最后同步时间与失败次数由服务端同步任务表提供。
+              订阅标的写入设置文档；最后同步时间与失败次数由服务端 OKX 同步任务表提供。
               系统健康只读后端已有的检查结果，页面不临时探测上游。
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
-            <TextField
-              label="Provider"
-              value={draft.data_sources.provider ?? ""}
-              onChange={(value) =>
-                onDraftChange("data_sources", { provider: value.trim() || null })
-              }
-            />
             <TextField
               label="订阅标的（逗号分隔）"
               value={instrumentsText}
@@ -506,7 +499,6 @@ export default function SettingsPage() {
         risk_defaults: draft.risk_defaults,
         execution: draft.execution,
         data_sources: {
-          provider: draft.data_sources.provider,
           subscribed_instruments: parseInstruments(instrumentsText),
         },
         exchange: apiKey.trim() ? { api_key: apiKey.trim() } : null,

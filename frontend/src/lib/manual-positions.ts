@@ -99,7 +99,6 @@ export function actionLabel(action: ManualTrade["action"]): string {
 export function priceSourceLabel(source: ManualPosition["price_source"]): string {
   if (source === "okx_spot") return "OKX 现货";
   if (source === "okx_swap") return "OKX 永续";
-  if (source === "us_equity_proxy") return "美股代理行情";
   if (source === "okx") return "OKX";
   return MISSING_VALUE;
 }

@@ -18,7 +18,6 @@ export type SettingsDraft = {
   display: DisplaySettings;
   risk_defaults: RiskDefaults;
   execution: ExecutionSettings;
-  data_sources: { provider: string | null };
 };
 
 export function toSettingsDraft(settings: SettingsResponse): SettingsDraft {
@@ -26,9 +25,6 @@ export function toSettingsDraft(settings: SettingsResponse): SettingsDraft {
     display: settings.display,
     risk_defaults: settings.risk_defaults,
     execution: settings.execution,
-    data_sources: {
-      provider: settings.data_sources.provider ?? null,
-    },
   };
 }
 

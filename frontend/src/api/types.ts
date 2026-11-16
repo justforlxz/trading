@@ -71,7 +71,7 @@ export interface paths {
         put?: never;
         /**
          * Post Ai Summary
-         * @description 把市场快照、新闻与待处理提醒归纳成带来源的结构化摘要。
+         * @description 把 BTC 市场快照与待处理提醒归纳成带来源的结构化摘要。
          */
         post: operations["post_ai_summary_api_ai_summary_post"];
         delete?: never;
@@ -610,9 +610,9 @@ export interface paths {
          * Get Instrument Candles
          * @description 某一来源的已落库 K 线尾部窗口，附带该来源真实的可用区间与缺口标记。
          *
-         *     `source` 必填、没有默认值：同一标的可能同时存有 OKX 行情与美股代理行情，两者
-         *     的日界不同（OKX 是 16:00 UTC，代理是美东 09:30），静默挑一个就把两种来源拼成
-         *     一条时间轴（Q5 / D3）。缺参会由参数校验直接拒绝，不会默认成 OKX。
+         *     `source` 必填、没有默认值：同一标的可能同时存有 OKX 现货与永续行情，两者的
+         *     日界与计价不同，静默挑一个就把两种来源拼成一条时间轴（Q5 / D3）。缺参会由参数
+         *     校验直接拒绝，不会默认成 OKX。
          */
         get: operations["get_instrument_candles_api_instruments__inst_id__candles_get"];
         put?: never;
@@ -732,26 +732,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/market/events": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Market Events
-         * @description 按标的与时间范围读取宏观/公司事件；缺省范围为前后 30/90 天。
-         */
-        get: operations["get_market_events_api_market_events_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/market/overview": {
         parameters: {
             query?: never;
@@ -761,29 +741,9 @@ export interface paths {
         };
         /**
          * Get Market Snapshot
-         * @description NASDAQ、SP500、DOW、VIX、BTC 的最新值、涨跌、时段与来源。
+         * @description BTC 的最新值、24 小时涨跌、时段、来源与报价时间。
          */
         get: operations["get_market_snapshot_api_market_overview_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/news": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get News
-         * @description 按标的或行业标签读取已采集新闻，保留标题、来源、URL 与发布时间。
-         */
-        get: operations["get_news_api_news_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1140,7 +1100,7 @@ export interface paths {
         };
         /**
          * Get System Health
-         * @description 数据库、OKX REST、OKX WebSocket、外部 Provider、任务队列与 K 线覆盖。
+         * @description 数据库、OKX REST、OKX WebSocket、任务队列与 K 线覆盖。
          */
         get: operations["get_system_health_api_system_health_get"];
         put?: never;
@@ -1162,7 +1122,7 @@ export interface paths {
         put?: never;
         /**
          * Post System Sync
-         * @description 手动触发一次数据同步；同一 Provider 与数据集已在运行时返回 409。
+         * @description 手动触发一次 OKX 数据同步；同一数据集已在运行时返回 409。
          */
         post: operations["post_system_sync_api_system_sync_post"];
         delete?: never;
@@ -1509,37 +1469,21 @@ export interface components {
             text: string;
         };
         /**
-         * AiSummaryRequest
-         * @description 摘要输入；只读取已采集的数据，不触发外部请求。
-         */
-        AiSummaryRequest: {
-            /**
-             * Include News
-             * @default true
-             */
-            include_news: boolean;
-            /**
-             * News Limit
-             * @default 10
-             */
-            news_limit: number;
-        };
-        /**
          * AiSummaryResponse
          * @description 结构化摘要；没有来源的事实点不会出现在 `points` 或 `risks` 里。
          * @example {
          *       "disclaimer": "仅作信息归纳，不构成交易建议",
          *       "generated_at": "2026-11-15T06:10:00Z",
-         *       "overall": "偏强，波动率抬升",
+         *       "overall": "偏强",
          *       "points": [
          *         {
          *           "sources": [
          *             {
-         *               "id": "NASDAQ",
+         *               "id": "BTC",
          *               "type": "market_overview"
          *             }
          *           ],
-         *           "text": "NASDAQ Composite 最新 18000.12，较前值 +1.01%。"
+         *           "text": "Bitcoin 最新 65000.5，较前值 +1.88%。"
          *         }
          *       ],
          *       "risks": [
@@ -1574,7 +1518,7 @@ export interface components {
         };
         /**
          * AiSummarySource
-         * @description 一条可回溯的来源；`id` 对应事件、新闻或提醒的本地标识。
+         * @description 一条可回溯的来源；`id` 对应指标或提醒的本地标识。
          */
         AiSummarySource: {
             /** Id */
@@ -1583,7 +1527,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "news" | "alert" | "market_overview" | "risk";
+            type: "alert" | "market_overview" | "risk";
             /** Url */
             url?: string | null;
         };
@@ -1690,7 +1634,7 @@ export interface components {
              * Data Source
              * @enum {string}
              */
-            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+            data_source: "okx" | "okx_spot" | "okx_swap";
             /** Gaps */
             gaps: components["schemas"]["AnalysisGap"][];
             /** Overlays */
@@ -1715,7 +1659,7 @@ export interface components {
              * Data Source
              * @enum {string}
              */
-            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+            data_source: "okx" | "okx_spot" | "okx_swap";
             /** Gap Count */
             gap_count: number;
             /** Last Synced At */
@@ -1786,7 +1730,7 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+            source: "okx" | "okx_spot" | "okx_swap";
         };
         /** AnalysisQuote */
         AnalysisQuote: {
@@ -1817,7 +1761,6 @@ export interface components {
          *       ],
          *       "inst_id": "XAAPL-USDT",
          *       "inst_type": "SPOT",
-         *       "is_proxy": false,
          *       "metrics": {
          *         "annualized_return_pct": "48.21",
          *         "avg_holding_hours": "18.4",
@@ -1875,7 +1818,7 @@ export interface components {
              * Data Source
              * @enum {string}
              */
-            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+            data_source: "okx" | "okx_spot" | "okx_swap";
             /**
              * End Date
              * Format: date
@@ -1894,8 +1837,6 @@ export interface components {
              * @enum {string}
              */
             inst_type: "SPOT" | "SWAP";
-            /** Is Proxy */
-            is_proxy: boolean;
             metrics?: components["schemas"]["BacktestMetrics"] | null;
             /** Params */
             params: {
@@ -1939,7 +1880,7 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+            source: "okx" | "okx_spot" | "okx_swap";
             /** Time */
             time: string;
             /** Volume */
@@ -2010,7 +1951,7 @@ export interface components {
              * Data Source
              * @enum {string}
              */
-            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+            data_source: "okx" | "okx_spot" | "okx_swap";
             /** Inst Id */
             inst_id: string;
             /** Markers */
@@ -2103,7 +2044,6 @@ export interface components {
          *         "finished_at": "2026-11-10T01:21:30Z",
          *         "inst_id": "XAAPL-USDT",
          *         "inst_type": "SPOT",
-         *         "is_proxy": false,
          *         "metrics": {
          *           "annualized_return_pct": "48.21",
          *           "avg_holding_hours": "18.4",
@@ -2368,7 +2308,7 @@ export interface components {
              * Data Source
              * @enum {string}
              */
-            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+            data_source: "okx" | "okx_spot" | "okx_swap";
             /** Items */
             items: components["schemas"]["BacktestRankingRow"][];
             /**
@@ -2526,7 +2466,7 @@ export interface components {
              * Data Source
              * @enum {string}
              */
-            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+            data_source: "okx" | "okx_spot" | "okx_swap";
             /**
              * End Date
              * Format: date
@@ -2572,7 +2512,6 @@ export interface components {
          *           "finished_at": "2026-11-10T01:21:30Z",
          *           "inst_id": "XAAPL-USDT",
          *           "inst_type": "SPOT",
-         *           "is_proxy": false,
          *           "metrics": {
          *             "annualized_return_pct": "48.21",
          *             "avg_holding_hours": "18.4",
@@ -2611,7 +2550,7 @@ export interface components {
              * Data Source
              * @enum {string}
              */
-            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+            data_source: "okx" | "okx_spot" | "okx_swap";
             /** Items */
             items: components["schemas"]["BacktestRunSummary"][];
             /** Total */
@@ -2627,7 +2566,6 @@ export interface components {
          *       "finished_at": "2026-11-10T01:21:30Z",
          *       "inst_id": "XAAPL-USDT",
          *       "inst_type": "SPOT",
-         *       "is_proxy": false,
          *       "metrics": {
          *         "annualized_return_pct": "48.21",
          *         "avg_holding_hours": "18.4",
@@ -2670,7 +2608,7 @@ export interface components {
              * Data Source
              * @enum {string}
              */
-            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+            data_source: "okx" | "okx_spot" | "okx_swap";
             /**
              * End Date
              * Format: date
@@ -2687,8 +2625,6 @@ export interface components {
              * @enum {string}
              */
             inst_type: "SPOT" | "SWAP";
-            /** Is Proxy */
-            is_proxy: boolean;
             metrics?: components["schemas"]["BacktestMetrics"] | null;
             /** Params */
             params: {
@@ -2760,7 +2696,7 @@ export interface components {
              * Data Source
              * @enum {string}
              */
-            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+            data_source: "okx" | "okx_spot" | "okx_swap";
             /**
              * Status
              * @enum {string}
@@ -2876,7 +2812,7 @@ export interface components {
              * Data Source
              * @enum {string}
              */
-            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+            data_source: "okx" | "okx_spot" | "okx_swap";
             /** High */
             high: string;
             /** Is Closed */
@@ -2930,7 +2866,7 @@ export interface components {
              * Data Source
              * @enum {string}
              */
-            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+            data_source: "okx" | "okx_spot" | "okx_swap";
             /**
              * Has Gap
              * @default false
@@ -3286,7 +3222,7 @@ export interface components {
              * Primary Source
              * @enum {string}
              */
-            primary_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+            primary_source: "okx" | "okx_spot" | "okx_swap";
             resonance: components["schemas"]["MarketResonance"];
             /**
              * Session
@@ -3379,7 +3315,7 @@ export interface components {
              * Data Source
              * @enum {string}
              */
-            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+            data_source: "okx" | "okx_spot" | "okx_swap";
             /** Max Drawdown */
             max_drawdown: string;
             /** Run Id */
@@ -3536,7 +3472,7 @@ export interface components {
          *                 "unchanged": 0
          *               },
          *               "inst_type": "SWAP",
-         *               "primary_source": "us_equity_proxy",
+         *               "primary_source": "okx_swap",
          *               "resonance": {
          *                 "participants": 10,
          *                 "strength": "0",
@@ -3712,8 +3648,6 @@ export interface components {
             failure_count: number;
             /** Last Sync At */
             last_sync_at?: string | null;
-            /** Provider */
-            provider?: string | null;
             /** Subscribed Instruments */
             subscribed_instruments?: string[];
         };
@@ -3722,8 +3656,6 @@ export interface components {
          * @description 数据源可写字段；最后同步时间与失败次数只读。
          */
         DataSourceSettingsUpdate: {
-            /** Provider */
-            provider?: string | null;
             /** Subscribed Instruments */
             subscribed_instruments?: string[] | null;
         };
@@ -4552,7 +4484,7 @@ export interface components {
              * Data Source
              * @enum {string}
              */
-            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+            data_source: "okx" | "okx_spot" | "okx_swap";
             /** Max Drawdown Pct */
             max_drawdown_pct: string;
             /** Run Id */
@@ -4655,7 +4587,7 @@ export interface components {
             /** Price */
             price?: string | null;
             /** Price Source */
-            price_source?: ("okx" | "okx_spot" | "okx_swap" | "us_equity_proxy") | null;
+            price_source?: ("okx" | "okx_spot" | "okx_swap") | null;
             /**
              * Price Status
              * @enum {string}
@@ -4885,66 +4817,6 @@ export interface components {
             resonance: components["schemas"]["MarketResonance"];
         };
         /**
-         * MarketEventItem
-         * @description 一条宏观或公司事件；`scheduled_at_beijing` 是展示用北京时间。
-         */
-        MarketEventItem: {
-            /** Actual */
-            actual: string | null;
-            /** Event Type */
-            event_type: string;
-            /** Forecast */
-            forecast: string | null;
-            /** Id */
-            id: string;
-            /** Importance */
-            importance: string | null;
-            /** Previous */
-            previous: string | null;
-            /** Received At */
-            received_at: string;
-            /** Region */
-            region: string | null;
-            /** Scheduled At */
-            scheduled_at: string;
-            /** Scheduled At Beijing */
-            scheduled_at_beijing: string;
-            /** Source */
-            source: string;
-            /** Source Url */
-            source_url: string | null;
-            /** Ticker */
-            ticker: string | null;
-            /** Title */
-            title: string;
-        };
-        /**
-         * MarketEventListResponse
-         * @description 按时间范围与标的条件读取的事件列表。
-         * @example {
-         *       "items": [
-         *         {
-         *           "event_type": "earnings",
-         *           "forecast": "1.20",
-         *           "id": "evt_0123456789abcdef01234567",
-         *           "importance": "high",
-         *           "previous": "1.10",
-         *           "received_at": "2026-11-15T06:10:00Z",
-         *           "region": "US",
-         *           "scheduled_at": "2026-11-16T21:00:00Z",
-         *           "scheduled_at_beijing": "2026-11-17 05:00",
-         *           "source": "market_data_provider",
-         *           "ticker": "AAPL",
-         *           "title": "AAPL 财报"
-         *         }
-         *       ]
-         *     }
-         */
-        MarketEventListResponse: {
-            /** Items */
-            items: components["schemas"]["MarketEventItem"][];
-        };
-        /**
          * MarketOverviewItem
          * @description 一个市场指标；缺数据时数值为 `null`，`quality_status` 说明原因。
          */
@@ -4992,25 +4864,23 @@ export interface components {
         };
         /**
          * MarketSnapshotResponse
-         * @description 五个市场指标的当前快照；顶层 `stale` 表示至少一项不能当作实时值。
+         * @description BTC 的当前快照；顶层 `stale` 表示这项数据不能当作实时值。
          * @example {
          *       "as_of": "2026-11-15T06:10:00Z",
          *       "items": [
          *         {
-         *           "as_of": "2026-11-15T06:00:00Z",
-         *           "change": "180",
-         *           "change_pct": "1.01",
+         *           "as_of": "2026-11-15T06:09:30Z",
+         *           "change": "1200",
+         *           "change_pct": "1.88",
          *           "is_delayed": false,
-         *           "market_session": "closed",
-         *           "name": "NASDAQ Composite",
+         *           "market_session": "regular",
+         *           "name": "Bitcoin",
          *           "quality_status": "normal",
-         *           "source": "market_data_provider",
-         *           "symbol": "NASDAQ",
-         *           "value": "18000.12"
+         *           "source": "okx_spot",
+         *           "symbol": "BTC",
+         *           "value": "65000.5"
          *         }
          *       ],
-         *       "last_success_at": "2026-11-15T06:05:00Z",
-         *       "provider": "market_data_provider",
          *       "stale": false
          *     }
          */
@@ -5019,10 +4889,6 @@ export interface components {
             as_of: string;
             /** Items */
             items: components["schemas"]["MarketOverviewItem"][];
-            /** Last Success At */
-            last_success_at: string | null;
-            /** Provider */
-            provider: string | null;
             /** Stale */
             stale: boolean;
             /** Stale Reason */
@@ -5152,59 +5018,6 @@ export interface components {
             macd_signal?: string | null;
             /** Rsi14 */
             rsi14?: string | null;
-        };
-        /**
-         * NewsItem
-         * @description 一条已采集新闻；标题、来源、URL 与发布时间原样保留。
-         */
-        NewsItem: {
-            /** Id */
-            id: string;
-            /** Published At */
-            published_at: string | null;
-            /** Publisher */
-            publisher: string | null;
-            /** Received At */
-            received_at: string;
-            /** Source */
-            source: string;
-            /** Summary */
-            summary: string | null;
-            /** Tags */
-            tags: string[];
-            /** Tickers */
-            tickers: string[];
-            /** Title */
-            title: string;
-            /** Url */
-            url: string | null;
-        };
-        /**
-         * NewsListResponse
-         * @description 按标的或行业标签读取的新闻列表。
-         * @example {
-         *       "items": [
-         *         {
-         *           "id": "news_0123456789abcdef01234567",
-         *           "published_at": "2026-11-15T05:00:00Z",
-         *           "publisher": "Example News",
-         *           "received_at": "2026-11-15T06:10:00Z",
-         *           "source": "market_data_provider",
-         *           "summary": "收入高于市场预期。",
-         *           "tags": [
-         *             "technology"
-         *           ],
-         *           "tickers": [
-         *             "AAPL"
-         *           ],
-         *           "title": "AAPL 发布季度业绩"
-         *         }
-         *       ]
-         *     }
-         */
-        NewsListResponse: {
-            /** Items */
-            items: components["schemas"]["NewsItem"][];
         };
         /**
          * Opportunity
@@ -6218,7 +6031,7 @@ export interface components {
              * Data Source
              * @enum {string}
              */
-            data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+            data_source: "okx" | "okx_spot" | "okx_swap";
             /** Max Drawdown Pct */
             max_drawdown_pct: string;
             /** Run Id */
@@ -6842,14 +6655,13 @@ export interface components {
          *           "status": "ok"
          *         },
          *         {
-         *           "detail": "market_data_provider / market_overview",
-         *           "error": "Provider 超时",
-         *           "last_success_at": "2026-11-14T06:00:00Z",
-         *           "name": "external_provider",
-         *           "status": "stale"
+         *           "detail": "candles 最近一次同步成功且仍在时效内",
+         *           "last_success_at": "2026-11-15T06:05:00Z",
+         *           "name": "okx_rest",
+         *           "status": "ok"
          *         }
          *       ],
-         *       "status": "degraded"
+         *       "status": "ok"
          *     }
          */
         SystemHealthResponse: {
@@ -6865,10 +6677,7 @@ export interface components {
         };
         /**
          * SystemSyncRequest
-         * @description 手动触发一次数据同步；数据集由服务端校验。
-         *
-         *     `instruments` 与 `candles` 是 OKX 公共行情的产品入口；其余数据集走外部行情
-         *     Provider。`bar` 与 `days` 只对 `candles` 生效。
+         * @description 手动触发一次 OKX 行情同步；`bar` 与 `days` 只对 `candles` 生效。
          */
         SystemSyncRequest: {
             /** Bar */
@@ -6879,8 +6688,6 @@ export interface components {
             days?: number | null;
             /** Instrument Ids */
             instrument_ids?: string[];
-            /** Provider */
-            provider?: string | null;
         };
         /**
          * SystemSyncResponse
@@ -7238,11 +7045,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AiSummaryRequest"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -7251,15 +7054,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiSummaryResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7529,7 +7323,7 @@ export interface operations {
     list_backtests_api_backtests_get: {
         parameters: {
             query: {
-                data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+                data_source: "okx" | "okx_spot" | "okx_swap";
                 limit?: number;
             };
             header?: never;
@@ -7594,7 +7388,7 @@ export interface operations {
     get_backtest_ranking_api_backtests_ranking_get: {
         parameters: {
             query: {
-                data_source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+                data_source: "okx" | "okx_spot" | "okx_swap";
                 metric?: "total_return_pct" | "max_drawdown_pct" | "sharpe" | "profit_factor";
                 limit?: number;
             };
@@ -8145,7 +7939,7 @@ export interface operations {
         parameters: {
             query: {
                 bar: "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
-                source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy";
+                source: "okx" | "okx_spot" | "okx_swap";
                 limit?: number;
             };
             header?: never;
@@ -8423,40 +8217,6 @@ export interface operations {
             };
         };
     };
-    get_market_events_api_market_events_get: {
-        parameters: {
-            query?: {
-                ticker?: string | null;
-                start?: string | null;
-                end?: string | null;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MarketEventListResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     get_market_snapshot_api_market_overview_get: {
         parameters: {
             query?: never;
@@ -8473,39 +8233,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MarketSnapshotResponse"];
-                };
-            };
-        };
-    };
-    get_news_api_news_get: {
-        parameters: {
-            query?: {
-                ticker?: string | null;
-                industry?: string | null;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["NewsListResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

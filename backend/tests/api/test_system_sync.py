@@ -167,10 +167,12 @@ def test_running_job_returns_conflict(client: TestClient) -> None:
     assert "仍在运行" in response.json()["detail"]
 
 
-def test_unknown_dataset_lists_okx_and_external_datasets(client: TestClient) -> None:
+def test_unknown_dataset_lists_only_the_okx_datasets(client: TestClient) -> None:
     response = client.post("/api/system/sync", json={"dataset": "unknown"})
 
     assert response.status_code == 400
     detail = response.json()["detail"]
     assert "instruments" in detail
-    assert "market_overview" in detail
+    assert "candles" in detail
+    assert "market_overview" not in detail
+    assert "news" not in detail

@@ -208,12 +208,15 @@ def test_research_alerts_activity_migration_and_legacy_price_alerts_removed() ->
     assert unique >= 1
 
 
-def test_external_market_migration_creates_tables_and_settings_groups() -> None:
-    """0018 建出外部事件、新闻与同步任务表，并扩展设置分组。"""
+def test_external_market_tables_are_removed_at_head() -> None:
+    """0018 建出的外部事件与新闻表，在 0020 之后不再存在；同步任务表保留。"""
 
     init_db()
 
-    assert {"market_events", "news_items", "data_sync_jobs"} <= _tables()
+    tables = _tables()
+    assert "data_sync_jobs" in tables
+    assert "market_events" not in tables
+    assert "news_items" not in tables
     with session_scope() as session:
         columns = set(
             session.execute(
@@ -225,6 +228,69 @@ def test_external_market_migration_creates_tables_and_settings_groups() -> None:
         )
     assert {"display", "risk_defaults", "data_sources"} <= columns
     assert "data" not in columns
+
+
+def test_0020_removes_external_sync_data_proxy_rows_and_provider_setting() -> None:
+    """0020 只保留 OKX 同步数据集与 OKX K 线，并清掉设置里的 Provider 键。"""
+
+    command.upgrade(alembic_config(), "0019")
+    with session_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO data_sync_jobs
+                    (id, provider, dataset, status, started_at, rows)
+                VALUES
+                    ('job-overview', 'external', 'market_overview', 'succeeded',
+                     '2026-11-16 01:00:00', 0),
+                    ('job-events', 'external', 'market_events', 'succeeded',
+                     '2026-11-16 01:00:00', 0),
+                    ('job-news', 'external', 'news', 'succeeded',
+                     '2026-11-16 01:00:00', 0),
+                    ('job-candles', 'okx', 'candles', 'succeeded',
+                     '2026-11-16 01:00:00', 10)
+                """
+            )
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO candles
+                    (symbol, bar, open_time, source, open, high, low, close, volume,
+                     updated_at, market_session)
+                VALUES
+                    ('AAPL-USDT-SWAP', '1h', 1764160800, 'us_equity_proxy',
+                     '100', '101', '99', '100.5', '10', 1764160800, 'regular'),
+                    ('AAPL-USDT-SWAP', '1h', 1764160800, 'okx_swap',
+                     '100', '101', '99', '100.5', '10', 1764160800, 'regular'),
+                    ('BTC-USDT', '1h', 1764160800, 'okx_spot',
+                     '100', '101', '99', '100.5', '10', 1764160800, 'regular')
+                """
+            )
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO settings
+                    (id, execution, risk, costs, backtest, updated_at,
+                     display, risk_defaults, data_sources)
+                VALUES
+                    (1, '{}', '{}', '{}', '{}', '2026-11-16 01:00:00', '{}', '{}',
+                     '{"provider": "yahoo", "subscribed_instruments": ["BTC-USDT"]}')
+                """
+            )
+        )
+
+    command.upgrade(alembic_config(), "head")
+
+    with session_scope() as session:
+        datasets = set(session.execute(text("SELECT dataset FROM data_sync_jobs")).scalars())
+        sources = set(session.execute(text("SELECT source FROM candles")).scalars())
+        data_sources = session.execute(text("SELECT data_sources FROM settings")).scalar_one()
+
+    assert datasets == {"candles"}
+    assert sources == {"okx_swap", "okx_spot"}
+    assert "provider" not in data_sources
 
 
 def test_account_snapshot_migration_backfills_position_batch_marker() -> None:

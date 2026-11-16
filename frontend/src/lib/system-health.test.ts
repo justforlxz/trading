@@ -22,11 +22,10 @@ function component(
 }
 
 describe("系统健康展示", () => {
-  it("六个固定组件名显示可读名称，未知名称原样保留", () => {
+  it("五个固定组件名显示可读名称，未知名称原样保留", () => {
     expect(healthComponentLabel("database")).toBe("数据库");
     expect(healthComponentLabel("okx_rest")).toBe("OKX REST");
     expect(healthComponentLabel("okx_ws")).toBe("OKX WebSocket");
-    expect(healthComponentLabel("external_provider")).toBe("外部 Provider");
     expect(healthComponentLabel("job_queue")).toBe("任务队列");
     expect(healthComponentLabel("candle_coverage")).toBe("K 线覆盖");
     expect(healthComponentLabel("backup")).toBe("backup");
@@ -46,17 +45,15 @@ describe("系统健康展示", () => {
       component("database", "ok"),
       component("candle_coverage", "stale"),
       component("job_queue", "ok"),
-      component("external_provider", "error"),
-      component("okx_ws", "unconfigured"),
-      component("okx_rest", "ok"),
+      component("okx_ws", "error"),
+      component("okx_rest", "unconfigured"),
     ]);
     expect(sorted.map((item) => item.name)).toEqual([
-      "external_provider",
-      "candle_coverage",
       "okx_ws",
+      "candle_coverage",
+      "okx_rest",
       "database",
       "job_queue",
-      "okx_rest",
     ]);
   });
 

@@ -224,9 +224,10 @@ def test_manual_position_is_included_with_source_and_local_stop(api: TestClient)
     assert body["summary"]["margin_usage_basis"] is None
 
 
-def test_manual_quantity_and_proxy_only_bars_do_not_leak_into_margin(api: TestClient) -> None:
+def test_manual_quantity_uses_base_quantity_not_contract_multiplier(api: TestClient) -> None:
     sync_instruments(parse_instruments([BTC_SWAP_INSTRUMENT]))
-    _seed_atr(BTC_SWAP_INST_ID, price="100", atr="2", count=15, source="us_equity_proxy")
+    # 只写少于 ATR 周期的有效日线：最新价可用于名义价值，ATR 则如实缺失。
+    _seed_atr(BTC_SWAP_INST_ID, price="100", atr="2", count=5, source="okx_swap")
 
     created = api.post(
         "/api/manual-positions",

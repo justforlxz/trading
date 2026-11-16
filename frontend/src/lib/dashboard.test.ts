@@ -213,7 +213,6 @@ describe("枚举与数值文案", () => {
     expect(marketSessionLabel("overnight")).toContain("未知时段");
 
     expect(dataSourceLabel("okx_spot")).toBe("OKX 现货");
-    expect(dataSourceLabel("us_equity_proxy")).toBe("美股代理行情");
     expect(dataSourceLabel("nasdaq")).toContain("未知来源");
 
     expect(exchangeStatusLabel("ok")).toBe("正常");

@@ -165,7 +165,6 @@ def test_create_backtest_returns_a_succeeded_run(client: TestClient, version_id:
     assert summary["inst_type"] == "SPOT"
     assert summary["symbol_count"] == 1
     assert summary["data_source"] == SOURCE
-    assert summary["is_proxy"] is False
     assert summary["strategy_version_id"] == version_id
     assert summary["params"] == PAIR_PARAMS
     assert summary["start_date"] == WINDOW["start_date"]
@@ -426,7 +425,7 @@ def test_batch_failure_leaves_no_partial_rows(client: TestClient) -> None:
             make_ref(inst_id="ETH-USDT", base_ccy="ETH", inst_category="1"),
         ]
     )
-    for inst_id, source in (("BTC-USDT", SOURCE), ("ETH-USDT", "us_equity_proxy")):
+    for inst_id, source in (("BTC-USDT", SOURCE), ("ETH-USDT", "okx_swap")):
         closes = CLOSES[inst_id]
         opens = [AS_OF - DAY * (len(closes) - 1 - index) for index in range(len(closes))]
         upsert_candles(

@@ -71,7 +71,7 @@ AssetType = Literal["tokenized_equity", "crypto", "commodity_token", "unknown"]
 # `exchange`（`app.instrument.model.EXCHANGE`，值为 `okx`）填 `data_source`
 # （见 `app/api/routes/instruments.py` 的 `get_instrument_candles`），因此它也
 # 必须留在契约里；同时它也是早期未区分形态的存量取值。
-DataSource = Literal["okx", "okx_spot", "okx_swap", "us_equity_proxy"]
+DataSource = Literal["okx", "okx_spot", "okx_swap"]
 # 组件层判断：单个基础组件对某个标的看多、看空还是不动。它不表达仓位，也不表达
 # 组合——「怎么做、做多少、做哪几条腿」由下面的 `TargetPortfolio` 承载。
 SignalAction = Literal["BUY", "SELL", "HOLD"]

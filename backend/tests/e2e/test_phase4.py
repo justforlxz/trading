@@ -215,7 +215,6 @@ def test_phase4_backtest_batch_ranking_and_detail(
     assert first["status"] == "succeeded"
     assert first["inst_id"] in INST_IDS
     assert first["data_source"] == SOURCE
-    assert first["is_proxy"] is False
 
     # 批量：两个标的各一条运行。
     listing = client.get("/api/backtests", params={"data_source": SOURCE})

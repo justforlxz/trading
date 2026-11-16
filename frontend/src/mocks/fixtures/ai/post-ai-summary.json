@@ -1,16 +1,16 @@
 {
   "disclaimer": "仅作信息归纳，不构成交易建议",
   "generated_at": "2026-11-15T06:10:00Z",
-  "overall": "偏强，波动率抬升",
+  "overall": "偏强",
   "points": [
     {
       "sources": [
         {
-          "id": "NASDAQ",
+          "id": "BTC",
           "type": "market_overview"
         }
       ],
-      "text": "NASDAQ Composite 最新 18000.12，较前值 +1.01%。"
+      "text": "Bitcoin 最新 65000.5，较前值 +1.88%。"
     }
   ],
   "risks": [

@@ -91,7 +91,6 @@ DEFAULT_RISK_DEFAULTS: dict[str, Any] = {
     "stop_rule": "fixed_pct",
 }
 DEFAULT_DATA_SOURCES: dict[str, Any] = {
-    "provider": None,
     "subscribed_instruments": [],
 }
 
@@ -156,14 +155,10 @@ def _execution_view(value: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _data_sources_view(value: Mapping[str, Any]) -> dict[str, Any]:
-    provider = value.get("provider")
-    if provider is not None and not isinstance(provider, str):
-        provider = None
     subscribed = value.get("subscribed_instruments", [])
     if not isinstance(subscribed, list):
         subscribed = []
     return {
-        "provider": provider.strip() if isinstance(provider, str) and provider.strip() else None,
         "subscribed_instruments": [
             item for item in subscribed if isinstance(item, str) and item.strip()
         ],
@@ -237,7 +232,7 @@ def save_settings(
     """按分组部分更新设置；未提交的分组保持原值。
 
     `api_key` 只在非空时覆盖；空字符串表示「本次不修改」，不会把已有密钥清空。
-    `subscribed_instruments` 单独给出时只替换订阅清单，不动 Provider。
+    `subscribed_instruments` 单独给出时只替换订阅清单。
     """
 
     moment = (clock or SystemClock()).now()

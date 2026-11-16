@@ -12,7 +12,7 @@
 
 日线的 `open_time` 由上游给出（OKX 是 16:00 UTC），本表不改写它；**期望的日界**由
 `app/market/session.py` 定：同步窗口与缺口网格都按「该条行情所属市场的交易日
-首个 `open_time`」算（美股代理源落在美东 09:30，24/7 市场仍是 UTC+8 零点）。时段
+首个 `open_time`」算（OKX 行情按 UTC+8 零点）。时段
 另存一列 `market_session`，读回时随 `Bar` 一起带出。
 """
 
@@ -22,7 +22,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Float, Index, Integer, String, Text, TypeDecorator, UniqueConstraint
+from sqlalchemy import Float, Index, Integer, String, Text, TypeDecorator
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core import Bar, Timeframe, ValidationError
@@ -194,55 +194,8 @@ class CorrelationSnapshot(Base):
     samples: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
-class MarketEventRow(Base):
-    """一条宏观或公司事件；时间统一保存为 UTC。"""
-
-    __tablename__ = "market_events"
-    __table_args__ = (
-        Index("ix_market_events_scheduled", "scheduled_at"),
-        Index("ix_market_events_ticker_scheduled", "ticker", "scheduled_at"),
-    )
-
-    id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    event_type: Mapped[str] = mapped_column(String(32), nullable=False)
-    title: Mapped[str] = mapped_column(String(256), nullable=False)
-    region: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    ticker: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    scheduled_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
-    actual: Mapped[str | None] = mapped_column(Text, nullable=True)
-    forecast: Mapped[str | None] = mapped_column(Text, nullable=True)
-    previous: Mapped[str | None] = mapped_column(Text, nullable=True)
-    importance: Mapped[str | None] = mapped_column(String(16), nullable=True)
-    source: Mapped[str] = mapped_column(String(64), nullable=False)
-    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
-    received_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
-
-
-class NewsItemRow(Base):
-    """一条已采集新闻；同一来源的 `provider_id` 只保留一行。"""
-
-    __tablename__ = "news_items"
-    __table_args__ = (
-        UniqueConstraint("source", "provider_id", name="uq_news_items_source_provider"),
-        Index("ix_news_items_published", "published_at"),
-        Index("ix_news_items_source_published", "source", "published_at"),
-    )
-
-    id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    provider_id: Mapped[str] = mapped_column(String(128), nullable=False)
-    title: Mapped[str] = mapped_column(String(512), nullable=False)
-    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
-    publisher: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    url: Mapped[str | None] = mapped_column(Text, nullable=True)
-    published_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
-    tickers_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
-    tags_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
-    source: Mapped[str] = mapped_column(String(64), nullable=False)
-    received_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
-
-
 class DataSyncJobRow(Base):
-    """一次外部数据同步任务；健康接口读取它，不临时探测上游。"""
+    """一次数据同步任务；健康接口读取它，不临时探测上游。"""
 
     __tablename__ = "data_sync_jobs"
     __table_args__ = (

@@ -142,7 +142,6 @@ _EXAMPLE_RUN = {
     "data_source": "okx",
     "inst_id": "XAAPL-USDT",
     "inst_type": "SPOT",
-    "is_proxy": False,
     "bar": "1h",
     "start_date": "2026-08-01",
     "end_date": "2026-11-01",
@@ -186,7 +185,6 @@ class BacktestRunSummary(BaseModel):
     # 一次回测只跑一个标的：批量回测按标的分成多条运行，列表与排行榜才有一行可比。
     inst_id: str
     inst_type: InstType
-    is_proxy: bool
     bar: Bar
     start_date: date
     end_date: date

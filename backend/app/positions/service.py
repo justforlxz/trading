@@ -88,7 +88,7 @@ STATUS_OPEN = "open"
 STATUS_CLOSED = "closed"
 
 #: 手动持仓的行情来源优先级；同一标的只用第一个有数据的来源。
-PRICE_SOURCES: tuple[str, ...] = ("okx", "okx_spot", "okx_swap", "us_equity_proxy")
+PRICE_SOURCES: tuple[str, ...] = ("okx", "okx_spot", "okx_swap")
 
 BEIJING = ZoneInfo("Asia/Shanghai")
 #: 日初基准快照的识别窗口：每日任务在 00:00 触发，允许几分钟的调度抖动。

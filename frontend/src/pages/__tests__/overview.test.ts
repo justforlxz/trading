@@ -31,7 +31,7 @@ function summary(): DashboardSummary {
           {
             inst_type: "SWAP",
             session: "pre",
-            primary_source: "us_equity_proxy",
+            primary_source: "okx_swap",
             bar: "1d",
             as_of: "2026-11-13T09:00:00Z",
             breadth: { advancers: 5, decliners: 5, unchanged: 0, ratio: "1", participants: 10 },
@@ -152,26 +152,25 @@ function summary(): DashboardSummary {
 }
 
 function marketOverview(): MarketSnapshot {
-  const symbols = ["NASDAQ", "SP500", "DOW", "VIX", "BTC"] as const;
   return {
     as_of: "2026-11-15T06:10:00Z",
-    provider: "market_data_provider",
     stale: false,
     stale_reason: null,
-    last_success_at: "2026-11-15T06:05:00Z",
-    items: symbols.map((symbol, index) => ({
-      symbol,
-      name: `${symbol} Composite`,
-      value: symbol === "BTC" ? "100000" : `${18000 + index}.12`,
-      change: symbol === "BTC" ? "1200" : "180",
-      change_pct: "1.01",
-      market_session: "closed",
-      source: "market_data_provider",
-      as_of: "2026-11-15T06:00:00Z",
-      is_delayed: index === 1,
-      quality_status: "normal" as const,
-      source_url: `https://example.test/${symbol.toLowerCase()}`,
-    })),
+    items: [
+      {
+        symbol: "BTC",
+        name: "Bitcoin",
+        value: "100000",
+        change: "1200",
+        change_pct: "1.01",
+        market_session: "regular",
+        source: "okx_spot",
+        as_of: "2026-11-15T06:00:00Z",
+        is_delayed: false,
+        quality_status: "normal",
+        source_url: "https://www.okx.com/trade-spot/btc-usdt",
+      },
+    ],
   };
 }
 
@@ -181,12 +180,8 @@ function aiSummary(): AiSummary {
     overall: "偏强，波动率抬升",
     points: [
       {
-        text: "NASDAQ Composite 最新 18000.12，较前值 +1.01%。",
-        sources: [{ type: "market_overview", id: "NASDAQ", url: null }],
-      },
-      {
-        text: "AAPL 发布季度业绩",
-        sources: [{ type: "news", id: "news_1", url: "https://example.test/news/1" }],
+        text: "BTC 最新 100000，较前值 +1.01%。",
+        sources: [{ type: "market_overview", id: "BTC", url: null }],
       },
     ],
     risks: [
@@ -251,7 +246,6 @@ describe("首页 v6", () => {
 
   it("数值全部来自后端，不在页面里重算", () => {
     const html = render();
-    expect(html).toContain("18000.12");
     expect(html).toContain("100000");
     expect(html).toContain("偏强，波动率抬升");
     expect(html).toContain("1248.60 USDT");
@@ -322,7 +316,6 @@ describe("首页 v6", () => {
     expect(html).toContain('id="risk"');
     expect(html).toContain('href="#market-overview"');
     expect(html).toContain('href="#alerts"');
-    expect(html).toContain('href="https://example.test/news/1"');
   });
 
   it("单个模块失效只降级自己，其余模块照常渲染", () => {
@@ -406,32 +399,32 @@ describe("首页 v6", () => {
     expect(section).not.toContain("偏强，波动率抬升");
   });
 
-  it("市场概况展示五个指标、来源、报价时间与延迟状态", () => {
+  it("市场概况只展示 BTC、OKX 来源、报价时间与状态", () => {
     const html = render();
-    for (const symbol of ["NASDAQ", "SP500", "DOW", "VIX", "BTC"]) {
-      expect(html).toContain(`data-market-symbol="${symbol}"`);
+    expect(html).toContain('data-market-symbol="BTC"');
+    for (const symbol of ["NASDAQ", "SP500", "DOW", "VIX"]) {
+      expect(html).not.toContain(`data-market-symbol="${symbol}"`);
     }
     const start = html.indexOf('data-module="market"');
     const end = html.indexOf('data-module="account"', start);
     const section = html.slice(start, end);
-    expect(section).toContain("market_data_provider");
+    expect(section).toContain("OKX 公共行情");
+    expect(section).toContain("okx_spot");
     expect(section).toContain("2026-11-15 14:00");
-    expect(section).toContain("延迟");
     expect(section).toContain("实时");
-    expect(section).toContain("https://example.test/nasdaq");
+    expect(section).toContain("https://www.okx.com/trade-spot/btc-usdt");
   });
 
   it("市场概况读取失败时显示原因，不显示旧值", () => {
     const html = render({
       marketOverview: null,
-      marketOverviewError: "外部 Provider 未配置",
+      marketOverviewError: "OKX BTC 行情读取失败（HTTP 502）",
       marketOverviewLoading: false,
     });
-    expect(html).toContain("外部 Provider 未配置");
+    expect(html).toContain("OKX BTC 行情读取失败（HTTP 502）");
     const start = html.indexOf('data-module="market"');
     const end = html.indexOf('data-module="account"', start);
     const section = html.slice(start, end);
-    expect(section).not.toContain("18000.12");
     expect(section).not.toContain("100000");
     expect(section).not.toContain("实时");
     // 其它模块不受影响。
@@ -446,13 +439,12 @@ describe("首页 v6", () => {
         points: [
           ...base.points,
           { text: "这条没有来源，不应出现", sources: [] },
-          { text: "来源标识为空，也不应出现", sources: [{ type: "news", id: " ", url: null }] },
+          { text: "来源标识为空，也不应出现", sources: [{ type: "alert", id: " ", url: null }] },
         ],
       },
     });
-    expect(html).toContain("NASDAQ Composite 最新 18000.12");
-    expect(html).toContain("https://example.test/news/1");
-    expect(html).toContain("市场概况 · NASDAQ");
+    expect(html).toContain("BTC 最新 100000");
+    expect(html).toContain("市场概况 · BTC");
     expect(html).toContain('href="#alerts"');
     expect(html).not.toContain("这条没有来源，不应出现");
     expect(html).not.toContain("来源标识为空，也不应出现");
@@ -471,20 +463,20 @@ describe("首页 v6", () => {
       marketOverview: {
         ...overview,
         stale: true,
-        stale_reason: "外部行情数据已过期: NASDAQ",
+        stale_reason: "OKX BTC 行情已过期",
         items: overview.items.map((item) => ({
           ...item,
-          quality_status: item.symbol === "NASDAQ" ? "stale" : item.quality_status,
+          quality_status: "stale" as const,
         })),
       },
       aiSummary: {
         ...summary,
         stale: true,
-        stale_notice: "外部行情数据已过期: NASDAQ",
+        stale_notice: "OKX BTC 行情已过期",
         overall: "数据不完整；偏强",
       },
     });
-    expect(html).toContain("数据已过期：外部行情数据已过期: NASDAQ");
+    expect(html).toContain("数据已过期：OKX BTC 行情已过期");
     expect(html).toContain("数据不完整；偏强");
     expect(html).toContain("过期");
   });

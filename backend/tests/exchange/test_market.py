@@ -14,7 +14,15 @@ import httpx
 import pytest
 
 from app.config import Settings
-from app.core import Bar, InstrumentRef, MarketDataPort, Ticker, Timeframe, ValidationError
+from app.core import (
+    Bar,
+    InstrumentRef,
+    MarketDataPort,
+    Ticker,
+    Timeframe,
+    ValidationError,
+    utc_from_millis,
+)
 from app.exchange import ExchangeError, OkxClient, OkxMarketData, create_market_data
 
 SPOT = "SPOT"
@@ -533,6 +541,37 @@ def test_ticker_invalid_number_raises() -> None:
 
     with pytest.raises(ExchangeError, match="数据非法"):
         market.ticker("XAAPL-USDT", inst_type=SPOT)
+    market.close()
+
+
+def test_ticker_quote_returns_last_open_and_time() -> None:
+    market, requests = _market(_envelope([TICKER]))
+
+    quote = market.ticker_quote("XAAPL-USDT")
+    market.close()
+
+    assert requests[0].url.path == "/api/v5/market/ticker"
+    assert requests[0].url.params["instId"] == "XAAPL-USDT"
+    assert quote.inst_id == "XAAPL-USDT"
+    assert quote.last == Decimal("352.11")
+    assert quote.open_24h == Decimal("350")
+    assert quote.ts == utc_from_millis("1794290400000")
+
+
+def test_ticker_quote_empty_response_raises() -> None:
+    market, _ = _market(_envelope([]))
+
+    with pytest.raises(ExchangeError, match="为空"):
+        market.ticker_quote("XAAPL-USDT")
+    market.close()
+
+
+def test_ticker_quote_missing_open_raises() -> None:
+    row = {key: value for key, value in TICKER.items() if key != "open24h"}
+    market, _ = _market(_envelope([row]))
+
+    with pytest.raises(ExchangeError, match="缺少字段"):
+        market.ticker_quote("XAAPL-USDT")
     market.close()
 
 

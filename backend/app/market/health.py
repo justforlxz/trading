@@ -1,7 +1,7 @@
-"""系统健康读取：数据库、OKX REST、OKX WebSocket、外部 Provider、任务队列与 K 线覆盖。
+"""系统健康读取：数据库、OKX REST、OKX WebSocket、任务队列与 K 线覆盖。
 
 健康接口只读已有事实，不在请求里临时探测上游：OKX REST 读同步任务或最近 K 线同步
-时间，外部 Provider 读 `data_sync_jobs`，WebSocket 状态由推送层传入，任务队列读
+时间，WebSocket 状态由推送层传入，任务队列读
 `data_sync_jobs`，K 线覆盖读 `candles`。单项失败只影响该项，不阻断其他检查。
 
 状态取值：
@@ -24,7 +24,6 @@ from sqlalchemy import text
 from app.core import Clock, SystemClock
 from app.db import session_scope
 from app.market import sync_jobs
-from app.market.external import MARKET_QUOTE_STALE_AFTER
 from app.market.service import CandleCoverage, candle_coverage_summary
 
 __all__ = [
@@ -38,14 +37,11 @@ COMPONENT_NAMES: tuple[str, ...] = (
     "database",
     "okx_rest",
     "okx_ws",
-    "external_provider",
     "job_queue",
     "candle_coverage",
 )
 OKX_PROVIDER = "okx"
 CANDLE_STALE_AFTER = timedelta(days=3)
-# 外部行情同步没有独立调度器，手动同步后一天内视为仍然新鲜。
-MARKET_SYNC_STALE_AFTER = timedelta(hours=24)
 
 
 def _window_label(window: timedelta) -> str:
@@ -196,59 +192,6 @@ def _okx_ws(ws_status: Mapping[str, Any] | None) -> ComponentHealth:
     )
 
 
-def _external_provider(
-    provider_name: str | None,
-    now: datetime,
-    provider_error: str | None = None,
-) -> ComponentHealth:
-    if provider_error is not None:
-        return ComponentHealth(
-            name="external_provider",
-            status="error",
-            last_success_at=None,
-            error=provider_error,
-            detail="无法读取外部行情 Provider 设置",
-        )
-    if provider_name is None:
-        return ComponentHealth(
-            name="external_provider",
-            status="unconfigured",
-            last_success_at=None,
-            error=None,
-            detail="未配置外部行情 Provider",
-        )
-    view = sync_jobs.provider_sync_status(
-        provider_name,
-        "market_overview",
-        now=now,
-        stale_after=MARKET_SYNC_STALE_AFTER,
-    )
-    quote_expired = view.data_as_of is not None and view.data_as_of < now - MARKET_QUOTE_STALE_AFTER
-    if view.job_status == "running":
-        detail = f"{provider_name} / market_overview 最近一次同步仍在运行"
-    elif view.job_status == "failed":
-        detail = f"{provider_name} / market_overview 最近一次同步失败"
-    elif quote_expired:
-        window = _window_label(MARKET_QUOTE_STALE_AFTER)
-        detail = f"{provider_name} / market_overview 报价时间已超过 {window}"
-    elif view.status == "ok":
-        detail = f"{provider_name} / market_overview 最近一次同步成功且仍在时效内"
-    elif view.status == "unconfigured":
-        detail = f"{provider_name} / market_overview 尚未同步过"
-    else:
-        window = _window_label(MARKET_SYNC_STALE_AFTER)
-        detail = f"{provider_name} / market_overview 数据已超过 {window}未更新"
-    if view.failure_count:
-        detail = f"{detail}；失败 {view.failure_count} 次"
-    return ComponentHealth(
-        name="external_provider",
-        status="stale" if quote_expired else view.status,
-        last_success_at=view.last_success_at,
-        error=view.error,
-        detail=detail,
-    )
-
-
 def _job_queue() -> ComponentHealth:
     view = sync_jobs.queue_sync_status()
     return ComponentHealth(
@@ -314,8 +257,6 @@ def _candle_component(
 
 def system_health(
     *,
-    provider_name: str | None,
-    provider_error: str | None = None,
     ws_status: Mapping[str, Any] | None = None,
     clock: Clock | None = None,
 ) -> SystemHealth:
@@ -337,10 +278,6 @@ def system_health(
         _database(now),
         _safe("okx_rest", lambda: _okx_rest(now, coverage)),
         _safe("okx_ws", lambda: _okx_ws(ws_status)),
-        _safe(
-            "external_provider",
-            lambda: _external_provider(provider_name, now, provider_error),
-        ),
         _safe("job_queue", _job_queue),
         _candle_component(now, coverage, coverage_error),
     )

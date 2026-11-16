@@ -521,42 +521,22 @@
         "title": "AiSummaryPoint",
         "type": "object"
       },
-      "AiSummaryRequest": {
-        "additionalProperties": false,
-        "description": "摘要输入；只读取已采集的数据，不触发外部请求。",
-        "properties": {
-          "include_news": {
-            "default": true,
-            "title": "Include News",
-            "type": "boolean"
-          },
-          "news_limit": {
-            "default": 10,
-            "maximum": 50.0,
-            "minimum": 1.0,
-            "title": "News Limit",
-            "type": "integer"
-          }
-        },
-        "title": "AiSummaryRequest",
-        "type": "object"
-      },
       "AiSummaryResponse": {
         "description": "结构化摘要；没有来源的事实点不会出现在 `points` 或 `risks` 里。",
         "examples": [
           {
             "disclaimer": "仅作信息归纳，不构成交易建议",
             "generated_at": "2026-11-15T06:10:00Z",
-            "overall": "偏强，波动率抬升",
+            "overall": "偏强",
             "points": [
               {
                 "sources": [
                   {
-                    "id": "NASDAQ",
+                    "id": "BTC",
                     "type": "market_overview"
                   }
                 ],
-                "text": "NASDAQ Composite 最新 18000.12，较前值 +1.01%。"
+                "text": "Bitcoin 最新 65000.5，较前值 +1.88%。"
               }
             ],
             "risks": [
@@ -628,7 +608,7 @@
         "type": "object"
       },
       "AiSummarySource": {
-        "description": "一条可回溯的来源；`id` 对应事件、新闻或提醒的本地标识。",
+        "description": "一条可回溯的来源；`id` 对应指标或提醒的本地标识。",
         "properties": {
           "id": {
             "title": "Id",
@@ -636,7 +616,6 @@
           },
           "type": {
             "enum": [
-              "news",
               "alert",
               "market_overview",
               "risk"
@@ -885,8 +864,7 @@
             "enum": [
               "okx",
               "okx_spot",
-              "okx_swap",
-              "us_equity_proxy"
+              "okx_swap"
             ],
             "title": "Data Source",
             "type": "string"
@@ -960,8 +938,7 @@
             "enum": [
               "okx",
               "okx_spot",
-              "okx_swap",
-              "us_equity_proxy"
+              "okx_swap"
             ],
             "title": "Data Source",
             "type": "string"
@@ -1203,8 +1180,7 @@
             "enum": [
               "okx",
               "okx_spot",
-              "okx_swap",
-              "us_equity_proxy"
+              "okx_swap"
             ],
             "title": "Source",
             "type": "string"
@@ -1277,7 +1253,6 @@
             ],
             "inst_id": "XAAPL-USDT",
             "inst_type": "SPOT",
-            "is_proxy": false,
             "metrics": {
               "annualized_return_pct": "48.21",
               "avg_holding_hours": "18.4",
@@ -1344,8 +1319,7 @@
             "enum": [
               "okx",
               "okx_spot",
-              "okx_swap",
-              "us_equity_proxy"
+              "okx_swap"
             ],
             "title": "Data Source",
             "type": "string"
@@ -1395,10 +1369,6 @@
             ],
             "title": "Inst Type",
             "type": "string"
-          },
-          "is_proxy": {
-            "title": "Is Proxy",
-            "type": "boolean"
           },
           "metrics": {
             "anyOf": [
@@ -1480,7 +1450,6 @@
           "data_source",
           "inst_id",
           "inst_type",
-          "is_proxy",
           "bar",
           "start_date",
           "end_date",
@@ -1523,8 +1492,7 @@
             "enum": [
               "okx",
               "okx_spot",
-              "okx_swap",
-              "us_equity_proxy"
+              "okx_swap"
             ],
             "title": "Source",
             "type": "string"
@@ -1629,8 +1597,7 @@
             "enum": [
               "okx",
               "okx_spot",
-              "okx_swap",
-              "us_equity_proxy"
+              "okx_swap"
             ],
             "title": "Data Source",
             "type": "string"
@@ -1771,7 +1738,6 @@
               "finished_at": "2026-11-10T01:21:30Z",
               "inst_id": "XAAPL-USDT",
               "inst_type": "SPOT",
-              "is_proxy": false,
               "metrics": {
                 "annualized_return_pct": "48.21",
                 "avg_holding_hours": "18.4",
@@ -2337,8 +2303,7 @@
             "enum": [
               "okx",
               "okx_spot",
-              "okx_swap",
-              "us_equity_proxy"
+              "okx_swap"
             ],
             "title": "Data Source",
             "type": "string"
@@ -2677,8 +2642,7 @@
             "enum": [
               "okx",
               "okx_spot",
-              "okx_swap",
-              "us_equity_proxy"
+              "okx_swap"
             ],
             "title": "Data Source",
             "type": "string"
@@ -2763,7 +2727,6 @@
                 "finished_at": "2026-11-10T01:21:30Z",
                 "inst_id": "XAAPL-USDT",
                 "inst_type": "SPOT",
-                "is_proxy": false,
                 "metrics": {
                   "annualized_return_pct": "48.21",
                   "avg_holding_hours": "18.4",
@@ -2802,8 +2765,7 @@
             "enum": [
               "okx",
               "okx_spot",
-              "okx_swap",
-              "us_equity_proxy"
+              "okx_swap"
             ],
             "title": "Data Source",
             "type": "string"
@@ -2838,7 +2800,6 @@
             "finished_at": "2026-11-10T01:21:30Z",
             "inst_id": "XAAPL-USDT",
             "inst_type": "SPOT",
-            "is_proxy": false,
             "metrics": {
               "annualized_return_pct": "48.21",
               "avg_holding_hours": "18.4",
@@ -2890,8 +2851,7 @@
             "enum": [
               "okx",
               "okx_spot",
-              "okx_swap",
-              "us_equity_proxy"
+              "okx_swap"
             ],
             "title": "Data Source",
             "type": "string"
@@ -2934,10 +2894,6 @@
             ],
             "title": "Inst Type",
             "type": "string"
-          },
-          "is_proxy": {
-            "title": "Is Proxy",
-            "type": "boolean"
           },
           "metrics": {
             "anyOf": [
@@ -3012,7 +2968,6 @@
           "data_source",
           "inst_id",
           "inst_type",
-          "is_proxy",
           "bar",
           "start_date",
           "end_date",
@@ -3150,8 +3105,7 @@
             "enum": [
               "okx",
               "okx_spot",
-              "okx_swap",
-              "us_equity_proxy"
+              "okx_swap"
             ],
             "title": "Data Source",
             "type": "string"
@@ -3405,8 +3359,7 @@
             "enum": [
               "okx",
               "okx_spot",
-              "okx_swap",
-              "us_equity_proxy"
+              "okx_swap"
             ],
             "title": "Data Source",
             "type": "string"
@@ -3523,8 +3476,7 @@
             "enum": [
               "okx",
               "okx_spot",
-              "okx_swap",
-              "us_equity_proxy"
+              "okx_swap"
             ],
             "title": "Data Source",
             "type": "string"
@@ -4413,8 +4365,7 @@
             "enum": [
               "okx",
               "okx_spot",
-              "okx_swap",
-              "us_equity_proxy"
+              "okx_swap"
             ],
             "title": "Primary Source",
             "type": "string"
@@ -4701,8 +4652,7 @@
             "enum": [
               "okx",
               "okx_spot",
-              "okx_swap",
-              "us_equity_proxy"
+              "okx_swap"
             ],
             "title": "Data Source",
             "type": "string"
@@ -5069,7 +5019,7 @@
                       "unchanged": 0
                     },
                     "inst_type": "SWAP",
-                    "primary_source": "us_equity_proxy",
+                    "primary_source": "okx_swap",
                     "resonance": {
                       "participants": 10,
                       "strength": "0",
@@ -5424,17 +5374,6 @@
             ],
             "title": "Last Sync At"
           },
-          "provider": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Provider"
-          },
           "subscribed_instruments": {
             "items": {
               "type": "string"
@@ -5450,18 +5389,6 @@
         "additionalProperties": false,
         "description": "数据源可写字段；最后同步时间与失败次数只读。",
         "properties": {
-          "provider": {
-            "anyOf": [
-              {
-                "maxLength": 64,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Provider"
-          },
           "subscribed_instruments": {
             "anyOf": [
               {
@@ -7133,8 +7060,7 @@
             "enum": [
               "okx",
               "okx_spot",
-              "okx_swap",
-              "us_equity_proxy"
+              "okx_swap"
             ],
             "title": "Data Source",
             "type": "string"
@@ -7421,8 +7347,7 @@
                 "enum": [
                   "okx",
                   "okx_spot",
-                  "okx_swap",
-                  "us_equity_proxy"
+                  "okx_swap"
                 ],
                 "type": "string"
               },
@@ -7918,171 +7843,6 @@
         "title": "MarketBreadthResponse",
         "type": "object"
       },
-      "MarketEventItem": {
-        "description": "一条宏观或公司事件；`scheduled_at_beijing` 是展示用北京时间。",
-        "properties": {
-          "actual": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Actual"
-          },
-          "event_type": {
-            "title": "Event Type",
-            "type": "string"
-          },
-          "forecast": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Forecast"
-          },
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "importance": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Importance"
-          },
-          "previous": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Previous"
-          },
-          "received_at": {
-            "title": "Received At",
-            "type": "string"
-          },
-          "region": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Region"
-          },
-          "scheduled_at": {
-            "title": "Scheduled At",
-            "type": "string"
-          },
-          "scheduled_at_beijing": {
-            "title": "Scheduled At Beijing",
-            "type": "string"
-          },
-          "source": {
-            "title": "Source",
-            "type": "string"
-          },
-          "source_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Source Url"
-          },
-          "ticker": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Ticker"
-          },
-          "title": {
-            "title": "Title",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "event_type",
-          "title",
-          "region",
-          "ticker",
-          "scheduled_at",
-          "scheduled_at_beijing",
-          "actual",
-          "forecast",
-          "previous",
-          "importance",
-          "source",
-          "source_url",
-          "received_at"
-        ],
-        "title": "MarketEventItem",
-        "type": "object"
-      },
-      "MarketEventListResponse": {
-        "description": "按时间范围与标的条件读取的事件列表。",
-        "examples": [
-          {
-            "items": [
-              {
-                "event_type": "earnings",
-                "forecast": "1.20",
-                "id": "evt_0123456789abcdef01234567",
-                "importance": "high",
-                "previous": "1.10",
-                "received_at": "2026-11-15T06:10:00Z",
-                "region": "US",
-                "scheduled_at": "2026-11-16T21:00:00Z",
-                "scheduled_at_beijing": "2026-11-17 05:00",
-                "source": "market_data_provider",
-                "ticker": "AAPL",
-                "title": "AAPL 财报"
-              }
-            ]
-          }
-        ],
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/MarketEventItem"
-            },
-            "title": "Items",
-            "type": "array"
-          }
-        },
-        "required": [
-          "items"
-        ],
-        "title": "MarketEventListResponse",
-        "type": "object"
-      },
       "MarketOverviewItem": {
         "description": "一个市场指标；缺数据时数值为 `null`，`quality_status` 说明原因。",
         "properties": {
@@ -8225,26 +7985,24 @@
         "type": "object"
       },
       "MarketSnapshotResponse": {
-        "description": "五个市场指标的当前快照；顶层 `stale` 表示至少一项不能当作实时值。",
+        "description": "BTC 的当前快照；顶层 `stale` 表示这项数据不能当作实时值。",
         "examples": [
           {
             "as_of": "2026-11-15T06:10:00Z",
             "items": [
               {
-                "as_of": "2026-11-15T06:00:00Z",
-                "change": "180",
-                "change_pct": "1.01",
+                "as_of": "2026-11-15T06:09:30Z",
+                "change": "1200",
+                "change_pct": "1.88",
                 "is_delayed": false,
-                "market_session": "closed",
-                "name": "NASDAQ Composite",
+                "market_session": "regular",
+                "name": "Bitcoin",
                 "quality_status": "normal",
-                "source": "market_data_provider",
-                "symbol": "NASDAQ",
-                "value": "18000.12"
+                "source": "okx_spot",
+                "symbol": "BTC",
+                "value": "65000.5"
               }
             ],
-            "last_success_at": "2026-11-15T06:05:00Z",
-            "provider": "market_data_provider",
             "stale": false
           }
         ],
@@ -8259,28 +8017,6 @@
             },
             "title": "Items",
             "type": "array"
-          },
-          "last_success_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Last Success At"
-          },
-          "provider": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Provider"
           },
           "stale": {
             "title": "Stale",
@@ -8300,10 +8036,8 @@
         },
         "required": [
           "as_of",
-          "provider",
           "stale",
           "stale_reason",
-          "last_success_at",
           "items"
         ],
         "title": "MarketSnapshotResponse",
@@ -8655,137 +8389,6 @@
           }
         },
         "title": "MomentumIndicators",
-        "type": "object"
-      },
-      "NewsItem": {
-        "description": "一条已采集新闻；标题、来源、URL 与发布时间原样保留。",
-        "properties": {
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "published_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Published At"
-          },
-          "publisher": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Publisher"
-          },
-          "received_at": {
-            "title": "Received At",
-            "type": "string"
-          },
-          "source": {
-            "title": "Source",
-            "type": "string"
-          },
-          "summary": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Summary"
-          },
-          "tags": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Tags",
-            "type": "array"
-          },
-          "tickers": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Tickers",
-            "type": "array"
-          },
-          "title": {
-            "title": "Title",
-            "type": "string"
-          },
-          "url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Url"
-          }
-        },
-        "required": [
-          "id",
-          "title",
-          "summary",
-          "publisher",
-          "url",
-          "published_at",
-          "tickers",
-          "tags",
-          "source",
-          "received_at"
-        ],
-        "title": "NewsItem",
-        "type": "object"
-      },
-      "NewsListResponse": {
-        "description": "按标的或行业标签读取的新闻列表。",
-        "examples": [
-          {
-            "items": [
-              {
-                "id": "news_0123456789abcdef01234567",
-                "published_at": "2026-11-15T05:00:00Z",
-                "publisher": "Example News",
-                "received_at": "2026-11-15T06:10:00Z",
-                "source": "market_data_provider",
-                "summary": "收入高于市场预期。",
-                "tags": [
-                  "technology"
-                ],
-                "tickers": [
-                  "AAPL"
-                ],
-                "title": "AAPL 发布季度业绩"
-              }
-            ]
-          }
-        ],
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/NewsItem"
-            },
-            "title": "Items",
-            "type": "array"
-          }
-        },
-        "required": [
-          "items"
-        ],
-        "title": "NewsListResponse",
         "type": "object"
       },
       "Opportunity": {
@@ -11007,8 +10610,7 @@
             "enum": [
               "okx",
               "okx_spot",
-              "okx_swap",
-              "us_equity_proxy"
+              "okx_swap"
             ],
             "title": "Data Source",
             "type": "string"
@@ -12360,14 +11962,13 @@
                 "status": "ok"
               },
               {
-                "detail": "market_data_provider / market_overview",
-                "error": "Provider 超时",
-                "last_success_at": "2026-11-14T06:00:00Z",
-                "name": "external_provider",
-                "status": "stale"
+                "detail": "candles 最近一次同步成功且仍在时效内",
+                "last_success_at": "2026-11-15T06:05:00Z",
+                "name": "okx_rest",
+                "status": "ok"
               }
             ],
-            "status": "degraded"
+            "status": "ok"
           }
         ],
         "properties": {
@@ -12401,7 +12002,7 @@
       },
       "SystemSyncRequest": {
         "additionalProperties": false,
-        "description": "手动触发一次数据同步；数据集由服务端校验。\n\n`instruments` 与 `candles` 是 OKX 公共行情的产品入口；其余数据集走外部行情\nProvider。`bar` 与 `days` 只对 `candles` 生效。",
+        "description": "手动触发一次 OKX 行情同步；`bar` 与 `days` 只对 `candles` 生效。",
         "properties": {
           "bar": {
             "anyOf": [
@@ -12447,18 +12048,6 @@
             },
             "title": "Instrument Ids",
             "type": "array"
-          },
-          "provider": {
-            "anyOf": [
-              {
-                "maxLength": 64,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Provider"
           }
         },
         "required": [
@@ -13295,18 +12884,8 @@
     },
     "/api/ai/summary": {
       "post": {
-        "description": "把市场快照、新闻与待处理提醒归纳成带来源的结构化摘要。",
+        "description": "把 BTC 市场快照与待处理提醒归纳成带来源的结构化摘要。",
         "operationId": "post_ai_summary_api_ai_summary_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AiSummaryRequest"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
           "200": {
             "content": {
@@ -13317,16 +12896,6 @@
               }
             },
             "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
           }
         },
         "summary": "Post Ai Summary",
@@ -13790,8 +13359,7 @@
               "enum": [
                 "okx",
                 "okx_spot",
-                "okx_swap",
-                "us_equity_proxy"
+                "okx_swap"
               ],
               "title": "Data Source",
               "type": "string"
@@ -13891,8 +13459,7 @@
               "enum": [
                 "okx",
                 "okx_spot",
-                "okx_swap",
-                "us_equity_proxy"
+                "okx_swap"
               ],
               "title": "Data Source",
               "type": "string"
@@ -14921,7 +14488,7 @@
     },
     "/api/instruments/{inst_id}/candles": {
       "get": {
-        "description": "某一来源的已落库 K 线尾部窗口，附带该来源真实的可用区间与缺口标记。\n\n`source` 必填、没有默认值：同一标的可能同时存有 OKX 行情与美股代理行情，两者\n的日界不同（OKX 是 16:00 UTC，代理是美东 09:30），静默挑一个就把两种来源拼成\n一条时间轴（Q5 / D3）。缺参会由参数校验直接拒绝，不会默认成 OKX。",
+        "description": "某一来源的已落库 K 线尾部窗口，附带该来源真实的可用区间与缺口标记。\n\n`source` 必填、没有默认值：同一标的可能同时存有 OKX 现货与永续行情，两者的\n日界与计价不同，静默挑一个就把两种来源拼成一条时间轴（Q5 / D3）。缺参会由参数\n校验直接拒绝，不会默认成 OKX。",
         "operationId": "get_instrument_candles_api_instruments__inst_id__candles_get",
         "parameters": [
           {
@@ -14958,8 +14525,7 @@
               "enum": [
                 "okx",
                 "okx_spot",
-                "okx_swap",
-                "us_equity_proxy"
+                "okx_swap"
               ],
               "title": "Source",
               "type": "string"
@@ -15373,105 +14939,9 @@
         ]
       }
     },
-    "/api/market/events": {
-      "get": {
-        "description": "按标的与时间范围读取宏观/公司事件；缺省范围为前后 30/90 天。",
-        "operationId": "get_market_events_api_market_events_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "ticker",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Ticker"
-            }
-          },
-          {
-            "in": "query",
-            "name": "start",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "date-time",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Start"
-            }
-          },
-          {
-            "in": "query",
-            "name": "end",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "date-time",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "End"
-            }
-          },
-          {
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "default": 100,
-              "maximum": 500,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MarketEventListResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Get Market Events",
-        "tags": [
-          "market"
-        ]
-      }
-    },
     "/api/market/overview": {
       "get": {
-        "description": "NASDAQ、SP500、DOW、VIX、BTC 的最新值、涨跌、时段与来源。",
+        "description": "BTC 的最新值、24 小时涨跌、时段、来源与报价时间。",
         "operationId": "get_market_snapshot_api_market_overview_get",
         "responses": {
           "200": {
@@ -15486,84 +14956,6 @@
           }
         },
         "summary": "Get Market Snapshot",
-        "tags": [
-          "market"
-        ]
-      }
-    },
-    "/api/news": {
-      "get": {
-        "description": "按标的或行业标签读取已采集新闻，保留标题、来源、URL 与发布时间。",
-        "operationId": "get_news_api_news_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "ticker",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Ticker"
-            }
-          },
-          {
-            "in": "query",
-            "name": "industry",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Industry"
-            }
-          },
-          {
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "default": 50,
-              "maximum": 200,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NewsListResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Get News",
         "tags": [
           "market"
         ]
@@ -16875,7 +16267,7 @@
     },
     "/api/system/health": {
       "get": {
-        "description": "数据库、OKX REST、OKX WebSocket、外部 Provider、任务队列与 K 线覆盖。",
+        "description": "数据库、OKX REST、OKX WebSocket、任务队列与 K 线覆盖。",
         "operationId": "get_system_health_api_system_health_get",
         "responses": {
           "200": {
@@ -16897,7 +16289,7 @@
     },
     "/api/system/sync": {
       "post": {
-        "description": "手动触发一次数据同步；同一 Provider 与数据集已在运行时返回 409。",
+        "description": "手动触发一次 OKX 数据同步；同一数据集已在运行时返回 409。",
         "operationId": "post_system_sync_api_system_sync_post",
         "requestBody": {
           "content": {

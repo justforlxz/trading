@@ -3,7 +3,7 @@
 > 版本：v1.0  
 > 基准原型：Trading Dashboard v6  
 > 目的：把原型中的页面、功能、数据字段、数据来源、计算方式和更新机制记录下来，作为后端设计及 Multica Issue 拆分依据。  
-> 说明：原型中的价格、账户、持仓、指标、信号、新闻事件、回测记录均为演示数据，不代表真实行情或真实交易结果。
+> 说明：原型中的价格、账户、持仓、指标、信号、回测记录均为演示数据，不代表真实行情或真实交易结果。
 
 ---
 
@@ -12,7 +12,7 @@
 `trading` 是个人使用的自托管交易工作台。当前原型围绕以下能力组织：
 
 - 市场概览：查看美股大盘、波动率、加密市场与市场状态。
-- 自选与分析：维护关注标的，查看 K 线、技术指标、相关性和近期事件。
+- 自选与分析：维护关注标的，查看 K 线、技术指标和相关性。
 - 账户与持仓：读取 OKX 账户、持仓和风险信息；同时维护非 OKX 的手动持仓。
 - 策略与回测：定义规则、选择标的和回测区间，查看回测结果。
 - 研究记录：记录假设、回测结论、决策和交易复盘。
@@ -88,11 +88,11 @@ OKX 股票永续产品说明提到交易对采用 `[TICKER]USDT` 格式，且产
 
 | 功能区 | 产品功能 | 展示数据 | 数据来源/计算方式 |
 |---|---|---|---|
-| 市场概况 | 查看大盘、波动率和加密市场状态 | NASDAQ、S&P 500、DOW、VIX、BTC 的最新值、涨跌额、涨跌幅、市场时段、更新时间 | BTC 用 OKX ticker；美股指数和 VIX 使用外部行情供应商。候选 FMP，需确认对应指数代码、实时权限和授权范围 |
+| 市场概况 | 查看加密市场状态 | BTC 的最新值、24 小时涨跌额、涨跌幅、市场时段、报价时间 | OKX 公共 ticker（`instId=BTC-USDT`）；不接入外部指数或外部行情供应商 |
 | 账户概览 | 了解账户资金和保证金使用情况 | 账户权益、今日盈亏及比例、可用权益/保证金、已用保证金、未实现盈亏、持仓名义价值、保证金使用率 | OKX 私有 Account API；名义价值根据合约规格和 mark price 计算或采用交易所字段 |
 | 风险监控 | 显示组合层面的风险状态 | 综合等级、临近止损持仓数、高杠杆持仓数、最大单标的敞口、未设置止损数量 | 持仓快照 + 本地止损设置 + 风控规则计算 |
 | 当前持仓 | 快速查看所有持仓 | 合约、方向、杠杆、未实现盈亏、标记价、止损距离 | OKX 持仓快照；手动持仓表；实时价格 |
-| 市场摘要 | 汇总当天市场变化与主要风险 | 标题、要点、关联标的、依据数据、生成时间 | 由行情摘要指标和新闻事件生成；LLM 只负责归纳，不负责创造行情数据 |
+| 市场摘要 | 汇总市场变化与主要风险 | 标题、要点、关联标的、依据数据、生成时间 | 由 BTC 行情快照和待处理提醒生成；LLM 只负责归纳，不负责创造行情数据 |
 | 关注列表摘要 | 查看关注标的核心技术状态 | 价格、日涨跌幅、RSI、趋势、信号 | 行情 + 本地指标计算 + 信号引擎 |
 | 需要关注 | 聚合需要用户处理的提醒 | 提醒类型、标的、触发条件、严重程度、触发时间、状态 | 本地 `alert_event`，来源包括技术信号、风险规则、策略信号和数据异常 |
 | 策略运行 | 查看策略概况 | 策略总数、启用数、运行状态、待确认信号、近 30 日回测/模拟表现 | 本地策略、扫描任务、回测结果；当前不代表真实自动交易 |
@@ -135,7 +135,6 @@ OKX 股票永续产品说明提到交易对采用 `[TICKER]USDT` 格式，且产
 | 关联资产 | 关联标的、行业/类别、相关系数、计算窗口 | 对齐交易日/时间窗后，基于收益率序列计算 Pearson 相关系数；缺失样本要剔除并显示有效样本数 |
 | 读数 | 对趋势、动量、波动和相关性的文字解释 | 由模板/规则引擎生成；如接 AI，输入必须是已计算的指标快照 |
 | 关联策略 | 策略名称、参数、标的关系、最近回测收益、最大回撤、交易数、回测日期 | 本地策略与回测数据库关联查询 |
-| 近期事件 | 宏观事件、公司财报、公司公告/新闻，事件时间、影响标的、来源链接 | 宏观事件优先 OKX Economic Calendar 或外部日历；公司财报/新闻用外部数据供应商 |
 | 数据覆盖 | 每个周期的起止时间、K 线数量、缺口数量、最后同步时间 | K 线存储与数据质量检查任务 |
 
 ### 指标定义（首版固定）
@@ -282,7 +281,7 @@ OKX 股票永续产品说明提到交易对采用 `[TICKER]USDT` 格式，且产
 
 | 设置项 | 保存内容 | 后端要求 |
 |---|---|---|
-| 行情与推送 | Provider、连接状态、订阅标的、最后同步时间、失败次数 | 提供数据源健康检查和同步任务状态 |
+| 行情与推送 | 连接状态、订阅标的、最后同步时间、失败次数 | 提供 OKX 数据源健康检查和同步任务状态 |
 | 显示偏好 | 涨跌配色、默认周期、价格精度、首页布局 | 用户级设置，前端可缓存，后端持久化 |
 | 交易连接 | OKX API Key/Secret/Passphrase、账户连接状态、权限检测 | Secret 只在服务端加密保存；前端不回显 |
 | 自动执行开关 | v6 默认关闭 | 当前版本可以只保存状态，不实现真实下单 |
@@ -305,10 +304,6 @@ OKX 股票永续产品说明提到交易对采用 `[TICKER]USDT` 格式，且产
 | OKX 账户余额/权益 | OKX Account API | `GET /api/v5/account/balance` + 私有 account/balance_and_position channel | 需要只读 API Key |
 | OKX 持仓 | OKX Account API | `GET /api/v5/account/positions` + 私有 positions channel | 页面只读；定期 REST 对账 |
 | OKX 资金费率 | OKX Public API | 当前费率和 funding-rate-history；订阅 funding-rate channel | API 历史窗口有限；长周期回测需另行归档 |
-| 美股指数、VIX、底层股票参考价 | 外部行情商，候选 FMP | REST/WS（依供应商能力） | 需确认 NASDAQ Composite、S&P 500、DOW、VIX 的具体 symbol、实时权限、延迟与授权条款 |
-| 宏观日历 | OKX Economic Calendar 或 FMP Calendar | REST 定期拉取；若需要可订阅 OKX economic-calendar channel | 统一保存事件时区、重要性、前值/预期/实际值 |
-| 公司财报/公司事件 | FMP Calendar 或其他授权供应商 | 按关注标的查询财报日、拆股、分红等事件 | 供应商 coverage/价格/授权需要在接入前确认 |
-| 新闻 | FMP Market News 或其他新闻源 | 按关注标的/行业抓取；保存标题、来源、URL、发布时间和 ticker 标签 | AI 只对已抓取的内容做归纳和分类 |
 | 技术指标 | 自有计算模块 | 从标准化 OHLCV 计算 | 不需要额外购买指标 API |
 | 相关性/市场广度/关键价位 | 自有计算模块 | 从对齐后的历史收益率和指标计算 | 保存计算窗口、样本数和算法版本 |
 | 提醒/活动 | 自有事件系统 | 指标、风险、策略、采集任务触发时写入数据库 | 不能仅靠前端临时拼接 |
@@ -320,15 +315,9 @@ OKX 股票永续产品说明提到交易对采用 `[TICKER]USDT` 格式，且产
 - [OKX API v5 文档](https://www.okx.com/docs-v5/en/)
 - [OKX Stock Perpetuals 产品说明](https://www.okx.com/en-us/help/stock-perpetuals)
 
-**FMP** 可作为外部股票数据的候选统一供应商。其文档列有 Real-time Market Data、Index Market Data、Market Calendar、Market News、Historical Market Data 等数据集；实际使用前需核对具体 symbol、实时/延迟权限、套餐限制和数据使用授权：
-
-- [FMP API Quickstart](https://site.financialmodelingprep.com/developer/docs/quickstart)
-
-不要在未核实前把 FMP 视为已经选定的数据供应商；也不要假设免费套餐可提供所有指数实时数据。
-
 ### 4.3 推荐同步频率
 
-以下是系统侧建议值，最终需结合 OKX/外部供应商限频与个人设备资源调整：
+以下是系统侧建议值，最终需结合 OKX 限频与个人设备资源调整：
 
 | 数据 | 采集/刷新方式 | 建议频率 |
 |---|---|---|
@@ -338,8 +327,6 @@ OKX 股票永续产品说明提到交易对采用 `[TICKER]USDT` 格式，且产
 | 历史 K 线 | REST 分页初始化/补缺 | 首次全量；每根 bar 收盘后增量同步 |
 | 技术指标 | 本地计算 | 新 bar 完成后；新标的/历史补齐后重算 |
 | 相关性 | 本地计算 | 每日收盘后或数据集更新后 |
-| 宏观/公司事件 | Provider API | 每 6 小时同步；临近事件时可提高频率 |
-| 新闻 | Provider API | 1–5 分钟轮询，按供应商额度和新闻量调整 |
 | 策略信号 | 本地扫描器 | 每根目标周期 K 线完成后扫描；必要时单独做实时阈值监控 |
 | 风险规则 | 本地计算 | 持仓/价格/止损数据变化时重算 |
 | 最近活动 | 本地事件写入 | 业务事件发生时写入，不做周期性外部抓取 |
@@ -369,8 +356,6 @@ OKX 股票永续产品说明提到交易对采用 `[TICKER]USDT` 格式，且产
 | `correlation_snapshot` | source_instrument、target_instrument、window、coefficient、sample_count、ts | 关联资产分析 |
 | `alert_event` | id、type、severity、instrument_id、rule_id、title、detail、payload、status、dedup_key、triggered_at | 需要关注的提醒/信号事件 |
 | `activity_event` | id、event_type、object_type、object_id、summary、payload、created_at | 最近活动时间线 |
-| `market_event` | id、event_type、title、region、ticker、scheduled_at、actual、forecast、previous、source_url | 宏观/公司事件 |
-| `news_item` | id、provider_id、title、summary、publisher、url、published_at、tickers、sentiment/tags | 新闻池和 AI 输入 |
 | `strategy` / `strategy_version` | id、name、category、status、rule_json、parameters、timeframe、created_at | 策略定义与可复现版本 |
 | `strategy_instrument` | strategy_version_id、instrument_id | 策略标的关联 |
 | `strategy_signal` | id、strategy_version_id、instrument_id、direction、triggered_at、rule_snapshot、status | 策略产生的信号 |
@@ -384,7 +369,7 @@ OKX 股票永续产品说明提到交易对采用 `[TICKER]USDT` 格式，且产
 
 ### 每个外部数据记录建议保留的通用元数据
 
-- `source` / `provider`
+- `source`（取值 `okx`、`okx_spot`、`okx_swap`）
 - `source_symbol` / `source_id`
 - `as_of`：数据在源端代表的时间
 - `received_at`：本系统收到数据的时间
@@ -444,12 +429,12 @@ OKX 股票永续产品说明提到交易对采用 `[TICKER]USDT` 格式，且产
 | API | 作用 |
 |---|---|
 | `GET /api/dashboard/summary` | 首页汇总：市场、账户、风险、持仓、自选摘要、提醒、策略和活动 |
-| `GET /api/market/overview` | NASDAQ/S&P/DOW/VIX/BTC 市场概况 |
+| `GET /api/market/overview` | BTC 市场概况（OKX 公共 ticker） |
 | `GET /api/instruments?query=` | 标的搜索和可交易列表 |
 | `GET /api/watchlist` | 自选列表及指标摘要 |
 | `POST /api/watchlist/items` | 添加自选 |
 | `DELETE /api/watchlist/items/{id}` | 移除自选 |
-| `GET /api/instruments/{id}/analysis?bar=1D` | 标的分析聚合：quote、candles、indicators、levels、correlations、events、linked strategies |
+| `GET /api/instruments/{id}/analysis?bar=1D` | 标的分析聚合：quote、candles、indicators、levels、correlations、linked strategies |
 | `GET /api/positions` | OKX 与手动持仓合并视图，保留 source 类型 |
 | `POST /api/manual-positions` | 创建手动持仓 |
 | `POST /api/manual-positions/{id}/trades` | 写入手动买入/卖出/更正流水 |
@@ -467,7 +452,7 @@ OKX 股票永续产品说明提到交易对采用 `[TICKER]USDT` 格式，且产
 | `GET /api/research-notes` / `POST /api/research-notes` | 研究记录查询/创建 |
 | `PUT /api/research-notes/{id}` / `DELETE /api/research-notes/{id}` | 研究记录更新/删除 |
 | `GET /api/settings` / `PATCH /api/settings` | 用户设置 |
-| `GET /api/system/health` | 系统、Provider、WebSocket、任务队列和数据质量状态 |
+| `GET /api/system/health` | 系统、OKX REST、OKX WebSocket、任务队列和数据质量状态 |
 | `POST /api/system/sync` | 手动触发允许的同步任务 |
 
 ### WebSocket / SSE 推送事件
@@ -509,10 +494,9 @@ OKX 股票永续产品说明提到交易对采用 `[TICKER]USDT` 格式，且产
 - 支持最新 K 线增量更新、缺口扫描和补齐。
 - 验收：每个标的能查询起止时间、数量、缺口数和最后更新时间；历史数据时间口径固定。
 
-**A4. 外部市场数据 Provider**
-- 先验证供应商是否提供 NASDAQ Composite/S&P 500/DOW/VIX 所需字段、频率和授权。
-- 封装 Provider Adapter，避免页面绑定单一供应商格式。
-- 验收：市场概览数据返回统一 schema，失败时显示陈旧/不可用状态。
+**A4. BTC 市场概况**
+- 取 OKX 公共 ticker 的 BTC 最新价与 24 小时涨跌，附报价时间与来源。
+- 验收：市场概况只返回 BTC；取不到行情时如实显示缺失或陈旧，不用旧值冒充实时。
 
 ### 阶段 B：核心分析与首页数据
 
@@ -553,25 +537,15 @@ OKX 股票永续产品说明提到交易对采用 `[TICKER]USDT` 格式，且产
 - 为规则配置阈值和严重等级。
 - 验收：展示的每条风险都能追溯到输入字段、计算值和触发规则。
 
-### 阶段 D：提醒、事件和 AI 摘要
+### 阶段 D：提醒、活动与 AI 摘要
 
 **D1. 统一事件/活动存储**
 - 建立 alert_event 和 activity_event。
 - 加入事件去重、状态更新和查询接口。
 - 验收：首页提醒和活动均来自数据库事件，不由前端硬编码。
 
-**D2. 宏观与公司事件同步**
-- 接入宏观日历和关注标的的财报/公司事件。
-- 标准化时区、标的关联、事件来源和 URL。
-- 验收：可按标的和时间范围查询，事件时间明确显示北京时间。
-
-**D3. 新闻采集与筛选**
-- 按关注标的和行业获取新闻。
-- 去重、保留来源 URL、发布时间和关联 ticker。
-- 验收：每条 AI 摘要要点能回溯到至少一条数据/新闻来源。
-
-**D4. AI 市场摘要**
-- 输入市场指标快照、风险事件和已采集新闻。
+**D2. AI 市场摘要**
+- 输入 BTC 市场概况快照和待处理提醒。
 - 生成结构化摘要：总体状态、观察要点、风险提示、引用依据、生成时间。
 - 验收：无来源依据的事实不输出；数据过期时显式提示；AI 不能生成可执行订单。
 
@@ -603,7 +577,7 @@ OKX 股票永续产品说明提到交易对采用 `[TICKER]USDT` 格式，且产
 - 验收：筛选、创建、更新、删除和详情查看完整。
 
 **F2. 设置与系统健康**
-- 保存显示偏好、风险默认值和 Provider 配置。
+- 保存显示偏好、风险默认值和订阅标的配置。
 - 展示同步任务、WS、数据库和历史数据健康状态。
 - 验收：每个状态都有真实后端检查结果和最后成功时间。
 
@@ -620,7 +594,6 @@ OKX 股票永续产品说明提到交易对采用 `[TICKER]USDT` 格式，且产
 
 1. **OKX 产品清单：**账户实际能否通过 API 查询到计划使用的美股股票永续合约？确认 AAPL/NVDA/GOOG 等具体 `instId`、合约状态和交易规格。
 2. **历史 K 线覆盖：**目标合约从什么时候开始有日线？是否能覆盖首版策略回测区间？不同周期的可用深度分别是多少？
-3. **外部行情 Provider：**NASDAQ Composite、S&P 500、DOW、VIX 和公司新闻/财报使用哪家供应商？要确认实时/延迟、限频、成本与个人使用授权。
 4. **今日盈亏口径：**按北京时间自然日、UTC 自然日，还是美股交易日统计？首版默认可采用北京时间自然日并保存 00:00 权益快照。
 5. **回测资金费率：**多年回测需要完整历史资金费率。OKX 文档当前的 funding-rate-history API 只承诺近三个月数据；决定归档方案前，不要承诺多年回测的资金费率已经精确。
 6. **股票交易日与永续 24/7 数据口径：**日线策略按 OKX 24/7 合约日线，还是按美股常规交易时段构造日线？建议首版明确选 OKX 合约日线，另存底层股票参考数据。
@@ -640,7 +613,7 @@ OKX 股票永续产品说明提到交易对采用 `[TICKER]USDT` 格式，且产
 - 手动持仓具备可追溯流水。
 - 所有提醒和活动均由服务端事件产生、去重、持久化。
 - 回测保存策略版本、数据版本、成本参数和结果明细，可复现。
-- 市场新闻/事件与 AI 摘要具备来源和时间；AI 内容不能替代真实行情字段。
+- AI 摘要具备来源和时间；AI 内容不能替代真实行情字段。
 - live、delayed、stale、demo、backtest 数据在 UI 和 API 层明确区分。
 
 ---
@@ -649,6 +622,5 @@ OKX 股票永续产品说明提到交易对采用 `[TICKER]USDT` 格式，且产
 
 - [OKX API v5 文档](https://www.okx.com/docs-v5/en/)：公共行情、K 线、产品规格、账户余额、持仓、WebSocket、资金费率。
 - [OKX Stock Perpetuals 产品说明](https://www.okx.com/en-us/help/stock-perpetuals)：股票永续的产品范围、交易时间和指数价格机制。说明中指出股票永续 24/7 交易，底层美股常规市场仍按交易所日历开闭市。
-- [FMP API Quickstart](https://site.financialmodelingprep.com/developer/docs/quickstart)：股票行情、历史数据、指数、市场日历和新闻等数据集及 API 接入说明。
 
 > 本文中的接口路径以官方文档当前版本为依据；实际开发前还需用目标账户、目标地区和目标合约做一次端到端验证。供应商接口权限、数据授权和历史覆盖以实际套餐及服务条款为准。

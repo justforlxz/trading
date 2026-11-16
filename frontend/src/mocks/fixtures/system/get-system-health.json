@@ -7,12 +7,11 @@
       "status": "ok"
     },
     {
-      "detail": "market_data_provider / market_overview",
-      "error": "Provider 超时",
-      "last_success_at": "2026-11-14T06:00:00Z",
-      "name": "external_provider",
-      "status": "stale"
+      "detail": "candles 最近一次同步成功且仍在时效内",
+      "last_success_at": "2026-11-15T06:05:00Z",
+      "name": "okx_rest",
+      "status": "ok"
     }
   ],
-  "status": "degraded"
+  "status": "ok"
 }

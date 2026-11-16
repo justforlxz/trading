@@ -180,7 +180,7 @@ def test_multi_source_symbol_requires_an_explicit_source() -> None:
     """同一标的混存两种来源时不猜：不指定来源直接报错。"""
 
     _write(SYMBOL_A, [10.0, 12.0, 14.0, 16.0], source="okx_swap")
-    _write(SYMBOL_A, [1.0, 2.0, 3.0, 4.0], source="us_equity_proxy")
+    _write(SYMBOL_A, [1.0, 2.0, 3.0, 4.0], source="okx_spot")
     _write(SYMBOL_B, [101.0, 103.0, 99.0, 97.0], source="okx_swap")
 
     with pytest.raises(ValidationError):
@@ -191,7 +191,7 @@ def test_source_filter_keeps_one_series_per_symbol() -> None:
     """指定来源后只用该来源的 K 线：系数等于该来源的读数，另一来源的行不参与。"""
 
     _write(SYMBOL_A, [10.0, 12.0, 14.0, 16.0], source="okx_swap")
-    _write(SYMBOL_A, [1.0, 2.0, 3.0, 4.0], source="us_equity_proxy")
+    _write(SYMBOL_A, [1.0, 2.0, 3.0, 4.0], source="okx_spot")
     _write(SYMBOL_B, [101.0, 103.0, 99.0, 97.0], source="okx_swap")
 
     matrix = correlation_matrix([SYMBOL_A, SYMBOL_B], "1h", 4, _moment(3), source="okx_swap")
@@ -201,7 +201,7 @@ def test_source_filter_keeps_one_series_per_symbol() -> None:
     assert matrix.sample_size(SYMBOL_A, SYMBOL_B) == 4
 
     # 换成代理行情来源：B 没有这个来源的行，交集为空，系数与样本都归零。
-    other = correlation_matrix([SYMBOL_A, SYMBOL_B], "1h", 4, _moment(3), source="us_equity_proxy")
+    other = correlation_matrix([SYMBOL_A, SYMBOL_B], "1h", 4, _moment(3), source="okx_spot")
     assert other[SYMBOL_A][SYMBOL_B] is None
     assert other.sample_size(SYMBOL_A, SYMBOL_B) == 0
 

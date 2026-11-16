@@ -22,7 +22,6 @@ const SETTINGS: SettingsResponse = {
   },
   execution: { auto_trading_enabled: false },
   data_sources: {
-    provider: "market_data_provider",
     subscribed_instruments: ["BTC-USDT", "ETH-USDT-SWAP"],
     last_sync_at: "2026-11-15T06:00:00Z",
     failure_count: 2,
@@ -61,13 +60,6 @@ const HEALTH: SystemHealthResponse = {
       detail: "推送层未启动",
     },
     {
-      name: "external_provider",
-      status: "stale",
-      last_success_at: "2026-11-14T06:00:00Z",
-      error: "Provider 超时",
-      detail: "market_data_provider / market_overview",
-    },
-    {
       name: "job_queue",
       status: "ok",
       last_success_at: "2026-11-15T06:00:00Z",
@@ -76,9 +68,9 @@ const HEALTH: SystemHealthResponse = {
     },
     {
       name: "candle_coverage",
-      status: "ok",
+      status: "stale",
       last_success_at: "2026-11-15T05:00:00Z",
-      error: null,
+      error: "最近一次同步距今超过阈值",
       detail: "三个周期覆盖完整",
     },
   ],
@@ -123,32 +115,32 @@ describe("设置页", () => {
     expect(html).not.toContain("backtest");
   });
 
-  it("系统健康逐项展示六项状态、最后成功时间与错误摘要", () => {
+  it("系统健康逐项展示五项状态、最后成功时间与错误摘要", () => {
     const html = render();
     expect(html).toContain("整体状态：部分异常");
     expect(html).toContain("检查时间：2026-11-15 14:10（北京时间）");
-    for (const label of [
-      "数据库",
-      "OKX REST",
-      "OKX WebSocket",
-      "外部 Provider",
-      "任务队列",
-      "K 线覆盖",
-    ]) {
+    for (const label of ["数据库", "OKX REST", "OKX WebSocket", "任务队列", "K 线覆盖"]) {
       expect(html).toContain(label);
     }
+    expect(html).not.toContain("外部 Provider");
     expect(html).toContain("最后成功时间：2026-11-15 14:00");
     expect(html).toContain("最后成功时间：暂无成功记录");
-    expect(html).toContain("错误摘要：Provider 超时");
-    expect(html).toContain("详情：market_data_provider / market_overview");
+    expect(html).toContain("详情：最近一次 K 线同步成功");
     expect(html).toContain("陈旧");
     expect(html).toContain("未配置");
   });
 
   it("健康异常的项排在正常项前面", () => {
     const html = render();
-    expect(html.indexOf("外部 Provider")).toBeLessThan(html.indexOf("数据库"));
     expect(html.indexOf("OKX WebSocket")).toBeLessThan(html.indexOf("数据库"));
+  });
+
+  it("数据连接不含 Provider 输入，只保留订阅标的与 OKX 同步状态", () => {
+    const html = render();
+    expect(html).not.toContain("Provider");
+    expect(html).toContain("订阅标的（逗号分隔）");
+    expect(html).toContain("最后同步：");
+    expect(html).toContain("失败次数：2");
   });
 
   it("密钥区只显示掩码和配置状态，不出现 Secret 与 Passphrase 的值", () => {

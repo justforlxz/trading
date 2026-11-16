@@ -116,7 +116,7 @@ flowchart TD
 | 3 | S3-1 实时推送<br>S3-2 风险与敞口 | 服务端汇总 OKX WebSocket 后推给浏览器；持仓风险与敞口计算 | 自选、详情、持仓价格由推送更新；断线可恢复；每条风险能追溯到输入字段和规则 |
 | 4 | S4-1 首页 v6<br>S4-2 策略与回测页 | 账户、风险、持仓、自选、策略首页；策略参数与回测记录 | 首页每个模块独立降级，不显示假数字；策略版本和参数可复现 |
 | 5 | S4-3 详情联动回测<br>S4-4 回测详情<br>S5-1 研究记录<br>S5-2 提醒与活动 | 详情关联策略；K 线买卖标记、净值回撤与回放；假设、结论、决策、复盘 CRUD；服务端提醒与活动事件 | 从策略和从自选详情两个入口都能发起回测；回放只读已保存序列；记录可关联标的、策略和回测；提醒与活动来自事件表，前端不拼文案 |
-| 6 | S6-1 市场数据与 AI 摘要<br>S6-2 设置与健康 | NASDAQ、S&P 500、DOW、VIX、BTC，财报与新闻，带来源的摘要；设置与系统健康 | 每条摘要能回溯来源；过期数据显式提示；健康状态来自真实检查 |
+| 6 | S6-1 市场数据与 AI 摘要<br>S6-2 设置与健康 | BTC 市场概况（OKX 公共 ticker）、带来源的摘要；设置与系统健康 | 每条摘要能回溯来源；过期数据显式提示；健康状态来自真实检查 |
 | 7 | S7-1 全站验收<br>S7-2 真实功能验收清单与执行规则 | 清理演示数据与环境标签，端到端走查，执行旧代码残留检查，核对 PRD 状态；编写真实验收清单、判定规则、失败处理和报告格式 | 所有页面无硬编码业务数值；live、delayed、stale、demo、backtest 不混排；`rg` 查不到已删除页面、路由、API 路径、schema 和 feature flag；`docs/prd/v6.md` 的每行状态与代码一致；`docs/prd/v6-acceptance.md` 覆盖全部已实现和开发中功能行；验收唤醒报告全部 PASS，或 FAIL 已建修复 issue 并复验通过，BLOCKED 有原因和重试条件 |
 
 阶段 5 的排列说明：MKACG-807 的评论已决定把 S4-3、S4-4 从阶段 4 移到阶段 5，避免与 S4-2 同时开工、互相等待。本文按该评论记录；MKACG-807 的阶段表正文如仍未同步，由 PL 在该 issue 内更新。
@@ -168,7 +168,7 @@ flowchart TD
 ### S1-3 详情页 v6
 
 - 阶段：1
-- 范围：面包屑导航；`GET /api/instruments/{id}/analysis` 聚合接口与页面；周期切换、K 线与 MA 叠加、趋势、动量、波动、成交量、相对强弱、关键价位、关联资产、关联策略、近期事件、数据覆盖。
+- 范围：面包屑导航；`GET /api/instruments/{id}/analysis` 聚合接口与页面；周期切换、K 线与 MA 叠加、趋势、动量、波动、成交量、相对强弱、关键价位、关联资产、关联策略、数据覆盖。MKACG-853 已删除「近期事件」区块。
 - 依赖：P1。与 S1-1、S1-2 并行；只改详情页及其数据请求。
 - 验收要点：每个模块的数据都来自真实接口；没有完整数据的周期禁用并写明原因；数据覆盖显示起止时间、数量、缺口和最后同步时间；`lint` 和 `build` 通过。
 - 对应 issue：MKACG-810。
@@ -256,15 +256,15 @@ flowchart TD
 ### S6-1 市场数据与 AI 摘要
 
 - 阶段：6
-- 范围：首页 NASDAQ、S&P 500、DOW、VIX、BTC 市场概况；带来源和生成时间的 AI 摘要；详情页宏观、财报和公告事件。
+- 范围：首页 BTC 市场概况（数据来自 OKX 公共 ticker）；带来源和生成时间的 AI 摘要。
 - 依赖：B9（B4、B5）、S4-1、S3-1。
-- 验收要点：五个指标都带来源、时间和延迟状态；每个摘要事实点至少一条来源；没有来源的句子不输出；数据过期时显式提示。
+- 验收要点：BTC 一项带来源、时间和状态；每个摘要事实点至少一条来源；没有来源的句子不输出；数据过期时显式提示。MKACG-853 已删除外部指数、新闻与详情页事件，范围与验收不再包含这些内容。
 - 对应 issue：未创建，阶段 5 闸门通过后由 PL 创建。
 
 ### S6-2 设置与健康
 
 - 阶段：6
-- 范围：设置页保留数据连接、显示偏好、风险默认值、自动执行开关、密钥状态与健康；自动执行开关按规格 §3.8 保留，默认 `false`，只保存状态，不实现真实下单；系统健康展示数据库、OKX REST、OKX WebSocket、外部 Provider、任务队列和 K 线覆盖。
+- 范围：设置页保留数据连接、显示偏好、风险默认值、自动执行开关、密钥状态与健康；自动执行开关按规格 §3.8 保留，默认 `false`，只保存状态，不实现真实下单；系统健康展示数据库、OKX REST、OKX WebSocket、任务队列和 K 线覆盖。MKACG-853 已删除 Provider 输入框与 `external_provider` 健康项。
 - 依赖：B9、S1-1。
 - 验收要点：Secret 和 Passphrase 不回显，API Key 只显示掩码；自动执行开关默认关闭，修改后不产生任何真实订单；每个健康项来自真实检查并有最后成功时间；旧的执行模式、紧急停止、成本、回测默认值和代理分组从页面和接口响应中删除。
 - 对应 issue：未创建，阶段 5 闸门通过后由 PL 创建。
@@ -299,7 +299,7 @@ flowchart TD
 | B6 策略 v6 后端 | 4 | 策略、版本、规则 JSON、标的关联、CRUD | 0016 | 无 | 策略与回测页、详情关联策略 | MKACG-816 |
 | B7 回测 v6 后端 | 4 | K 线买卖标记、净值与回撤、回放序列、交易筛选与 CSV | 无 | B6、现有回测引擎 | 回测详情、详情回测入口 | MKACG-817 |
 | B8 记录、提醒与活动 | 5 | 研究记录 CRUD、提醒事件、活动事件、去重与状态 | 0017 | B2、B3、B6 | 记录页、首页提醒与活动、详情提醒 | MKACG-818 |
-| B9 外部市场、AI 与设置健康 | 6 | 市场指数、VIX、BTC、财报与新闻、带来源的 AI 摘要、系统健康 | 0018 | B4、B5 | 首页市场概况与摘要、设置页 | MKACG-819 |
+| B9 市场概况与 AI 摘要、设置健康 | 6 | BTC 市场概况、带来源的 AI 摘要、系统健康；外部指数、新闻与代理行情的删除见 MKACG-853 | 0018、0020 | B4、B5 | 首页市场概况与摘要、设置页 | MKACG-819、MKACG-853 |
 
 ### 5.1 迁移与并行规则
 
@@ -309,6 +309,7 @@ flowchart TD
 | 0016 | B6 | 策略、策略版本、策略标的关联、回测关联 |
 | 0017 | B8 | 研究记录、提醒事件、活动事件 |
 | 0018 | B9 | 市场事件、新闻条目、数据同步任务、设置扩展 |
+| 0020 | MKACG-853 | 删除市场事件与新闻条目、清理外部同步任务与代理行情 |
 
 - 合并前 `alembic heads` 必须只有一个头。如果 B2 的 0015 还没合并，B6 不得先写 0016。
 - 不依赖迁移的包（B3、B4、B5、B7）可以在前置包合并后并行，各自改独立模块，不碰同一批文件。
@@ -317,7 +318,7 @@ flowchart TD
 
 ## 6. API 契约表
 
-本节以 `docs/prd/v6-data-spec.md` 第 7 节为准。规格第 7 节列出 26 行、31 个方法与路径；本表另外登记 2 个已经合并的账户接口，以及 B9 新增的广度、事件、新闻与 AI 摘要 4 条路径，共 37 行。
+本节以 `docs/prd/v6-data-spec.md` 第 7 节为准。规格第 7 节列出 26 行、31 个方法与路径；本表另外登记 2 个已经合并的账户接口，以及 B9 新增的广度与 AI 摘要 2 条路径，共 35 行。MKACG-853 删除 `/api/market/events` 与 `/api/news` 两条路径。
 
 通用约定：
 
@@ -331,10 +332,10 @@ flowchart TD
 | 方法 | 路径 | 请求字段 | 响应字段 | 错误码 | 负责节点或包 |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/dashboard/summary` | 无 | `as_of`、`market`、`account`、`risk`、`positions`、`watchlist`、`alerts`、`strategies`、`activity`、`degraded[{module,status,reason,last_success_at}]` | 200（部分模块可为 `null`）、503 | B5 |
-| GET | `/api/market/overview` | 无 | `as_of`、`provider`、`stale`、`stale_reason`、`last_success_at`、`items[{symbol,name,value,change,change_pct,market_session,source,as_of,is_delayed,quality_status,source_url}]`，`symbol` 固定为 `NASDAQ`、`SP500`、`DOW`、`VIX`、`BTC`；Provider 失败时 `stale` 为真且不回填旧值；报价时间超过 24 小时时对应项 `quality_status=stale`，顶层 `stale` 为真并给出可读原因 | 502、503 | B9 |
+| GET | `/api/market/overview` | 无 | `as_of`、`stale`、`stale_reason`、`items[{symbol,name,value,change,change_pct,market_session,source,as_of,is_delayed,quality_status,source_url}]`，`items` 只有 `symbol=BTC`、`source=okx_spot` 一项（行情取 OKX 公共 ticker 的 `instId=BTC-USDT`）；取不到 OKX 行情时 `value` 为 `null`、`quality_status=missing`、`stale` 为真且不回填旧值；报价时间超过 24 小时时该项 `quality_status=stale`，顶层 `stale` 为真并给出可读原因 | 502、503 | B9、MKACG-853（改为只读 OKX BTC） |
 | GET | `/api/market/breadth` | `inst_type`（必填）、`bar`（可选，默认 `1d`）、`as_of`（可选） | `inst_type`、`bar`、`as_of`、`breadth{advancers,decliners,unchanged,ratio,participants}`、`resonance{strength,participants,window}` | 400 | B9（自选环境卡；由旧 `/api/market/overview` 广度实现迁移） |
-| GET | `/api/market/events` | `ticker`、`start`、`end`、`limit`（均可选） | `items[{id,event_type,title,region,ticker,scheduled_at,scheduled_at_beijing,actual,forecast,previous,importance,source,source_url,received_at}]` | 400 | B9 |
-| GET | `/api/news` | `ticker`、`industry`、`limit`（均可选） | `items[{id,title,summary,publisher,url,published_at,tickers,tags,source,received_at}]` | 400 | B9 |
+| GET | `/api/market/events` | 已删除，任何请求返回 404 | 已删除 | 404 | MKACG-853 |
+| GET | `/api/news` | 已删除，任何请求返回 404 | 已删除 | 404 | MKACG-853 |
 | GET | `/api/account/summary` | 无 | `status`（`ok`、`stale`、`unconfigured`）、`account_id`、`currency`、`equity`、`available_equity`、`cash_balance`、`unrealized_pnl`、`used_margin`、`available_margin`、`margin_usage_pct`、`day_pnl`、`day_pnl_basis`、`position_notional`（待 B2 补齐）、`day_pnl_pct`（待 B2 补齐）、`captured_at`、`source` | 200（未配置或没有快照时 `status` 为 `unconfigured` 或 `stale`，不用错误码） | B2 |
 | POST | `/api/account/sync` | 无 | 与 `GET /api/account/summary` 相同，另加 `positions_synced` | 200（未配置时 `status=unconfigured`）、502（上游失败）、503（标的表为空或返回的持仓标的未同步时要求先同步标的） | B2 |
 | GET | `/api/instruments?query=` | `query`、`asset_class`（可选）、`limit`（可选，默认 20） | `items[{instrument_id,venue,inst_id,inst_type,base_asset,quote_asset,display_symbol,asset_class,name,state,tradable}]` | 400 | S1-2 |
@@ -363,11 +364,11 @@ flowchart TD
 | POST | `/api/research-notes` | `type`、`title`、`content`、`related_instrument_id`（可选）、`related_strategy_id`（可选）、`related_backtest_id`（可选）、`tags`（可选） | 201：`id`、`type`、`title`、`created_at` | 400、404 | B8 |
 | PUT | `/api/research-notes/{id}` | 路径参数 `id`；`type`、`title`、`content`、`related_instrument_id`、`related_strategy_id`、`related_backtest_id`、`tags`（均可选，至少一项） | 200：`id`、`type`、`title`、`created_at`、`updated_at` | 400、404 | B8 |
 | DELETE | `/api/research-notes/{id}` | 路径参数 `id` | 204，无响应体 | 404 | B8 |
-| GET | `/api/settings` | 无 | `display{color_scheme,default_bar,price_precision,home_layout}`、`risk_defaults{default_leverage,risk_budget_per_trade,warning_threshold,stop_rule}`、`execution{auto_trading_enabled}`（默认 `false`，只保存状态）、`data_sources{provider,subscribed_instruments,last_sync_at,failure_count}`、`secrets{okx_api_key_masked,okx_configured,okx_permission}`、`updated_at` | 503 | B9 |
+| GET | `/api/settings` | 无 | `display{color_scheme,default_bar,price_precision,home_layout}`、`risk_defaults{default_leverage,risk_budget_per_trade,warning_threshold,stop_rule}`、`execution{auto_trading_enabled}`（默认 `false`，只保存状态）、`data_sources{subscribed_instruments,last_sync_at,failure_count}`、`secrets{okx_api_key_masked,okx_configured,okx_permission}`、`updated_at` | 503 | B9 |
 | PATCH | `/api/settings` | `display`、`risk_defaults`、`execution{auto_trading_enabled}`、`data_sources`（均可选，至少一项） | 200：完整设置对象，与 `GET` 相同；`secrets` 只读；修改 `auto_trading_enabled` 不产生任何真实订单 | 400 | B9 |
-| GET | `/api/system/health` | 无 | `status`、`checked_at`、`components[{name,status,last_success_at,error,detail}]`，`name` 包含 `database`、`okx_rest`、`okx_ws`、`external_provider`、`job_queue`、`candle_coverage`；同步任务仍在 `running`、最近一次失败、同一数据集的最后成功时间或报价时间超过新鲜度阈值（外部 Provider 24 小时，OKX REST 与 K 线覆盖 3 天）时该项为 `stale` | 200（单项异常不影响整体响应）、503 | B9 |
-| POST | `/api/ai/summary` | `include_news`（可选）、`news_limit`（可选） | `generated_at`、`overall`、`points[{text,sources[{type,id,url}]}]`、`risks[{text,sources}]`、`disclaimer`、`stale`、`stale_notice`；每个事实点至少一条来源；行情报价过期时 `stale_notice` 写明原因 | 400 | B9 |
-| POST | `/api/system/sync` | `dataset`、`provider`（可选）、`instrument_ids`（可选） | 202：`job_id`、`status` | 400、409 | B9 |
+| GET | `/api/system/health` | 无 | `status`、`checked_at`、`components[{name,status,last_success_at,error,detail}]`，`name` 包含 `database`、`okx_rest`、`okx_ws`、`job_queue`、`candle_coverage`；同步任务仍在 `running`、最近一次失败或同一数据集的最后成功时间超过新鲜度阈值（OKX REST 与 K 线覆盖 3 天）时该项为 `stale` | 200（单项异常不影响整体响应）、503 | B9、MKACG-853（删除 `external_provider`） |
+| POST | `/api/ai/summary` | 无请求体 | `generated_at`、`overall`、`points[{text,sources[{type,id,url}]}]`、`risks[{text,sources}]`、`disclaimer`、`stale`、`stale_notice`；来源 `type` 只有 `alert`、`market_overview`、`risk`；每个事实点至少一条来源；行情报价过期时 `stale_notice` 写明原因 | 400 | B9、MKACG-853（删除新闻输入） |
+| POST | `/api/system/sync` | `dataset`、`instrument_ids`（可选）、`bar`（可选）、`days`（可选）；`dataset` 只有 `instruments` 与 `candles` | 202：`job_id`、`status`、`rows`、`error` | 400、409 | B9、MKACG-853（删除外部数据集与 Provider 参数） |
 
 ### 6.1 账户与持仓接口的取舍
 
@@ -413,7 +414,7 @@ flowchart TD
 | 标的详情头部与 K 线 | `GET /api/instruments/{id}/analysis` | S1-3 | 现有模块 |
 | 标的详情指标、关键价位、关联资产、数据覆盖 | `GET /api/instruments/{id}/analysis` | S1-3 | 现有模块 |
 | 标的详情关联策略 | `GET /api/instruments/{id}/analysis` 的 `linked_strategies` | S4-3 | B6 |
-| 标的详情近期事件 | `GET /api/market/events`、`GET /api/news` | S6-1 | B9 |
+| 标的详情近期事件 | 已删除，`GET /api/market/events`、`GET /api/news` 返回 404 | MKACG-853 | 无 |
 | 持仓：账户概览 | `GET /api/account/summary` | S2-1 | B2 |
 | 持仓：OKX 区 | `GET /api/positions/exchange`（合并视图 `GET /api/positions?source=exchange` 已交付，前端尚未替换） | S2-1 | B2、MKACG-845 |
 | 持仓：手动区 | `GET /api/positions?source=manual`（写入与流水用 `/api/manual-positions` 系列） | S2-2 | B2 |

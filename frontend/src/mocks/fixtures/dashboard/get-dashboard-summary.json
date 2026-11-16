@@ -62,7 +62,7 @@
             "unchanged": 0
           },
           "inst_type": "SWAP",
-          "primary_source": "us_equity_proxy",
+          "primary_source": "okx_swap",
           "resonance": {
             "participants": 10,
             "strength": "0",

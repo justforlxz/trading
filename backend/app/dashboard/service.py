@@ -6,7 +6,8 @@
 - 账户与持仓来自 `app.positions`；
 - 风险等级、规则结果与止损距离来自 `app.risk`；
 - 自选摘要来自 `app.watchlist` 的 `summarize_entries`；
-- 策略计数来自 `app.strategy` 的 `summarize_instances`；
+- 策略计数来自 `app.strategy` 的 `summarize_user_strategies`，口径是 v6
+  `strategies` 表，旧 `strategy_instances` 表保留给自动化阶段、不参与首页计数；
 - 最近回测来自 `app.backtest` 的 `latest_run`。
 
 提醒读取 `alert_events` 的待处理行；活动读取 `activity_events` 的最近几条。
@@ -37,7 +38,7 @@ from app.risk import (
     RiskExposure,
     exposure_report,
 )
-from app.strategy import StrategySummary, summarize_instances
+from app.strategy import UserStrategySummary, summarize_user_strategies
 from app.watchlist import (
     WatchlistEntry,
     WatchlistSummary,
@@ -184,9 +185,9 @@ class AlertItem:
 
 @dataclass(frozen=True, slots=True)
 class StrategiesData:
-    """策略卡：实例计数与最近 30 天的一次回测结果。"""
+    """策略卡：v6 用户策略计数与最近 30 天的一次回测结果。"""
 
-    summary: StrategySummary
+    summary: UserStrategySummary
     pending_signals: int | None
     recent_backtest: BacktestRunHeader | None
 
@@ -433,7 +434,7 @@ def _strategies(moment: datetime) -> Module:
         as_of=moment,
         error=None,
         data=StrategiesData(
-            summary=summarize_instances(),
+            summary=summarize_user_strategies(),
             # 待确认信号的事件表由 B6/B8 交付；现在没有可核对的事实，返回 `None`
             # 比写 0 更诚实，界面可以显示「未接入」。
             pending_signals=None,

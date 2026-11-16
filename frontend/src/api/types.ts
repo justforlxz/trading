@@ -3439,7 +3439,12 @@ export interface components {
              */
             status: "ok" | "stale" | "unavailable" | "unconfigured";
         };
-        /** DashboardStrategiesData */
+        /**
+         * DashboardStrategiesData
+         * @description 策略卡计数：`total`/`enabled` 来自 v6 `strategies` 表。
+         *
+         *     v6 策略没有「运行中」状态，`running` 为 `null`，界面按「未提供」显示。
+         */
         DashboardStrategiesData: {
             /** Enabled */
             enabled: number;
@@ -3447,7 +3452,7 @@ export interface components {
             pending_signals?: number | null;
             recent_backtest?: components["schemas"]["DashboardRecentBacktest"] | null;
             /** Running */
-            running: number;
+            running?: number | null;
             /** Total */
             total: number;
         };
@@ -3599,7 +3604,6 @@ export interface components {
          *             "trade_count": 18,
          *             "window_days": 30
          *           },
-         *           "running": 0,
          *           "total": 2
          *         },
          *         "status": "ok"

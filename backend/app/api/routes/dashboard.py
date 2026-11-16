@@ -288,7 +288,8 @@ def _strategies(module: Module) -> DashboardStrategiesModule:
         data=DashboardStrategiesData(
             total=data.summary.total,
             enabled=data.summary.enabled,
-            running=data.summary.running,
+            # v6 策略没有「运行中」状态；用 null 让界面写「未提供」，不用 0 冒充。
+            running=None,
             pending_signals=data.pending_signals,
             recent_backtest=None
             if run is None

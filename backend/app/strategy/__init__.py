@@ -38,6 +38,7 @@ from app.strategy.management import (
     InstrumentStrategyRecord,
     StrategyRecord,
     StrategyVersionRecord,
+    UserStrategySummary,
     create_strategy,
     create_version,
     get_user_strategy,
@@ -48,6 +49,7 @@ from app.strategy.management import (
     list_user_strategies,
     list_versions,
     replace_version_instruments,
+    summarize_user_strategies,
     update_strategy,
 )
 from app.strategy.model import (
@@ -82,7 +84,6 @@ from app.strategy.registry import (
 )
 from app.strategy.service import (
     InstanceRecord,
-    StrategySummary,
     create_instance,
     delete_instance,
     evaluate_replay,
@@ -91,7 +92,6 @@ from app.strategy.service import (
     list_replays,
     prepare_replay,
     save_replay,
-    summarize_instances,
     update_instance,
 )
 from app.strategy.target import (
@@ -137,7 +137,6 @@ __all__ = [
     "StrategyMeta",
     "StrategyRecord",
     "StrategyReplayRow",
-    "StrategySummary",
     "StrategyTemplateRow",
     "StrategyVersionRecord",
     "StrategyVersionRow",
@@ -147,6 +146,7 @@ __all__ = [
     "Template",
     "Trend",
     "UserStrategyRow",
+    "UserStrategySummary",
     "ValidationGate",
     "ValidationReport",
     "advance",
@@ -184,7 +184,7 @@ __all__ = [
     "replace_version_instruments",
     "resolve_params",
     "save_replay",
-    "summarize_instances",
+    "summarize_user_strategies",
     "target_quantity",
     "update_instance",
     "update_strategy",

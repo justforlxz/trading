@@ -89,6 +89,11 @@ cd backend && ../.venv/bin/python -m ruff check . \
 pnpm --dir frontend lint && pnpm --dir frontend build
 ```
 
+GitHub Actions 的 CI（`.github/workflows/ci.yml`）只执行静态检查，与上面的命令一致：
+
+- `backend-static`：Python 3.12，`pip install -e ".[dev]"`，再跑 `ruff check .` 与 `ruff format --check .`。
+- `frontend-static`：Node 22、pnpm 9.15.9，`pnpm install --frozen-lockfile`，再跑 `pnpm lint` 与 `pnpm typecheck`。
+
 ## 6. 禁止事项
 
 - 禁止业务逻辑写进 `api/` 或组件里；前端不做派生计算，所有派生值由后端返回。
@@ -109,12 +114,15 @@ make db-up                  # 用 podman run 起本地 PostgreSQL（已存在则
 make migrate                # 表结构推进到最新版本（alembic upgrade head）
 make test                   # 后端 pytest + 前端构建
 make lint
+pnpm --dir frontend typecheck  # 前端类型检查（tsc --noEmit）
 make format
 make verify-live            # 起真实 uvicorn 进程并请求 /api/health
 ```
 
 后端以 `backend/` 为 cwd 启动（`uvicorn app.main:app`）；数据库地址来自 `DATABASE_URL`，
 与 cwd 无关。部署方式不在项目范围，本地数据库只用 `podman run` 起容器。
+
+推送前先跑 `make lint` 与 `pnpm --dir frontend typecheck`，两项都与 CI 的静态检查 job 一致。
 
 ## 8. 文档与 issue 的关系
 

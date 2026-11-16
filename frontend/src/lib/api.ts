@@ -99,11 +99,6 @@ export type SystemComponent = components["schemas"]["SystemComponent"];
 export type MarketBreadthResponse = components["schemas"]["MarketBreadthResponse"];
 export type MarketSnapshotResponse = components["schemas"]["MarketSnapshotResponse"];
 export type MarketOverviewItem = components["schemas"]["MarketOverviewItem"];
-export type MarketEventItem = components["schemas"]["MarketEventItem"];
-export type MarketEventListResponse = components["schemas"]["MarketEventListResponse"];
-export type NewsItem = components["schemas"]["NewsItem"];
-export type NewsListResponse = components["schemas"]["NewsListResponse"];
-export type AiSummaryRequest = components["schemas"]["AiSummaryRequest"];
 export type AiSummaryResponse = components["schemas"]["AiSummaryResponse"];
 export type ResearchNoteItem = components["schemas"]["ResearchNoteItem"];
 export type ResearchNoteListResponse = components["schemas"]["ResearchNoteListResponse"];
@@ -187,37 +182,14 @@ export function fetchMarketBreadth(
   return request<MarketBreadthResponse>(`/market/breadth?${query.toString()}`);
 }
 
-/** v6 的五个市场指标；每项自带来源、时间与陈旧状态。 */
+/** 市场概况只有 BTC 一项；来源是 OKX 公共 ticker，每项自带报价时间与陈旧状态。 */
 export function fetchMarketOverview(): Promise<MarketSnapshotResponse> {
   return request<MarketSnapshotResponse>("/market/overview");
 }
 
-/** 带来源的市场摘要；输入只选择是否包含新闻与新闻条数，不在前端生成文字。 */
-export function fetchAiSummary(
-  input?: Partial<AiSummaryRequest>,
-): Promise<AiSummaryResponse> {
-  const body: AiSummaryRequest = {
-    include_news: input?.include_news ?? true,
-    news_limit: input?.news_limit ?? 10,
-  };
-  return send<AiSummaryResponse>("/ai/summary", "POST", body);
-}
-
-/** 按标的读取已采集的宏观与公司事件；不传标的时读取全部事件。 */
-export function fetchMarketEvents(
-  ticker?: string,
-  limit = 100,
-): Promise<MarketEventListResponse> {
-  const query = new URLSearchParams({ limit: String(limit) });
-  if (ticker !== undefined && ticker.trim() !== "") query.set("ticker", ticker);
-  return request<MarketEventListResponse>(`/market/events?${query.toString()}`);
-}
-
-/** 按标的读取已采集新闻；不传标的时读取最近新闻。 */
-export function fetchNews(ticker?: string, limit = 50): Promise<NewsListResponse> {
-  const query = new URLSearchParams({ limit: String(limit) });
-  if (ticker !== undefined && ticker.trim() !== "") query.set("ticker", ticker);
-  return request<NewsListResponse>(`/news?${query.toString()}`);
+/** 带来源的市场摘要；只归纳市场概况与待处理提醒，请求没有输入。 */
+export function fetchAiSummary(): Promise<AiSummaryResponse> {
+  return request<AiSummaryResponse>("/ai/summary", { method: "POST" });
 }
 
 /** 按代码或产品键搜索已同步的标的；不传形态时两类一起返回。 */
@@ -262,11 +234,11 @@ export function okxCandleSource(instType: "SPOT" | "SWAP"): "okx_spot" | "okx_sw
   return instType === "SWAP" ? "okx_swap" : "okx_spot";
 }
 
-/** K 线必须显式带来源：同一标的可能同时存有 OKX 与美股代理两条行情。 */
+/** K 线必须显式带来源：现货与永续是两条来源。 */
 export function fetchCandles(
   instId: string,
   bar: CandleBar,
-  source: "okx" | "okx_spot" | "okx_swap" | "us_equity_proxy",
+  source: "okx" | "okx_spot" | "okx_swap",
   limit?: number,
 ): Promise<CandleSeriesResponse> {
   const query = new URLSearchParams({ bar, source });

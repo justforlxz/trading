@@ -1,4 +1,4 @@
-"""外部数据同步任务：任务流水、最后成功时间与健康读取。
+"""数据同步任务：任务流水、最后成功时间与健康读取。
 
 每次同步先写一行 `running`，结束时改成 `succeeded` 或 `failed`。健康接口只读这张
 表，不在请求里临时探测上游；最后成功时间取最近一次成功任务的 `finished_at`。
@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from uuid import uuid4
 
 from sqlalchemy import func, select
@@ -20,13 +20,11 @@ from app.market.model import DataSyncJobRow
 
 __all__ = [
     "SYNC_STATUSES",
-    "ProviderSyncStatus",
     "QueueSyncStatus",
     "SyncJobView",
     "finish_sync_job",
     "latest_success_at",
     "latest_sync_job",
-    "provider_sync_status",
     "queue_sync_status",
     "start_sync_job",
     "sync_summary",
@@ -44,25 +42,11 @@ class SyncJobView:
     status: str
     started_at: datetime
     finished_at: datetime | None
-    #: `market_overview` 的同步游标记录本次报价的最新时间（ISO 8601）；其他数据集为空。
+    #: 同步游标；历史列，迁移 0020 未删除，当前 OKX 数据集不写入，读取时原样返回。
     cursor: str | None
     rows: int
     error: str | None
     last_success_at: datetime | None
-
-
-@dataclass(frozen=True, slots=True)
-class ProviderSyncStatus:
-    provider: str
-    dataset: str | None
-    status: str
-    last_success_at: datetime | None
-    error: str | None
-    failure_count: int
-    #: 最近一条任务的状态；没有任务记录时为 `None`。健康接口据此写真实 detail。
-    job_status: str | None = None
-    #: 最近一次成功同步写入的报价时间；没有记录时为 `None`。
-    data_as_of: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -190,7 +174,6 @@ def sync_summary(provider: str, dataset: str | None = None) -> tuple[datetime | 
     """数据源状态：最近同步时间与失败任务数。
 
     传入 `dataset` 时，最近同步时间只统计该数据集；失败次数仍按 Provider 累计。
-    健康接口必须传数据集，否则一个数据集的成功会掩盖另一个数据集的陈旧。
     """
 
     statement = select(func.max(DataSyncJobRow.finished_at)).where(
@@ -209,84 +192,6 @@ def sync_summary(provider: str, dataset: str | None = None) -> tuple[datetime | 
     )
     with session_scope() as session:
         return session.scalar(statement), int(session.scalar(failures) or 0)
-
-
-def _parse_data_as_of(value: str | None) -> datetime | None:
-    """同步游标里的报价时间；无法解析或没有记录时如实返回 `None`。"""
-
-    if not value:
-        return None
-    try:
-        moment = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
-
-
-def provider_sync_status(
-    provider: str,
-    dataset: str | None = None,
-    *,
-    now: datetime | None = None,
-    stale_after: timedelta | None = None,
-) -> ProviderSyncStatus:
-    """某个 Provider 的同步状态；失败次数是历史累计。
-
-    只有「最近一次任务成功，并且最后成功时间仍在 `stale_after` 以内」才是 `ok`。
-    `running` 表示结果尚未确认，同样按 `stale` 报告；成功过但超过时效时也返回
-    `stale`，避免把旧数据当成最新值。
-    """
-
-    job = latest_sync_job(provider=provider, dataset=dataset)
-    last_success, failures = sync_summary(provider, dataset)
-    data_as_of = _parse_data_as_of(None if job is None else job.cursor)
-    if job is None:
-        return ProviderSyncStatus(
-            provider=provider,
-            dataset=dataset,
-            status="unconfigured",
-            last_success_at=last_success,
-            error=None,
-            failure_count=failures,
-            data_as_of=data_as_of,
-        )
-    if job.status == "running":
-        return ProviderSyncStatus(
-            provider=provider,
-            dataset=dataset,
-            status="stale",
-            last_success_at=last_success,
-            error=None,
-            failure_count=failures,
-            job_status="running",
-            data_as_of=data_as_of,
-        )
-    if job.status == "failed":
-        return ProviderSyncStatus(
-            provider=provider,
-            dataset=dataset,
-            status="stale",
-            last_success_at=last_success,
-            error=job.error,
-            failure_count=failures,
-            job_status="failed",
-            data_as_of=data_as_of,
-        )
-    moment = now or SystemClock().now()
-    # 没有最后成功时间就无法证明数据新鲜，同样按过期处理。
-    expired = stale_after is not None and (
-        last_success is None or last_success < moment - stale_after
-    )
-    return ProviderSyncStatus(
-        provider=provider,
-        dataset=dataset,
-        status="stale" if expired else "ok",
-        last_success_at=last_success,
-        error=None,
-        failure_count=failures,
-        job_status="succeeded",
-        data_as_of=data_as_of,
-    )
 
 
 def queue_sync_status(*, clock: Clock | None = None) -> QueueSyncStatus:

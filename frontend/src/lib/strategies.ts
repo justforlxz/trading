@@ -59,7 +59,6 @@ export const BACKTEST_DATA_SOURCE_OPTIONS: ReadonlyArray<{
 }> = [
   { value: "okx_spot", label: "OKX 现货（okx_spot）" },
   { value: "okx_swap", label: "OKX 永续（okx_swap）" },
-  { value: "us_equity_proxy", label: "美股代理（us_equity_proxy）" },
   { value: "okx", label: "未区分形态的旧数据（okx）" },
 ];
 

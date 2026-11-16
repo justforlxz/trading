@@ -205,7 +205,7 @@ def test_candles_require_a_data_source(market_data: TestClient) -> None:
 def test_candles_return_only_the_requested_source(market_data: TestClient) -> None:
     """两种来源共存时按来源各取一条序列，不把两条时间轴拼在一起。"""
 
-    proxy_opens = latest_opens(2)
+    swap_opens = latest_opens(2)
     upsert_candles(
         [
             Bar(
@@ -218,25 +218,25 @@ def test_candles_return_only_the_requested_source(market_data: TestClient) -> No
                 close=Decimal("350.5"),
                 volume=Decimal("10"),
                 confirm=True,
-                source="us_equity_proxy",
+                source="okx_swap",
             )
-            for open_time in proxy_opens
+            for open_time in swap_opens
         ]
     )
 
     okx = market_data.get(
         "/api/instruments/XAAPL-USDT/candles", params={"bar": "1d", "source": "okx"}
     ).json()
-    proxy = market_data.get(
+    swap = market_data.get(
         "/api/instruments/XAAPL-USDT/candles",
-        params={"bar": "1d", "source": "us_equity_proxy"},
+        params={"bar": "1d", "source": "okx_swap"},
     ).json()
 
     assert okx["data_source"] == "okx"
     assert [candle["close"] for candle in okx["candles"]] == ["100", "110", "121"]
-    assert proxy["data_source"] == "us_equity_proxy"
-    assert [candle["close"] for candle in proxy["candles"]] == ["350.5", "350.5"]
-    assert {candle["data_source"] for candle in proxy["candles"]} == {"us_equity_proxy"}
+    assert swap["data_source"] == "okx_swap"
+    assert [candle["close"] for candle in swap["candles"]] == ["350.5", "350.5"]
+    assert {candle["data_source"] for candle in swap["candles"]} == {"okx_swap"}
 
 
 def test_candles_reject_out_of_range_limit(market_data: TestClient) -> None:

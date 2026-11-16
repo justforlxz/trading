@@ -7,8 +7,7 @@
 下单意图的幂等键表（`OrderSubmission`）也在这里发布：它是业务表，需要被装配根
 导入一次才会进 `Base.metadata`。
 
-导入本包即完成来源登记（`app.exchange.providers` 在 import 期登记 `provider` 桶），
-因此装配方按名字取实现不会因为「没先 import 某个子模块」而落空。
+本包只发布 OKX 的公开行情与私有交易实现。
 """
 
 from __future__ import annotations
@@ -19,7 +18,7 @@ from app.config import Settings
 from app.exchange.errors import ExchangeError, RateLimitedError
 from app.exchange.okx.client import OkxClient
 from app.exchange.okx.ledger import OrderSubmission
-from app.exchange.okx.market import OkxMarketData
+from app.exchange.okx.market import OkxMarketData, TickerQuote
 from app.exchange.okx.market_ws import (
     MarketPush,
     OkxPublicWebSocket,
@@ -31,7 +30,6 @@ from app.exchange.okx.snapshots import (
     parse_exchange_position_row,
 )
 from app.exchange.okx.ws import OkxWebSocket
-from app.exchange.providers import UsEquityMarketData, create_us_equity_market_data
 
 __all__ = [
     "ExchangeError",
@@ -43,10 +41,9 @@ __all__ = [
     "OkxWebSocket",
     "OrderSubmission",
     "RateLimitedError",
-    "UsEquityMarketData",
+    "TickerQuote",
     "create_market_data",
     "create_trade_port",
-    "create_us_equity_market_data",
     "load_quote_snapshot",
     "parse_account_snapshot_row",
     "parse_exchange_position_row",

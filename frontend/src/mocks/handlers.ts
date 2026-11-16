@@ -40,9 +40,7 @@ import patchManualPositionsPositionId from "./fixtures/positions/patch-manual-po
 import getManualPositionsPositionIdTrades from "./fixtures/positions/get-manual-positions-position_id-trades.json";
 import postManualPositionsPositionIdTrades from "./fixtures/positions/post-manual-positions-position_id-trades.json";
 import getMarketBreadth from "./fixtures/market/get-market-breadth.json";
-import getMarketEvents from "./fixtures/market/get-market-events.json";
 import getMarketOverview from "./fixtures/market/get-market-overview.json";
-import getNews from "./fixtures/market/get-news.json";
 import getOpportunities from "./fixtures/opportunity/get-opportunities.json";
 import getOpportunitiesOpportunityId from "./fixtures/opportunity/get-opportunities-opportunity_id.json";
 import patchOpportunitiesOpportunityId from "./fixtures/opportunity/patch-opportunities-opportunity_id.json";
@@ -115,9 +113,7 @@ export const handlers = [
   http.get("*/api/manual-positions/:position_id/trades", () => HttpResponse.json(getManualPositionsPositionIdTrades)),
   http.post("*/api/manual-positions/:position_id/trades", () => HttpResponse.json(postManualPositionsPositionIdTrades, { status: 201 })),
   http.get("*/api/market/breadth", () => HttpResponse.json(getMarketBreadth)),
-  http.get("*/api/market/events", () => HttpResponse.json(getMarketEvents)),
   http.get("*/api/market/overview", () => HttpResponse.json(getMarketOverview)),
-  http.get("*/api/news", () => HttpResponse.json(getNews)),
   http.get("*/api/opportunities", () => HttpResponse.json(getOpportunities)),
   http.get("*/api/opportunities/:opportunity_id", () => HttpResponse.json(getOpportunitiesOpportunityId)),
   http.patch("*/api/opportunities/:opportunity_id", () => HttpResponse.json(patchOpportunitiesOpportunityId)),

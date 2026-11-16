@@ -300,19 +300,19 @@ def test_overview_counts_each_class_on_its_own() -> None:
     assert spot.as_of == _last_open()
 
 
-def test_overview_picks_the_source_of_each_symbol() -> None:
-    """代币化股票：交易时段读代理行情，休市时段读 OKX 行情，不拿另一个来源顶替。"""
+def test_overview_always_reads_the_okx_source() -> None:
+    """代币化股票在交易时段也读 OKX 行情，另一个来源的行不参与横截面。"""
 
     sync_instruments([make_ref(inst_id="XAAPL-USDT", base_ccy="XAAPL")])
-    proxy_start = datetime(2026, 11, 8, 14, 30, tzinfo=UTC)
+    legacy_start = datetime(2026, 11, 8, 14, 30, tzinfo=UTC)
     okx_start = datetime(2026, 11, 8, 16, 0, tzinfo=UTC)
     upsert_candles(
         _bars(
             [10.0, 11.0, 12.0],
             symbol="XAAPL-USDT",
-            source="us_equity_proxy",
+            source="okx_swap",
             bar="1d",
-            start=proxy_start,
+            start=legacy_start,
         )
     )
     upsert_candles(
@@ -322,7 +322,7 @@ def test_overview_picks_the_source_of_each_symbol() -> None:
     regular = market_overview(REGULAR_MOMENT, "1d", "SPOT")
     closed = market_overview(CLOSED_MOMENT, "1d", "SPOT")
 
-    assert (regular.breadth.advancers, regular.breadth.decliners) == (1, 0)
+    assert (regular.breadth.advancers, regular.breadth.decliners) == (0, 1)
     assert (closed.breadth.advancers, closed.breadth.decliners) == (0, 1)
 
 

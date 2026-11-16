@@ -121,7 +121,6 @@ export default function BacktestsPage() {
           >
             <option value="okx_spot">OKX 现货（okx_spot）</option>
             <option value="okx_swap">OKX 永续（okx_swap）</option>
-            <option value="us_equity_proxy">美股代理（us_equity_proxy）</option>
             <option value="okx">未区分形态的旧数据（okx）</option>
           </select>
           <span className="text-xs text-muted-foreground">只影响读取哪些已保存的结果，不做跨源聚合。</span>

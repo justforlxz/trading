@@ -58,7 +58,6 @@ describe("手动持仓展示文案", () => {
     expect(priceSourceLabel("okx")).toBe("OKX");
     expect(priceSourceLabel("okx_spot")).toBe("OKX 现货");
     expect(priceSourceLabel("okx_swap")).toBe("OKX 永续");
-    expect(priceSourceLabel("us_equity_proxy")).toBe("美股代理行情");
     expect(priceSourceLabel(null)).toBe("未提供");
   });
 

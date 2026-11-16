@@ -67,10 +67,6 @@ class Settings(BaseSettings):
             return override
         return OKX_WS_PRIVATE_URL_DEMO if self.okx_demo else OKX_WS_PRIVATE_URL_PROD
 
-    # 美股代理行情上游（只读公开接口）：正常交易时段的参考价格来源。
-    us_equity_rest_base_url: str = "https://query1.finance.yahoo.com"
-    us_equity_http_timeout_seconds: float = 10.0
-
 
 @lru_cache
 def get_settings() -> Settings:

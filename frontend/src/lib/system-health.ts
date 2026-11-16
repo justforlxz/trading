@@ -1,7 +1,7 @@
 /**
  * 设置页系统健康与密钥状态的展示文案。
  *
- * 六项状态、最后成功时间与错误摘要全部来自 `GET /api/system/health`，
+ * 五项状态、最后成功时间与错误摘要全部来自 `GET /api/system/health`，
  * 密钥状态来自 `GET /api/settings` 的 `secrets`。这里只做名称映射和排序，
  * 不推断状态，也不在时间缺失时用当前时间补造。
  */
@@ -16,7 +16,6 @@ const HEALTH_COMPONENT_LABELS: Record<string, string> = {
   database: "数据库",
   okx_rest: "OKX REST",
   okx_ws: "OKX WebSocket",
-  external_provider: "外部 Provider",
   job_queue: "任务队列",
   candle_coverage: "K 线覆盖",
 };

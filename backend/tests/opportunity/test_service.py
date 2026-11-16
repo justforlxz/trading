@@ -100,9 +100,9 @@ def test_target_mode_ignores_bars_stored_under_another_source() -> None:
 
     seed_instruments(make_ref(), make_ref(inst_id="XETH-USDT", base_ccy="XETH"))
     seed_daily("XAAPL-USDT", ANCHOR_CLOSES)
-    # XETH 是代币化股票现货，盘后读代理行情；这里只把它的日线写在 OKX 来源下。
-    assert effective_source("XETH-USDT") != "okx_spot"
-    seed_daily("XETH-USDT", NEIGHBOUR_CLOSES, source="okx_spot")
+    # XETH 是代币化股票现货，检测读现货来源；这里只把它的日线写在永续来源下。
+    assert effective_source("XETH-USDT") == "okx_spot"
+    seed_daily("XETH-USDT", NEIGHBOUR_CLOSES, source="okx_swap")
 
     assert detect_opportunities(AS_OF, "1d", anchor_product_key="AAPL") == ()
 

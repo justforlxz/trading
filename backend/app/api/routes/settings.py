@@ -4,7 +4,7 @@
 
 - `GET /api/settings` 永不返回 API Key 明文，只返回是否已配置与全掩码；
 - `PATCH /api/settings` 按分组部分更新，成本与回测默认值不再经 HTTP 暴露；
-- 数据源的最后同步时间与失败次数来自 `data_sync_jobs`，不由前端推算。
+- 数据源的最后同步时间与失败次数来自 OKX 的 `data_sync_jobs`，不由前端推算。
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from app.api.schemas import (
     SettingsResponse,
     SettingsUpdateRequest,
 )
+from app.jobs import OKX_PROVIDER
 from app.market import sync_summary
 from app.settings import SettingsRecord, load_settings, save_settings
 
@@ -60,17 +61,12 @@ def _api_key(payload: SettingsUpdateRequest) -> str | None:
 
 
 def _response(record: SettingsRecord) -> SettingsResponse:
-    provider = record.data_sources.get("provider")
-    last_sync_at = None
-    failure_count = 0
-    if isinstance(provider, str) and provider:
-        last_sync_at, failure_count = sync_summary(provider)
+    last_sync_at, failure_count = sync_summary(OKX_PROVIDER)
     return SettingsResponse(
         display=DisplaySettings(**record.display),
         risk_defaults=RiskDefaults(**record.risk_defaults),
         execution=ExecutionSettings(**record.execution),
         data_sources=DataSourceSettings(
-            provider=provider if isinstance(provider, str) else None,
             subscribed_instruments=list(record.data_sources.get("subscribed_instruments", [])),
             last_sync_at=last_sync_at,
             failure_count=failure_count,

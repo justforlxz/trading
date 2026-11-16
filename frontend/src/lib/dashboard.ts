@@ -118,7 +118,6 @@ export function dataSourceLabel(source: DashboardDataSource | string | null | un
   if (source === "okx_spot") return "OKX 现货";
   if (source === "okx_swap") return "OKX 永续";
   if (source === "okx") return "OKX";
-  if (source === "us_equity_proxy") return "美股代理行情";
   return `未知来源（${String(source)}）`;
 }
 

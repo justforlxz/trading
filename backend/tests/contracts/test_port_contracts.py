@@ -4,8 +4,7 @@
 
 - 值对象与错误的不可变、封闭性——改动它们会静默污染全仓，所以逐条钉住。
 - 端口契约 mixin——`tests/fakes/okx` 与真实 OKX 适配器继承同一组断言，避免「两个
-  实现两种语义」。美股代理源（`us_equity_proxy`）刻意不下发标的元数据、不提供实时
-  快照，因此有自己的一组断言（`tests/exchange/test_us_equity.py`）。
+  实现两种语义」。
 - registry / clock 这两个跨模块原语的行为。
 
 构造数据一律来自 `conftest.py` 的 fixture。

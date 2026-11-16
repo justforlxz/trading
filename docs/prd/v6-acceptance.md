@@ -13,7 +13,7 @@
 
 - 仓库根目录已经完成 `pnpm --dir frontend install`；后端虚拟环境 `.venv` 可用。
 - 本机已安装 `podman`、Python 3.12 及以上、Node.js 20 及以上、`pnpm`、`curl`、`jq`。
-- 可以访问 OKX 模拟盘接口与外部行情 Provider；不能访问时按 `BLOCKED` 记录，不用 fixture 或演示数据替代。
+- 可以访问 OKX 公共行情与模拟盘接口；不能访问时按 `BLOCKED` 记录，不用 fixture 或演示数据替代。
 - OKX 只使用模拟盘，只调用只读接口；验收期间不执行真实下单、撤单、改单、平仓、资金划转和提现。
 
 ### 1.2 使用独立 schema
@@ -141,8 +141,6 @@ select 'exchange_position_snapshots', count(*) from v6_accept.exchange_position_
 union all
 select 'manual_positions', count(*) from v6_accept.manual_positions where note like 'fixture%'
 union all
-select 'news_items', count(*) from v6_accept.news_items where source = 'fake'
-union all
 select 'strategies', count(*) from v6_accept.strategies where name like '%走查策略%' or name like '%验证策略%'
 union all
 select 'settings', count(*) from v6_accept.settings where coalesce(okx_api_key, '') <> ''
@@ -164,13 +162,13 @@ podman exec trading-db psql -U trading -d trading -v ON_ERROR_STOP=1 \
 
 ### 2.1 清单范围和编号
 
-清单以 `docs/prd/v6.md` 的 3.1、3.2、3.3 三张表为准，覆盖其中前端或后端状态为 `已实现` 或 `开发中` 的全部功能行。共 96 行：
+清单以 `docs/prd/v6.md` 的 3.1、3.2、3.3 三张表为准，覆盖其中前端或后端状态为 `已实现` 或 `开发中` 的全部功能行。共 95 行：
 
-- 3.1 页面与页面区块：62 行，对应 61 个页面功能点。
+- 3.1 页面与页面区块：61 行，对应 60 个页面功能点。
 - 3.2 规格第 7 节 API：29 行，对应 17 个接口功能点。
 - 3.3 保留但不通过 v6 页面暴露的能力：5 行，对应 5 个后端回归点。
 
-数据推送另设 1 个页面级功能点 `I-01`，与接口功能点 `P-17` 从页面和接口两侧验证同一行。清单共 84 个功能点。报告中的“功能点总数”按 84 计算，并同时报告 PRD 行覆盖率 `96/96`。`未实现` 和 `不适用` 行不在本次功能验收范围内；如果验收时 `docs/prd/v6.md` 的状态已变化，以验收唤醒时的文档为准，并在报告中记录差异。
+数据推送另设 1 个页面级功能点 `I-01`，与接口功能点 `P-17` 从页面和接口两侧验证同一行。清单共 83 个功能点。报告中的“功能点总数”按 83 计算，并同时报告 PRD 行覆盖率 `95/95`。MKACG-853 与 MKACG-857 分别删除了「近期事件」和「合约元数据」页面行，本清单同步删除对应功能点。`未实现` 和 `不适用` 行不在本次功能验收范围内；如果验收时 `docs/prd/v6.md` 的状态已变化，以验收唤醒时的文档为准，并在报告中记录差异。
 
 证据类型统一记为：
 
@@ -198,8 +196,8 @@ podman exec trading-db psql -U trading -d trading -v ON_ERROR_STOP=1 \
 | B-01 | 3.1 概览 / 账户概览 | `/` | 打开首页账户卡；与 `GET /api/account/summary` 对比数值；检查来源和数据时间；断开 OKX 凭据后刷新 | 显示权益、今日盈亏、可用与已用保证金、未实现盈亏、保证金使用率；每项有来源和数据时间；名义价值后端未提供时不显示或明确写“未提供”，不显示 0 冒充；凭据缺失时显示明确状态 | E1、E2 |
 | B-02 | 3.1 概览 / 风险监控 | `/` | 打开首页风险卡；与 `GET /api/risk/exposure` 或 `GET /api/dashboard/summary` 的 `risk` 模块对比 | 显示综合等级、临近止损数、高杠杆数、单标的敞口、未设置止损数、保证金使用率；口径字段随数值显示；没有规则数据时显示空态或原因，不编造数字 | E1、E2 |
 | B-03 | 3.1 概览 / 当前持仓：OKX 与手动持仓合并视图，保留来源 | `/` | 打开首页持仓表；与 `/api/positions/exchange`、`/api/manual-positions` 对比；检查来源列和止损距离字段 | 两种来源合并显示并保留 `exchange` 或 `manual` 来源；最多显示五行；`stop_distance_pct` 为空时写“后端未返回止损距离”，不写成“未设置止损”；刷新后条目一致 | E1、E2、E3 |
-| B-04 | 3.1 概览 / 市场概况：NASDAQ、S&P 500、DOW、VIX、BTC | `/` | 打开市场概况卡；逐项核对数值、涨跌、市场时段、来源、报价时间、延迟状态；与 `GET /api/market/overview` 对比 | 五项固定顺序；每项有来源、报价时间和延迟状态；BTC 来自 OKX，外部四项来自已配置 Provider；报价过期时显示 `stale` 和可读原因，不把旧值当当前值 | E1、E2 |
-| B-05 | 3.1 概览 / 市场摘要：带来源和生成时间的 AI 归纳 | `/` | 打开市场摘要卡；检查总体结论、观察要点、风险、免责声明、生成时间、数据截止时间；点击每条事实的来源链接 | 每个事实点至少一条来源；没有来源的句子不显示；来源能回到市场概况、提醒、风险或新闻原文；数据陈旧时显示提示和“数据不完整” | E1、E2 |
+| B-04 | 3.1 概览 / 市场概况：BTC | `/` | 打开市场概况卡；核对数值、涨跌、市场时段、来源、报价时间、状态；与 `GET /api/market/overview` 对比 | 只有 `symbol=BTC` 一项（行情取 OKX 公共 ticker 的 `instId=BTC-USDT`）；数值非空；`source=okx_spot`；`quality_status` 为 `normal` 或如实 `stale`；不出现 NASDAQ、S&P 500、DOW、VIX 占位项；报价过期时显示 `stale` 和可读原因 | E1、E2 |
+| B-05 | 3.1 概览 / 市场摘要：带来源和生成时间的 AI 归纳 | `/` | 打开市场摘要卡；检查总体结论、观察要点、风险、免责声明、生成时间、数据截止时间；点击每条事实的来源链接 | 每个事实点至少一条来源；没有来源的句子不显示；来源只能回到市场概况、提醒与风险区块，不出现新闻来源；数据陈旧时显示提示和“数据不完整” | E1、E2 |
 | B-06 | 3.1 概览 / 关注列表摘要：价格、日涨跌、RSI、趋势、信号 | `/` | 打开关注列表卡；与 `GET /api/watchlist` 和推送帧对比；检查价格时间与快照时间标注 | 显示总数、偏多/偏空数、覆盖率与最多五行；价格按推送事件时间更新；日涨跌、RSI、趋势显示 HTTP 快照时间；后端没有信号时不拼信号文案 | E1、E2、E5 |
 | B-07 | 3.1 概览 / 提醒与活动：待处理提醒、最近活动 | `/` | 打开提醒卡和活动卡；对待处理提醒执行确认和忽略；刷新；检查活动列表 | 提醒来自 `alert_events`，状态变化写入活动；活动来自 `activity_events`，不由前端硬编码；重复处置返回冲突或明确提示，不重复写活动 | E1、E2、E3、E6 |
 | B-08 | 3.1 概览 / 策略运行：策略总数、启用数、运行状态、待确认信号、近 30 日回测表现 | `/` | 打开策略运行卡；与 `GET /api/dashboard/summary` 的 `strategies` 模块对比 | 显示总数、已启用、运行中、待确认信号和近 30 天回测；最近回测显示收益、最大回撤、交易次数和窗口；没有记录时显示“最近没有回测记录”，不编造 | E1、E2 |
@@ -230,7 +228,6 @@ podman exec trading-db psql -U trading -d trading -v ON_ERROR_STOP=1 \
 | D-10 | 3.1 详情 / 相关性：60 日相关系数、有效样本数、计算窗口 | `/watchlist/<instId>` | 打开相关性区；检查系数、样本数、窗口；切换到样本不足的标的 | 三项都显示；样本不足时写“样本不足”；窗口与接口一致；不在前端重新计算 | E1、E2 |
 | D-11 | 3.1 详情 / 关联策略：最近一个月回测收益、最大回撤、交易数、回测日期 | `/watchlist/<instId>` | 打开关联策略区；查看近 30 天回测；用同一策略版本、同一区间从详情页发起回测；再从策略页发起同一回测 | 显示收益、最大回撤、交易数、回测日期；两个入口的同一参数得到同一结果；没有关联策略时说明 | E1、E2、E3 |
 | D-12 | 3.1 详情 / 提醒区：按标的过滤待处理提醒，支持确认与忽略 | `/watchlist/<instId>` | 打开提醒区；确认只显示当前标的；执行确认和忽略；刷新并检查活动 | 只显示当前标的待处理提醒；确认和忽略调用 `PATCH /api/alerts/<id>`；状态变化写入活动；重复处置有明确提示 | E1、E2、E3 |
-| D-13 | 3.1 详情 / 近期事件：宏观事件、财报、公司公告和新闻 | `/watchlist/<instId>` | 打开近期事件；检查分组、北京时间、来源、预期/前值/实际和新闻链接；临时断开一路数据源 | 按宏观事件、财报、公告、新闻分组；显示北京时间、来源和原文链接；一路失败时显示原因并保留另一路事件；未绑定标的的宏观事件可见，其他标的事件不混入 | E1、E2 |
 | D-14 | 3.1 详情 / 数据覆盖：每个周期的起止时间、K 线数量、缺口数量、最后同步时间 | `/watchlist/<instId>` | 打开数据覆盖表；逐周期核对起止时间、数量、缺口数、最后同步时间 | 每个周期都有对应行；缺数据写“尚未同步”，不显示 0；最后同步时间来自数据库或接口，不由前端推算 | E1、E2、E3 |
 
 ### 2.6 持仓
@@ -276,11 +273,11 @@ podman exec trading-db psql -U trading -d trading -v ON_ERROR_STOP=1 \
 
 | 编号 | 覆盖 PRD 行 | 页面路径 | 操作步骤 | 预期结果 | 证据 |
 | --- | --- | --- | --- | --- | --- |
-| H-01 | 3.1 设置 / 行情与推送：Provider、连接状态、订阅标的、最后同步、失败次数 | `/settings` | 打开设置页；查看 Provider、连接状态、订阅标的、最后同步、失败次数；逐项编辑订阅标的并保存 | 字段来自 `GET /api/settings`；订阅标的可以逐项输入和删除；保存后刷新仍保留；最后同步和失败次数来自同步任务表，不由前端推算 | E1、E2、E3 |
+| H-01 | 3.1 设置 / 行情与推送：连接状态、订阅标的、最后同步、失败次数 | `/settings` | 打开设置页；确认没有 Provider 输入框；查看订阅标的、最后同步、失败次数；逐项编辑订阅标的并保存 | 页面没有 Provider 输入框；`GET /api/settings` 的 `data_sources` 不含 `provider`；订阅标的可以逐项输入和删除；保存后刷新仍保留；最后同步和失败次数来自同步任务表，不由前端推算 | E1、E2、E3 |
 | H-02 | 3.1 设置 / 显示偏好：涨跌配色、默认周期、价格精度、首页布局 | `/settings` | 修改涨跌配色、默认周期、价格精度、首页布局；保存；刷新 | 修改后立即生效；刷新后仍保留；非法值被拒绝并提示；不影响其他设置分组 | E1、E2、E3 |
 | H-03 | 3.1 设置 / 风险默认值：默认杠杆、单笔风险预算、预警阈值、止损规则 | `/settings` | 修改四项风险默认值；保存；刷新；再改回原值 | 四项保存成功；刷新后保留；与执行风控限额分开；非法值被拒绝 | E1、E2、E3 |
 | H-04 | 3.1 设置 / 交易连接和密钥状态：API Key 只写不读、Secret 和 Passphrase 不回显 | `/settings` | 打开连接与密钥区；检查页面和 `GET /api/settings` 的 `secrets`；在 DevTools 查看响应 | 页面不显示 API Key 明文；`GET /api/settings` 只返回 `okx_api_key_masked`、`okx_configured`、`okx_permission`；Secret 和 Passphrase 不出现在响应或页面；不提交真实 Key | E1、E2 |
-| H-05 | 3.1 设置 / 系统健康：数据库、OKX REST、OKX WebSocket、外部 Provider、任务队列、K 线覆盖 | `/settings` | 打开系统健康；逐项检查六项状态、最后成功时间、错误和详情；与 `GET /api/system/health` 对比 | 六项独立检查，单项异常不影响其他项；每项有 `status`、`last_success_at`、`error`、`detail`；异常项排在前面；缺失最后成功时间写“暂无成功记录”；不把陈旧数据报告为 `ok` | E1、E2 |
+| H-05 | 3.1 设置 / 系统健康：数据库、OKX REST、OKX WebSocket、任务队列、K 线覆盖 | `/settings` | 打开系统健康；逐项检查五项状态、最后成功时间、错误和详情；与 `GET /api/system/health` 对比 | 五项独立检查，单项异常不影响其他项；每项有 `status`、`last_success_at`、`error`、`detail`；`components` 不含 `external_provider`；异常项排在前面；缺失最后成功时间写“暂无成功记录”；不把陈旧数据报告为 `ok` | E1、E2 |
 
 ### 2.10 数据推送
 
@@ -301,7 +298,8 @@ export API="http://127.0.0.1:8000/api"
 | 编号 | 覆盖 PRD 行 | 接口 | 操作步骤 | 预期结果 | 证据 |
 | --- | --- | --- | --- | --- | --- |
 | P-01 | 3.2 首页 / `GET /api/dashboard/summary` | `GET /api/dashboard/summary` | `curl -sS -w '\n%{http_code}\n' "$API/dashboard/summary"` | 200；包含 `market`、`account`、`risk`、`positions`、`watchlist`、`alerts`、`strategies`、`activity` 八个模块；每个模块有 `status`、`as_of`、`error`、`data`；不可用模块有原因，不返回其他模块数据冒充 | E2 |
-| P-02 | 3.2 市场 / `GET /api/market/overview` | `GET /api/market/overview` | `curl -sS -w '\n%{http_code}\n' "$API/market/overview"` | 200；五个指标固定顺序；每项有 `source`、`as_of`、`is_delayed`、`quality_status`；顶层有 `stale`、`stale_reason`、`last_success_at`；失败项 `value=null`、`quality_status=missing` | E2 |
+| P-02 | 3.2 市场 / `GET /api/market/overview` | `GET /api/market/overview` | `curl -sS -w '\n%{http_code}\n' "$API/market/overview"` | 200；`items` 只有 `symbol=BTC` 一项（行情取 `instId=BTC-USDT`）；`source=okx_spot`、`value` 非空；每项有 `as_of`、`is_delayed`、`quality_status`；顶层有 `stale`、`stale_reason`，不含 `provider` 与 `last_success_at`；失败项 `value=null`、`quality_status=missing` | E2 |
+| P-02a | 3.4 已删除 / `GET /api/market/events`、`GET /api/news` | 两个已删除接口 | `curl -s -o /dev/null -w '%{http_code}\n' "$API/market/events"`；对 `"$API/news"` 重复一次 | 两个请求都返回 404；路由不存在；`market_events`、`news_items` 两张表不存在 | E2、E3 |
 | P-03 | 3.2 标的 / `GET /api/instruments?query=` | 实际路径 `GET /api/instruments/search?q=` | `curl -sS -w '\n%{http_code}\n' "$API/instruments/search?q=AAPL"` | 200；能按关键字返回真实标的；不存在的关键字返回空结果而不是错误标的；PRD 行写的 `query` 与证据列的实际路径差异在报告中记录 | E2 |
 | P-04 | 3.2 自选 / `GET /api/watchlist`、`POST /api/watchlist/items` 等效接口、`DELETE /api/watchlist/items/{id}` 等效接口 | `GET /api/watchlist`、`POST /api/watchlist`、`DELETE /api/watchlist/{inst_id}` | 读取列表；加入一个可交易标的；重复加入；删除；再读取 | GET 200；POST 201 或对应成功码；重复加入不产生重复行；DELETE 成功；删除后列表不再包含；错误标的返回明确错误 | E2、E3 |
 | P-05 | 3.2 标的 / `GET /api/instruments/{id}/analysis?bar=1d、4h、1h` | `GET /api/instruments/{id}/analysis` | 对同一标的依次请求 `bar=1d`、`bar=4h`、`bar=1h` | 200；返回对应周期 K 线、MA20/MA60、指标、趋势、成交量、相对强弱、关键价位、相关性、覆盖；数据不足时字段为空并给原因，不返回假数据 | E2 |
@@ -314,8 +312,9 @@ export API="http://127.0.0.1:8000/api"
 | P-12 | 3.2 回测 / `GET /api/backtests/{id}/chart`、`/equity`、`/trades`、`/trades.csv`、`/replay` | 五个回测详情接口 | 对同一条回测依次请求五个接口； CSV 用 `curl -o` 保存后检查 BOM 和列顺序；回放检查只读已保存序列 | 五个接口都 200；图表标记来自 `backtest_trades`；净值基准缺失时为 `null`；交易筛选与分页正确；CSV 编码和列顺序正确；回放不访问实时行情 | E2、E3 |
 | P-13 | 3.2 记录 / `GET`、`POST /api/research-notes`；`PUT`、`DELETE /api/research-notes/{id}` | 研究记录接口 | 创建记录；列表按类型和关联对象筛选；更新；删除；再读取 | 创建 201；列表支持筛选、排序和游标；更新成功；删除 204；不存在返回 404；关联对象不存在返回 404 | E2、E3 |
 | P-14 | 3.2 设置 / `GET`、`PATCH /api/settings` 的 v6 分组 | 设置接口 | `GET /api/settings`；`PATCH` 修改 `display` 或 `risk_defaults`；再 `GET`；恢复原值 | 只返回 `display`、`risk_defaults`、`execution.auto_trading_enabled`、`data_sources` 与只读 `secrets`；不返回成本、回测默认值和执行风控限额；PATCH 后 GET 一致；响应不含 API Key 明文 | E2、E3 |
-| P-15 | 3.2 健康 / `GET /api/system/health` | 健康接口 | `curl -sS -w '\n%{http_code}\n' "$API/system/health"` | 200；六项组件各自有 `status`、`last_success_at`、`error`、`detail`；单项异常不影响其他项；不把陈旧数据报告为 `ok` | E2 |
-| P-16 | 3.2 同步 / `POST /api/system/sync` | 手动同步接口 | 用设置页配置的 Provider 和 `dataset=market_overview` 请求同步；再请求未知数据集和重复运行 | 合法请求成功并写 `data_sync_jobs`；未知数据集或未配置 Provider 返回 400；同一 Provider 与数据集仍在运行返回 409；响应包含本次结果 | E2、E3 |
+| P-15 | 3.2 健康 / `GET /api/system/health` | 健康接口 | `curl -sS -w '\n%{http_code}\n' "$API/system/health"` | 200；五项组件各自有 `status`、`last_success_at`、`error`、`detail`；`components` 不含 `external_provider`；单项异常不影响其他项；不把陈旧数据报告为 `ok` | E2 |
+| P-15a | 3.4 已删除 / 外部 Provider 与代理行情 | 健康与回测接口 | `GET /api/system/health` 检查组件名；`GET /api/backtests?data_source=us_equity_proxy` 与不合法 `data_source` 各请求一次 | `components` 不含 `external_provider`；`GET /api/settings` 的 `data_sources` 不含 `provider`；回测接口拒绝 `us_equity_proxy`；数据库没有该来源的 K 线 | E2、E3 |
+| P-16 | 3.2 同步 / `POST /api/system/sync` | 手动同步接口 | 用 `dataset=instruments` 请求同步；再请求未知数据集与仍在运行的数据集 | 合法请求成功并写 `data_sync_jobs`；未知数据集或参数不合法返回 400；同一数据集仍在运行返回 409；响应包含本次结果；请求不再接受 `provider` | E2、E3 |
 | P-17 | 3.2 推送 / WebSocket `/api/stream` 及九类事件 | WebSocket `/api/stream` | 用 `websocat` 或浏览器连接；触发价格、账户、持仓、提醒、活动和回测事件；记录每类事件的帧 | 连接成功；事件帧有类型、数据和 `as_of`；九类事件要么观察到真实帧，要么逐项记 `BLOCKED` 并写原因；不得用假帧 | E5 |
 
 ### 2.12 后端保留能力
@@ -362,7 +361,7 @@ export API="http://127.0.0.1:8000/api"
 
 下列情况记 `BLOCKED`，不得记 `PASS`：
 
-- OKX 模拟盘凭据缺失、网络不可达、上游 Provider 不可用，导致必须由真实数据证明的子项无法执行。
+- OKX 模拟盘凭据缺失、网络不可达或 OKX 公共行情不可用，导致必须由真实数据证明的子项无法执行。
 - 数据库、迁移、前端构建或后端进程无法启动。
 - 需要一个当前无法触发的业务条件，例如没有待处理提醒、没有可用的策略版本或没有已保存的回测结果，且不能通过正常业务操作产生。
 - 页面正确显示“不可用”“陈旧”或“暂无数据”，但功能点要求验证真实数据本身。
@@ -381,10 +380,10 @@ export API="http://127.0.0.1:8000/api"
 
 ### 3.5 总体结论
 
-- 全部 84 个功能点 `PASS`：结论为“通过”。
+- 全部 83 个功能点 `PASS`：结论为“通过”。
 - 存在任一 `FAIL`：结论为“不通过”，进入第 4 节的失败处理。
 - 没有 `FAIL` 但存在 `BLOCKED`：结论为“有阻塞”，不得宣布 v6 验收通过；列出重试条件和责任人。
-- 存在未覆盖的 PRD 行（覆盖率低于 `96/96`）：结论为“不通过”，先补清单或补验收。
+- 存在未覆盖的 PRD 行（覆盖率低于 `95/95`）：结论为“不通过”，先补清单或补验收。
 
 ## 4. 失败处理
 
@@ -407,7 +406,7 @@ multica issue create \
 修复 issue 描述必须包含：
 
 - 功能点编号和对应的 `docs/prd/v6.md` 行。
-- 验收提交、环境、数据时间和所用 Provider。
+- 验收提交、环境与数据时间。
 - 复现步骤，按顺序写清点击、输入、接口请求或数据库查询。
 - 期望结果和实际结果，分别列出。
 - 证据：接口响应、数据库查询结果、截图说明或推送帧；不要只写“页面不对”。
@@ -447,11 +446,11 @@ multica issue create \
 
 | 项目 | 数值 |
 | --- | ---: |
-| 功能点总数 | 84 |
+| 功能点总数 | 83 |
 | PASS |  |
 | FAIL |  |
 | BLOCKED |  |
-| PRD 行覆盖率 | /96 |
+| PRD 行覆盖率 | /95 |
 
 ### 失败清单
 
@@ -470,7 +469,6 @@ multica issue create \
 - 后端健康检查：
 - 前端构建：
 - 数据库 schema 与迁移版本：
-- 外部 Provider：
 - 数据时间与陈旧状态：
 
 ### 结论
@@ -485,7 +483,7 @@ multica issue create \
 - 不执行真实下单、撤单、改单、平仓、资金划转和提现。
 - OKX 只使用模拟盘只读接口，不切换到实盘，不修改账户设置。
 - 不修改业务代码、配置、迁移、测试或 PR；发现问题只创建修复 issue。
-- 不手工插入 fixture、演示数据、假新闻、假 K 线或假账户快照。
+- 不手工插入 fixture、演示数据、假 K 线或假账户快照。
 - 不把 mock、MSW、演示后端、假 WebSocket 或静态占位数值当作通过证据。
 - 不打印、复制或提交 API Key、Secret 和 Passphrase。
 - 不删除 `public` schema、数据库容器或容器数据卷；只清理 `v6_accept`。

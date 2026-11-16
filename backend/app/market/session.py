@@ -1,9 +1,8 @@
 """交易时段与行情来源优先级：两层时段模型，纯函数。
 
 系统同时看两类市场：美股（有盘前 / 正常 / 盘后与休市日）与加密资产（24/7 连续）。
-「现在该用哪个来源的行情」不是「开市 / 休市」二选一，而是「资产时段 × 资产类别」
-查表——代币化股票在正常时段取美股代理行情，休市时段仍取 OKX 合约行情；加密资产
-任何时候都取 OKX 行情。
+行情来源统一取 OKX：代币化股票按对应形态取 OKX 现货或永续，加密资产同样取 OKX。
+美股交易时段仍单独计算，供代币化股票的时段展示与分析使用，但不再切换行情来源。
 
 时段按**标的所属资产**判，不按标的类别判：`SWAP` 里既有代币化股票永续
 （`AAPL-USDT-SWAP`，受美股时段影响）也有加密永续（`BTC-USDT-SWAP`，全天连续）。
@@ -77,7 +76,6 @@ REGULAR_CLOSE = time(16, 0)
 POST_CLOSE = time(20, 0)
 
 # 行情来源标识：与 `app.api.schemas.common.DataSource` 同值。
-SOURCE_EQUITY_PROXY = "us_equity_proxy"
 SOURCE_OKX = "okx"
 
 # 资产的时段类别：代币化商品与未登记分类暂按代币化股票处理（临时取值，接入真实
@@ -161,16 +159,14 @@ def exchange_session(ts: datetime) -> str:
 def primary_source(session: str, asset_type: str, inst_type: str) -> str:
     """「资产时段 × 资产类别」→ 该时刻的参考行情来源。
 
-    代币化股票在盘前、正常、盘后都取美股代理行情（盘前盘后用它的最新收盘价作参考
-    价，跨源价差由 `divergence` 报）；休市时段与加密资产取 OKX 行情，来源按形态
-    区分现货与永续——现货与永续是两行行情，混用一个来源会取错价格。
+    所有资产统一取 OKX 行情，来源按形态区分现货与永续——现货与永续是两行行情，
+    混用一个来源会取错价格。美股交易时段仍由调用方按资产类别计算，用于时段展示。
     """
 
     if session not in _SESSIONS:
         raise ValidationError(f"未知的资产时段 {session!r}; 支持: {', '.join(sorted(_SESSIONS))}")
-    if _session_kind(asset_type, inst_type) == _KIND_CRYPTO or session == SESSION_CLOSED:
-        return _okx_source(inst_type)
-    return SOURCE_EQUITY_PROXY
+    _session_kind(asset_type, inst_type)
+    return _okx_source(inst_type)
 
 
 def daily_open_time(asset_type: str, ts: datetime, *, inst_type: str | None = None) -> datetime:

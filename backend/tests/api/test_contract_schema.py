@@ -258,7 +258,7 @@ def test_every_instrument_asset_type_serializes() -> None:
 def test_source_identifier_is_split_by_category() -> None:
     """来源标识已按类别拆分：应用代码里不得再出现只含 `okx` 的字面枚举。"""
 
-    assert set(get_args(DataSource)) == {"okx", "okx_spot", "okx_swap", "us_equity_proxy"}
+    assert set(get_args(DataSource)) == {"okx", "okx_spot", "okx_swap"}
 
     offenders = [
         path.relative_to(BACKEND_ROOT).as_posix()

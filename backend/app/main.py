@@ -34,8 +34,6 @@ from app.journal import ExecutionSnapshot
 from app.market import (  # noqa: F401
     Candle,
     DataSyncJobRow,
-    MarketEventRow,
-    NewsItemRow,
 )
 from app.portfolio import (  # noqa: F401
     AllocationRow,

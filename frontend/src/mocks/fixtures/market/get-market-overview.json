@@ -2,19 +2,17 @@
   "as_of": "2026-11-15T06:10:00Z",
   "items": [
     {
-      "as_of": "2026-11-15T06:00:00Z",
-      "change": "180",
-      "change_pct": "1.01",
+      "as_of": "2026-11-15T06:09:30Z",
+      "change": "1200",
+      "change_pct": "1.88",
       "is_delayed": false,
-      "market_session": "closed",
-      "name": "NASDAQ Composite",
+      "market_session": "regular",
+      "name": "Bitcoin",
       "quality_status": "normal",
-      "source": "market_data_provider",
-      "symbol": "NASDAQ",
-      "value": "18000.12"
+      "source": "okx_spot",
+      "symbol": "BTC",
+      "value": "65000.5"
     }
   ],
-  "last_success_at": "2026-11-15T06:05:00Z",
-  "provider": "market_data_provider",
   "stale": false
 }

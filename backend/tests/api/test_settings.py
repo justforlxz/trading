@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
+from app.jobs import OKX_PROVIDER
 from app.market import finish_sync_job, start_sync_job
 
 UTC_ZULU = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
@@ -47,7 +48,6 @@ def test_get_returns_v6_defaults_and_hides_internal_groups(client: TestClient) -
     assert body["risk_defaults"] == DEFAULT_RISK_DEFAULTS
     assert body["execution"] == {"auto_trading_enabled": False}
     assert body["data_sources"] == {
-        "provider": None,
         "subscribed_instruments": [],
         "last_sync_at": None,
         "failure_count": 0,
@@ -83,7 +83,6 @@ def test_patch_updates_each_group_and_persists(client: TestClient) -> None:
             },
             "execution": {"auto_trading_enabled": True},
             "data_sources": {
-                "provider": "fake",
                 "subscribed_instruments": ["BTC-USDT", "AAPL-USDT-SWAP"],
             },
         },
@@ -95,7 +94,7 @@ def test_patch_updates_each_group_and_persists(client: TestClient) -> None:
     assert body["display"]["default_bar"] == "4h"
     assert body["risk_defaults"]["default_leverage"] == "5"
     assert body["execution"]["auto_trading_enabled"] is True
-    assert body["data_sources"]["provider"] == "fake"
+    assert "provider" not in body["data_sources"]
     assert body["data_sources"]["subscribed_instruments"] == [
         "BTC-USDT",
         "AAPL-USDT-SWAP",
@@ -120,6 +119,7 @@ def test_patch_rejects_removed_groups_and_fields(client: TestClient) -> None:
         {"costs": {"taker_fee_bps": "5"}},
         {"backtest": {"default_bar": "1h"}},
         {"data": {"proxy_enabled": True}},
+        {"data_sources": {"provider": "fake"}},
         {"secrets": {"okx_api_key_masked": "x"}},
     ):
         assert client.patch("/api/settings", json=payload).status_code == 422, payload
@@ -159,15 +159,14 @@ def test_secret_and_passphrase_never_appear_in_response(
 
 
 def test_data_source_status_comes_from_sync_jobs(client: TestClient) -> None:
-    succeeded = start_sync_job("fake", "market_overview")
+    succeeded = start_sync_job(OKX_PROVIDER, "candles")
     finish_sync_job(succeeded.id, "succeeded", rows=4)
-    failed = start_sync_job("fake", "news")
-    finish_sync_job(failed.id, "failed", error="Provider 超时")
-    client.patch("/api/settings", json={"data_sources": {"provider": "fake"}})
+    failed = start_sync_job(OKX_PROVIDER, "instruments")
+    finish_sync_job(failed.id, "failed", error="OKX 超时")
 
     body = client.get("/api/settings").json()
 
-    assert body["data_sources"]["provider"] == "fake"
+    assert "provider" not in body["data_sources"]
     assert body["data_sources"]["last_sync_at"] is not None
     assert body["data_sources"]["failure_count"] == 1
 

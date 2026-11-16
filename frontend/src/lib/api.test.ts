@@ -3,9 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ApiError,
   fetchAiSummary,
-  fetchMarketEvents,
   fetchMarketOverview,
-  fetchNews,
   request,
 } from "./api";
 
@@ -48,32 +46,26 @@ describe("市场数据接口", () => {
     vi.unstubAllGlobals();
   });
 
-  it("市场概况与事件按契约路径读取，事件带标的筛选", async () => {
+  it("市场概况按契约路径读取", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(respond(JSON.stringify({ items: [] })))
-      .mockResolvedValueOnce(respond(JSON.stringify({ items: [] })))
       .mockResolvedValueOnce(respond(JSON.stringify({ items: [] })));
     vi.stubGlobal("fetch", fetchMock);
 
     await fetchMarketOverview();
-    await fetchMarketEvents("AAPL", 20);
-    await fetchNews("AAPL", 10);
 
     expect(fetchMock.mock.calls[0][0]).toBe("/api/market/overview");
-    expect(fetchMock.mock.calls[1][0]).toBe("/api/market/events?limit=20&ticker=AAPL");
-    expect(fetchMock.mock.calls[2][0]).toBe("/api/news?limit=10&ticker=AAPL");
   });
 
-  it("摘要以 POST 提交 include_news 与 news_limit，不把请求体拼进路径", async () => {
+  it("摘要以不带请求体的 POST 读取，不把查询参数拼进路径", async () => {
     const fetchMock = vi.fn().mockResolvedValue(respond(JSON.stringify({ points: [] })));
     vi.stubGlobal("fetch", fetchMock);
 
-    await fetchAiSummary({ include_news: false, news_limit: 5 });
+    await fetchAiSummary();
 
     const [path, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(path).toBe("/api/ai/summary");
     expect(init.method).toBe("POST");
-    expect(JSON.parse(String(init.body))).toEqual({ include_news: false, news_limit: 5 });
+    expect(init.body).toBeUndefined();
   });
 });

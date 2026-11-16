@@ -863,7 +863,6 @@ def _summary(record: BacktestRunRecord | BacktestRunHeader) -> BacktestRunSummar
         data_source=record.data_source,
         inst_id=record.inst_id,
         inst_type=record.inst_type,
-        is_proxy=record.data_source == "us_equity_proxy",
         bar=record.bar,
         start_date=record.start_date,
         end_date=record.end_date,

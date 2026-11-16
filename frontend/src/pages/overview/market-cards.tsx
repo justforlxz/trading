@@ -122,7 +122,7 @@ export function MarketItemBody({ item }: { item: MarketOverviewItem }) {
   );
 }
 
-/** 首页市场概况：五个指标与顶层过期提示。 */
+/** 首页市场概况：BTC 一项与顶层过期提示。 */
 export function MarketOverviewBody({
   overview,
   error,
@@ -159,7 +159,7 @@ export function MarketOverviewBody({
       {overview.items.length === 0 ? (
         <p className="text-sm text-muted-foreground">后端没有返回市场指标。</p>
       ) : (
-        <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <dl className="grid gap-3">
           {overview.items.map((item) => (
             <MarketItemBody key={item.symbol} item={item} />
           ))}
@@ -194,9 +194,7 @@ export function MarketOverviewCard({
         <CardDescription className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span>数据时间：{asOfText(overview?.as_of)}</span>
           <span aria-hidden="true">·</span>
-          <span>来源 {overview?.provider ?? "未配置"}</span>
-          <span aria-hidden="true">·</span>
-          <span>最近成功：{asOfText(overview?.last_success_at)}</span>
+          <span>来源：OKX 公共行情</span>
         </CardDescription>
       </CardHeader>
       <CardContent>

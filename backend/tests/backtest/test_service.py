@@ -338,7 +338,7 @@ def test_same_inputs_produce_the_same_result_hash() -> None:
         ("数据区间终点变了", {"end_date": date(2026, 3, 4)}),
         ("数据指纹变了", {"data_fingerprint": "0" * 64}),
         ("策略版本变了", {"strategy_version": "1.1.0"}),
-        ("数据源变了", {"data_source": "us_equity_proxy"}),
+        ("数据源变了", {"data_source": "okx_swap"}),
         (
             "成本假设变了",
             {"costs": CostModel(taker_fee_bps=Decimal("4"), slippage_bps=Decimal("1"))},
@@ -379,7 +379,7 @@ def test_data_fingerprint_is_order_independent_and_content_sensitive() -> None:
     moved = bars()
     moved[LEG_LONG][3] = candle(LEG_LONG, 3, "131")
     assert data_fingerprint(moved, "okx") != forward
-    assert data_fingerprint(bars(), "us_equity_proxy") != forward
+    assert data_fingerprint(bars(), "okx_swap") != forward
 
 
 def test_data_fingerprint_requires_a_source() -> None:

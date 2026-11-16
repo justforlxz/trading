@@ -18,7 +18,6 @@
   ],
   "inst_id": "XAAPL-USDT",
   "inst_type": "SPOT",
-  "is_proxy": false,
   "metrics": {
     "annualized_return_pct": "48.21",
     "avg_holding_hours": "18.4",

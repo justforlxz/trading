@@ -79,7 +79,6 @@ class ExecutionSettings(BaseModel):
 class DataSourceSettings(BaseModel):
     """数据源配置与同步状态；状态字段由服务端读取同步任务表填写。"""
 
-    provider: str | None = None
     subscribed_instruments: list[str] = Field(default_factory=list)
     last_sync_at: UtcDatetime | None = None
     failure_count: int = Field(default=0, ge=0)
@@ -88,7 +87,6 @@ class DataSourceSettings(BaseModel):
 class DataSourceSettingsUpdate(BaseModel):
     """数据源可写字段；最后同步时间与失败次数只读。"""
 
-    provider: str | None = Field(default=None, max_length=64)
     subscribed_instruments: list[str] | None = None
 
     model_config = ConfigDict(extra="forbid")
@@ -136,7 +134,6 @@ class SettingsResponse(BaseModel):
                     },
                     "execution": {"auto_trading_enabled": False},
                     "data_sources": {
-                        "provider": None,
                         "subscribed_instruments": [],
                         "last_sync_at": None,
                         "failure_count": 0,

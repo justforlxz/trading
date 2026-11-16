@@ -7,12 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { StreamNotice, StreamTag } from "../components/ui/stream-status";
 import {
   fetchInstrumentAnalysis,
+  fetchInstrumentDetail,
   fetchInstrumentStrategies,
   fetchStrategyVersions,
   fetchWatchlist,
   okxCandleSource,
   type BacktestBatchResponse,
   type BacktestDataSource,
+  type InstrumentDetailResponse,
   type InstrumentAnalysisBar,
   type InstrumentAnalysisCorrelation,
   type InstrumentAnalysisCoverage,
@@ -40,6 +42,7 @@ import {
 import { useQuoteStream } from "../lib/stream-hooks";
 import { cn } from "../lib/utils";
 import { InstrumentAlertsCard } from "./instrument-detail/alerts-card";
+import { InstrumentContractsCard } from "./instrument-detail/contracts-card";
 import { InstrumentEventsCard } from "./instrument-detail/events-card";
 import { BacktestLaunchForm } from "./strategies/backtest-launch-form";
 
@@ -379,6 +382,9 @@ export default function InstrumentDetailPage() {
   const navigate = useNavigate();
   const [bar, setBar] = useState<InstrumentAnalysisBar>("1d");
   const [analysis, setAnalysis] = useState<InstrumentAnalysisResponse | null>(null);
+  const [detail, setDetail] = useState<InstrumentDetailResponse | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [detailLoading, setDetailLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [slowLoading, setSlowLoading] = useState(false);
@@ -400,6 +406,27 @@ export default function InstrumentDetailPage() {
       .then(setWatchlist)
       .catch(() => setWatchlist(null));
   }, []);
+
+  useEffect(() => {
+    if (!instId) return;
+    let active = true;
+    setDetail(null);
+    setDetailError(null);
+    setDetailLoading(true);
+    fetchInstrumentDetail(instId)
+      .then((value) => {
+        if (active) setDetail(value);
+      })
+      .catch((reason: unknown) => {
+        if (active) setDetailError(loadErrorMessage(reason));
+      })
+      .finally(() => {
+        if (active) setDetailLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [instId]);
 
   const linkedRequestRef = useRef(0);
   const launchSourceInstrumentRef = useRef<string | null>(null);
@@ -763,6 +790,13 @@ export default function InstrumentDetailPage() {
               </dl>
             </div>
           </section>
+
+          <InstrumentContractsCard
+            instrument={instrument}
+            siblings={detail?.siblings ?? null}
+            siblingsLoading={detailLoading}
+            siblingsError={detailError}
+          />
 
           <p className="rounded-md border bg-muted/40 px-3 py-2 text-xs leading-5 text-muted-foreground">
             <span className="font-medium text-foreground">数据覆盖</span>

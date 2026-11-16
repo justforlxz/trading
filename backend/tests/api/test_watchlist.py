@@ -83,14 +83,55 @@ def test_add_duplicate_item_is_400(market_data: TestClient) -> None:
     assert response.json()["detail"]
 
 
-def test_add_without_quotes_is_503_and_leaves_nothing(quote_less_instrument: TestClient) -> None:
-    """日线不足时明确报数据不可用，且不留下半条自选。"""
+def test_add_without_quotes_creates_item_with_missing_status(
+    quote_less_instrument: TestClient,
+) -> None:
+    """标的已同步但没有日线：照样加入自选，列表用 missing 表示缺失。"""
 
     response = quote_less_instrument.post("/api/watchlist", json={"inst_id": "XETH-USDT"})
 
-    assert response.status_code == 503
-    assert response.json()["detail"]
-    assert quote_less_instrument.get("/api/watchlist").json() == {"items": [], "groups": []}
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["last_price"] is None
+    assert body["change_pct_24h"] is None
+    assert body["volume_24h_quote"] is None
+    assert body["candle_count"] == 0
+    assert body["last_candle_at"] is None
+    assert body["data_status"] == "missing"
+
+    listed = quote_less_instrument.get("/api/watchlist")
+    assert listed.status_code == 200, listed.text
+    item = listed.json()["items"][0]
+    assert item["instrument"]["inst_id"] == "XETH-USDT"
+    assert item["data_status"] == "missing"
+    assert item["last_price"] is None
+
+
+def test_add_with_one_daily_candle_returns_partial_snapshot(client: TestClient) -> None:
+    """只有一根日线：返回最新收盘价，涨跌幅为空，状态为 partial。"""
+
+    seed_instruments(make_ref(inst_id="XETH-USDT", base_ccy="XETH"))
+    seed_daily("XETH-USDT", ["100"])
+
+    response = client.post("/api/watchlist", json={"inst_id": "XETH-USDT"})
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["last_price"] == "100"
+    assert body["change_pct_24h"] is None
+    assert body["volume_24h_quote"] is None
+    assert body["candle_count"] == 1
+    assert body["last_candle_at"] is not None
+    assert body["data_status"] == "partial"
+
+    listed = client.get("/api/watchlist")
+    assert listed.status_code == 200, listed.text
+    item = listed.json()["items"][0]
+    assert item["instrument"]["inst_id"] == "XETH-USDT"
+    assert item["last_price"] == "100"
+    assert item["change_pct_24h"] is None
+    assert item["candle_count"] == 1
+    assert item["data_status"] == "partial"
 
 
 def test_add_missing_inst_id_is_422(market_data: TestClient) -> None:

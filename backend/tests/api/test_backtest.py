@@ -363,11 +363,12 @@ def test_target_outside_the_version_is_400(client: TestClient, version_id: str) 
 
 
 def test_missing_candles_are_503(client: TestClient, version_id: str) -> None:
-    """该来源没有同步过行情：503「行情不可用」，不伪装成一次零交易的通过结果。"""
+    """该来源没有同步过行情：503 明确提示先同步行情，不伪装成零交易结果。"""
 
     response = client.post("/api/backtests", json=payload(version_id, data_source="okx_swap"))
     assert response.status_code == 503
     assert "K 线" in response.json()["detail"]
+    assert "先同步行情" in response.json()["detail"]
 
 
 def test_sizing_cap_limits_the_weight(client: TestClient, version_id: str) -> None:

@@ -10,7 +10,7 @@ from decimal import Decimal
 import pytest
 
 from app.activity import list_activity
-from app.core import Bar, DataUnavailable, Timeframe, ValidationError
+from app.core import Bar, Timeframe, ValidationError
 from app.instrument import sync_instruments
 from app.market import upsert_candles
 from app.watchlist import (
@@ -72,16 +72,31 @@ def test_add_item_unknown_symbol_returns_none() -> None:
     assert list_entries() == []
 
 
-def test_add_item_without_daily_candles_reports_missing_data() -> None:
+def test_add_item_without_daily_candles_returns_missing_snapshot() -> None:
+    _seed_instruments(make_ref())
+
+    entry = add_item("XAAPL-USDT")
+
+    assert entry is not None
+    assert entry.quote.last_price is None
+    assert entry.quote.change_pct_24h is None
+    assert entry.quote.candle_count == 0
+    assert entry.quote.data_status == "missing"
+    assert [item.instrument.symbol for item in list_entries()] == ["XAAPL-USDT"]
+    assert list_groups() == ["默认"]
+
+
+def test_add_item_with_one_daily_candle_returns_partial_snapshot() -> None:
     _seed_instruments(make_ref())
     _daily("XAAPL-USDT", ["100"])
 
-    with pytest.raises(DataUnavailable):
-        add_item("XAAPL-USDT")
+    entry = add_item("XAAPL-USDT")
 
-    # 行情算不出来就不留半条自选。
-    assert list_entries() == []
-    assert list_groups() == []
+    assert entry is not None
+    assert entry.quote.last_price == Decimal("100")
+    assert entry.quote.change_pct_24h is None
+    assert entry.quote.candle_count == 1
+    assert entry.quote.data_status == "partial"
 
 
 def test_add_item_twice_is_rejected() -> None:

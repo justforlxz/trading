@@ -4,8 +4,9 @@
 收盘价，`change_pct_24h` 是它与前一根收盘价的涨跌幅，`volume_24h_quote` 是
 `最新收盘价 × 最新成交量`。库里的成交量是基础币种的成交量，没有单独的报价
 成交量列，所以这里按收盘价折算成近似成交额，口径写在响应字段之外，不做伪
-装。趋势、RSI 与 ATR 复用 `app.indicators` 的计算，历史不足时如实留空；
-加入自选仍要求至少两根日线，列表读取则允许某一行缺数据（显式标记 `missing`）。
+装。趋势、RSI 与 ATR 复用 `app.indicators` 的计算，历史不足时如实留空。加入
+自选只要求标的已同步：没有日线时 `last_price` 与涨跌幅为 `None`、状态为
+`missing`；只有一根日线时给出最新收盘价、涨跌幅仍为 `None`、状态为 `partial`。
 
 自选增删与换组写一条活动；价格提醒已由 B8 的 `alert_events` 取代，本域不再
 保存提醒规则。
@@ -22,7 +23,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.activity import record_activity
-from app.core import DataUnavailable, InvariantViolation, ValidationError
+from app.core import InvariantViolation, ValidationError
 from app.db import session_scope
 from app.instrument import Instrument
 from app.market import correlation, load_candles
@@ -108,18 +109,6 @@ def summarize_entries(entries: Sequence[WatchlistEntry]) -> WatchlistSummary:
     )
 
 
-def quote(inst_id: str) -> DailySnapshot:
-    """按已落库日线算行情快照；数据不够两根就报缺数据，不补造。"""
-
-    snapshot = summarize_daily(load_candles(inst_id, QUOTE_BAR))
-    if snapshot.candle_count < 2:
-        raise DataUnavailable(f"标的 {inst_id} 的日线不足 2 根无法计算 24 小时涨跌幅")
-    if snapshot.change_pct_24h is None:
-        raise DataUnavailable(f"标的 {inst_id} 的日线无法计算 24 小时涨跌幅")
-
-    return snapshot
-
-
 def list_entries() -> list[WatchlistEntry]:
     """按加入顺序列出全部自选条目；某一行缺行情时保留该行并标记数据状态。"""
 
@@ -192,7 +181,7 @@ def tracked_instruments(group: str | None = None) -> list[Instrument]:
 
 
 def add_item(inst_id: str, group: str = DEFAULT_GROUP) -> WatchlistEntry | None:
-    """把标的加入自选；标的未知返回 `None`，重复加入按入参错误处理。"""
+    """把标的加入自选；只要求标的已同步，行情缺失不阻断。"""
 
     symbol = inst_id.strip()
     name = group.strip() or DEFAULT_GROUP
@@ -204,8 +193,8 @@ def add_item(inst_id: str, group: str = DEFAULT_GROUP) -> WatchlistEntry | None:
         if session.get(WatchlistItemRow, symbol) is not None:
             raise ValidationError(f"标的 {symbol} 已经在自选里")
 
-        # 先算行情：加进去却读不出最新价，等于留给前端一个会炸的条目。
-        entry_quote = quote(symbol)
+        # 行情可以暂时没有：条目先建立，列表按 `data_status` 显示缺失状态。
+        entry_quote = summarize_daily(load_candles(symbol, QUOTE_BAR))
         added_at = datetime.now(UTC)
         _ensure_group(session, name, added_at)
         session.add(WatchlistItemRow(inst_id=symbol, group_name=name, added_at=added_at))

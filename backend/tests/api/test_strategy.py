@@ -118,6 +118,8 @@ def add_backtest_run(inst_id: str, run_id: str, *, created_at: datetime) -> None
 
 
 def test_create_strategy_returns_first_draft_version(market: TestClient) -> None:
+    """没有日线也能创建策略：保存策略与参数不依赖行情。"""
+
     created = create(market)
 
     assert created["status"] == "draft"

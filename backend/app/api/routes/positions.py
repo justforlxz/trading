@@ -65,9 +65,9 @@ def sync_account_snapshot() -> AccountSyncResponse:
 
 @positions_router.get("/positions/exchange", response_model=ExchangePositionsResponse)
 def get_exchange_positions() -> ExchangePositionsResponse:
-    """最近一次同步的交易所持仓，`as_of` 与该次账户快照相同。"""
+    """最近一次同步的交易所持仓，`as_of` 与该次账户快照相同；标的未同步时返回 503。"""
 
-    view = exchange_positions()
+    view = exchange_positions(require_mapped=True)
     return ExchangePositionsResponse(
         as_of=view.as_of,
         status=view.status,  # type: ignore[arg-type]

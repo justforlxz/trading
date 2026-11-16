@@ -31,6 +31,7 @@ from app.alerts.rules import (
 )
 from app.core import Clock, Conflict, SystemClock, ValidationError
 from app.db import session_scope
+from app.instrument import Instrument
 from app.market import integrity, load_candles
 from app.positions import exchange_positions, list_manual_positions
 from app.risk import (
@@ -183,7 +184,9 @@ def scan_alerts(*, clock: Clock | None = None) -> ScanResult:
     """扫描风险、技术、价格与数据规则，写入新提醒并标记已恢复的旧提醒。"""
 
     moment = (clock or SystemClock()).now().astimezone(UTC).replace(microsecond=0)
-    candidates = _risk_candidates(moment) + _instrument_candidates(moment)
+    candidates = _drop_unknown_instruments(
+        _risk_candidates(moment) + _instrument_candidates(moment)
+    )
     unique = {candidate.dedup_key: candidate for candidate in candidates}
 
     created = 0
@@ -256,6 +259,25 @@ def scan_alerts(*, clock: Clock | None = None) -> ScanResult:
 
         expired = _expire_stale(session, unique.values(), new_groups, moment, clock=clock)
     return ScanResult(created=created, expired=expired)
+
+
+def _drop_unknown_instruments(candidates: list[AlertCandidate]) -> list[AlertCandidate]:
+    """标的表里没有的标的无法落成提醒；跳过这些候选，不影响其他提醒。"""
+
+    symbols = {
+        candidate.instrument_id for candidate in candidates if candidate.instrument_id is not None
+    }
+    if not symbols:
+        return candidates
+    with session_scope() as session:
+        known = set(
+            session.scalars(select(Instrument.symbol).where(Instrument.symbol.in_(symbols)))
+        )
+    return [
+        candidate
+        for candidate in candidates
+        if candidate.instrument_id is None or candidate.instrument_id in known
+    ]
 
 
 def _risk_candidates(moment: datetime) -> list[AlertCandidate]:

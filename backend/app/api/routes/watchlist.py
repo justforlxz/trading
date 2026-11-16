@@ -71,7 +71,7 @@ def list_watchlist(request: Request) -> WatchlistResponse:
 
 @watchlist_router.post("/watchlist", status_code=201)
 def add_watchlist_item(payload: WatchlistAddRequest, request: Request) -> WatchlistItem:
-    """把标的加入自选；标的必须已同步，且已有足够的日线可算行情。"""
+    """把标的加入自选；只要求标的已同步，行情缺失时按 `data_status` 返回。"""
 
     entry = add_item(payload.inst_id, payload.group)
     if entry is None:

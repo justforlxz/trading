@@ -7,14 +7,17 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime
+from decimal import Decimal
 
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
 from app.activity import set_event_publisher
 from app.alerts import AlertEventRow, scan_alerts, update_alert_status
-from app.core import Conflict
+from app.core import AccountSnapshot, Conflict, ExchangePosition
 from app.db import session_scope
+from app.positions import record_exchange_snapshot
 
 
 def _open_position(
@@ -271,3 +274,45 @@ def test_scan_publishes_alert_and_activity_events(market_data: TestClient) -> No
         "triggered_at",
         "expires_at",
     } <= set(alert_events[0])
+
+
+def test_alert_scan_tolerates_exchange_position_with_unsynced_instrument(
+    market_data: TestClient,
+) -> None:
+    """交易所快照里有未同步标的时，提醒列表仍返回 200，不用 503 拖垮普通读取。"""
+
+    record_exchange_snapshot(
+        captured_at=datetime(2026, 11, 16, 9, 0, tzinfo=UTC),
+        source="okx_ws",
+        snapshot=AccountSnapshot(
+            currency="USDT",
+            equity=Decimal("100"),
+            available_equity=Decimal("100"),
+            cash_balance=Decimal("0"),
+            unrealized_pnl=Decimal("0"),
+            used_margin=Decimal("0"),
+            available_margin=Decimal("100"),
+            margin_ratio=Decimal("0"),
+        ),
+        positions=[
+            ExchangePosition(
+                pos_id="unsynced-1",
+                inst_id="UNSYNCED-USDT-SWAP",
+                pos_side="long",
+                size=Decimal("1"),
+                avg_px=Decimal("100"),
+                mark_px=None,
+                upl=None,
+                upl_ratio=None,
+                lever=None,
+                mgn_mode=None,
+                liq_px=None,
+                margin=None,
+            )
+        ],
+    )
+
+    response = market_data.get("/api/alerts")
+
+    assert response.status_code == 200, response.text
+    assert all(item["instrument_id"] != "UNSYNCED-USDT-SWAP" for item in response.json()["items"])

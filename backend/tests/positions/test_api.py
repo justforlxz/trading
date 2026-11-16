@@ -11,6 +11,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
 
 from app.config import get_settings
 from app.core import AccountSnapshot, ExchangePosition, ReplayClock
@@ -388,6 +389,33 @@ def test_unconfigured_returns_unconfigured_without_fake_numbers(bare_client: Tes
     assert synced.json()["positions_synced"] == 0
 
 
+def test_account_sync_without_instruments_reports_sync_instruments_first(
+    fake_okx_server: FakeOkxServer,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """标的表为空时不能把交易所持仓映射成产品：同步入口明确要求先同步标的。"""
+
+    credentials = fake_okx_server.store.book.credentials
+    monkeypatch.setenv("OKX_API_KEY", credentials.api_key)
+    monkeypatch.setenv("OKX_SECRET_KEY", credentials.secret)
+    monkeypatch.setenv("OKX_PASSPHRASE", credentials.passphrase)
+    monkeypatch.setenv("OKX_DEMO", "1")
+    monkeypatch.setenv("OKX_REST_BASE_URL", fake_okx_server.base_url)
+    monkeypatch.setenv("OKX_HTTP_MAX_RETRIES", "0")
+    monkeypatch.setenv("OKX_RATE_LIMIT_CAPACITY", "1000")
+    monkeypatch.setenv("OKX_RATE_LIMIT_REFILL_PER_SECOND", "1000")
+    get_settings.cache_clear()
+
+    try:
+        with TestClient(create_app()) as client:
+            response = client.post("/api/account/sync")
+    finally:
+        get_settings.cache_clear()
+
+    assert response.status_code == 503, response.text
+    assert "先同步标的" in response.json()["detail"]
+
+
 def test_manual_position_flow_matches_hand_calculation(api: TestClient) -> None:
     created = api.post(
         "/api/manual-positions",
@@ -762,6 +790,87 @@ def test_position_batch_can_be_replaced_and_shrunk_at_one_captured_at(
     assert [item.pos_id for item in view.items] == ["1"]
 
 
+def test_exchange_positions_without_instrument_table_reports_sync_instruments_first(
+    client: TestClient,
+) -> None:
+    """交易所持仓入口要求先同步标的，合并视图仍用原始 instId 降级展示。"""
+
+    captured_at = datetime(2026, 11, 13, 9, 0, tzinfo=UTC)
+    record_exchange_snapshot(
+        captured_at=captured_at,
+        source="okx_ws",
+        snapshot=_account_snapshot("100"),
+        positions=[_exchange_position("1", "2", mark_px="101")],
+    )
+
+    response = client.get("/api/positions/exchange")
+
+    assert response.status_code == 503, response.text
+    assert "先同步标的" in response.json()["detail"]
+
+    merged = client.get("/api/positions")
+
+    assert merged.status_code == 200, merged.text
+    item = merged.json()["items"][0]
+    assert item["inst_id"] == SWAP_INST_ID
+    assert item["display_symbol"] == SWAP_INST_ID
+    assert item["asset_class"] == "unknown"
+
+
+def test_merged_positions_manual_source_survives_unmapped_exchange_position(
+    api: TestClient,
+) -> None:
+    """交易所快照里有未同步标的时，只看手动持仓的请求不应被一起拒绝。"""
+
+    created = api.post(
+        "/api/manual-positions",
+        json={
+            "inst_id": SWAP_INST_ID,
+            "side": "long",
+            "quantity": "1",
+            "avg_cost": "100",
+            "idempotency_key": "merged-manual-1",
+        },
+    )
+    assert created.status_code == 201, created.text
+    record_exchange_snapshot(
+        captured_at=datetime(2026, 11, 16, 9, 0, tzinfo=UTC),
+        source="okx_ws",
+        snapshot=_account_snapshot("100"),
+        positions=[_exchange_position("1", "2", mark_px="101", inst_id="UNSYNCED-USDT-SWAP")],
+    )
+
+    response = api.get("/api/positions?source=manual")
+
+    assert response.status_code == 200, response.text
+    assert [item["position_ref"] for item in response.json()["items"]] == [
+        f"manual:{created.json()['id']}"
+    ]
+
+
+def test_account_sync_with_unmapped_position_writes_nothing(
+    api: TestClient,
+    fake_okx_server: FakeOkxServer,
+) -> None:
+    """标的表非空但持仓标的未同步：同步返回 503，且不留下无法读取的快照。"""
+
+    fake_okx_server.store.book.set_position(
+        "UNSYNCED-USDT-SWAP",
+        qty="1",
+        pos_side="long",
+        avg_price="100",
+        pos_id="999",
+    )
+
+    response = api.post("/api/account/sync")
+
+    assert response.status_code == 503, response.text
+    assert "先同步标的" in response.json()["detail"]
+    with session_scope() as session:
+        count = session.scalar(select(func.count()).select_from(AccountSnapshotRow))
+    assert count == 0
+
+
 def test_positions_endpoint_merges_exchange_and_manual_sources(
     api: TestClient,
     fake_okx_server: FakeOkxServer,
@@ -898,10 +1007,16 @@ def _account_snapshot(equity: str) -> AccountSnapshot:
     )
 
 
-def _exchange_position(pos_id: str, size: str, *, mark_px: str) -> ExchangePosition:
+def _exchange_position(
+    pos_id: str,
+    size: str,
+    *,
+    mark_px: str,
+    inst_id: str = SWAP_INST_ID,
+) -> ExchangePosition:
     return ExchangePosition(
         pos_id=pos_id,
-        inst_id=SWAP_INST_ID,
+        inst_id=inst_id,
         pos_side="long",
         size=Decimal(size),
         avg_px=Decimal("100"),

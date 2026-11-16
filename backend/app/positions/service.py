@@ -32,6 +32,7 @@ from app.core import (
     AccountSnapshot,
     Clock,
     Conflict,
+    DataUnavailable,
     ExchangePosition,
     SystemClock,
     UnprocessableEntity,
@@ -225,7 +226,7 @@ def account_summary(
 
 
 def sync_account(*, clock: Clock | None = None) -> AccountSyncView:
-    """采集一次 OKX 只读快照并落库；上游失败时不写任何半套数据。"""
+    """采集一次 OKX 只读快照并落库；上游失败或标的未同步时不写任何半套数据。"""
 
     if not _credentials_configured():
         return AccountSyncView(_empty_account(STATUS_UNCONFIGURED), 0)
@@ -248,6 +249,9 @@ def sync_account(*, clock: Clock | None = None) -> AccountSyncView:
             raise
     finally:
         port.close()
+
+    with session_scope() as session:
+        _ensure_instruments_synced(session, {item.inst_id for item in positions})
 
     summary = record_exchange_snapshot(
         captured_at=moment,
@@ -401,8 +405,23 @@ def exchange_position_view_from_snapshot(item: ExchangePosition) -> ExchangePosi
     )
 
 
-def exchange_positions() -> ExchangePositionsView:
-    """最近一次账户快照同一时刻的交易所持仓；不联网，状态取当前凭证配置。"""
+def _ensure_instruments_synced(session: Session, symbols: set[str]) -> None:
+    """持仓或同步结果里的标的必须已经在标的表里，否则拒绝继续。"""
+
+    if not symbols:
+        return
+    known = set(session.scalars(select(Instrument.symbol).where(Instrument.symbol.in_(symbols))))
+    missing = sorted(symbols - known)
+    if missing:
+        raise DataUnavailable(f"标的 {missing[0]} 不在标的表里, 先同步标的")
+
+
+def exchange_positions(*, require_mapped: bool = False) -> ExchangePositionsView:
+    """最近一次账户快照同一时刻的交易所持仓；不联网，状态取当前凭证配置。
+
+    默认容忍标的表里找不到的持仓，用原始 `inst_id` 显示，方便提醒、合并视图等
+    普通读取继续工作；只有需要保证产品信息完整的调用方显式开启 `require_mapped`。
+    """
 
     with session_scope() as session:
         latest = _latest_account_row(session)
@@ -415,6 +434,8 @@ def exchange_positions() -> ExchangePositionsView:
                 .order_by(ExchangePositionSnapshotRow.pos_id)
             )
         )
+        if require_mapped:
+            _ensure_instruments_synced(session, {row.inst_id for row in rows})
     items = tuple(_exchange_position_view(row) for row in rows)
     return ExchangePositionsView(latest.captured_at, _configured_status(), items)
 

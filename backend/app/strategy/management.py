@@ -18,7 +18,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.orm import Session
 
@@ -44,6 +44,7 @@ __all__ = [
     "InstrumentStrategyRecord",
     "StrategyRecord",
     "StrategyVersionRecord",
+    "UserStrategySummary",
     "create_strategy",
     "create_version",
     "get_user_strategy",
@@ -54,6 +55,7 @@ __all__ = [
     "list_user_strategies",
     "list_versions",
     "replace_version_instruments",
+    "summarize_user_strategies",
     "update_strategy",
 ]
 
@@ -129,6 +131,18 @@ class InstrumentStrategyRecord:
     version_ids: tuple[str, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class UserStrategySummary:
+    """v6 用户策略的数量分布；首页只需要计数，不读每条策略的完整内容。
+
+    v6 的 `strategies.status` 只有草稿、已验证、已启用、已暂停与已归档五种，
+    没有「运行中」状态，因此这里只给总数与按 `enabled` 统计的启用数。
+    """
+
+    total: int
+    enabled: int
+
+
 def list_user_strategies(
     *,
     status: str | None = None,
@@ -168,6 +182,22 @@ def list_user_strategies(
         last = page[-1]
         next_cursor = f"{int(last.created_at.timestamp())}:{last.id}"
     return records, next_cursor
+
+
+def summarize_user_strategies() -> UserStrategySummary:
+    """统计 v6 用户策略的总数与启用数；计数在 SQL 里完成。"""
+
+    with session_scope() as session:
+        total = int(session.scalar(select(func.count()).select_from(UserStrategyRow)) or 0)
+        enabled = int(
+            session.scalar(
+                select(func.count())
+                .select_from(UserStrategyRow)
+                .where(UserStrategyRow.status == "enabled")
+            )
+            or 0
+        )
+    return UserStrategySummary(total=total, enabled=enabled)
 
 
 def get_user_strategy(strategy_id: str) -> StrategyRecord | None:

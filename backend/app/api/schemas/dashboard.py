@@ -217,9 +217,14 @@ class DashboardRecentBacktest(BaseModel):
 
 
 class DashboardStrategiesData(BaseModel):
+    """策略卡计数：`total`/`enabled` 来自 v6 `strategies` 表。
+
+    v6 策略没有「运行中」状态，`running` 为 `null`，界面按「未提供」显示。
+    """
+
     total: int
     enabled: int
-    running: int
+    running: int | None = None
     pending_signals: int | None = None
     recent_backtest: DashboardRecentBacktest | None = None
 
@@ -388,7 +393,7 @@ _EXAMPLE: dict[str, object] = {
         "data": {
             "total": 2,
             "enabled": 1,
-            "running": 0,
+            "running": None,
             "pending_signals": None,
             "recent_backtest": {
                 "run_id": "bt_0001",

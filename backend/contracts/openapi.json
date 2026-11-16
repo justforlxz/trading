@@ -4901,6 +4901,7 @@
         "type": "object"
       },
       "DashboardStrategiesData": {
+        "description": "策略卡计数：`total`/`enabled` 来自 v6 `strategies` 表。\n\nv6 策略没有「运行中」状态，`running` 为 `null`，界面按「未提供」显示。",
         "properties": {
           "enabled": {
             "title": "Enabled",
@@ -4928,8 +4929,15 @@
             ]
           },
           "running": {
-            "title": "Running",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Running"
           },
           "total": {
             "title": "Total",
@@ -4938,8 +4946,7 @@
         },
         "required": [
           "total",
-          "enabled",
-          "running"
+          "enabled"
         ],
         "title": "DashboardStrategiesData",
         "type": "object"
@@ -5130,7 +5137,6 @@
                   "trade_count": 18,
                   "window_days": 30
                 },
-                "running": 0,
                 "total": 2
               },
               "status": "ok"

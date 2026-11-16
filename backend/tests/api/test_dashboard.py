@@ -24,7 +24,7 @@ from app.core import Bar, Timeframe
 from app.db.engine import get_engine
 from app.instrument import sync_instruments
 from app.market import upsert_candles
-from app.strategy import create_instance
+from app.strategy import create_instance, update_strategy
 from tests.api.conftest import latest_opens, seed_daily
 from tests.factories.instruments import make_ref, make_swap_ref
 from tests.factories.strategies import make_strategy
@@ -302,12 +302,13 @@ def test_alerts_come_from_alert_events_and_match_api(client: TestClient) -> None
 
 
 def test_strategies_count_and_recent_backtest(client: TestClient) -> None:
-    """策略卡给出实例计数与最近 30 天的一次回测；没有回测时为 `null`。"""
+    """策略卡按 v6 `strategies` 表计数与回测；旧实例表不再参与。"""
 
     _strategy_market()
+    # 旧实例表保留给自动化阶段；首页不能把它算成用户已创建的策略。
     create_instance(
         strategy_id="relative_value",
-        name="BTC/ETH 首页",
+        name="BTC/ETH 旧实例",
         bar="1d",
         params={"reversion_window": 3, "strength_window": 2, "pair_count": 1},
         inst_ids=["BTC-USDT", "ETH-USDT"],
@@ -319,12 +320,16 @@ def test_strategies_count_and_recent_backtest(client: TestClient) -> None:
         params={"reversion_window": 3, "strength_window": 2, "pair_count": 1},
         inst_ids=["BTC-USDT", "ETH-USDT"],
     )
+    enabled = make_strategy(name="已启用策略", inst_ids=["BTC-USDT"])
+    update_strategy(enabled.id, {"status": "enabled"})
+    paused = make_strategy(name="已暂停策略", inst_ids=["BTC-USDT"])
+    update_strategy(paused.id, {"status": "paused"})
 
     before = client.get("/api/dashboard/summary").json()["strategies"]["data"]
     assert before == {
-        "total": 1,
+        "total": 3,
         "enabled": 1,
-        "running": 0,
+        "running": None,
         "pending_signals": None,
         "recent_backtest": None,
     }
@@ -355,7 +360,9 @@ def test_strategies_count_and_recent_backtest(client: TestClient) -> None:
     assert run.status_code == 202, run.text
 
     after = client.get("/api/dashboard/summary").json()["strategies"]["data"]
-    assert after["total"] == 1
+    assert after["total"] == 3
+    assert after["enabled"] == 1
+    assert after["running"] is None
     recent = after["recent_backtest"]
     assert recent is not None
     assert recent["run_id"] == run.json()["run_id"]

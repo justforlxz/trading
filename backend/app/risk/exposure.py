@@ -25,6 +25,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
+from app.instrument import notional_value as value_by_unit
 from app.instrument import trading_rules
 
 __all__ = [
@@ -153,16 +154,16 @@ def notional_value(position: PositionRiskInput) -> Decimal | None:
 
     if position.inst_type is None or position.mark_px is None:
         return None
-    size = abs(position.size)
     # 手动持仓账本按基础数量记账（`price * quantity`），不是合约张数；再乘
     # `ctVal * ctMult` 会与 `/api/manual-positions` 的市值口径分叉。
-    if position.source == "manual":
-        return size * position.mark_px
-    if not trading_rules(position.inst_type).has_margin:
-        return size * position.mark_px
-    if position.ct_val is None or position.ct_mult is None:
-        return None
-    return size * position.mark_px * position.ct_val * position.ct_mult
+    qty_unit = "base" if position.source == "manual" else trading_rules(position.inst_type).qty_unit
+    return value_by_unit(
+        size=position.size,
+        price=position.mark_px,
+        qty_unit=qty_unit,
+        ct_val=position.ct_val,
+        ct_mult=position.ct_mult,
+    )
 
 
 def _price_distance(position: PositionRiskInput) -> Decimal | None:

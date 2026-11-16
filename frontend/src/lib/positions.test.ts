@@ -166,6 +166,41 @@ describe("推送数据合并", () => {
     expect(mergeAccountUpdate(account, null)).toBe(account);
   });
 
+  it("账户推送前进快照时间时，持仓市值仍保留自己的旧时间", () => {
+    const account: AccountSummary = {
+      account_id: "okx-main",
+      captured_at: "2026-11-14T10:00:00Z",
+      currency: "USDT",
+      day_pnl_basis: "equity_only",
+      equity: "1248.60",
+      position_notional: "1851.36",
+      position_notional_at: "2026-11-14T10:00:00Z",
+      source: "okx_rest",
+      status: "ok",
+    };
+    const update: AccountUpdate = {
+      account_id: "okx-main",
+      currency: "USDT",
+      equity: "1300.10",
+      available_equity: "700.20",
+      cash_balance: "0",
+      unrealized_pnl: "40.10",
+      used_margin: "599.90",
+      available_margin: "700.20",
+      margin_usage_pct: "46.15",
+      captured_at: "2026-11-14T10:05:00Z",
+      source: "okx_ws",
+      as_of: "2026-11-14T10:05:00Z",
+      received_at: "2026-11-14T10:05:01Z",
+    };
+
+    const merged = mergeAccountUpdate(account, update);
+
+    expect(merged.captured_at).toBe("2026-11-14T10:05:00Z");
+    expect(merged.position_notional).toBe("1851.36");
+    expect(merged.position_notional_at).toBe("2026-11-14T10:00:00Z");
+  });
+
   it("忽略早于 HTTP 账户快照的推送，避免同步后回退", () => {
     const account: AccountSummary = {
       account_id: "okx-main",

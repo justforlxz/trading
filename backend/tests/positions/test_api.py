@@ -26,7 +26,7 @@ from app.positions import (
 )
 from app.positions.model import AccountSnapshotRow, ManualPositionRow
 from tests.api.conftest import seed_daily
-from tests.exchange.conftest import SPOT_INSTRUMENT, SWAP_INST_ID, SWAP_INSTRUMENT
+from tests.exchange.conftest import SPOT_INST_ID, SPOT_INSTRUMENT, SWAP_INST_ID, SWAP_INSTRUMENT
 from tests.factories.instruments import make_ref
 from tests.fakes.okx.server import FakeOkxServer
 
@@ -108,6 +108,8 @@ def test_sync_then_summary_and_exchange_positions_share_captured_at(
     )
     assert body["day_pnl"] is None
     assert body["day_pnl_basis"] == "equity_only"
+    assert Decimal(body["position_notional"]) == Decimal("1851.36")
+    assert body["position_notional_at"] == body["captured_at"]
 
     summary = api.get("/api/account/summary")
     positions = api.get("/api/positions/exchange")
@@ -115,6 +117,8 @@ def test_sync_then_summary_and_exchange_positions_share_captured_at(
     assert summary.status_code == 200, summary.text
     assert positions.status_code == 200, positions.text
     assert summary.json()["captured_at"] == body["captured_at"]
+    assert Decimal(summary.json()["position_notional"]) == Decimal("1851.36")
+    assert summary.json()["position_notional_at"] == body["captured_at"]
     assert positions.json()["as_of"] == body["captured_at"]
     item = positions.json()["items"][0]
     assert item["pos_id"] == "123456"
@@ -137,6 +141,178 @@ def test_sync_then_summary_and_exchange_positions_share_captured_at(
         path not in {"/api/v5/trade/order", "/api/v5/trade/cancel-order"}
         for _method, path, _query, _body in book.requests
     )
+
+
+def test_account_summary_position_notional_adds_manual_market_value(
+    api: TestClient,
+    fake_okx_server: FakeOkxServer,
+) -> None:
+    book = fake_okx_server.store.book
+    book.set_position(
+        SWAP_INST_ID,
+        qty="8",
+        pos_side="long",
+        avg_price="226.80",
+        pos_id="123456",
+        mark_px="231.42",
+    )
+    assert api.post("/api/account/sync").status_code == 200
+
+    created = api.post(
+        "/api/manual-positions",
+        json={
+            "inst_id": SWAP_INST_ID,
+            "side": "long",
+            "quantity": "2",
+            "avg_cost": "200",
+            "idempotency_key": "position-notional-manual",
+        },
+    )
+    assert created.status_code == 201, created.text
+
+    summary = api.get("/api/account/summary")
+
+    assert summary.status_code == 200, summary.text
+    assert Decimal(summary.json()["position_notional"]) == Decimal("1972.36")
+
+
+def test_account_summary_position_notional_is_null_when_a_price_is_missing(
+    client: TestClient,
+) -> None:
+    sync_instruments(parse_instruments([SPOT_INSTRUMENT]))
+    captured_at = datetime(2026, 11, 13, 9, 0, tzinfo=UTC)
+    account = AccountSnapshot(
+        currency="USDT",
+        equity=Decimal("100"),
+        available_equity=Decimal("100"),
+        cash_balance=Decimal("100"),
+        unrealized_pnl=Decimal("0"),
+        used_margin=Decimal("0"),
+        available_margin=Decimal("100"),
+        margin_ratio=Decimal("0"),
+    )
+    spot = ExchangePosition(
+        pos_id=f"{SPOT_INST_ID}:long",
+        inst_id=SPOT_INST_ID,
+        pos_side="long",
+        size=Decimal("5"),
+        avg_px=Decimal("100"),
+        mark_px=None,
+        upl=None,
+        upl_ratio=None,
+        lever=None,
+        mgn_mode=None,
+        liq_px=None,
+        margin=None,
+    )
+
+    view = record_exchange_snapshot(
+        captured_at=captured_at,
+        source="okx_rest",
+        snapshot=account,
+        positions=[spot],
+    )
+
+    assert view is not None
+    assert view.position_notional is None
+    assert account_summary().position_notional is None
+
+
+def test_account_summary_position_notional_is_zero_without_open_positions(
+    api: TestClient,
+    fake_okx_server: FakeOkxServer,
+) -> None:
+    book = fake_okx_server.store.book
+    book.set_account(equity="1000", available_equity="1000")
+    assert api.post("/api/account/sync").status_code == 200
+
+    summary = api.get("/api/account/summary")
+
+    assert summary.status_code == 200, summary.text
+    assert Decimal(summary.json()["position_notional"]) == Decimal("0")
+
+
+def test_account_summary_position_notional_is_null_when_the_snapshot_has_no_batch(
+    client: TestClient,
+) -> None:
+    """账户推送没有携带持仓批次时，市值是未知，不能沿用上一批或报成 0。"""
+
+    sync_instruments(parse_instruments([SWAP_INSTRUMENT]))
+    first = datetime(2026, 11, 13, 9, 0, tzinfo=UTC)
+    second = datetime(2026, 11, 13, 9, 5, tzinfo=UTC)
+
+    record_exchange_snapshot(
+        captured_at=first,
+        source="okx_ws",
+        snapshot=_account_snapshot("100"),
+        positions=[_exchange_position("1", "8", mark_px="231.42")],
+    )
+    assert account_summary().position_notional == Decimal("1851.36")
+
+    record_exchange_snapshot(
+        captured_at=second,
+        source="okx_ws",
+        snapshot=_account_snapshot("100"),
+        positions=None,
+    )
+
+    view = account_summary()
+    assert view.position_notional is None
+    assert view.position_notional_at is None
+
+
+def test_account_summary_position_notional_is_zero_for_an_explicit_empty_batch(
+    client: TestClient,
+) -> None:
+    """明确记录的空白批次是「没有持仓」，与「没有携带批次」必须区分。"""
+
+    sync_instruments(parse_instruments([SWAP_INSTRUMENT]))
+    first = datetime(2026, 11, 13, 9, 0, tzinfo=UTC)
+    second = datetime(2026, 11, 13, 9, 5, tzinfo=UTC)
+
+    record_exchange_snapshot(
+        captured_at=first,
+        source="okx_ws",
+        snapshot=_account_snapshot("100"),
+        positions=[_exchange_position("1", "8", mark_px="231.42")],
+    )
+    record_exchange_snapshot(
+        captured_at=second,
+        source="okx_ws",
+        snapshot=_account_snapshot("100"),
+        positions=[],
+    )
+
+    view = account_summary()
+    assert view.position_notional == Decimal("0")
+    assert view.position_notional_at == second
+
+
+def test_position_batch_written_after_account_row_marks_the_same_timestamp(
+    client: TestClient,
+) -> None:
+    """同一时刻先写账户行、后补持仓批次时，批次标记要补上并能算出市值。"""
+
+    sync_instruments(parse_instruments([SWAP_INSTRUMENT]))
+    captured_at = datetime(2026, 11, 13, 9, 0, tzinfo=UTC)
+
+    record_exchange_snapshot(
+        captured_at=captured_at,
+        source="okx_ws",
+        snapshot=_account_snapshot("100"),
+        positions=None,
+    )
+    assert account_summary().position_notional is None
+
+    record_exchange_snapshot(
+        captured_at=captured_at,
+        source="okx_ws",
+        positions=[_exchange_position("1", "8", mark_px="231.42")],
+    )
+
+    view = account_summary()
+    assert view.position_notional == Decimal("1851.36")
+    assert view.position_notional_at == captured_at
 
 
 def test_upstream_failure_keeps_the_previous_snapshot(
@@ -707,6 +883,19 @@ def test_positions_endpoint_keeps_manual_positions_when_exchange_unconfigured(
     assert len(body["items"]) == 1
     assert body["items"][0]["source"] == "manual"
     assert body["items"][0]["position_ref"] == f"manual:{created.json()['id']}"
+
+
+def _account_snapshot(equity: str) -> AccountSnapshot:
+    return AccountSnapshot(
+        currency="USDT",
+        equity=Decimal(equity),
+        available_equity=Decimal(equity),
+        cash_balance=Decimal("0"),
+        unrealized_pnl=Decimal("0"),
+        used_margin=Decimal("0"),
+        available_margin=Decimal(equity),
+        margin_ratio=Decimal("0"),
+    )
 
 
 def _exchange_position(pos_id: str, size: str, *, mark_px: str) -> ExchangePosition:

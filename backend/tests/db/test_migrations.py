@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from alembic import command
 from alembic.script import ScriptDirectory
 from sqlalchemy import text
@@ -223,3 +225,51 @@ def test_external_market_migration_creates_tables_and_settings_groups() -> None:
         )
     assert {"display", "risk_defaults", "data_sources"} <= columns
     assert "data" not in columns
+
+
+def test_account_snapshot_migration_backfills_position_batch_marker() -> None:
+    """0019 按同一采集时刻的持仓行回填标记，没有持仓行的历史快照保持未知。"""
+
+    command.upgrade(alembic_config(), "0018")
+    with session_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO account_snapshots
+                    (account_id, currency, equity, available_equity, cash_balance,
+                     unrealized_pnl, used_margin, available_margin, margin_ratio,
+                     captured_at, source)
+                VALUES
+                    ('okx-main', 'USDT', '100', '100', '100', '0', '0', '100', '0',
+                     '2026-11-13 09:00:00', 'okx_rest'),
+                    ('okx-main', 'USDT', '100', '100', '100', '0', '0', '100', '0',
+                     '2026-11-13 09:05:00', 'okx_ws')
+                """
+            )
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO exchange_position_snapshots
+                    (account_id, pos_id, inst_id, pos_side, size, avg_px,
+                     captured_at, source)
+                VALUES
+                    ('okx-main', '1', 'AAPL-USDT-SWAP', 'long', '8', '226.80',
+                     '2026-11-13 09:00:00', 'okx_rest')
+                """
+            )
+        )
+
+    command.upgrade(alembic_config(), "head")
+
+    with session_scope() as session:
+        rows = session.execute(
+            text(
+                "SELECT captured_at, positions_included FROM account_snapshots ORDER BY captured_at"
+            )
+        ).all()
+
+    assert [(row.captured_at, row.positions_included) for row in rows] == [
+        (datetime(2026, 11, 13, 9, 0), True),
+        (datetime(2026, 11, 13, 9, 5), False),
+    ]

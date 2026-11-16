@@ -74,7 +74,7 @@ class _InstrumentRiskData:
 def exposure_report(*, clock: Clock | None = None) -> RiskExposure:
     """当前组合的风险与敞口；没有持仓时返回空视图，不编造数值。"""
 
-    account = account_summary()
+    account = account_summary(include_position_notional=False)
     exchange = exchange_positions()
     manual = [item for item in list_manual_positions() if item.status == "open"]
 
@@ -158,7 +158,7 @@ def save_position_risk_config(
 
 
 def _known_position_refs() -> set[str]:
-    account = account_summary()
+    account = account_summary(include_position_notional=False)
     exchange = exchange_positions()
     refs = {f"exchange:{account.account_id}:{item.pos_id}" for item in exchange.items}
     refs.update(f"manual:{item.id}" for item in list_manual_positions() if item.status == "open")

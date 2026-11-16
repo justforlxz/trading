@@ -14,7 +14,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, DecimalText, UtcDateTime
@@ -32,7 +32,11 @@ DEFAULT_CURRENCY = "USDT"
 
 
 class AccountSnapshotRow(Base):
-    """账户权益快照；同一账户、时刻与来源只保留一行。"""
+    """账户权益快照；同一账户、时刻与来源只保留一行。
+
+    `positions_included` 记录这次账户快照是否同时写入了一批持仓明细。为 `False`
+    时无法判断当时是否有持仓，市值汇总只能返回未知，不能按 0 处理。
+    """
 
     __tablename__ = "account_snapshots"
     __table_args__ = (UniqueConstraint("account_id", "captured_at", "source"),)
@@ -47,6 +51,9 @@ class AccountSnapshotRow(Base):
     used_margin: Mapped[Decimal] = mapped_column(DecimalText, nullable=False)
     available_margin: Mapped[Decimal] = mapped_column(DecimalText, nullable=False)
     margin_ratio: Mapped[Decimal] = mapped_column(DecimalText, nullable=False)
+    positions_included: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     captured_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
     source: Mapped[str] = mapped_column(String(16), nullable=False)
     raw_payload_ref: Mapped[str | None] = mapped_column(Text, nullable=True)

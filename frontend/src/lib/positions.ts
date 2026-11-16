@@ -116,7 +116,12 @@ export function mergePositionUpdates(
   return changed ? { ...positions, items, as_of: asOf } : positions;
 }
 
-/** 推送账户快照只覆盖它携带的字段；日盈亏基准等 HTTP 字段继续保留。 */
+/**
+ * 推送账户快照只覆盖它携带的字段；日盈亏基准等 HTTP 字段继续保留。
+ *
+ * 推送不携带持仓市值，`position_notional` 与 `position_notional_at` 必须继续作为
+ * 同一份 HTTP 快照保留；账户快照时间前进时，不能把旧市值改标成新时间。
+ */
 export function mergeAccountUpdate(
   account: AccountSummary,
   update: AccountUpdate | null,

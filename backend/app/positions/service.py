@@ -21,7 +21,7 @@ from decimal import Decimal
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -39,7 +39,13 @@ from app.core import (
 )
 from app.db import session_scope
 from app.exchange import create_trade_port
-from app.instrument import Instrument, display_symbol, get_instrument
+from app.instrument import (
+    Instrument,
+    display_symbol,
+    get_instrument,
+    notional_value,
+    trading_rules,
+)
 from app.market import latest_candle
 from app.positions.manual import LONG, SHORT, LedgerTrade, apply_trade, replay_trades
 from app.positions.model import (
@@ -103,6 +109,8 @@ class AccountView:
     available_margin: Decimal | None
     margin_usage_pct: Decimal | None
     day_pnl: Decimal | None
+    position_notional: Decimal | None
+    position_notional_at: datetime | None
     captured_at: datetime | None
     source: str | None
 
@@ -192,7 +200,11 @@ class ManualTradeView:
 # --------------------------------------------------------------------- 账户
 
 
-def account_summary(*, clock: Clock | None = None) -> AccountView:
+def account_summary(
+    *,
+    clock: Clock | None = None,
+    include_position_notional: bool = True,
+) -> AccountView:
     """最近一条账户快照；状态取当前凭证配置，旧快照不冒充可刷新的数据。"""
 
     now = (clock or SystemClock()).now()
@@ -201,7 +213,15 @@ def account_summary(*, clock: Clock | None = None) -> AccountView:
         if latest is None:
             return _empty_account(_unconfigured_status())
         day_pnl = _day_pnl(session, latest, now)
-        return _account_view(latest, day_pnl=day_pnl, status=_configured_status())
+        position_notional = (
+            _position_notional(session, latest) if include_position_notional else None
+        )
+        return _account_view(
+            latest,
+            day_pnl=day_pnl,
+            position_notional=position_notional,
+            status=_configured_status(),
+        )
 
 
 def sync_account(*, clock: Clock | None = None) -> AccountSyncView:
@@ -256,11 +276,11 @@ def record_exchange_snapshot(
 ) -> AccountView | None:
     """把一次账户与持仓快照写进 B2 的表；只写传入的部分，不补造缺失数据。
 
-    `positions` 为空集合表示这一批没有持仓，会删除该时刻的旧行；传 `None` 表示
-    这次调用不涉及持仓。传非空集合时按 `(account_id, pos_id, captured_at)` 更新，
-    并删除该时刻不在集合里的旧行，保证同一时刻的账户与持仓是同一批状态。私有频道
-    推送与 REST 同步共用本函数，保证两边落库字段一致。返回账户视图，没有账户快照
-    时返回 `None`。
+    `positions` 为空集合表示这一批明确没有持仓，会删除该时刻的旧行并标记该时刻
+    已携带持仓批次；传 `None` 表示这次调用不涉及持仓，标记保持原值。传非空集合时
+    按 `(account_id, pos_id, captured_at)` 更新，并删除该时刻不在集合里的旧行，
+    保证同一时刻的账户与持仓是同一批状态。私有频道推送与 REST 同步共用本函数，
+    保证两边落库字段一致。返回账户视图，没有账户快照时返回 `None`。
     """
 
     with session_scope() as session:
@@ -278,6 +298,7 @@ def record_exchange_snapshot(
                     used_margin=snapshot.used_margin,
                     available_margin=snapshot.available_margin,
                     margin_ratio=snapshot.margin_ratio,
+                    positions_included=positions is not None,
                     captured_at=captured_at,
                     source=source,
                     raw_payload_ref=payload_ref,
@@ -336,6 +357,15 @@ def record_exchange_snapshot(
                     ExchangePositionSnapshotRow.pos_id.notin_([item.pos_id for item in positions])
                 )
             session.execute(stale)
+            # 同一时刻可能先写入账户行、后补持仓批次；已有账户行统一标记为已携带。
+            session.execute(
+                update(AccountSnapshotRow)
+                .where(
+                    AccountSnapshotRow.account_id == DEFAULT_ACCOUNT_ID,
+                    AccountSnapshotRow.captured_at == captured_at,
+                )
+                .values(positions_included=True)
+            )
         if snapshot is None:
             return None
         latest = _latest_account_row(session)
@@ -343,6 +373,7 @@ def record_exchange_snapshot(
         return _account_view(
             latest,
             day_pnl=_day_pnl(session, latest, captured_at),
+            position_notional=_position_notional(session, latest),
             status=_configured_status(),
         )
 
@@ -423,10 +454,74 @@ def _day_pnl(
     return latest.equity - baseline.equity
 
 
+def _position_notional(session: Session, latest: AccountSnapshotRow) -> Decimal | None:
+    """持仓市值：交易所持仓按合约规格与价格折算，手动持仓按最新价折算。
+
+    任一条持仓缺少价格、合约规格或标的信息时返回 `None`，不把不完整的部分相加后
+    当成总额。价格优先用快照里的标记价；缺失时回退到已落库的最新收盘价，与风险
+    敞口使用同一套行情来源。最新账户快照没有携带持仓批次且该时刻没有持仓行时返回
+    `None`，不能把未知当成空持仓的 0。
+    """
+
+    exchange_rows = list(
+        session.scalars(
+            select(ExchangePositionSnapshotRow).where(
+                ExchangePositionSnapshotRow.captured_at == latest.captured_at
+            )
+        )
+    )
+    if not exchange_rows and not latest.positions_included:
+        return None
+    symbols = {row.inst_id for row in exchange_rows}
+    instruments = (
+        {
+            row.symbol: row
+            for row in session.scalars(select(Instrument).where(Instrument.symbol.in_(symbols)))
+        }
+        if symbols
+        else {}
+    )
+
+    total = Decimal(0)
+    for row in exchange_rows:
+        instrument = instruments.get(row.inst_id)
+        if instrument is None:
+            return None
+        price = row.mark_px
+        if price is None:
+            price, _ = _latest_price(row.inst_id)
+        value = notional_value(
+            size=row.size,
+            price=price,
+            qty_unit=trading_rules(instrument.inst_type).qty_unit,
+            ct_val=instrument.ct_val,
+            ct_mult=instrument.ct_mult,
+        )
+        if value is None:
+            return None
+        total += value
+
+    manual_rows = session.scalars(
+        select(ManualPositionRow).where(ManualPositionRow.status == STATUS_OPEN)
+    )
+    for row in manual_rows:
+        price, _ = _latest_price(row.inst_id)
+        value = notional_value(
+            size=row.quantity,
+            price=price,
+            qty_unit="base",
+        )
+        if value is None:
+            return None
+        total += value
+    return total
+
+
 def _account_view(
     row: AccountSnapshotRow,
     *,
     day_pnl: Decimal | None,
+    position_notional: Decimal | None,
     status: str,
 ) -> AccountView:
     return AccountView(
@@ -441,6 +536,8 @@ def _account_view(
         available_margin=row.available_margin,
         margin_usage_pct=row.margin_ratio * 100,
         day_pnl=day_pnl,
+        position_notional=position_notional,
+        position_notional_at=row.captured_at if position_notional is not None else None,
         captured_at=row.captured_at,
         source=row.source,
     )
@@ -459,6 +556,8 @@ def _empty_account(status: str) -> AccountView:
         available_margin=None,
         margin_usage_pct=None,
         day_pnl=None,
+        position_notional=None,
+        position_notional_at=None,
         captured_at=None,
         source=None,
     )

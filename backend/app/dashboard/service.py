@@ -281,7 +281,7 @@ def _market(moment: datetime) -> Module:
 
 
 def _account() -> Module:
-    view = account_summary()
+    view = account_summary(include_position_notional=False)
     if view.status == STATUS_UNCONFIGURED:
         return Module(
             status=STATUS_UNCONFIGURED,

@@ -343,6 +343,7 @@ flowchart TD
 | POST | `/api/watchlist` | `inst_id`、`group`（可选，默认「默认」） | 201：自选条目快照 | 400、404、422；标的已同步但日线不足时仍返回 201 | S1-2 |
 | DELETE | `/api/watchlist/items/{id}` | 路径参数 `id` | 204，无响应体 | 404 | S1-2 |
 | GET | `/api/instruments/{id}/analysis?bar=1D` | 路径参数 `id`；`bar` 取 `1m`、`5m`、`15m`、`1h`、`4h`、`1d`，默认 `1d` | `instrument`、`bar`、`quote`、`candles[{ts,open,high,low,close,volume,volume_ccy,source,is_complete}]`、`indicators{ma20,ma60,ma20_distance_pct,rsi14,macd{value,signal,histogram},atr14,atr_pct,volume_ratio_20d}`、`relative_strength{window,symbol_return,benchmark_instrument_id,benchmark_return,excess_return}`、`levels{high_20d,low_20d,distance_to_high_pct,distance_to_low_pct}`、`correlations[{instrument_id,display_symbol,window,coefficient,sample_count,computed_at}]`、`events`、`linked_strategies`、`coverage{bar,start,end,candle_count,gap_count,last_synced_at}`、`generated_at` | 400、404、503 | S1-3 |
+| POST | `/api/instruments/{id}/sync` | 路径参数 `id`；`bar`（可选，`1d`、`4h`、`1h`，默认 `1d`）、`days`（可选，`1..3650`；缺省 `1d=400`、`4h=90`、`1h=30`） | 202：`inst_id`、`bar`、`days`、`status`（`started`、`already_running`、`fresh`、`backoff`）、`requested_at`；不等待同步完成，失败只写 `data_sync_jobs` | 404（标的未登记）、422（周期或天数非法）、503（按需同步调度器未启动） | S1-3、MKACG-855 |
 | GET | `/api/positions` | `source`（可选，取 `exchange` 或 `manual`） | `as_of`、`exchange_status`、`items[{position_ref,source,inst_id,display_symbol,name,asset_class,side,size,avg_px,mark_px,upl,upl_ratio,lever,mgn_mode,liq_px,margin,notional,stop_px,stop_distance_pct,price_status,updated_at}]` | 422；交易所持仓引用的标的未同步时，该行用原始 `inst_id` 与 `asset_class=unknown` 降级展示，不阻断整个列表 | B2、MKACG-845 |
 | GET | `/api/positions/exchange` | 无 | `as_of`、`status`、`items[{pos_id,inst_id,display_symbol,name,asset_class,pos_side,size,avg_px,mark_px,upl,upl_ratio,lever,mgn_mode,liq_px,margin}]` | 503（交易所持仓引用的标的未同步时要求先同步标的） | B2 |
 | POST | `/api/manual-positions` | `inst_id`、`side`、`quantity`、`avg_cost`、`stop_px`（可选）、`leverage`（可选）、`note`（可选）、`idempotency_key` | 201：`id`、`inst_id`、`display_symbol`、`name`、`asset_class`、`side`、`quantity`、`avg_cost`、`stop_px`、`leverage`、`status`、`note`、`price`、`price_status`、`price_source`、`market_value`、`unrealized_pnl`、`created_at`、`updated_at` | 400、404、409 | B2 |
@@ -369,6 +370,8 @@ flowchart TD
 | GET | `/api/system/health` | 无 | `status`、`checked_at`、`components[{name,status,last_success_at,error,detail}]`，`name` 包含 `database`、`okx_rest`、`okx_ws`、`job_queue`、`candle_coverage`；同步任务仍在 `running`、最近一次失败或同一数据集的最后成功时间超过新鲜度阈值（OKX REST 与 K 线覆盖 3 天）时该项为 `stale` | 200（单项异常不影响整体响应）、503 | B9、MKACG-853（删除 `external_provider`） |
 | POST | `/api/ai/summary` | 无请求体 | `generated_at`、`overall`、`points[{text,sources[{type,id,url}]}]`、`risks[{text,sources}]`、`disclaimer`、`stale`、`stale_notice`；来源 `type` 只有 `alert`、`market_overview`、`risk`；每个事实点至少一条来源；行情报价过期时 `stale_notice` 写明原因 | 400 | B9、MKACG-853（删除新闻输入） |
 | POST | `/api/system/sync` | `dataset`、`instrument_ids`（可选）、`bar`（可选）、`days`（可选）；`dataset` 只有 `instruments` 与 `candles` | 202：`job_id`、`status`、`rows`、`error` | 400、409 | B9、MKACG-853（删除外部数据集与 Provider 参数） |
+
+搜索接口 `GET /api/instruments/search` 只查询 `instruments` 表，不访问 OKX、不请求 K 线同步。
 
 ### 6.1 账户与持仓接口的取舍
 

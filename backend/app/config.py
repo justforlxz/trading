@@ -3,6 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # 后端包所在目录：`.env` 与 `alembic.ini` 按包路径定位，不依赖进程 cwd。
@@ -45,6 +46,9 @@ class Settings(BaseSettings):
     # 令牌桶容量与补充速率：按上游最紧的公共行情配额（20 次 / 2 秒）折算。
     okx_rate_limit_capacity: int = 20
     okx_rate_limit_refill_per_second: float = 10.0
+
+    # 按需 K 线同步在进程内的并发上限：单进程部署没有独立 worker，线程数即上限。
+    on_demand_sync_max_concurrency: int = Field(default=2, ge=1)
 
     # 私有交易接口凭据。密钥只经环境变量注入，没有内建默认值，也不进仓库；
     # 未配置时私有客户端在构造阶段就报错，而不是发一次必然失败的请求。

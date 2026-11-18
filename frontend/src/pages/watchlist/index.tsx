@@ -17,7 +17,6 @@ import {
   fetchMarketBreadth,
   fetchWatchlist,
   removeWatchlistItem,
-  searchInstruments,
   updateWatchlistItem,
   type InstrumentRef,
   type MarketBreadthResponse,
@@ -41,8 +40,11 @@ import {
   type WatchlistCategory,
 } from "../../lib/watchlist";
 import { cn } from "../../lib/utils";
+import { searchWatchlist } from "../../lib/watchlist-search";
 
 const DEFAULT_GROUP = "默认";
+/** 加入自选后只做有限次重读，等后台同步把价格、涨跌和指标写回。 */
+const ADD_REFRESH_DELAYS = [2000, 6000, 12000];
 const INPUT_CLASS =
   "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
@@ -391,6 +393,13 @@ export default function WatchlistPage() {
   const [market, setMarket] = useState<MarketBreadthResponse[] | null>(null);
   const [marketError, setMarketError] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const refreshTimers = useRef<number[]>([]);
+
+  useEffect(() => {
+    return () => {
+      refreshTimers.current.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -442,8 +451,7 @@ export default function WatchlistPage() {
     setSearching(true);
     setSearchError(null);
     try {
-      const response = await searchInstruments(keyword);
-      setResults(response.items);
+      setResults(await searchWatchlist(keyword));
     } catch (reason: unknown) {
       setResults(null);
       setSearchError(messageOf(reason, "搜索失败"));
@@ -452,12 +460,20 @@ export default function WatchlistPage() {
     }
   }
 
+  function scheduleAddRefreshes(): void {
+    refreshTimers.current.forEach((timer) => window.clearTimeout(timer));
+    refreshTimers.current = ADD_REFRESH_DELAYS.map((delay) =>
+      window.setTimeout(() => setReloadToken((token) => token + 1), delay),
+    );
+  }
+
   async function handleAdd(instId: string): Promise<void> {
     setBusy(instId);
     setActionError(null);
     try {
       await addWatchlistItem(instId, DEFAULT_GROUP);
       reload();
+      scheduleAddRefreshes();
     } catch (reason: unknown) {
       setActionError(messageOf(reason, "加入自选失败"));
     } finally {

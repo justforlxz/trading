@@ -25,6 +25,7 @@ from app.db.engine import get_engine
 from app.main import create_app
 from tests.fakes.okx.app import create_app as create_fake_okx_app
 from tests.fakes.okx.server import FakeOkxServer, start_server
+from tests.fakes.on_demand import RecordingScheduler
 
 
 def _run_on_server(database_url: str, statement: str) -> None:
@@ -65,10 +66,21 @@ def _isolated_schema(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
 
 @pytest.fixture()
-def client() -> Iterator[TestClient]:
-    """会触发 lifespan（执行迁移）的客户端。"""
+def sync_scheduler() -> RecordingScheduler:
+    """默认注入的记录型调度器；自选用例据此断言同步被请求了一次。"""
 
-    with TestClient(create_app()) as test_client:
+    return RecordingScheduler()
+
+
+@pytest.fixture()
+def client(sync_scheduler: RecordingScheduler) -> Iterator[TestClient]:
+    """会触发 lifespan（执行迁移）的客户端。
+
+    默认不启动真实按需同步线程：加入自选的用例很多，不能因为一次测试就访问上游。
+    需要真实队列的用例自行替换 `client.app.state.on_demand_sync`。
+    """
+
+    with TestClient(create_app(on_demand_sync=sync_scheduler)) as test_client:
         yield test_client
 
 

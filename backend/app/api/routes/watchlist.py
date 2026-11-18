@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -21,6 +22,7 @@ from app.api.schemas import (
     WatchlistStrategy,
     WatchlistUpdateRequest,
 )
+from app.jobs import WATCHLIST_BAR, WATCHLIST_DAYS
 from app.journal import ExecutionSnapshot, RecordedSignal
 from app.strategy import InstanceRecord, list_instances
 from app.watchlist import (
@@ -35,6 +37,8 @@ from app.watchlist import (
 )
 
 __all__ = ["watchlist_router"]
+
+logger = logging.getLogger(__name__)
 
 watchlist_router = APIRouter(tags=["watchlist"])
 
@@ -76,6 +80,7 @@ def add_watchlist_item(payload: WatchlistAddRequest, request: Request) -> Watchl
     entry = add_item(payload.inst_id, payload.group)
     if entry is None:
         raise HTTPException(status_code=404, detail=f"未找到标的 {payload.inst_id}")
+    _request_daily_sync(request, entry)
     return _compose_one(request, entry)
 
 
@@ -113,6 +118,19 @@ def delete_watchlist_item(inst_id: str) -> None:
 
     if not remove_item(inst_id):
         raise HTTPException(status_code=404, detail=f"自选里没有标的 {inst_id}")
+
+
+def _request_daily_sync(request: Request, entry: WatchlistEntry) -> None:
+    """加入自选后在后台同步日线；调度失败不阻断 201，也不回滚条目。"""
+
+    scheduler = getattr(request.app.state, "on_demand_sync", None)
+    if scheduler is None:
+        logger.warning("按需同步调度器未启动，跳过 %s 的日线同步", entry.instrument.symbol)
+        return
+    try:
+        scheduler.submit(entry.instrument.symbol, WATCHLIST_BAR, WATCHLIST_DAYS)
+    except Exception:
+        logger.exception("加入自选后提交日线同步失败: %s", entry.instrument.symbol)
 
 
 def _item(

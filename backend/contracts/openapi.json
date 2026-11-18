@@ -7040,6 +7040,90 @@
         "title": "InstrumentStrategyListResponse",
         "type": "object"
       },
+      "InstrumentSyncRequest": {
+        "description": "单标的按需同步：周期限定详情页支持的三种，天数留给调用方覆盖默认窗口。",
+        "properties": {
+          "bar": {
+            "default": "1d",
+            "enum": [
+              "1d",
+              "4h",
+              "1h"
+            ],
+            "title": "Bar",
+            "type": "string"
+          },
+          "days": {
+            "anyOf": [
+              {
+                "maximum": 3650.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days"
+          }
+        },
+        "title": "InstrumentSyncRequest",
+        "type": "object"
+      },
+      "InstrumentSyncResponse": {
+        "description": "同步只被接受，不在请求内等待；真正的结果写在 `data_sync_jobs`。",
+        "examples": [
+          {
+            "bar": "1d",
+            "days": 400,
+            "inst_id": "XAAPL-USDT",
+            "requested_at": "2026-11-16T08:00:00Z",
+            "status": "started"
+          }
+        ],
+        "properties": {
+          "bar": {
+            "enum": [
+              "1d",
+              "4h",
+              "1h"
+            ],
+            "title": "Bar",
+            "type": "string"
+          },
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "requested_at": {
+            "title": "Requested At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "started",
+              "already_running",
+              "fresh",
+              "backoff"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "inst_id",
+          "bar",
+          "days",
+          "status",
+          "requested_at"
+        ],
+        "title": "InstrumentSyncResponse",
+        "type": "object"
+      },
       "LinkedBacktest": {
         "properties": {
           "backtest_end_date": {
@@ -14615,6 +14699,66 @@
         ]
       }
     },
+    "/api/instruments/{inst_id}/sync": {
+      "post": {
+        "description": "接受一次单标的按需 K 线同步，立即返回，不等待上游。\n\n标的未登记直接 404；周期与天数由请求模型校验。上游失败由后台任务写入\n`data_sync_jobs`，不会让这个接口变成 500。",
+        "operationId": "sync_instrument_api_instruments__inst_id__sync_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "inst_id",
+            "required": true,
+            "schema": {
+              "title": "Inst Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/InstrumentSyncRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstrumentSyncResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sync Instrument",
+        "tags": [
+          "instruments"
+        ]
+      }
+    },
     "/api/manual-positions": {
       "get": {
         "operationId": "get_manual_positions_api_manual_positions_get",
@@ -15213,7 +15357,7 @@
     },
     "/api/positions/exchange": {
       "get": {
-        "description": "最近一次同步的交易所持仓，`as_of` 与该次账户快照相同。",
+        "description": "最近一次同步的交易所持仓，`as_of` 与该次账户快照相同；标的未同步时返回 503。",
         "operationId": "get_exchange_positions_api_positions_exchange_get",
         "responses": {
           "200": {
@@ -16488,7 +16632,7 @@
         ]
       },
       "post": {
-        "description": "把标的加入自选；标的必须已同步，且已有足够的日线可算行情。",
+        "description": "把标的加入自选；只要求标的已同步，行情缺失时按 `data_status` 返回。",
         "operationId": "add_watchlist_item_api_watchlist_post",
         "requestBody": {
           "content": {

@@ -11,6 +11,7 @@ import {
   fetchStrategyVersions,
   fetchWatchlist,
   okxCandleSource,
+  syncInstrument,
   type BacktestBatchResponse,
   type BacktestDataSource,
   type InstrumentAnalysisBar,
@@ -31,7 +32,6 @@ import {
   signedTone,
   signedValue,
 } from "../lib/display";
-import { resolveAvailableBar } from "../lib/instrument";
 import {
   launchVersionsForInstrument,
   linkedStrategyState,
@@ -64,6 +64,8 @@ const DATA_SOURCE_LABELS: Record<string, string> = {
 
 const PLACEHOLDER = "未生成";
 const NOT_SYNCED = "尚未同步";
+/** 同步请求发出后只做有限次重读，避免刷新页面时无限轮询上游。 */
+const SYNC_POLL_DELAYS = [2000, 6000, 12000];
 
 function sourceLabel(source: string): string {
   return DATA_SOURCE_LABELS[source] ?? source;
@@ -420,6 +422,7 @@ export default function InstrumentDetailPage() {
   const [bar, setBar] = useState<InstrumentAnalysisBar>("1d");
   const [analysis, setAnalysis] = useState<InstrumentAnalysisResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [slowLoading, setSlowLoading] = useState(false);
   const [watchlist, setWatchlist] = useState<WatchlistResponse | null>(null);
@@ -514,7 +517,7 @@ export default function InstrumentDetailPage() {
   }, [launchOpen, launchVersions, linkedStrategies, instId]);
 
   const loadAnalysis = useCallback(
-    (showLoading: boolean) => {
+    (showLoading: boolean, onSettled?: () => void) => {
       if (!instId) return () => {};
       let active = true;
       if (showLoading) {
@@ -524,19 +527,15 @@ export default function InstrumentDetailPage() {
       setError(null);
       fetchInstrumentAnalysis(instId, bar)
         .then((value) => {
-          if (!active) return;
-          const nextBar = resolveAvailableBar(value.coverage, bar);
-          if (nextBar !== bar) {
-            setBar(nextBar);
-            return;
-          }
-          setAnalysis(value);
+          if (active) setAnalysis(value);
         })
         .catch((reason: unknown) => {
           if (active) setError(loadErrorMessage(reason));
         })
         .finally(() => {
-          if (active) setLoading(false);
+          if (!active) return;
+          setLoading(false);
+          onSettled?.();
         });
       return () => {
         active = false;
@@ -545,7 +544,51 @@ export default function InstrumentDetailPage() {
     [instId, bar],
   );
 
-  useEffect(() => loadAnalysis(true), [loadAnalysis]);
+  useEffect(() => {
+    if (!instId) return () => {};
+    let active = true;
+    const timers: number[] = [];
+    setSyncNotice(null);
+
+    const poll = (attempt: number) => {
+      if (!active) return;
+      fetchInstrumentAnalysis(instId, bar)
+        .then((value) => {
+          if (!active) return;
+          const coverage = value.coverage.find((row) => row.bar === bar);
+          if (coverage && (coverage.available || coverage.candle_count > 0)) {
+            setAnalysis(value);
+            return;
+          }
+          schedule(attempt + 1);
+        })
+        .catch(() => {
+          // 同步失败保留已有数据；页面错误状态只由首次读取决定。
+        });
+    };
+
+    const schedule = (attempt: number) => {
+      if (!active || attempt >= SYNC_POLL_DELAYS.length) return;
+      timers.push(window.setTimeout(() => poll(attempt), SYNC_POLL_DELAYS[attempt]));
+    };
+
+    const stop = loadAnalysis(true, () => {
+      if (!active) return;
+      syncInstrument(instId, bar)
+        .then(() => {
+          if (active) schedule(0);
+        })
+        .catch(() => {
+          if (active) setSyncNotice("同步失败，可稍后重试");
+        });
+    });
+
+    return () => {
+      active = false;
+      stop();
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [loadAnalysis, instId, bar]);
 
   useEffect(() => {
     if (!loading) {
@@ -705,6 +748,12 @@ export default function InstrumentDetailPage() {
         </p>
       ) : null}
 
+      {syncNotice ? (
+        <p className="mb-6 rounded-md border border-amber-600/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+          {syncNotice}
+        </p>
+      ) : null}
+
       {!analysis && loading ? (
         <div className="py-16 text-center text-sm text-muted-foreground">
           <p>加载中…</p>
@@ -837,7 +886,6 @@ export default function InstrumentDetailPage() {
                 >
                   {BAR_OPTIONS.map((option) => {
                     const coverage = coverageByBar.get(option.bar);
-                    const disabled = coverage ? !coverage.available : true;
                     return (
                       <Button
                         key={option.bar}
@@ -845,11 +893,10 @@ export default function InstrumentDetailPage() {
                         size="sm"
                         variant={option.bar === bar ? "default" : "ghost"}
                         className="flex-1 rounded-sm sm:flex-none"
-                        disabled={disabled}
                         aria-pressed={option.bar === bar}
                         title={
-                          disabled
-                            ? (coverage?.unavailable_reason ?? NOT_SYNCED)
+                          coverage && !coverage.available
+                            ? `${BAR_LABELS[option.bar]}：${coverage.unavailable_reason ?? NOT_SYNCED}；切换后触发同步`
                             : `${BAR_LABELS[option.bar]}已同步`
                         }
                         onClick={() => setBar(option.bar)}

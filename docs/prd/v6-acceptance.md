@@ -168,7 +168,7 @@ podman exec trading-db psql -U trading -d trading -v ON_ERROR_STOP=1 \
 - 3.2 规格第 7 节 API：29 行，对应 17 个接口功能点。
 - 3.3 保留但不通过 v6 页面暴露的能力：5 行，对应 5 个后端回归点。
 
-数据推送另设 1 个页面级功能点 `I-01`，与接口功能点 `P-17` 从页面和接口两侧验证同一行。清单共 83 个功能点。报告中的“功能点总数”按 83 计算，并同时报告 PRD 行覆盖率 `95/95`。MKACG-853 与 MKACG-857 分别删除了「近期事件」和「合约元数据」页面行，本清单同步删除对应功能点。`未实现` 和 `不适用` 行不在本次功能验收范围内；如果验收时 `docs/prd/v6.md` 的状态已变化，以验收唤醒时的文档为准，并在报告中记录差异。
+数据推送另设 1 个页面级功能点 `I-01`，与接口功能点 `P-17` 从页面和接口两侧验证同一行。按需同步另设 5 个功能点 `S-01` 至 `S-05`，见 2.13。清单共 88 个功能点。报告中的“功能点总数”按 88 计算，并同时报告 PRD 行覆盖率 `95/95`。MKACG-853 与 MKACG-857 分别删除了「近期事件」和「合约元数据」页面行，本清单同步删除对应功能点。`未实现` 和 `不适用` 行不在本次功能验收范围内；如果验收时 `docs/prd/v6.md` 的状态已变化，以验收唤醒时的文档为准，并在报告中记录差异。
 
 证据类型统一记为：
 
@@ -207,7 +207,7 @@ podman exec trading-db psql -U trading -d trading -v ON_ERROR_STOP=1 \
 
 | 编号 | 覆盖 PRD 行 | 页面路径 | 操作步骤 | 预期结果 | 证据 |
 | --- | --- | --- | --- | --- | --- |
-| C-01 | 3.1 自选 / 搜索、加入自选、移出自选、切换分组 | `/watchlist` | 搜索一个真实标的并加入自选；加入一个尚未同步日线的标的；加入一个只有 1 根日线的标的；切换到另一个分组再切回；移出自选；刷新页面 | 搜索、加入、移出都调用真实接口；加入后列表和首页关注列表同步；没有日线的标的仍返回 201 并显示「尚未同步」，页面不报错；只有 1 根日线的标的显示最新价和「未生成」、涨跌幅为空；移出后消失；分组切换保留正确成员；重复加入不产生重复行 | E1、E2、E3、E6 |
+| C-01 | 3.1 自选 / 搜索、加入自选、移出自选、切换分组 | `/watchlist` | 搜索一个真实标的并加入自选；加入一个尚未同步日线的标的；加入一个只有 1 根日线的标的；切换到另一个分组再切回；移出自选；刷新页面 | 搜索只调用 `GET /api/instruments/search`，不产生 `data_sync_jobs` 记录；加入后列表和首页关注列表同步，并触发该标的 1d 日线后台同步；没有日线的标的仍返回 201 并显示「尚未同步」，页面不报错；只有 1 根日线的标的显示最新价和「未生成」、涨跌幅为空；移出后消失；分组切换保留正确成员；重复加入不产生重复行 | E1、E2、E3、E6 |
 | C-02 | 3.1 自选 / v6 列表指标列 | `/watchlist` | 打开自选列表；逐列核对最新价、日涨跌、趋势、RSI(14)、ATR(14) 百分比、K 线覆盖、最近更新时间；与 `GET /api/watchlist` 对比 | 所有指标列都有值或明确缺值说明；数值来自后端，不在前端重新计算；价格按推送更新，其余字段标注快照时间 | E1、E2 |
 | C-03 | 3.1 自选 / 分类筛选：全部、股票永续、加密资产 | `/watchlist` | 依次选择全部、股票永续、加密资产；记录每类数量和标的 | 每个筛选结果只包含对应类别；全部等于三类之和；没有匹配时显示空态，不把其他类别混入 | E1、E2 |
 | C-04 | 3.1 自选 / 市场环境卡：风险偏好、趋势广度、波动状态 | `/watchlist` | 打开市场环境卡；检查风险偏好、趋势广度、波动状态、广度、共振、窗口和更新时间 | 三项状态都有真实值或明确“未生成”原因；广度和共振来自 `GET /api/market/breadth`；页面不在前端推算风险偏好、趋势广度和波动状态 | E1、E2 |
@@ -216,9 +216,9 @@ podman exec trading-db psql -U trading -d trading -v ON_ERROR_STOP=1 \
 
 | 编号 | 覆盖 PRD 行 | 页面路径 | 操作步骤 | 预期结果 | 证据 |
 | --- | --- | --- | --- | --- | --- |
-| D-01 | 3.1 详情 / 面包导航：自选 / 标的，下拉搜索并切换标的 | `/watchlist/<instId>` | 打开详情；点击面包导航；用下拉搜索另一个标的并切换；检查 URL 和周期 | 面包导航可回到自选；下拉能搜索并切换；切换后 URL 更新，周期回退到有数据的周期；没有数据时说明原因 | E1 |
+| D-01 | 3.1 详情 / 面包导航：自选 / 标的，下拉搜索并切换标的 | `/watchlist/<instId>` | 打开详情；点击面包导航；用下拉搜索另一个标的并切换；检查 URL 和周期 | 面包导航可回到自选；下拉能搜索并切换；切换后 URL 更新；切换标的保留当前周期，新标的该周期没有数据时显示「尚未同步」并触发对应周期同步，不回退到其他周期 | E1、E2 |
 | D-02 | 3.1 详情 / 头部：名称、合约 ID、资产类别、最新价、涨跌；头部下方行情信息行显示标记价、指数价、数据时间、来源 | `/watchlist/<instId>` | 打开详情头部；切换现货和永续标的；与 `GET /api/instruments/<id>/analysis` 对比 | 名称、合约 ID、资产类别正确；头部右栏只显示最新价与涨跌幅；标记价、指数价、数据时间、来源在头部下方各显示一次；缺值写“尚未提供”，不填 0 | E1、E2 |
-| D-03 | 3.1 详情 / K 线图：K 线卡内 1D / 4H / 1H 切换，MA20/MA60 叠加，缺口标注 | `/watchlist/<instId>` | 在「K 线与均线」卡片右上角依次切换 1D、4H、1H；检查 K 柱、MA20、MA60 和缺口；打开数据不完整的周期 | 周期按钮只在 K 线卡内出现一次；三个周期可切换；均线和缺口可见；没有完整数据的周期禁用或显示原因；图表数据来自分析接口，不在前端合成 | E1、E2 |
+| D-03 | 3.1 详情 / K 线图：K 线卡内 1D / 4H / 1H 切换，MA20/MA60 叠加，缺口标注 | `/watchlist/<instId>` | 在「K 线与均线」卡片右上角依次切换 1D、4H、1H；检查 K 柱、MA20、MA60 和缺口；切换到一个尚未同步的周期 | 周期按钮只在 K 线卡内出现一次；三个周期始终可切换，切换即触发该周期按需同步；均线和缺口可见；缺数据时显示「尚未同步」或原因，不禁用周期；图表数据来自分析接口，不在前端合成 | E1、E2 |
 | D-04 | 3.1 详情 / 指标卡：MA(20)、RSI(14)、MACD(12,26,9)、ATR(14) | `/watchlist/<instId>` | 打开指标卡；与 `GET /api/indicators` 或分析接口返回的指标对比 | 四个指标都有值和时间；数值与接口一致；缺样本时显示“样本不足”或空态，不编造 | E1、E2 |
 | D-05 | 3.1 详情 / 趋势读数：Close、MA20、MA60、价格与均线距离、均线斜率 | `/watchlist/<instId>` | 打开趋势读数区；与 `GET /api/instruments/<id>/analysis` 的对应字段对比 | Close、MA20、MA60、价格与均线距离、5 根均线斜率都显示；数值与接口一致；没有足够 K 线时说明不足 | E1、E2 |
 | D-06 | 3.1 详情 / 成交量读数：当前成交量、20 日均量、相对成交量 | `/watchlist/<instId>` | 打开成交量读数区；与接口返回的 `current`、`average20`、`relative` 对比 | 三项都显示；相对成交量与接口一致；没有 20 日均量时说明样本不足 | E1、E2 |
@@ -329,6 +329,57 @@ export API="http://127.0.0.1:8000/api"
 | R-04 | 3.3 组合 / 组合虚拟持仓、资金分配、敞口和调整申请 | 无页面；`backend/app/portfolio/` | 运行 `cd backend && ../.venv/bin/python -m pytest tests/portfolio -q` | 测试通过；v6 不提供组合页面 | E4、E1 |
 | R-05 | 3.3 流水 / 交易流水聚合 | 无页面；`backend/app/journal/` | 运行 `cd backend && ../.venv/bin/python -m pytest tests/journal -q`；请求 `GET /api/journal` | 测试通过；旧 HTTP 路由 `GET /api/journal` 返回 404 | E4、E2 |
 
+### 2.13 按需同步
+
+按需同步是 MKACG-855 的交付内容，覆盖 3.1 自选与详情两行、3.2 的 `POST /api/instruments/{id}/sync`。它和上面 83 个功能点分开编号，但计入功能点总数。
+
+| 编号 | 覆盖 PRD 行 | 页面路径 | 操作步骤 | 预期结果 | 证据 |
+| --- | --- | --- | --- | --- | --- |
+| S-01 | 3.1 自选 / 搜索；3.2 标的 / `GET /api/instruments?query=` | `/watchlist` | 记录 `data_sync_jobs` 行数；在自选页搜索一个尚未加入自选的标的；再次查询 `data_sync_jobs` 行数 | 搜索返回 200 和结果；`data_sync_jobs` 行数不变，没有新增任何标的或 K 线任务；后端日志没有 OKX 行情请求 | E1、E2、E3、E4 |
+| S-02 | 3.1 自选 / 加入自选 | `/watchlist` | 记录 `data_sync_jobs` 行数；加入一个尚未同步日线的标的；等待后台任务；查询该标的的日线覆盖与最新行情 | 加入返回 201，条目立即出现；新增 1 条 `dataset=candles` 的任务记录；同步完成后自选列表出现价格、涨跌幅和指标；上游失败时仍返回 201，任务记为失败并保留原因，页面显示「尚未同步」而不是错误弹窗 | E1、E2、E3、E6 |
+| S-03 | 3.2 标的 / 按需同步；3.1 详情 / K 线图与数据覆盖 | `/watchlist/<instId>` | 清空该标的 `1d` 数据；打开详情；观察网络请求与 `data_sync_jobs`；等待数据出现 | 页面先显示已有数据或「尚未同步」；随后请求 `POST /api/instruments/{id}/sync`，返回 202 且 `status=started`；不等待同步完成；同步完成后指标与 K 线在有限次重读内更新，最多 3 次（2 秒、6 秒、12 秒） | E1、E2、E3、E5 |
+| S-04 | 3.2 标的 / 按需同步 | 接口 | 对同一标的同一周期在同步进行中再次请求；成功后 60 秒内再次请求；切换到 `4h` 再请求 | 进行中返回 `already_running`，不新增任务；60 秒内返回 `fresh`，不新增任务；`4h` 返回 `started`，只新增 1 条 `bar=4h` 任务，`1d` 任务数不变；同时发起 10 个相同请求只产生 1 个后台任务 | E2、E3 |
+| S-05 | 3.2 标的 / 按需同步；3.1 详情 / 数据覆盖 | 接口与 `/watchlist/<instId>` | 让上游返回 429 或超时；请求同步；打开详情；查询 `data_sync_jobs` | `POST /sync` 仍返回 202，不是 500；`data_sync_jobs` 记录该次失败与原因，状态为 `failed`；详情页可打开并显示「尚未同步」「数据不足」或「同步失败，可稍后重试」；已有数据不被清空，也不补造 K 线 | E1、E2、E3 |
+
+| 字段 | 说明 |
+| --- | --- |
+| 请求 | `bar` 可选，取 `1d`、`4h`、`1h`，默认 `1d`；`days` 可选，`1..3650`，缺省按周期取 `1d=400`、`4h=90`、`1h=30` |
+| 响应 | 202：`inst_id`、`bar`、`days`、`status`（`started`、`already_running`、`fresh`、`backoff`）、`requested_at` |
+| 错误 | 标的未登记 404；周期或天数非法 422；调度器未启动 503；参数错误不启动任务 |
+| 去重与冷却 | 键为 `(inst_id, bar)`；运行中 `already_running`；成功 60 秒内 `fresh`；失败 30 秒内 `backoff`；并发上限默认 2，由 `ON_DEMAND_SYNC_MAX_CONCURRENCY` 配置 |
+
+复现命令：
+
+```bash
+export API="http://127.0.0.1:8000/api"
+export INST="XAAPL-USDT"
+
+# 搜索：不产生同步任务
+BEFORE=$(podman exec trading-db psql -U trading -d trading -Atc \
+  "select count(*) from v6_accept.data_sync_jobs")
+curl -sS -w '\n%{http_code}\n' "$API/instruments/search?q=SPCX"
+AFTER=$(podman exec trading-db psql -U trading -d trading -Atc \
+  "select count(*) from v6_accept.data_sync_jobs")
+echo "before=$BEFORE after=$AFTER"
+
+# 详情：首次 started，进行中 already_running，成功后 fresh
+curl -sS -X POST -H 'content-type: application/json' -d '{"bar":"1d"}' \
+  -w '\n%{http_code}\n' "$API/instruments/$INST/sync"
+curl -sS -X POST -H 'content-type: application/json' -d '{"bar":"1d"}' \
+  -w '\n%{http_code}\n' "$API/instruments/$INST/sync"
+
+# 参数错误不建任务
+curl -sS -X POST -H 'content-type: application/json' -d '{"bar":"5m"}' \
+  -w '\n%{http_code}\n' "$API/instruments/$INST/sync"
+curl -sS -X POST -H 'content-type: application/json' -d '{"bar":"1d","days":0}' \
+  -w '\n%{http_code}\n' "$API/instruments/$INST/sync"
+
+# 任务流水
+podman exec trading-db psql -U trading -d trading -P pager=off -c \
+  "select provider, dataset, status, params, started_at, finished_at
+     from v6_accept.data_sync_jobs order by started_at desc limit 5"
+```
+
 ## 3. 判定规则
 
 ### 3.1 PASS
@@ -380,7 +431,7 @@ export API="http://127.0.0.1:8000/api"
 
 ### 3.5 总体结论
 
-- 全部 83 个功能点 `PASS`：结论为“通过”。
+- 全部 88 个功能点 `PASS`：结论为“通过”。
 - 存在任一 `FAIL`：结论为“不通过”，进入第 4 节的失败处理。
 - 没有 `FAIL` 但存在 `BLOCKED`：结论为“有阻塞”，不得宣布 v6 验收通过；列出重试条件和责任人。
 - 存在未覆盖的 PRD 行（覆盖率低于 `95/95`）：结论为“不通过”，先补清单或补验收。
@@ -446,7 +497,7 @@ multica issue create \
 
 | 项目 | 数值 |
 | --- | ---: |
-| 功能点总数 | 83 |
+| 功能点总数 | 88 |
 | PASS |  |
 | FAIL |  |
 | BLOCKED |  |

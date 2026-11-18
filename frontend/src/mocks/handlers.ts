@@ -34,6 +34,7 @@ import getInstrumentsInstId from "./fixtures/instruments/get-instruments-inst_id
 import getInstrumentsInstIdAnalysis from "./fixtures/instruments/get-instruments-inst_id-analysis.json";
 import getInstrumentsInstIdCandles from "./fixtures/instruments/get-instruments-inst_id-candles.json";
 import getInstrumentsInstIdStrategies from "./fixtures/strategy/get-instruments-inst_id-strategies.json";
+import postInstrumentsInstIdSync from "./fixtures/instruments/post-instruments-inst_id-sync.json";
 import getManualPositions from "./fixtures/positions/get-manual-positions.json";
 import postManualPositions from "./fixtures/positions/post-manual-positions.json";
 import patchManualPositionsPositionId from "./fixtures/positions/patch-manual-positions-position_id.json";
@@ -106,6 +107,7 @@ export const handlers = [
   http.get("*/api/instruments/:inst_id/analysis", () => HttpResponse.json(getInstrumentsInstIdAnalysis)),
   http.get("*/api/instruments/:inst_id/candles", () => HttpResponse.json(getInstrumentsInstIdCandles)),
   http.get("*/api/instruments/:inst_id/strategies", () => HttpResponse.json(getInstrumentsInstIdStrategies)),
+  http.post("*/api/instruments/:inst_id/sync", () => HttpResponse.json(postInstrumentsInstIdSync, { status: 202 })),
   http.get("*/api/manual-positions", () => HttpResponse.json(getManualPositions)),
   http.post("*/api/manual-positions", () => HttpResponse.json(postManualPositions, { status: 201 })),
   http.patch("*/api/manual-positions/:position_id", () => HttpResponse.json(patchManualPositionsPositionId)),

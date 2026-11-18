@@ -29,7 +29,7 @@ from app.config import get_settings
 from app.db import init_db
 from app.exchange import OrderSubmission  # noqa: F401
 from app.instrument import Instrument  # noqa: F401
-from app.jobs import start_equity_snapshot_scheduler
+from app.jobs import OnDemandSyncScheduler, start_equity_snapshot_scheduler
 from app.journal import ExecutionSnapshot
 from app.market import (  # noqa: F401
     Candle,
@@ -90,11 +90,15 @@ async def lifespan(_app: FastAPI) -> Iterator[None]:
         set_event_publisher(None)
         stop_scheduler.set()
         scheduler.join(timeout=5.0)
+        _app.state.on_demand_sync.shutdown()
         await hub.stop()
 
 
-def create_app() -> FastAPI:
-    """构造应用实例：测试与生产共用同一装配路径。"""
+def create_app(*, on_demand_sync: OnDemandSyncScheduler | None = None) -> FastAPI:
+    """构造应用实例：测试与生产共用同一装配路径。
+
+    `on_demand_sync` 只供测试注入可控的同步调度器；生产路径按配置创建真实队列。
+    """
 
     settings = get_settings()
     logging.basicConfig(level=settings.log_level.upper())
@@ -112,6 +116,9 @@ def create_app() -> FastAPI:
     # Trades 页读取的执行事实。执行编排（T6.2）每完成一次下单或同步就替换这份快照；
     # 还没有执行编排时保持空快照，页面如实显示空状态，不编造持仓、订单或成交。
     app.state.execution_snapshot = ExecutionSnapshot()
+    app.state.on_demand_sync = on_demand_sync or OnDemandSyncScheduler(
+        max_concurrency=settings.on_demand_sync_max_concurrency
+    )
     include_routers(app)
     return app
 

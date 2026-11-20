@@ -73,10 +73,10 @@
    leading-none / leading-tight / order-1，这里用最小 CSS 补齐；
    分时线是内联 SVG，不引入图表库。 */
 
-/* 桌面（≥901px）：列表自适应 + 汇总固定 340px，栏间距 16px，两栏顶部对齐。 */
+/* 桌面（≥901px）：列表自适应 + 汇总固定 320px，栏间距 16px，两栏顶部对齐。 */
 .wl-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-columns: minmax(0, 1fr) 320px;
   gap: 16px;
   align-items: start;
 }
@@ -86,37 +86,18 @@
   display: none;
 }
 
-/* 列表固定 4 列。列宽与首末列内边距写在表头与单元格共用的类上，
-   两边的 x 坐标因此完全一致。 */
+/* 列表按 PRD 的七列指标排列；列宽交给内容，宽度不够时在卡片内横向滚动，
+   页面本身不产生横向溢出。 */
 .wl-table {
   display: table;
   width: 100%;
-  table-layout: fixed;
-  overflow: visible;
-  white-space: normal;
-}
-.wl-col-target {
-  width: 44%;
-}
-.wl-col-24h {
-  width: 18%;
-}
-.wl-col-price {
-  width: 22%;
-}
-.wl-col-signal {
-  width: 16%;
+  border-collapse: collapse;
 }
 .wl-cell-first {
   padding-left: 16px;
 }
 .wl-cell-last {
   padding-right: 16px;
-}
-
-/* 数据行固定 51px（契约要求 50–52px），内容在行内垂直居中。 */
-.wl-row {
-  height: 51px;
 }
 
 /* 移出按钮绝对定位在第一列右侧：不占列宽，也不撑高行。 */
@@ -133,24 +114,12 @@
 }
 
 @media (max-width: 900px) {
-  /* 单列，并把 24H 整列隐藏，剩 3 列。 */
+  /* 单列：汇总与列表由分段按钮切换。 */
   .wl-grid {
     grid-template-columns: minmax(0, 1fr);
     gap: 12px;
   }
-  .wl-col-24h {
-    display: none;
-  }
-  /* 3 列时按剩余宽度重新分配：长价格与「平盘 / 无数据」都要放得下，390px 不出横向滚动。 */
-  .wl-col-target {
-    width: 48%;
-  }
-  .wl-col-price {
-    width: 28%;
-  }
-  .wl-col-signal {
-    width: 24%;
-  }
+  /* 左栏变窄时表格在卡片内横向滚动，七列指标一列都不隐藏。 */
 
   .wl-tabs {
     display: grid;

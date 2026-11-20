@@ -44,30 +44,43 @@ describe("自选分类", () => {
     }
   });
 
-  it("股票永续只包含代币化股票的永续", () => {
+  it("股票永续按资产类别归组：代币化股票的现货与永续同组", () => {
     expect(matchesCategory(stockSwap, "stock_swap")).toBe(true);
-    expect(matchesCategory(stockSpot, "stock_swap")).toBe(false);
+    expect(matchesCategory(stockSpot, "stock_swap")).toBe(true);
     expect(matchesCategory(cryptoSpot, "stock_swap")).toBe(false);
+    expect(matchesCategory(commodity, "stock_swap")).toBe(false);
   });
 
-  it("加密只包含加密资产，不把商品代币算进来", () => {
+  it("加密资产只包含非股票类标的，商品代币也归入这一组", () => {
     expect(matchesCategory(cryptoSpot, "crypto")).toBe(true);
+    expect(matchesCategory(commodity, "crypto")).toBe(true);
     expect(matchesCategory(stockSwap, "crypto")).toBe(false);
-    expect(matchesCategory(commodity, "crypto")).toBe(false);
+    expect(matchesCategory(stockSpot, "crypto")).toBe(false);
   });
 
-  it("现货只看形态，不看资产类别", () => {
-    expect(matchesCategory(stockSpot, "spot")).toBe(true);
-    expect(matchesCategory(cryptoSpot, "spot")).toBe(true);
-    expect(matchesCategory(stockSwap, "spot")).toBe(false);
+  it("三类互斥且覆盖全部：全部 = 股票永续 + 加密资产", () => {
+    const universe = [stockSwap, stockSpot, cryptoSpot, commodity];
+    const stock = universe.filter((instrument) => matchesCategory(instrument, "stock_swap"));
+    const crypto = universe.filter((instrument) => matchesCategory(instrument, "crypto"));
+    const overlap = universe.filter(
+      (instrument) =>
+        matchesCategory(instrument, "stock_swap") && matchesCategory(instrument, "crypto"),
+    );
+
+    expect(overlap).toHaveLength(0);
+    expect(stock.length + crypto.length).toBe(universe.length);
+    expect(stock.map((instrument) => instrument.inst_id)).toEqual([
+      "AAPL-USDT-SWAP",
+      "XAAPL-USDT",
+    ]);
+    expect(crypto.map((instrument) => instrument.inst_id)).toEqual(["BTC-USDT", "XAUT-USDT"]);
   });
 
-  it("筛选行的中文标签依次是全部、美股、加密、现货", () => {
+  it("筛选行的中文标签依次是全部、股票永续、加密资产", () => {
     expect(WATCHLIST_CATEGORIES.map((item) => item.label)).toEqual([
       "全部",
-      "美股",
-      "加密",
-      "现货",
+      "股票永续",
+      "加密资产",
     ]);
   });
 });

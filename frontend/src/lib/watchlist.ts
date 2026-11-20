@@ -7,16 +7,15 @@
 
 import type { InstrumentRef, WatchlistItem } from "./api";
 
-export type WatchlistCategory = "all" | "stock_swap" | "crypto" | "spot";
+export type WatchlistCategory = "all" | "stock_swap" | "crypto";
 
 export const WATCHLIST_CATEGORIES: ReadonlyArray<{
   value: WatchlistCategory;
   label: string;
 }> = [
   { value: "all", label: "全部" },
-  { value: "stock_swap", label: "美股" },
-  { value: "crypto", label: "加密" },
-  { value: "spot", label: "现货" },
+  { value: "stock_swap", label: "股票永续" },
+  { value: "crypto", label: "加密资产" },
 ];
 
 type InstrumentLike = Pick<InstrumentRef, "asset_type" | "inst_type">;
@@ -30,14 +29,18 @@ const ASSET_TYPE_LABELS: Record<InstrumentRef["asset_type"], string> = {
   unknown: "未分类",
 };
 
-/** 分类是页面筛选，不改变后端返回的标的身份。 */
+/**
+ * 分类筛选只有三个按钮，按资产类别切分，必须互斥且覆盖全部条目：
+ * 「全部」= 股票永续 + 加密资产，不会既有重叠又有遗漏。
+ *
+ * 代币化股票的现货（`XAAPL-USDT`）与永续（`AAPL-USDT-SWAP`）同属一组：PRD 只有
+ * 三个按钮，原型里这一组叫「股票代币」，本就按资产类别而不是按合约形态切分。
+ * 其余标的（加密现货与永续、代币化商品、未分类）都归入「加密资产」。
+ */
 export function matchesCategory(instrument: InstrumentLike, category: WatchlistCategory): boolean {
   if (category === "all") return true;
-  if (category === "stock_swap") {
-    return instrument.asset_type === "tokenized_equity" && instrument.inst_type === "SWAP";
-  }
-  if (category === "spot") return instrument.inst_type === "SPOT";
-  return instrument.asset_type === "crypto";
+  const isEquity = instrument.asset_type === "tokenized_equity";
+  return category === "stock_swap" ? isEquity : !isEquity;
 }
 
 export function assetTypeLabel(assetType: InstrumentRef["asset_type"]): string {

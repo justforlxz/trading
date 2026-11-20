@@ -1,4 +1,4 @@
-"""设置契约：v6 的显示偏好、风险默认值、自动执行开关、数据源与密钥状态。
+"""设置契约：v6 的显示偏好、风险默认值、自动执行开关、数据源、通知通道与密钥状态。
 
 交易所 API Key 只写不读：响应只带「是否已配置」与全掩码，明文永不进入 HTTP。
 Secret 与 Passphrase 仍只经环境变量注入，不在本契约的可写范围内。成本与回测默认值
@@ -20,6 +20,8 @@ __all__ = [
     "DisplaySettings",
     "ExchangeSettingsUpdate",
     "ExecutionSettings",
+    "NotificationSettings",
+    "NotificationSettingsUpdate",
     "RiskDefaults",
     "SecretSettings",
     "SettingsResponse",
@@ -92,6 +94,22 @@ class DataSourceSettingsUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class NotificationSettings(BaseModel):
+    """通知通道开关；本期只有 `browser` 一种实现，关闭后不再广播告警。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    channels: list[str] = Field(default_factory=lambda: ["browser"])
+
+
+class NotificationSettingsUpdate(BaseModel):
+    """只改通道清单；空列表表示一个通道都不开。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    channels: list[str]
+
+
 class SecretSettings(BaseModel):
     """密钥状态：只读，永不返回明文。"""
 
@@ -113,6 +131,7 @@ class SettingsResponse(BaseModel):
     risk_defaults: RiskDefaults
     execution: ExecutionSettings
     data_sources: DataSourceSettings
+    notifications: NotificationSettings
     secrets: SecretSettings
     updated_at: UtcDatetime
 
@@ -138,6 +157,7 @@ class SettingsResponse(BaseModel):
                         "last_sync_at": None,
                         "failure_count": 0,
                     },
+                    "notifications": {"channels": ["browser"]},
                     "secrets": {
                         "okx_api_key_masked": None,
                         "okx_configured": False,
@@ -159,6 +179,7 @@ class SettingsUpdateRequest(BaseModel):
     risk_defaults: RiskDefaults | None = None
     execution: ExecutionSettings | None = None
     data_sources: DataSourceSettingsUpdate | None = None
+    notifications: NotificationSettingsUpdate | None = None
     exchange: ExchangeSettingsUpdate | None = None
 
     @model_validator(mode="after")
@@ -170,6 +191,7 @@ class SettingsUpdateRequest(BaseModel):
                 self.risk_defaults,
                 self.execution,
                 self.data_sources,
+                self.notifications,
                 self.exchange,
             )
         ):

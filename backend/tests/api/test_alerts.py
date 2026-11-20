@@ -122,6 +122,49 @@ def test_adding_stop_expires_the_stop_missing_alert(
     assert activity[0]["payload"]["previous_status"] == "pending"
 
 
+def test_event_pipeline_alert_is_not_expired_by_the_scan(
+    market_data: TestClient,
+) -> None:
+    """AC9：不归扫描维护的提醒，多少次列表请求都不改状态、不写「条件已恢复」。"""
+
+    moment = datetime(2026, 11, 20, 12, 0, tzinfo=UTC)
+    with session_scope() as session:
+        session.add(
+            AlertEventRow(
+                id="al_pipeline_1",
+                type="price",
+                severity="warning",
+                instrument_id="XAAPL-USDT",
+                rule_id="price_deviation",
+                rule_version="stream-v1",
+                title="价格偏离参考价",
+                detail="XAAPL-USDT 最新成交价 110 高于 指数价 100，偏离 10%",
+                payload_json="{}",
+                status="pending",
+                dedup_key="price|price_deviation|XAAPL-USDT|above|2026-11-20T12:00:00+00:00",
+                triggered_at=moment,
+                expires_at=None,
+                updated_at=moment,
+            )
+        )
+
+    for _ in range(2):
+        listing = market_data.get("/api/alerts", params={"status": "pending"})
+        assert listing.status_code == 200, listing.text
+        assert [item["id"] for item in listing.json()["items"]] == ["al_pipeline_1"]
+
+    with session_scope() as session:
+        row = session.get(AlertEventRow, "al_pipeline_1")
+        assert row is not None
+        assert row.status == "pending"
+        assert row.expires_at is None
+
+    activity = market_data.get("/api/activity", params={"event_type": "alert.expired"}).json()[
+        "items"
+    ]
+    assert activity == []
+
+
 def test_activity_is_filtered_and_paginated_by_cursor(market_data: TestClient) -> None:
     """活动按时间倒序返回；同秒内多行也能用游标稳定翻页。"""
 

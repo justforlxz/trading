@@ -3,6 +3,11 @@
 技术指标复用 `app.indicators` 的同一套实现；价格区间只拿已收盘日线计算。每个候选
 都带稳定的 `dedup_key`，由「标的 + 规则 + bar + 方向或阈值」组成，扫描重复执行
 不会生成第二条。
+
+`SCAN_MANAGED_RULES` 是「生命周期由提醒扫描维护」的规则集合：扫描只对自己产出的
+这些规则判过期。`alert_events` 现在有两个写入方（提醒扫描与事件通知管道），过期扫描
+只能处理自己那一半——不在集合里的提醒（例如事件管道的 `price_deviation`）由产出方
+自己负责状态，扫描不碰。
 """
 
 from __future__ import annotations
@@ -15,11 +20,19 @@ from typing import Literal
 from app.core import Bar
 from app.indicators import Series, compute
 from app.market import IntegrityReport
+from app.risk import (
+    RULE_HIGH_LEVERAGE,
+    RULE_MARGIN_USAGE,
+    RULE_SINGLE_INSTRUMENT_WEIGHT,
+    RULE_STOP_DISTANCE,
+    RULE_STOP_MISSING,
+)
 
 __all__ = [
     "ALERT_SEVERITIES",
     "ALERT_STATUSES",
     "ALERT_TYPES",
+    "SCAN_MANAGED_RULES",
     "AlertCandidate",
     "data_gap_candidates",
     "price_range_candidates",
@@ -43,6 +56,24 @@ RSI_UPPER = Decimal("70")
 TECHNICAL_RULE_VERSION = "indicator-v1"
 PRICE_RULE_VERSION = "range-v1"
 DATA_RULE_VERSION = "integrity-v1"
+
+#: 扫描自己产出的规则：技术、价格、数据与风险四类候选的全部 `rule_id`。
+#: 只有这些规则的生命周期归扫描管；别的产出方写入的提醒不在其中，扫描不改它们的状态。
+SCAN_MANAGED_RULES: frozenset[str] = frozenset(
+    {
+        "ma20_cross",
+        "rsi_zone",
+        "trend_change",
+        "near_20d_high",
+        "near_20d_low",
+        "candle_gap",
+        RULE_STOP_MISSING,
+        RULE_STOP_DISTANCE,
+        RULE_HIGH_LEVERAGE,
+        RULE_SINGLE_INSTRUMENT_WEIGHT,
+        RULE_MARGIN_USAGE,
+    }
+)
 
 _HUNDRED = Decimal(100)
 

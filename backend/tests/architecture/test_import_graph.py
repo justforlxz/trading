@@ -37,6 +37,7 @@ PACKAGES: tuple[str, ...] = (
     "core",
     "dashboard",
     "db",
+    "events",
     "exchange",
     "execution",
     "indicators",
@@ -132,7 +133,12 @@ ALLOWED_DEPS: dict[str, frozenset[str]] = {
     # 研究记录校验标的、策略与回测引用，写记录与活动。
     "research": frozenset({"db", "activity", "instrument", "strategy", "backtest"}),
     # 推送层只编排交易所连接与 B2 的账户/持仓快照；行情合并与订阅过滤不放进业务域。
-    "stream": frozenset({"activity", "exchange", "positions"}),
+    # 上游订什么由常驻订阅集合决定（`watchlist.WatchRegistry`），推送层只在两个位置
+    # 通过 `events.emit` 交出事实，不自己判规则。
+    "stream": frozenset({"activity", "exchange", "events", "positions", "watchlist"}),
+    # 事件层只读提醒表的已有字段落一条提醒、条件恢复时写一条活动，偏离度复用
+    # `market` 的纯函数；其余全部在中间件与通道里完成。
+    "events": frozenset({"activity", "alerts", "db", "market"}),
     "execution": frozenset(
         {"shared", "db", "instrument", "market", "strategy", "risk", "exchange"}
     ),

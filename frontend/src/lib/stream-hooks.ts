@@ -1,7 +1,15 @@
 /** React 绑定：把共享推送连接的状态与事件映射成页面可用的状态。 */
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useNavigate } from "react-router-dom";
 
+import {
+  NotifiedAlerts,
+  alertNavigationPath,
+  currentPermissionState,
+  notifyAlert,
+  type NotificationDeps,
+} from "./notifications";
 import {
   acceptsUpdate,
   streamClient,
@@ -112,4 +120,42 @@ export function usePositionStream(): {
   }, [owner]);
 
   return { positions, account, liveness: streamLiveness(state, "private_ws") };
+}
+
+/**
+ * 浏览器通知：订阅 `alerts` 通道，把新告警弹成系统通知。
+ *
+ * 有没有告警推下来由服务端的通道开关决定（`settings.notifications.channels`）；这里
+ * 只负责订阅与展示。通知失败（未授权、浏览器不支持、重复告警）都在
+ * `notifications.ts` 里被吞掉，页面不会因此出错。
+ */
+export function useAlertNotifications(): void {
+  const owner = useOwner();
+  const navigate = useNavigate();
+  const seen = useRef<NotifiedAlerts>();
+
+  if (seen.current === undefined) seen.current = new NotifiedAlerts();
+
+  useStreamEvents((event) => {
+    if (event.type !== "alert.created") return;
+    notifyAlert(event.data, {
+      notification: browserNotification(),
+      permission: currentPermissionState(),
+      seen: seen.current as NotifiedAlerts,
+      onActivate: (alert) => {
+        const path = alertNavigationPath(alert);
+        if (path !== null) navigate(path);
+      },
+    });
+  });
+
+  useEffect(() => {
+    streamClient.setSubscription(owner, { alerts: true });
+    return () => streamClient.clearSubscription(owner);
+  }, [owner]);
+}
+
+function browserNotification(): NotificationDeps["notification"] {
+  if (typeof window === "undefined" || !("Notification" in window)) return null;
+  return window.Notification;
 }

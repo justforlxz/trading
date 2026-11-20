@@ -96,6 +96,7 @@ export type DisplaySettings = SettingsResponse["display"];
 export type ExecutionSettings = SettingsResponse["execution"];
 export type RiskDefaults = SettingsResponse["risk_defaults"];
 export type DataSourceSettings = SettingsResponse["data_sources"];
+export type NotificationSettings = SettingsResponse["notifications"];
 export type SecretSettings = SettingsResponse["secrets"];
 export type SystemHealthResponse = components["schemas"]["SystemHealthResponse"];
 export type SystemComponent = components["schemas"]["SystemComponent"];

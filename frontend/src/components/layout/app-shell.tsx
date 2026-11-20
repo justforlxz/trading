@@ -13,7 +13,7 @@ import { Link, Outlet, useLocation } from "react-router-dom";
 
 import { currentSection, isNavActive, type NavItem } from "../../lib/navigation";
 import { streamClient, streamStatusLabel } from "../../lib/stream";
-import { useStreamState } from "../../lib/stream-hooks";
+import { useAlertNotifications, useStreamState } from "../../lib/stream-hooks";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { ThemeToggle } from "./theme-toggle";
@@ -35,6 +35,8 @@ export function AppShell() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const streamState = useStreamState();
   const section = currentSection(pathname, NAV_ITEMS);
+  // 通知挂在应用外壳上：切页不重连，也不会重复弹同一条告警。
+  useAlertNotifications();
 
   useEffect(() => {
     streamClient.start();

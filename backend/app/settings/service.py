@@ -8,8 +8,8 @@ HTTP 层拿到的只有 `api_configured` 与全掩码字符串。Secret 与 Pass
 
 ## 分组
 
-v6 只经 HTTP 暴露四类：显示偏好、风险默认值、自动执行开关与数据源状态，另有只读的
-密钥状态。`risk`（执行风控限额）、`costs` 与 `backtest` 仍是服务端内部参数，保留在
+v6 只经 HTTP 暴露五类：显示偏好、风险默认值、自动执行开关、数据源状态与通知通道，
+另有只读的密钥状态。`risk`（执行风控限额）、`costs` 与 `backtest` 仍是服务端内部参数，保留在
 设置文档里，但不进入 `GET` / `PATCH /api/settings` 的响应与请求。
 
 ## 生效方式
@@ -41,6 +41,7 @@ __all__ = [
     "DEFAULT_DATA_SOURCES",
     "DEFAULT_DISPLAY",
     "DEFAULT_EXECUTION",
+    "DEFAULT_NOTIFICATIONS",
     "DEFAULT_RISK",
     "DEFAULT_RISK_DEFAULTS",
     "MASKED_API_KEY",
@@ -93,6 +94,10 @@ DEFAULT_RISK_DEFAULTS: dict[str, Any] = {
 DEFAULT_DATA_SOURCES: dict[str, Any] = {
     "subscribed_instruments": [],
 }
+# 通知通道默认只开浏览器：浏览器通知是内置能力，不需要任何凭据。
+DEFAULT_NOTIFICATIONS: dict[str, Any] = {
+    "channels": ["browser"],
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,6 +115,7 @@ class SettingsRecord:
     display: Mapping[str, Any]
     risk_defaults: Mapping[str, Any]
     data_sources: Mapping[str, Any]
+    notifications: Mapping[str, Any]
     api_configured: bool
     api_key_masked: str | None
     api_key: str | None
@@ -124,6 +130,7 @@ class SettingsRecord:
             "display",
             "risk_defaults",
             "data_sources",
+            "notifications",
         ):
             object.__setattr__(self, name, MappingProxyType(dict(getattr(self, name))))
         if self.updated_at.tzinfo is None:
@@ -165,6 +172,21 @@ def _data_sources_view(value: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _notifications_view(value: Mapping[str, Any]) -> dict[str, Any]:
+    """只保留非空的通道名，去重且保持提交顺序；空列表表示一个通道都不开。"""
+
+    channels = value.get("channels", [])
+    if not isinstance(channels, list):
+        channels = []
+    return {
+        "channels": list(
+            dict.fromkeys(
+                item.strip() for item in channels if isinstance(item, str) and item.strip()
+            )
+        )
+    }
+
+
 def _default_row(moment: datetime) -> SettingsRow:
     return SettingsRow(
         id=SETTINGS_ID,
@@ -175,6 +197,7 @@ def _default_row(moment: datetime) -> SettingsRow:
         display=_dump(DEFAULT_DISPLAY),
         risk_defaults=_dump(DEFAULT_RISK_DEFAULTS),
         data_sources=_dump(DEFAULT_DATA_SOURCES),
+        notifications=_dump(DEFAULT_NOTIFICATIONS),
         okx_api_key=None,
         updated_at=moment,
     )
@@ -191,6 +214,7 @@ def _record(row: SettingsRow) -> SettingsRecord:
         display=_merged(DEFAULT_DISPLAY, _parse("display", row.display)),
         risk_defaults=_merged(DEFAULT_RISK_DEFAULTS, _parse("risk_defaults", row.risk_defaults)),
         data_sources=_data_sources_view(_parse("data_sources", row.data_sources)),
+        notifications=_notifications_view(_parse("notifications", row.notifications)),
         api_configured=bool(api_key),
         api_key_masked=MASKED_API_KEY if api_key else None,
         api_key=api_key,
@@ -225,6 +249,7 @@ def save_settings(
     display: Mapping[str, Any] | None = None,
     risk_defaults: Mapping[str, Any] | None = None,
     data_sources: Mapping[str, Any] | None = None,
+    notifications: Mapping[str, Any] | None = None,
     subscribed_instruments: Sequence[str] | None = None,
     api_key: str | None = None,
     clock: Clock | None = None,
@@ -260,6 +285,8 @@ def save_settings(
                 item for item in subscribed_instruments if isinstance(item, str) and item.strip()
             ]
             row.data_sources = _dump(current)
+        if notifications is not None:
+            row.notifications = _dump(_notifications_view(notifications))
         if api_key is not None and api_key.strip():
             row.okx_api_key = api_key.strip()
         row.updated_at = moment

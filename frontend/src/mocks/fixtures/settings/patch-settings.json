@@ -12,6 +12,11 @@
   "execution": {
     "auto_trading_enabled": false
   },
+  "notifications": {
+    "channels": [
+      "browser"
+    ]
+  },
   "risk_defaults": {
     "default_leverage": "3",
     "risk_budget_per_trade": "100",

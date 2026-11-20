@@ -9,7 +9,7 @@ import asyncio
 from datetime import UTC, datetime
 from decimal import Decimal
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, ClassVar
 
 from app.activity import list_activity
 from app.db import init_db
@@ -18,6 +18,7 @@ from app.instrument import sync_instruments
 from app.positions import ExchangePositionView
 from app.stream import StreamHub
 from app.stream.hub import PRIVATE_CHANNELS
+from app.watchlist import WatchRegistry
 from tests.factories.instruments import make_swap_ref
 
 
@@ -43,6 +44,8 @@ def _hub(**overrides: Any) -> StreamHub:
         "positions_loader": lambda: SimpleNamespace(items=(), as_of=None),
         "public_factory": IdlePublic,
         "credentials_configured": lambda: False,
+        # 常驻订阅集合默认空：这些用例只关心浏览器订阅；常驻订阅另有专门用例。
+        "watch_registry": WatchRegistry(tracked=lambda: []),
     }
     options.update(overrides)
     return StreamHub(**options)
@@ -184,7 +187,8 @@ def test_reconnect_reconciles_with_a_rest_snapshot() -> None:
         hub = _hub(
             quote_loader=lambda _ids: [
                 {"inst_id": "XAAPL-USDT", "last": "232.00", "ts": 1794284761000}
-            ]
+            ],
+            watch_registry=WatchRegistry(tracked=lambda: ["XAAPL-USDT"]),
         )
         client = hub.register(events.append)
         client.quotes = {"XAAPL-USDT"}
@@ -554,3 +558,151 @@ def test_publish_broadcasts_low_frequency_events() -> None:
     asyncio.run(scenario())
     assert [event["type"] for event in events] == ["alert.created"]
     assert events[0]["data"] == {"id": "al_1", "status": "pending"}
+
+
+class RecordingPublic:
+    """记录被订阅的标的，并在需要时暴露自己的实例给用例断言。"""
+
+    instances: ClassVar[list[RecordingPublic]] = []
+
+    def __init__(self, _on_status: Any) -> None:
+        self.instruments: set[str] = set()
+        self.stopped = False
+        RecordingPublic.instances.append(self)
+
+    def set_instruments(self, inst_ids: Any) -> None:
+        self.instruments = set(inst_ids)
+
+    async def messages(self):  # type: ignore[no-untyped-def]
+        await asyncio.Event().wait()
+        yield  # pragma: no cover
+
+
+def test_resident_instruments_are_subscribed_without_any_browser() -> None:
+    """AC1：没有浏览器连接时，关注列表里的标的仍然订阅着上游推送。"""
+
+    async def scenario() -> None:
+        RecordingPublic.instances.clear()
+        hub = _hub(
+            public_factory=RecordingPublic,
+            watch_registry=WatchRegistry(tracked=lambda: ["XAAPL-USDT", "AAPL-USDT-SWAP"]),
+        )
+        hub.refresh_subscriptions()
+
+        assert hub._public_task is not None
+        assert RecordingPublic.instances[0].instruments == {"XAAPL-USDT", "AAPL-USDT-SWAP"}
+        await hub.stop()
+
+    asyncio.run(scenario())
+
+
+def test_browser_subscriptions_are_added_on_top_of_the_resident_set() -> None:
+    async def scenario() -> None:
+        RecordingPublic.instances.clear()
+        registry = WatchRegistry(tracked=lambda: ["XAAPL-USDT"])
+        hub = _hub(public_factory=RecordingPublic, watch_registry=registry)
+        registry.set_browser_source(hub.browser_instruments)
+        hub.refresh_subscriptions()
+
+        client = hub.register(lambda _event: None)
+        await hub.subscribe(client, [{"type": "quote", "inst_ids": ["AAPL-USDT-SWAP"]}])
+
+        assert RecordingPublic.instances[0].instruments == {"XAAPL-USDT", "AAPL-USDT-SWAP"}
+        await hub.stop()
+
+    asyncio.run(scenario())
+
+
+def test_alerts_subscription_only_receives_alert_events() -> None:
+    """浏览器 sink 的通道隔离：只看 `alerts` 位的连接才收告警。"""
+
+    alerts: list[dict[str, Any]] = []
+    others: list[dict[str, Any]] = []
+
+    async def scenario() -> None:
+        hub = _hub()
+        watcher = hub.register(alerts.append)
+        bystander = hub.register(others.append)
+        await hub.subscribe(watcher, [{"type": "alerts"}])
+
+        await hub.publish(
+            "alert.created",
+            {"id": "al_1"},
+            as_of=datetime(2026, 11, 10, tzinfo=UTC),
+            predicate=lambda client: bool(client.alerts),
+        )
+        await hub.stop()
+        assert bystander.alerts is False
+
+    asyncio.run(scenario())
+
+    assert [event["type"] for event in alerts] == ["alert.created"]
+    assert others == []
+
+
+def test_market_push_is_emitted_to_the_pipeline_once(monkeypatch: Any) -> None:
+    """hub 的行情 emit 点：一条推送交出一条事件，载荷是合并后的行情。"""
+
+    emitted: list[Any] = []
+    monkeypatch.setattr("app.stream.hub.emit", emitted.append)
+
+    async def scenario() -> None:
+        hub = _hub()
+        hub._handle_market(
+            MarketPush(
+                "tickers",
+                "XAAPL-USDT",
+                {"instId": "XAAPL-USDT", "last": "231.42", "ts": "1794284760000"},
+            )
+        )
+        hub._handle_market(
+            MarketPush(
+                "index-tickers",
+                "XAAPL-USDT",
+                {"instId": "XAAPL-USDT", "idxPx": "230.00", "ts": "1794284760000"},
+            )
+        )
+        await hub.stop()
+
+    asyncio.run(scenario())
+
+    assert [event.kind for event in emitted] == ["quote", "quote"]
+    assert emitted[0].inst_id == "XAAPL-USDT"
+    assert emitted[1].payload["last"] == "231.42"
+    assert emitted[1].payload["index"] == "230"
+
+
+def test_private_updates_are_emitted_to_the_pipeline(monkeypatch: Any, client: Any) -> None:
+    """私有 emit 点：账户与持仓状态更新各交出一条事件。"""
+
+    sync_instruments([make_swap_ref()])
+    emitted: list[Any] = []
+    monkeypatch.setattr("app.stream.hub.emit", emitted.append)
+
+    async def scenario() -> None:
+        hub = _hub(persist_snapshot=_fail_persist)
+        await hub._handle_account_row(_account_row(uTime="1794284760000"))
+        await hub._handle_position_row(
+            {
+                "instId": "AAPL-USDT-SWAP",
+                "posId": "pos-1",
+                "posSide": "long",
+                "pos": "2",
+                "avgPx": "100",
+                "markPx": "101",
+                "upl": "2",
+                "uplRatio": "0.01",
+                "lever": "3",
+                "mgnMode": "cross",
+                "liqPx": "80",
+                "margin": "10",
+                "uTime": "1794284760000",
+            }
+        )
+        await hub.stop()
+
+    asyncio.run(scenario())
+
+    assert [event.kind for event in emitted] == ["account", "position"]
+    assert emitted[0].payload["equity"] == "100"
+    assert emitted[1].inst_id == "AAPL-USDT-SWAP"

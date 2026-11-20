@@ -9,6 +9,7 @@
 import type {
   DisplaySettings,
   ExecutionSettings,
+  NotificationSettings,
   RiskDefaults,
   SettingsResponse,
 } from "./api";
@@ -18,6 +19,7 @@ export type SettingsDraft = {
   display: DisplaySettings;
   risk_defaults: RiskDefaults;
   execution: ExecutionSettings;
+  notifications: NotificationSettings;
 };
 
 export function toSettingsDraft(settings: SettingsResponse): SettingsDraft {
@@ -25,6 +27,7 @@ export function toSettingsDraft(settings: SettingsResponse): SettingsDraft {
     display: settings.display,
     risk_defaults: settings.risk_defaults,
     execution: settings.execution,
+    notifications: settings.notifications,
   };
 }
 

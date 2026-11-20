@@ -24,6 +24,7 @@ from app.alerts.rules import (
     ALERT_SEVERITIES,
     ALERT_STATUSES,
     ALERT_TYPES,
+    SCAN_MANAGED_RULES,
     AlertCandidate,
     data_gap_candidates,
     price_range_candidates,
@@ -354,6 +355,9 @@ def _expire_stale(
     rows = list(session.scalars(statement.order_by(AlertEventRow.id).with_for_update()))
     expired = 0
     for row in rows:
+        if row.rule_id not in SCAN_MANAGED_RULES:
+            # 不归扫描维护的提醒（例如事件管道写入的）：状态由产出方负责，这里不碰。
+            continue
         group = (row.type, row.rule_id, row.instrument_id)
         if group not in new_groups and group in active_groups:
             continue

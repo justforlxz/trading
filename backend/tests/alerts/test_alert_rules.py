@@ -10,12 +10,20 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from app.alerts.rules import (
+    SCAN_MANAGED_RULES,
     data_gap_candidates,
     price_range_candidates,
     technical_candidates,
 )
 from app.core import Bar, Timeframe
 from app.market import CandleGap, IntegrityReport
+from app.risk import (
+    RULE_HIGH_LEVERAGE,
+    RULE_MARGIN_USAGE,
+    RULE_SINGLE_INSTRUMENT_WEIGHT,
+    RULE_STOP_DISTANCE,
+    RULE_STOP_MISSING,
+)
 
 START = datetime(2026, 1, 1, tzinfo=UTC)
 MOMENT = datetime(2026, 3, 1, tzinfo=UTC)
@@ -160,3 +168,83 @@ def test_no_candidates_without_a_gap() -> None:
     )
 
     assert data_gap_candidates("TEST-USDT", report, moment=MOMENT) == []
+
+
+def test_every_scan_candidate_rule_belongs_to_the_scan_managed_set() -> None:
+    """扫描产出的每个 `rule_id` 都在归属集合里。
+
+    新增一条扫描规则却忘了写进 `SCAN_MANAGED_RULES` 时，它的提醒会在下一次扫描被
+    「过期」处理掉，这条用例就是那道门。
+    """
+
+    gap = CandleGap(
+        start=datetime(2026, 1, 5, tzinfo=UTC),
+        end=datetime(2026, 1, 8, tzinfo=UTC),
+        missing=3,
+    )
+    report = IntegrityReport(
+        symbol="TEST-USDT",
+        bar="1d",
+        start=datetime(2026, 1, 1, tzinfo=UTC),
+        end=datetime(2026, 1, 10, tzinfo=UTC),
+        expected=10,
+        present=7,
+        missing=3,
+        gaps=(gap,),
+        duplicates=(),
+    )
+    produced: set[str] = set()
+    produced.update(
+        item.rule_id
+        for item in technical_candidates("TEST-USDT", _bars(["100"] * 20 + ["80"]), moment=MOMENT)
+    )
+    produced.update(
+        item.rule_id
+        for item in technical_candidates(
+            "TEST-USDT", _bars(["100", "101"] + ["101"] * 14 + ["96"]), moment=MOMENT
+        )
+    )
+    produced.update(
+        item.rule_id
+        for item in technical_candidates(
+            "TEST-USDT",
+            _bars(["100"] * 30 + [str(100 - index) for index in range(1, 31)] + ["200"]),
+            moment=MOMENT,
+        )
+    )
+    range_bars = [_bar(index, "95", high="100", low="90") for index in range(20)]
+    range_bars.append(_bar(20, "99.5", high="100.5", low="99"))
+    produced.update(
+        item.rule_id for item in price_range_candidates("TEST-USDT", range_bars, moment=MOMENT)
+    )
+    low_bars = [_bar(index, "95", high="110", low="90") for index in range(20)]
+    low_bars.append(_bar(20, "90.5", high="91", low="90"))
+    produced.update(
+        item.rule_id for item in price_range_candidates("TEST-USDT", low_bars, moment=MOMENT)
+    )
+    produced.update(
+        item.rule_id for item in data_gap_candidates("TEST-USDT", report, moment=MOMENT)
+    )
+
+    # 三条技术规则、两条价格区间规则、一条数据规则都要真的被这次构造产出。
+    assert produced == {
+        "ma20_cross",
+        "rsi_zone",
+        "trend_change",
+        "near_20d_high",
+        "near_20d_low",
+        "candle_gap",
+    }
+    assert produced <= SCAN_MANAGED_RULES
+
+
+def test_scan_managed_set_covers_every_risk_rule_constant() -> None:
+    """风险规则用常量登记，改了常量名也不会让集合与规则脱节。"""
+
+    assert {
+        RULE_STOP_MISSING,
+        RULE_STOP_DISTANCE,
+        RULE_HIGH_LEVERAGE,
+        RULE_SINGLE_INSTRUMENT_WEIGHT,
+        RULE_MARGIN_USAGE,
+    } <= SCAN_MANAGED_RULES

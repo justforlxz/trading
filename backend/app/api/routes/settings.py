@@ -4,6 +4,8 @@
 
 - `GET /api/settings` 永不返回 API Key 明文，只返回是否已配置与全掩码；
 - `PATCH /api/settings` 按分组部分更新，成本与回测默认值不再经 HTTP 暴露；
+- 通知通道开关与其余分组一样存在设置文档里，不在仓库里写死；保存后立即应用，
+  不用重启进程（`app.events.apply_channels`）；
 - 数据源的最后同步时间与失败次数来自 OKX 的 `data_sync_jobs`，不由前端推算。
 """
 
@@ -15,11 +17,14 @@ from app.api.schemas import (
     DataSourceSettings,
     DisplaySettings,
     ExecutionSettings,
+    NotificationSettings,
+    NotificationSettingsUpdate,
     RiskDefaults,
     SecretSettings,
     SettingsResponse,
     SettingsUpdateRequest,
 )
+from app.events import apply_channels
 from app.jobs import OKX_PROVIDER
 from app.market import sync_summary
 from app.settings import SettingsRecord, load_settings, save_settings
@@ -49,15 +54,28 @@ def patch_settings_document(payload: SettingsUpdateRequest) -> SettingsResponse:
         data_sources=None
         if payload.data_sources is None
         else payload.data_sources.model_dump(exclude_unset=True),
+        notifications=None if payload.notifications is None else _channels(payload),
         api_key=_api_key(payload),
     )
+    if payload.notifications is not None:
+        apply_channels(record.notifications.get("channels", []))
     return _response(record)
+
+
+def _channels(payload: SettingsUpdateRequest) -> dict[str, list[str]]:
+    notifications: NotificationSettingsUpdate | None = payload.notifications
+    return {"channels": [] if notifications is None else list(notifications.channels)}
 
 
 def _api_key(payload: SettingsUpdateRequest) -> str | None:
     if payload.exchange is None or payload.exchange.api_key is None:
         return None
     return payload.exchange.api_key.get_secret_value()
+
+
+def _notification_settings(record: SettingsRecord) -> NotificationSettings:
+    channels = record.notifications.get("channels", [])
+    return NotificationSettings(channels=[str(item) for item in channels])
 
 
 def _response(record: SettingsRecord) -> SettingsResponse:
@@ -71,6 +89,7 @@ def _response(record: SettingsRecord) -> SettingsResponse:
             last_sync_at=last_sync_at,
             failure_count=failure_count,
         ),
+        notifications=_notification_settings(record),
         secrets=SecretSettings(
             okx_api_key_masked=record.api_key_masked,
             okx_configured=record.api_configured,

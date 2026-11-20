@@ -1,24 +1,21 @@
 /**
- * 自选页的展示规则：分类筛选、中文标签与缺数据文案。
+ * 自选页的展示规则：分组筛选、中文标签与缺数据文案。
  *
  * 这里不计算任何业务数值：趋势、RSI、ATR、K 线覆盖都来自后端契约字段，
- * 本模块只做分类判断、枚举翻译与缺失值的显式文案。
+ * 本模块只做分组判断、枚举翻译与缺失值的显式文案。
  */
 
 import type { InstrumentRef, WatchlistItem } from "./api";
 
-export type WatchlistCategory = "all" | "stock_swap" | "crypto";
+/** 没有指定分组时后端写入的分组名。 */
+export const DEFAULT_GROUP = "默认";
 
-export const WATCHLIST_CATEGORIES: ReadonlyArray<{
-  value: WatchlistCategory;
-  label: string;
-}> = [
-  { value: "all", label: "全部" },
-  { value: "stock_swap", label: "股票永续" },
-  { value: "crypto", label: "加密资产" },
-];
+/** 分组筛选的取值：`null` 表示「全部」。 */
+export type WatchlistGroupFilter = string | null;
 
-type InstrumentLike = Pick<InstrumentRef, "asset_type" | "inst_type">;
+/** 筛选行与「移动到分组」只关心条目的 `group`，其余字段不参与。 */
+type GroupedItem = Pick<WatchlistItem, "group">;
+
 type DataStatus = WatchlistItem["data_status"];
 type Trend = WatchlistItem["trend"];
 
@@ -30,17 +27,41 @@ const ASSET_TYPE_LABELS: Record<InstrumentRef["asset_type"], string> = {
 };
 
 /**
- * 分类筛选只有三个按钮，按资产类别切分，必须互斥且覆盖全部条目：
- * 「全部」= 股票永续 + 加密资产，不会既有重叠又有遗漏。
+ * 分组筛选行的分组名：接口返回的 `groups` 排在前面，再补上条目实际所在的分组，
+ * 去重且保持首次出现的顺序。「全部」由页面单独渲染，不在这个列表里。
  *
- * 代币化股票的现货（`XAAPL-USDT`）与永续（`AAPL-USDT-SWAP`）同属一组：PRD 只有
- * 三个按钮，原型里这一组叫「股票代币」，本就按资产类别而不是按合约形态切分。
- * 其余标的（加密现货与永续、代币化商品、未分类）都归入「加密资产」。
+ * 接口的 `groups` 是库里已有的全部分组，可能暂时没有条目；条目的 `group` 才是
+ * 当前真实分布，两边合起来才不会漏掉任何一组。
  */
-export function matchesCategory(instrument: InstrumentLike, category: WatchlistCategory): boolean {
-  if (category === "all") return true;
-  const isEquity = instrument.asset_type === "tokenized_equity";
-  return category === "stock_swap" ? isEquity : !isEquity;
+export function watchlistGroups(
+  items: readonly GroupedItem[],
+  groups: readonly string[],
+): string[] {
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of [...groups, ...items.map((item) => item.group)]) {
+    const name = raw.trim();
+    if (name === "" || seen.has(name)) continue;
+    seen.add(name);
+    names.push(name);
+  }
+  return names;
+}
+
+/** 分组筛选只看条目自己的 `group`；`null` 表示全部，不做其他归类。 */
+export function matchesGroup(item: GroupedItem, group: WatchlistGroupFilter): boolean {
+  return group === null || item.group === group;
+}
+
+/** 每个分组的条目数；接口列出的空分组记 0，不在筛选行里隐藏。 */
+export function groupCounts(
+  items: readonly GroupedItem[],
+  groups: readonly string[],
+): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const name of watchlistGroups(items, groups)) counts[name] = 0;
+  for (const item of items) counts[item.group] = (counts[item.group] ?? 0) + 1;
+  return counts;
 }
 
 export function assetTypeLabel(assetType: InstrumentRef["asset_type"]): string {

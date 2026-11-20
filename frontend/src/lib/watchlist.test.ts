@@ -1,87 +1,46 @@
 import { describe, expect, it } from "vitest";
 
-import type { InstrumentRef } from "./api";
 import {
   coverageText,
   dataTimeText,
-  matchesCategory,
+  groupCounts,
+  matchesGroup,
   metricText,
   ratioPercent,
   shortUtc,
   trendLabel,
   trendText,
-  WATCHLIST_CATEGORIES,
+  watchlistGroups,
 } from "./watchlist";
 
-const stockSwap: InstrumentRef = {
-  inst_id: "AAPL-USDT-SWAP",
-  inst_type: "SWAP",
-  product_key: "AAPL",
-  asset_type: "tokenized_equity",
-  base_currency: "AAPL",
-  quote_currency: "USDT",
-};
+/** 分组筛选只读条目自己的 `group`，其余字段不参与，这里用最小形状即可。 */
+type GroupedItem = { group: string };
 
-const stockSpot: InstrumentRef = { ...stockSwap, inst_id: "XAAPL-USDT", inst_type: "SPOT" };
-const cryptoSpot: InstrumentRef = {
-  ...stockSwap,
-  inst_id: "BTC-USDT",
-  inst_type: "SPOT",
-  product_key: "BTC",
-  asset_type: "crypto",
-};
-const commodity: InstrumentRef = {
-  ...stockSpot,
-  inst_id: "XAUT-USDT",
-  product_key: "XAUT",
-  asset_type: "commodity_token",
-};
+describe("分组筛选", () => {
+  const items: GroupedItem[] = [{ group: "美股" }, { group: "加密" }, { group: "美股" }];
 
-describe("自选分类", () => {
-  it("全部包含所有类别", () => {
-    for (const instrument of [stockSwap, stockSpot, cryptoSpot, commodity]) {
-      expect(matchesCategory(instrument, "all")).toBe(true);
-    }
+  it("全部不过滤，选中分组只留该组标的", () => {
+    expect(items.filter((item) => matchesGroup(item, null))).toHaveLength(3);
+    expect(items.filter((item) => matchesGroup(item, "美股"))).toHaveLength(2);
+    expect(items.filter((item) => matchesGroup(item, "加密"))).toHaveLength(1);
+    expect(items.filter((item) => matchesGroup(item, "默认"))).toHaveLength(0);
   });
 
-  it("股票永续按资产类别归组：代币化股票的现货与永续同组", () => {
-    expect(matchesCategory(stockSwap, "stock_swap")).toBe(true);
-    expect(matchesCategory(stockSpot, "stock_swap")).toBe(true);
-    expect(matchesCategory(cryptoSpot, "stock_swap")).toBe(false);
-    expect(matchesCategory(commodity, "stock_swap")).toBe(false);
+  it("分组名来自接口 groups 与条目自身的 group，去重并保留首次出现顺序", () => {
+    expect(watchlistGroups(items, ["加密", "默认"])).toEqual(["加密", "默认", "美股"]);
+    expect(watchlistGroups(items, ["美股", "加密"])).toEqual(["美股", "加密"]);
+    expect(watchlistGroups([], [])).toEqual([]);
   });
 
-  it("加密资产只包含非股票类标的，商品代币也归入这一组", () => {
-    expect(matchesCategory(cryptoSpot, "crypto")).toBe(true);
-    expect(matchesCategory(commodity, "crypto")).toBe(true);
-    expect(matchesCategory(stockSwap, "crypto")).toBe(false);
-    expect(matchesCategory(stockSpot, "crypto")).toBe(false);
+  it("空白分组名不算一个分组", () => {
+    expect(watchlistGroups([{ group: "  " }], [" "])).toEqual([]);
   });
 
-  it("三类互斥且覆盖全部：全部 = 股票永续 + 加密资产", () => {
-    const universe = [stockSwap, stockSpot, cryptoSpot, commodity];
-    const stock = universe.filter((instrument) => matchesCategory(instrument, "stock_swap"));
-    const crypto = universe.filter((instrument) => matchesCategory(instrument, "crypto"));
-    const overlap = universe.filter(
-      (instrument) =>
-        matchesCategory(instrument, "stock_swap") && matchesCategory(instrument, "crypto"),
-    );
+  it("计数覆盖接口列出的空分组，各分组之和等于全部", () => {
+    const counts = groupCounts(items, ["美股", "加密", "默认"]);
 
-    expect(overlap).toHaveLength(0);
-    expect(stock.length + crypto.length).toBe(universe.length);
-    expect(stock.map((instrument) => instrument.inst_id)).toEqual([
-      "AAPL-USDT-SWAP",
-      "XAAPL-USDT",
-    ]);
-    expect(crypto.map((instrument) => instrument.inst_id)).toEqual(["BTC-USDT", "XAUT-USDT"]);
-  });
-
-  it("筛选行的中文标签依次是全部、股票永续、加密资产", () => {
-    expect(WATCHLIST_CATEGORIES.map((item) => item.label)).toEqual([
-      "全部",
-      "股票永续",
-      "加密资产",
-    ]);
+    expect(counts).toEqual({ 美股: 2, 加密: 1, 默认: 0 });
+    expect(Object.values(counts).reduce((sum, count) => sum + count, 0)).toBe(items.length);
   });
 });
 

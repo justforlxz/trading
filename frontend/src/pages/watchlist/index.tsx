@@ -30,11 +30,13 @@ import { instTypeLabel } from "../../lib/display";
 import { useQuoteStream } from "../../lib/stream-hooks";
 import {
   assetTypeLabel,
-  matchesCategory,
+  DEFAULT_GROUP,
+  groupCounts,
+  matchesGroup,
   ratioPercent,
   shortUtc,
-  WATCHLIST_CATEGORIES,
-  type WatchlistCategory,
+  watchlistGroups,
+  type WatchlistGroupFilter,
 } from "../../lib/watchlist";
 import { aggregateWatchlist, buildPendingDigest } from "../../lib/watchlist-summary";
 import { cn } from "../../lib/utils";
@@ -42,7 +44,6 @@ import { searchWatchlist } from "../../lib/watchlist-search";
 import { WatchlistList } from "./list";
 import { WatchlistSummary } from "./summary";
 
-const DEFAULT_GROUP = "默认";
 /** 加入自选后只做有限次重读，等后台同步把价格、涨跌和指标写回。 */
 const ADD_REFRESH_DELAYS = [2000, 6000, 12000];
 const INPUT_CLASS =
@@ -56,28 +57,43 @@ function messageOf(reason: unknown, fallback: string): string {
   return reason instanceof Error ? reason.message : fallback;
 }
 
-function CategoryFilter({
+/**
+ * 分组筛选行：选中后同时筛列表与关注汇总。
+ *
+ * 「全部」用 `null` 表示，计数等于全部条目数；分组名与计数来自 `GET /api/watchlist`
+ * 的 `groups` 与当前条目，不再按资产类别切分。
+ */
+export function GroupFilter({
   value,
+  groups,
   counts,
+  total,
   onChange,
 }: {
-  value: WatchlistCategory;
-  counts: Record<WatchlistCategory, number>;
-  onChange: (value: WatchlistCategory) => void;
+  value: WatchlistGroupFilter;
+  groups: readonly string[];
+  counts: Record<string, number>;
+  total: number;
+  onChange: (value: WatchlistGroupFilter) => void;
 }) {
+  const options: Array<{ value: WatchlistGroupFilter; label: string; count: number }> = [
+    { value: null, label: "全部", count: total },
+    ...groups.map((name) => ({ value: name, label: name, count: counts[name] ?? 0 })),
+  ];
+
   return (
-    <div role="group" aria-label="分类筛选" className="flex flex-wrap items-center gap-1">
-      {WATCHLIST_CATEGORIES.map((item) => (
+    <div role="group" aria-label="分组筛选" className="flex flex-wrap items-center gap-1">
+      {options.map((option) => (
         <Button
-          key={item.value}
+          key={option.value ?? "all"}
           type="button"
           size="sm"
-          variant={value === item.value ? "default" : "ghost"}
-          aria-pressed={value === item.value}
-          onClick={() => onChange(item.value)}
+          variant={value === option.value ? "default" : "ghost"}
+          aria-pressed={value === option.value}
+          onClick={() => onChange(option.value)}
           className="h-7 px-2 text-[11px]"
         >
-          {item.label} {counts[item.value]}
+          {option.label} {option.count}
         </Button>
       ))}
     </div>
@@ -155,21 +171,17 @@ function MarketRegimeCard({
 
 function SearchResults({
   results,
-  category,
   tracked,
   busy,
   onAdd,
 }: {
   results: InstrumentRef[] | null;
-  category: WatchlistCategory;
   tracked: Set<string>;
   busy: string | null;
   onAdd: (instId: string) => void;
 }) {
   if (results === null) return null;
-
-  const visible = results.filter((instrument) => matchesCategory(instrument, category));
-  if (visible.length === 0) {
+  if (results.length === 0) {
     return <p className="mt-4 text-sm text-muted-foreground">没有匹配标的</p>;
   }
 
@@ -189,7 +201,7 @@ function SearchResults({
           </tr>
         </thead>
         <tbody>
-          {visible.map((instrument) => {
+          {results.map((instrument) => {
             const alreadyTracked = tracked.has(instrument.inst_id);
             return (
               <tr key={instrument.inst_id} className="border-b last:border-0">
@@ -245,12 +257,11 @@ export default function WatchlistPage() {
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  /** 换组失败时递增，让行内分组输入框回到接口返回的值。 */
-  const [groupResetToken, setGroupResetToken] = useState(0);
 
-  const [category, setCategory] = useState<WatchlistCategory>("all");
+  /** 当前分组筛选，`null` 表示「全部」。 */
+  const [groupFilter, setGroupFilter] = useState<WatchlistGroupFilter>(null);
   const [query, setQuery] = useState("");
-  /** 加入自选时写进 `POST /api/watchlist` 的分组；留空回落到默认分组。 */
+  /** 加入自选时写进 `POST /api/watchlist` 的分组，默认落在默认分组。 */
   const [targetGroup, setTargetGroup] = useState(DEFAULT_GROUP);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -323,27 +334,22 @@ export default function WatchlistPage() {
 
   const items = data?.items ?? EMPTY_ITEMS;
 
+  /** 筛选行的分组名：接口的 `groups` 加上条目实际所在的分组。 */
+  const groups = useMemo(() => watchlistGroups(items, data?.groups ?? []), [items, data]);
+
   const visibleItems = useMemo(
-    () => items.filter((item) => matchesCategory(item.instrument, category)),
-    [items, category],
+    () => items.filter((item) => matchesGroup(item, groupFilter)),
+    [items, groupFilter],
   );
 
-  /** 分类筛选是联动的：列表与三块汇总都按当前分类的标的统计；切回「全部」恢复全量。 */
+  /** 分组筛选是联动的：列表与三块汇总都按当前分组的标的统计；切回「全部」恢复全量。 */
   const aggregate = useMemo(() => aggregateWatchlist(visibleItems), [visibleItems]);
   const pending = useMemo(
     () => buildPendingDigest(visibleItems, pendingAlerts),
     [visibleItems, pendingAlerts],
   );
 
-  const categoryCounts = useMemo(() => {
-    const counts = { all: 0, stock_swap: 0, crypto: 0 } as Record<WatchlistCategory, number>;
-    for (const entry of WATCHLIST_CATEGORIES) {
-      counts[entry.value] = items.filter((item) =>
-        matchesCategory(item.instrument, entry.value),
-      ).length;
-    }
-    return counts;
-  }, [items]);
+  const counts = useMemo(() => groupCounts(items, groups), [items, groups]);
 
   /** 分时线取最近 24 根 1 小时收盘；`instIds` 用可见集合，筛选后不重复请求。 */
   useEffect(() => {
@@ -385,11 +391,8 @@ export default function WatchlistPage() {
 
   const { quotes, liveness } = useQuoteStream(items.map((item) => item.instrument.inst_id));
   const tracked = new Set(items.map((item) => item.instrument.inst_id));
-  /** 行内分组输入框的可选项：接口返回的分组名加默认分组，允许直接输入新名字。 */
-  const groupNames = useMemo(
-    () => [...new Set([DEFAULT_GROUP, ...(data?.groups ?? [])])],
-    [data],
-  );
+  /** 「加入分组」与「移动到分组」的可选项：默认分组始终可选，其余来自接口。 */
+  const groupChoices = useMemo(() => [...new Set([DEFAULT_GROUP, ...groups])], [groups]);
 
   function reload(): void {
     setError(null);
@@ -456,7 +459,7 @@ export default function WatchlistPage() {
     }
   }
 
-  /** 行内分组切换：写回 `PATCH /api/watchlist/{inst_id}`，失败时让输入框回到接口的值。 */
+  /** 行尾菜单「移动到分组」：写回 `PATCH /api/watchlist/{inst_id}` 后重读列表。 */
   async function handleMove(instId: string, group: string): Promise<void> {
     setBusy(instId);
     setActionError(null);
@@ -465,7 +468,6 @@ export default function WatchlistPage() {
       reload();
     } catch (reason: unknown) {
       setActionError(messageOf(reason, "切换分组失败"));
-      setGroupResetToken((token) => token + 1);
     } finally {
       setBusy(null);
     }
@@ -479,23 +481,12 @@ export default function WatchlistPage() {
         description="左边是关注的全部标的，右边是这些标的的汇总；单个标的的细节在详情页。"
       />
 
-      <datalist id="watchlist-groups">
-        {groupNames.map((name) => (
-          <option key={name} value={name} />
-        ))}
-      </datalist>
-
       <Card className="mb-6">
         <CardHeader>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <CardTitle>搜索标的</CardTitle>
-              <CardDescription>
-                按代码或产品键搜索已同步的标的；分类筛选作用于搜索结果、关注列表与关注汇总。
-              </CardDescription>
-            </div>
-            <CategoryFilter value={category} counts={categoryCounts} onChange={setCategory} />
-          </div>
+          <CardTitle>搜索标的</CardTitle>
+          <CardDescription>
+            按代码或产品键搜索已同步的标的；加入时在右侧选择分组，列表按分组筛选。
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form
@@ -515,14 +506,18 @@ export default function WatchlistPage() {
             </Button>
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
               加入分组
-              <input
-                list="watchlist-groups"
+              <select
                 aria-label="加入自选的分组"
                 value={targetGroup}
                 onChange={(event) => setTargetGroup(event.target.value)}
-                placeholder={DEFAULT_GROUP}
                 className={cn(INPUT_CLASS, "h-9 w-32 px-2")}
-              />
+              >
+                {groupChoices.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
             </label>
           </form>
 
@@ -534,7 +529,6 @@ export default function WatchlistPage() {
 
           <SearchResults
             results={results}
-            category={category}
             tracked={tracked}
             busy={busy}
             onAdd={(instId) => void handleAdd(instId)}
@@ -602,13 +596,7 @@ export default function WatchlistPage() {
           <div className="wl-grid" data-view={view}>
             <section className="wl-list rounded-lg border bg-card text-card-foreground shadow-sm">
               <header className="flex flex-wrap items-baseline justify-between gap-2 border-b px-4 py-3">
-                <div>
-                  <h2 className="text-sm font-semibold tracking-tight">关注列表</h2>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    价格按推送更新；日涨跌、趋势、RSI(14)、ATR(14)%、K 线覆盖与最近更新时间来自
-                    HTTP 快照，快照时间见每行「最近更新时间」。
-                  </p>
-                </div>
+                <h2 className="text-sm font-semibold tracking-tight">关注列表</h2>
                 <span className="flex items-center gap-2 text-[11px] text-muted-foreground">
                   <StreamTag liveness={liveness} />
                   {visibleItems.length} 个
@@ -616,7 +604,13 @@ export default function WatchlistPage() {
               </header>
 
               <div className="flex flex-wrap items-center gap-1 border-b px-3 py-2">
-                <CategoryFilter value={category} counts={categoryCounts} onChange={setCategory} />
+                <GroupFilter
+                  value={groupFilter}
+                  groups={groups}
+                  counts={counts}
+                  total={items.length}
+                  onChange={setGroupFilter}
+                />
               </div>
 
               {liveness === "live" ? null : (
@@ -627,12 +621,12 @@ export default function WatchlistPage() {
 
               {visibleItems.length === 0 ? (
                 <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-                  当前分类下没有标的。
+                  当前分组下没有标的。
                   <Button
                     type="button"
                     variant="link"
                     className="h-auto px-2 py-0"
-                    onClick={() => setCategory("all")}
+                    onClick={() => setGroupFilter(null)}
                   >
                     查看全部
                   </Button>
@@ -643,7 +637,7 @@ export default function WatchlistPage() {
                   quotes={quotes}
                   closes={closes}
                   busy={busy}
-                  groupResetToken={groupResetToken}
+                  groups={groupChoices}
                   onRemove={(instId) => void handleRemove(instId)}
                   onMove={(instId, group) => void handleMove(instId, group)}
                 />

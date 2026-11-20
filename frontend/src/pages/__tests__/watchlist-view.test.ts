@@ -25,46 +25,63 @@ function renderList(items: readonly WatchlistItem[]): string {
         quotes: {},
         closes: {},
         busy: null,
+        groupResetToken: 0,
         onRemove: () => {},
+        onMove: () => {},
       }),
     ),
   );
 }
 
-describe("关注列表结构（MUST 2 / MUST 4）", () => {
+describe("关注列表结构（C-01 / C-02）", () => {
   const items = [
     makeItem("AAPL-USDT-SWAP", { change: "1.86" }),
     makeItem("BTC-USDT-SWAP", { change: "-0.44" }),
     makeItem("XSPCX-USDT", { change: null, dataStatus: "missing" }),
   ];
 
-  it("只有 4 列：标的、24H、价格 / 涨跌、信号", () => {
+  it("表头是 v6 的七列指标，另加信号列", () => {
     const html = renderList(items);
     // 只看表头，别把行内「无信号」里的「信号」也算进来。
     const headerText = plainText(html.slice(0, html.indexOf("<tbody")));
 
-    expect(html.split("<th ").length - 1).toBe(4);
-    expect(headerText.match(/标的|24H|价格 \/ 涨跌|信号/g)).toEqual([
-      "标的",
-      "24H",
-      "价格 / 涨跌",
-      "信号",
-    ]);
+    expect(html.split("<th ").length - 1).toBe(9);
+    expect(headerText).toBe(
+      "标的最新价日涨跌趋势RSI(14)ATR(14)%K 线覆盖最近更新时间信号",
+    );
   });
 
-  it("列宽按 44% / 18% / 22% / 16% 声明，表头与单元格共用同一组类", () => {
+  it("七列数值来自 WatchlistItem 字段，缺数据写「尚未同步」而不是 0", () => {
+    const text = plainText(renderList(items));
+
+    expect(text).toContain("100.00");
+    expect(text).toContain("+1.86%");
+    expect(text).toContain("偏多");
+    expect(text).toContain("55.4");
+    expect(text).toContain("2.3%");
+    expect(text).toContain("日线 120 根");
+    expect(text).toContain("11-12");
+    expect(text).toContain("16:00 UTC");
+    // 没有日线的行：最新价、日涨跌、趋势都写「尚未同步」。
+    expect(text).toContain("尚未同步");
+  });
+
+  it("24H 分时线放在最新价单元格里，不单独占一列", () => {
     const html = renderList(items);
 
-    for (const className of [
-      "wl-col-target",
-      "wl-col-24h",
-      "wl-col-price",
-      "wl-col-signal",
-      "wl-cell-first",
-      "wl-cell-last",
-    ]) {
-      expect(html).toContain(`class="${className}`);
-    }
+    // 每行一个分时线（另有每行的移出图标，因此按 viewBox 认）；没有收盘时画灰色虚线。
+    expect(html.split('viewBox="0 0 76 30"').length - 1).toBe(items.length);
+    expect(html).toContain("stroke-dasharray");
+  });
+
+  it("每行有分组输入框，可选项来自 watchlist-groups", () => {
+    const html = renderList(items);
+
+    expect(html.split('list="watchlist-groups"').length - 1).toBe(items.length);
+    expect(html).toContain('aria-label="AAPL-USDT-SWAP 的分组"');
+    expect(html).toContain('value="默认"');
+    expect(html).toContain("wl-cell-first");
+    expect(html).toContain("wl-cell-last");
   });
 
   it("每个标的渲染一行，没有信号时写「无信号」并用灰色色条", () => {

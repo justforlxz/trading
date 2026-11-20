@@ -10,6 +10,7 @@ import {
   shortUtc,
   trendLabel,
   trendText,
+  WATCHLIST_CATEGORIES,
 } from "./watchlist";
 
 const stockSwap: InstrumentRef = {
@@ -53,6 +54,21 @@ describe("自选分类", () => {
     expect(matchesCategory(cryptoSpot, "crypto")).toBe(true);
     expect(matchesCategory(stockSwap, "crypto")).toBe(false);
     expect(matchesCategory(commodity, "crypto")).toBe(false);
+  });
+
+  it("现货只看形态，不看资产类别", () => {
+    expect(matchesCategory(stockSpot, "spot")).toBe(true);
+    expect(matchesCategory(cryptoSpot, "spot")).toBe(true);
+    expect(matchesCategory(stockSwap, "spot")).toBe(false);
+  });
+
+  it("筛选行的中文标签依次是全部、美股、加密、现货", () => {
+    expect(WATCHLIST_CATEGORIES.map((item) => item.label)).toEqual([
+      "全部",
+      "美股",
+      "加密",
+      "现货",
+    ]);
   });
 });
 

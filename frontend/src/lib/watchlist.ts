@@ -7,15 +7,16 @@
 
 import type { InstrumentRef, WatchlistItem } from "./api";
 
-export type WatchlistCategory = "all" | "stock_swap" | "crypto";
+export type WatchlistCategory = "all" | "stock_swap" | "crypto" | "spot";
 
 export const WATCHLIST_CATEGORIES: ReadonlyArray<{
   value: WatchlistCategory;
   label: string;
 }> = [
   { value: "all", label: "全部" },
-  { value: "stock_swap", label: "股票永续" },
+  { value: "stock_swap", label: "美股" },
   { value: "crypto", label: "加密" },
+  { value: "spot", label: "现货" },
 ];
 
 type InstrumentLike = Pick<InstrumentRef, "asset_type" | "inst_type">;
@@ -35,6 +36,7 @@ export function matchesCategory(instrument: InstrumentLike, category: WatchlistC
   if (category === "stock_swap") {
     return instrument.asset_type === "tokenized_equity" && instrument.inst_type === "SWAP";
   }
+  if (category === "spot") return instrument.inst_type === "SPOT";
   return instrument.asset_type === "crypto";
 }
 

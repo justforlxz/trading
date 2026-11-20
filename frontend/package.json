@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "api:sync": "node scripts/api-sync.mjs",
+    "test": "vitest run",
     "test:mocks": "vitest run",
     "preview": "vite preview"
   },

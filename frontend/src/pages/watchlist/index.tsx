@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 
 import { PageHeading } from "../../components/layout/page-parts";
 import { Button } from "../../components/ui/button";
@@ -14,39 +13,43 @@ import {
 import { StreamNotice, StreamTag } from "../../components/ui/stream-status";
 import {
   addWatchlistItem,
+  fetchAlerts,
+  fetchCandles,
   fetchMarketBreadth,
   fetchWatchlist,
+  okxCandleSource,
   removeWatchlistItem,
-  updateWatchlistItem,
+  type AlertItem,
   type InstrumentRef,
   type MarketBreadthResponse,
   type WatchlistItem,
   type WatchlistResponse,
 } from "../../lib/api";
-import { instTypeLabel, signedTone, signedValue } from "../../lib/display";
+import { instTypeLabel } from "../../lib/display";
 import { useQuoteStream } from "../../lib/stream-hooks";
-import type { QuoteUpdate } from "../../lib/stream";
 import {
   assetTypeLabel,
-  coverageText,
-  dataTimeText,
   matchesCategory,
-  metricText,
   ratioPercent,
   shortUtc,
-  trendText,
-  trendTone,
   WATCHLIST_CATEGORIES,
   type WatchlistCategory,
 } from "../../lib/watchlist";
+import { aggregateWatchlist, buildPendingDigest } from "../../lib/watchlist-summary";
 import { cn } from "../../lib/utils";
 import { searchWatchlist } from "../../lib/watchlist-search";
+import { WatchlistList } from "./list";
+import { WatchlistSummary } from "./summary";
 
 const DEFAULT_GROUP = "默认";
 /** 加入自选后只做有限次重读，等后台同步把价格、涨跌和指标写回。 */
 const ADD_REFRESH_DELAYS = [2000, 6000, 12000];
 const INPUT_CLASS =
   "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
+/** 数据未加载时用同一个空数组，避免每次渲染都换引用把下游 effect 打成死循环。 */
+const EMPTY_ITEMS: readonly WatchlistItem[] = [];
+/** 移动端同一时间只显示一块：汇总还是关注列表。 */
+type MobileView = "summary" | "list";
 
 function messageOf(reason: unknown, fallback: string): string {
   return reason instanceof Error ? reason.message : fallback;
@@ -54,17 +57,15 @@ function messageOf(reason: unknown, fallback: string): string {
 
 function CategoryFilter({
   value,
+  counts,
   onChange,
 }: {
   value: WatchlistCategory;
+  counts: Record<WatchlistCategory, number>;
   onChange: (value: WatchlistCategory) => void;
 }) {
   return (
-    <div
-      role="group"
-      aria-label="分类筛选"
-      className="flex flex-wrap items-center gap-1 rounded-md border p-1"
-    >
+    <div role="group" aria-label="分类筛选" className="flex flex-wrap items-center gap-1">
       {WATCHLIST_CATEGORIES.map((item) => (
         <Button
           key={item.value}
@@ -73,8 +74,9 @@ function CategoryFilter({
           variant={value === item.value ? "default" : "ghost"}
           aria-pressed={value === item.value}
           onClick={() => onChange(item.value)}
+          className="h-7 px-2 text-[11px]"
         >
-          {item.label}
+          {item.label} {counts[item.value]}
         </Button>
       ))}
     </div>
@@ -236,153 +238,12 @@ function SearchResults({
   );
 }
 
-function WatchlistTable({
-  items,
-  quotes,
-  busy,
-  groupResetToken,
-  onRemove,
-  onMove,
-}: {
-  items: WatchlistItem[];
-  quotes: Record<string, QuoteUpdate>;
-  busy: string | null;
-  groupResetToken: number;
-  onRemove: (instId: string) => void;
-  onMove: (instId: string, group: string) => void;
-}) {
-  const navigate = useNavigate();
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-xs sm:text-sm">
-        <thead>
-          <tr className="border-b text-xs text-muted-foreground">
-            <th className="py-2 pr-2 text-left font-medium">标的</th>
-            <th className="px-1.5 py-2 text-right font-medium sm:px-2">最新价</th>
-            <th className="px-1.5 py-2 text-right font-medium sm:px-2">日涨跌</th>
-            <th className="px-1.5 py-2 text-left font-medium sm:px-2">趋势</th>
-            <th className="hidden px-2 py-2 text-right font-medium lg:table-cell">RSI(14)</th>
-            <th className="hidden px-2 py-2 text-right font-medium lg:table-cell">ATR(14)</th>
-            <th className="hidden px-2 py-2 text-left font-medium md:table-cell">数据</th>
-            <th className="py-2 pl-1 text-right font-medium sm:pl-2">
-              <span className="sr-only sm:hidden">操作</span>
-              <span className="hidden sm:inline">操作</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => {
-            const { instrument } = item;
-            const live = quotes[instrument.inst_id];
-            return (
-              <tr
-                key={instrument.inst_id}
-                onClick={() => navigate(`/watchlist/${instrument.inst_id}`)}
-                className="cursor-pointer border-b transition-colors last:border-0 hover:bg-accent/50"
-              >
-                <td className="py-3 pr-2 align-top">
-                  <Link
-                    to={`/watchlist/${instrument.inst_id}`}
-                    onClick={(event) => event.stopPropagation()}
-                    className="font-mono font-medium underline-offset-4 hover:underline"
-                  >
-                    {instrument.inst_id}
-                  </Link>
-                  <span className="block text-xs text-muted-foreground">
-                    {instrument.product_key} · {assetTypeLabel(instrument.asset_type)}
-                  </span>
-                  <input
-                    key={`${instrument.inst_id}:${item.group}:${groupResetToken}`}
-                    list="watchlist-groups"
-                    defaultValue={item.group}
-                    aria-label={`${instrument.inst_id} 的分组`}
-                    disabled={busy === instrument.inst_id}
-                    onClick={(event) => event.stopPropagation()}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        event.currentTarget.blur();
-                      }
-                    }}
-                    onBlur={(event) => {
-                      const next = event.currentTarget.value.trim() || DEFAULT_GROUP;
-                      if (next !== item.group) onMove(instrument.inst_id, next);
-                    }}
-                    className={cn(INPUT_CLASS, "mt-1 h-7 w-16 px-2 text-xs sm:w-24")}
-                  />
-                </td>
-                <td className="px-1.5 py-3 text-right align-top font-mono tabular-nums sm:px-2">
-                  {metricText(live?.last ?? item.last_price, item.data_status)}
-                </td>
-                <td
-                  title="日涨跌来自 HTTP 快照；推送消息只提供价格"
-                  className={cn(
-                    "px-1.5 py-3 text-right align-top font-mono tabular-nums sm:px-2",
-                    item.change_pct_24h === null ? "" : signedTone(item.change_pct_24h),
-                  )}
-                >
-                  {item.change_pct_24h === null
-                    ? metricText(null, item.data_status)
-                    : `${signedValue(item.change_pct_24h)}%`}
-                </td>
-                <td className="px-1.5 py-3 align-top sm:px-2">
-                  <span
-                    className={cn(
-                      "whitespace-nowrap text-xs font-medium",
-                      trendTone(item.trend),
-                    )}
-                  >
-                    {trendText(item.trend, item.data_status)}
-                  </span>
-                </td>
-                <td className="hidden px-2 py-3 text-right align-top font-mono tabular-nums lg:table-cell">
-                  {metricText(item.rsi_14, item.data_status)}
-                </td>
-                <td className="hidden px-2 py-3 text-right align-top font-mono tabular-nums lg:table-cell">
-                  {item.atr_pct_14 === null
-                    ? metricText(null, item.data_status)
-                    : `${item.atr_pct_14}%`}
-                </td>
-                <td className="hidden px-2 py-3 align-top text-xs text-muted-foreground md:table-cell">
-                  <span className="block whitespace-nowrap">{coverageText(item)}</span>
-                  <span className="block whitespace-nowrap">{dataTimeText(item.last_candle_at)}</span>
-                </td>
-                <td className="py-3 pl-1 text-right align-top sm:pl-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="px-2 sm:px-3"
-                    aria-label={`移出 ${instrument.inst_id}`}
-                    disabled={busy === instrument.inst_id}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onRemove(instrument.inst_id);
-                    }}
-                  >
-                    <Trash2 className="h-3.5 w-3.5 sm:hidden" aria-hidden="true" />
-                    <span className="hidden sm:inline">
-                      {busy === instrument.inst_id ? "处理中…" : "移出"}
-                    </span>
-                  </Button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 export default function WatchlistPage() {
   const [data, setData] = useState<WatchlistResponse | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [groupResetToken, setGroupResetToken] = useState(0);
 
   const [category, setCategory] = useState<WatchlistCategory>("all");
   const [query, setQuery] = useState("");
@@ -392,6 +253,13 @@ export default function WatchlistPage() {
 
   const [market, setMarket] = useState<MarketBreadthResponse[] | null>(null);
   const [marketError, setMarketError] = useState<string | null>(null);
+
+  const [pendingAlerts, setPendingAlerts] = useState<readonly AlertItem[]>([]);
+  const [alertsError, setAlertsError] = useState<string | null>(null);
+  /** 每个标的最近 24 根 1 小时收盘；取不到就是空数组，图里画灰虚线。 */
+  const [closes, setCloses] = useState<Record<string, number[]>>({});
+  const [view, setView] = useState<MobileView>("summary");
+
   const searchInputRef = useRef<HTMLInputElement>(null);
   const refreshTimers = useRef<number[]>([]);
 
@@ -428,6 +296,93 @@ export default function WatchlistPage() {
       active = false;
     };
   }, []);
+
+  /** 「需要处理」里的待处理提醒；拿不到时如实说明，不把条数当成 0。 */
+  useEffect(() => {
+    let active = true;
+    fetchAlerts({ status: "pending" })
+      .then((value) => {
+        if (!active) return;
+        setPendingAlerts(value.items);
+        setAlertsError(null);
+      })
+      .catch((reason: unknown) => {
+        if (!active) return;
+        setPendingAlerts([]);
+        setAlertsError(messageOf(reason, "待处理提醒加载失败"));
+      });
+    return () => {
+      active = false;
+    };
+  }, [reloadToken]);
+
+  const items = data?.items ?? EMPTY_ITEMS;
+
+  const visibleItems = useMemo(
+    () => items.filter((item) => matchesCategory(item.instrument, category)),
+    [items, category],
+  );
+
+  /** 分组筛选是联动的：列表与三块汇总都按当前分组的标的统计；切回「全部」恢复全量。 */
+  const aggregate = useMemo(() => aggregateWatchlist(visibleItems), [visibleItems]);
+  const pending = useMemo(
+    () => buildPendingDigest(visibleItems, pendingAlerts),
+    [visibleItems, pendingAlerts],
+  );
+
+  const categoryCounts = useMemo(() => {
+    const counts = { all: 0, stock_swap: 0, crypto: 0, spot: 0 } as Record<
+      WatchlistCategory,
+      number
+    >;
+    for (const entry of WATCHLIST_CATEGORIES) {
+      counts[entry.value] = items.filter((item) =>
+        matchesCategory(item.instrument, entry.value),
+      ).length;
+    }
+    return counts;
+  }, [items]);
+
+  /** 分时线取最近 24 根 1 小时收盘；`instIds` 用可见集合，筛选后不重复请求。 */
+  useEffect(() => {
+    let active = true;
+
+    if (visibleItems.length === 0) {
+      setCloses({});
+      return () => {
+        active = false;
+      };
+    }
+
+    void Promise.all(
+      visibleItems.map(async (item) => {
+        try {
+          const series = await fetchCandles(
+            item.instrument.inst_id,
+            "1h",
+            okxCandleSource(item.instrument.inst_type),
+            24,
+          );
+          return [
+            item.instrument.inst_id,
+            series.candles.map((candle) => Number(candle.close)),
+          ] as const;
+        } catch {
+          // 分时线取不到不是错误：图里画灰虚线，不用假数据顶上。
+          return [item.instrument.inst_id, [] as number[]] as const;
+        }
+      }),
+    ).then((entries) => {
+      if (active) setCloses(Object.fromEntries(entries));
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [visibleItems]);
+
+  const { quotes, liveness } = useQuoteStream(items.map((item) => item.instrument.inst_id));
+  const tracked = new Set(items.map((item) => item.instrument.inst_id));
 
   function reload(): void {
     setError(null);
@@ -494,41 +449,13 @@ export default function WatchlistPage() {
     }
   }
 
-  async function handleMove(instId: string, group: string): Promise<void> {
-    setBusy(instId);
-    setActionError(null);
-    try {
-      await updateWatchlistItem(instId, group);
-      reload();
-    } catch (reason: unknown) {
-      setActionError(messageOf(reason, "切换分组失败"));
-      setGroupResetToken((token) => token + 1);
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  const items = data?.items ?? [];
-  const visibleItems = items.filter((item) => matchesCategory(item.instrument, category));
-  const { quotes, liveness } = useQuoteStream(
-    visibleItems.map((item) => item.instrument.inst_id),
-  );
-  const tracked = new Set(items.map((item) => item.instrument.inst_id));
-  const groupNames = [...new Set([DEFAULT_GROUP, ...(data?.groups ?? [])])];
-
   return (
     <>
       <PageHeading
         eyebrow="Watchlist"
         title="自选"
-        description="搜索标的加入自选；点任意一行进入分析，进入后可以切换标的。列表里的价格、趋势、RSI、ATR 与数据覆盖都来自后端真实数据。"
+        description="左边是关注的全部标的，右边是这些标的的汇总；单个标的的细节在详情页。"
       />
-
-      <datalist id="watchlist-groups">
-        {groupNames.map((name) => (
-          <option key={name} value={name} />
-        ))}
-      </datalist>
 
       <Card className="mb-6">
         <CardHeader>
@@ -536,14 +463,17 @@ export default function WatchlistPage() {
             <div>
               <CardTitle>搜索标的</CardTitle>
               <CardDescription>
-                按代码或产品键搜索已同步的标的；分类筛选同时作用于搜索结果与自选列表。
+                按代码或产品键搜索已同步的标的；分类筛选作用于搜索结果、关注列表与关注汇总。
               </CardDescription>
             </div>
-            <CategoryFilter value={category} onChange={setCategory} />
+            <CategoryFilter value={category} counts={categoryCounts} onChange={setCategory} />
           </div>
         </CardHeader>
         <CardContent>
-          <form onSubmit={(event) => void handleSearch(event)} className="flex flex-col gap-2 sm:flex-row">
+          <form
+            onSubmit={(event) => void handleSearch(event)}
+            className="flex flex-col gap-2 sm:flex-row"
+          >
             <input
               ref={searchInputRef}
               aria-label="搜索关键字"
@@ -579,6 +509,12 @@ export default function WatchlistPage() {
         </p>
       ) : null}
 
+      {alertsError ? (
+        <p className="mb-4 rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive">
+          {alertsError}
+        </p>
+      ) : null}
+
       {actionError ? (
         <p className="mb-4 rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive">
           {actionError}
@@ -604,53 +540,77 @@ export default function WatchlistPage() {
       ) : null}
 
       {data && items.length > 0 ? (
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <div>
-                <CardTitle>自选列表</CardTitle>
-                <CardDescription>
-                  {visibleItems.length} 个标的 · 日线 · RSI(14) · ATR(14) ·
-                  价格由推送更新，其余字段来自 HTTP 快照
-                </CardDescription>
+        <>
+          <div className="wl-tabs" role="tablist" aria-label="切换视图">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === "summary"}
+              onClick={() => setView("summary")}
+            >
+              汇总
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === "list"}
+              onClick={() => setView("list")}
+            >
+              关注列表
+            </button>
+          </div>
+
+          <div className="wl-grid" data-view={view}>
+            <section className="wl-list rounded-lg border bg-card text-card-foreground shadow-sm">
+              <header className="flex items-baseline justify-between gap-2 border-b px-4 py-3">
+                <h2 className="text-sm font-semibold tracking-tight">关注列表</h2>
+                <span className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <StreamTag liveness={liveness} />
+                  {visibleItems.length} 个
+                </span>
+              </header>
+
+              <div className="flex flex-wrap items-center gap-1 border-b px-3 py-2">
+                <CategoryFilter value={category} counts={categoryCounts} onChange={setCategory} />
               </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <StreamTag liveness={liveness} />
-                <span>点击标的进入技术分析</span>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="px-3 pb-3 sm:px-6">
-            <div className="mb-3">
-              <StreamNotice liveness={liveness} subject="价格" />
-            </div>
-            {visibleItems.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                当前分类下没有标的。
-                <Button
-                  type="button"
-                  variant="link"
-                  className="h-auto px-2 py-0"
-                  onClick={() => setCategory("all")}
-                >
-                  查看全部
-                </Button>
-              </p>
-            ) : (
-              <WatchlistTable
-                items={visibleItems}
-                quotes={quotes}
-                busy={busy}
-                groupResetToken={groupResetToken}
-                onRemove={(instId) => void handleRemove(instId)}
-                onMove={(instId, group) => void handleMove(instId, group)}
-              />
-            )}
-          </CardContent>
-        </Card>
+
+              {liveness === "live" ? null : (
+                <div className="px-3 pt-2">
+                  <StreamNotice liveness={liveness} subject="价格" />
+                </div>
+              )}
+
+              {visibleItems.length === 0 ? (
+                <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+                  当前分类下没有标的。
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto px-2 py-0"
+                    onClick={() => setCategory("all")}
+                  >
+                    查看全部
+                  </Button>
+                </p>
+              ) : (
+                <WatchlistList
+                  items={visibleItems}
+                  quotes={quotes}
+                  closes={closes}
+                  busy={busy}
+                  onRemove={(instId) => void handleRemove(instId)}
+                />
+              )}
+            </section>
+
+            <WatchlistSummary aggregate={aggregate} pending={pending} />
+          </div>
+        </>
       ) : null}
 
-      <MarketRegimeCard market={market} error={marketError} />
+      <div className="mt-6">
+        <MarketRegimeCard market={market} error={marketError} />
+      </div>
     </>
   );
 }

@@ -67,3 +67,127 @@
     }
   }
 }
+
+/* ── 自选页 v7：桌面两栏（列表 + 汇总），移动端两页切换 ──
+   构建产物里没有 grid-cols-3 / divide-y / space-y-* / pl-4 / w-8 / w-10 /
+   leading-none / leading-tight / order-1，这里用最小 CSS 补齐；
+   分时线是内联 SVG，不引入图表库。 */
+
+/* 桌面（≥901px）：列表自适应 + 汇总固定 340px，栏间距 16px，两栏顶部对齐。 */
+.wl-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  align-items: start;
+}
+
+/* 移动端的分段切换在桌面不出现。 */
+.wl-tabs {
+  display: none;
+}
+
+/* 列表固定 4 列。列宽与首末列内边距写在表头与单元格共用的类上，
+   两边的 x 坐标因此完全一致。 */
+.wl-table {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+  overflow: visible;
+  white-space: normal;
+}
+.wl-col-target {
+  width: 44%;
+}
+.wl-col-24h {
+  width: 18%;
+}
+.wl-col-price {
+  width: 22%;
+}
+.wl-col-signal {
+  width: 16%;
+}
+.wl-cell-first {
+  padding-left: 16px;
+}
+.wl-cell-last {
+  padding-right: 16px;
+}
+
+/* 数据行固定 51px（契约要求 50–52px），内容在行内垂直居中。 */
+.wl-row {
+  height: 51px;
+}
+
+/* 移出按钮绝对定位在第一列右侧：不占列宽，也不撑高行。 */
+.wl-target-cell {
+  position: relative;
+}
+.wl-remove {
+  opacity: 0;
+}
+.wl-row:hover .wl-remove,
+.wl-row:focus-within .wl-remove,
+.wl-remove:focus-visible {
+  opacity: 1;
+}
+
+@media (max-width: 900px) {
+  /* 单列，并把 24H 整列隐藏，剩 3 列。 */
+  .wl-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .wl-col-24h {
+    display: none;
+  }
+  /* 3 列时按剩余宽度重新分配：长价格与「平盘 / 无数据」都要放得下，390px 不出横向滚动。 */
+  .wl-col-target {
+    width: 48%;
+  }
+  .wl-col-price {
+    width: 28%;
+  }
+  .wl-col-signal {
+    width: 24%;
+  }
+
+  .wl-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    margin-bottom: 12px;
+    border: 1px solid hsl(var(--border));
+    border-radius: 10px;
+    padding: 4px;
+    background: hsl(var(--muted));
+  }
+  .wl-tabs button {
+    border: 0;
+    background: transparent;
+    border-radius: 8px;
+    padding: 8px 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: hsl(var(--muted-foreground));
+    cursor: pointer;
+  }
+  .wl-tabs button[aria-selected="true"] {
+    background: hsl(var(--card));
+    color: hsl(var(--foreground));
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+  }
+
+  /* 同一时间只显示一块：另一块 display:none，量到的尺寸为 0。 */
+  .wl-grid[data-view="summary"] .wl-list {
+    display: none;
+  }
+  .wl-grid[data-view="list"] .wl-summary {
+    display: none;
+  }
+
+  /* 触屏没有 hover，移出按钮常显。 */
+  .wl-remove {
+    opacity: 1;
+  }
+}

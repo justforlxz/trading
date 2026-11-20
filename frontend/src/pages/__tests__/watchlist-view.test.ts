@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import type { WatchlistItem } from "../../lib/api";
 import { aggregateWatchlist, buildPendingDigest } from "../../lib/watchlist-summary";
+import { GroupFilter } from "../watchlist/index";
 import { WatchlistList } from "../watchlist/list";
 import { Sparkline } from "../watchlist/sparkline";
 import { WatchlistSummary } from "../watchlist/summary";
@@ -15,7 +16,10 @@ function plainText(html: string): string {
   return html.replace(/<[^>]*>/g, "");
 }
 
-function renderList(items: readonly WatchlistItem[]): string {
+function renderList(
+  items: readonly WatchlistItem[],
+  groups: readonly string[] = ["默认", "美股", "加密"],
+): string {
   return renderToStaticMarkup(
     createElement(
       MemoryRouter,
@@ -25,7 +29,7 @@ function renderList(items: readonly WatchlistItem[]): string {
         quotes: {},
         closes: {},
         busy: null,
-        groupResetToken: 0,
+        groups,
         onRemove: () => {},
         onMove: () => {},
       }),
@@ -35,53 +39,51 @@ function renderList(items: readonly WatchlistItem[]): string {
 
 describe("关注列表结构（C-01 / C-02）", () => {
   const items = [
-    makeItem("AAPL-USDT-SWAP", { change: "1.86" }),
-    makeItem("BTC-USDT-SWAP", { change: "-0.44" }),
-    makeItem("XSPCX-USDT", { change: null, dataStatus: "missing" }),
+    makeItem("AAPL-USDT-SWAP", { change: "1.86", group: "美股" }),
+    makeItem("BTC-USDT-SWAP", { change: "-0.44", group: "加密" }),
+    makeItem("XSPCX-USDT", { change: null, group: "默认", dataStatus: "missing" }),
   ];
 
-  it("表头是 v6 的七列指标，另加信号列", () => {
+  it("表头固定 4 列：标的、24H、价格 / 涨跌、信号", () => {
     const html = renderList(items);
     // 只看表头，别把行内「无信号」里的「信号」也算进来。
     const headerText = plainText(html.slice(0, html.indexOf("<tbody")));
 
-    expect(html.split("<th ").length - 1).toBe(9);
-    expect(headerText).toBe(
-      "标的最新价日涨跌趋势RSI(14)ATR(14)%K 线覆盖最近更新时间信号",
-    );
+    expect(html.split("<th ").length - 1).toBe(4);
+    expect(headerText).toBe("标的24H价格 / 涨跌信号");
   });
 
-  it("七列数值来自 WatchlistItem 字段，缺数据写「尚未同步」而不是 0", () => {
+  it("RSI、ATR、K 线覆盖与最近更新时间不再出现在列表里", () => {
     const text = plainText(renderList(items));
 
-    expect(text).toContain("100.00");
-    expect(text).toContain("+1.86%");
-    expect(text).toContain("偏多");
-    expect(text).toContain("55.4");
-    expect(text).toContain("2.3%");
-    expect(text).toContain("日线 120 根");
-    expect(text).toContain("11-12");
-    expect(text).toContain("16:00 UTC");
-    // 没有日线的行：最新价、日涨跌、趋势都写「尚未同步」。
-    expect(text).toContain("尚未同步");
+    expect(text).not.toContain("RSI(14)");
+    expect(text).not.toContain("ATR(14)%");
+    expect(text).not.toContain("K 线覆盖");
+    expect(text).not.toContain("最近更新时间");
+    expect(text).not.toContain("日线");
   });
 
-  it("24H 分时线放在最新价单元格里，不单独占一列", () => {
+  it("24H 分时线单独占一列，没有收盘时画灰色虚线", () => {
     const html = renderList(items);
 
-    // 每行一个分时线（另有每行的移出图标，因此按 viewBox 认）；没有收盘时画灰色虚线。
+    expect(html).toContain('<col class="wl-col-24h"');
+    // 每行一个分时线（另有每行的操作图标，因此按 viewBox 认）。
     expect(html.split('viewBox="0 0 76 30"').length - 1).toBe(items.length);
     expect(html).toContain("stroke-dasharray");
   });
 
-  it("每行有分组输入框，可选项来自 watchlist-groups", () => {
+  it("行内没有常驻分组输入框：分组改由行尾菜单「移动到分组」", () => {
     const html = renderList(items);
 
-    expect(html.split('list="watchlist-groups"').length - 1).toBe(items.length);
-    expect(html).toContain('aria-label="AAPL-USDT-SWAP 的分组"');
-    expect(html).toContain('value="默认"');
-    expect(html).toContain("wl-cell-first");
-    expect(html).toContain("wl-cell-last");
+    expect(html).not.toContain("list=");
+    expect(html).not.toContain("<datalist");
+    expect(html).not.toContain("<input");
+    // 每行一个菜单入口，菜单里先写分组动作，再列出各分组。
+    expect(html.split('aria-label="AAPL-USDT-SWAP 的更多操作"').length - 1).toBe(1);
+    expect(html).toContain("移动到分组");
+    expect(html).toContain("默认 · 当前");
+    expect(html).toContain(">美股</button>");
+    expect(html).toContain(">加密</button>");
   });
 
   it("每个标的渲染一行，没有信号时写「无信号」并用灰色色条", () => {
@@ -101,6 +103,35 @@ describe("关注列表结构（C-01 / C-02）", () => {
     expect(html).toContain("inset 3px 0 0 #10b981");
     expect(html).toContain("inset 3px 0 0 #f59e0b");
     expect(plainText(html)).toContain("MA20 上穿 MA60");
+  });
+});
+
+describe("分组筛选行（AC4）", () => {
+  function renderFilter(value: string | null, groups: readonly string[]): string {
+    return renderToStaticMarkup(
+      createElement(GroupFilter, {
+        value,
+        groups,
+        counts: Object.fromEntries(groups.map((name) => [name, 0])) as Record<string, number>,
+        total: 3,
+        onChange: () => {},
+      }),
+    );
+  }
+
+  it("显示全部、各分组与各自计数", () => {
+    const html = renderFilter(null, ["美股", "加密"]);
+
+    expect(plainText(html)).toBe("全部 3美股 0加密 0");
+    expect(html).toContain('aria-label="分组筛选"');
+  });
+
+  it("选中某个分组时只有那一个按钮是按下状态", () => {
+    const html = renderFilter("加密", ["美股", "加密"]);
+    const pressed = html.match(/aria-pressed="true"/g) ?? [];
+
+    expect(pressed).toHaveLength(1);
+    expect(html).toContain(">加密 0</button>");
   });
 });
 

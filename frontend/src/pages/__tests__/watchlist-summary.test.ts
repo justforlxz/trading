@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { matchesCategory } from "../../lib/watchlist";
+import { matchesGroup } from "../../lib/watchlist";
 import {
   aggregateWatchlist,
   averageChangeText,
@@ -204,9 +204,9 @@ describe("提醒归属（AC10）", () => {
 
 describe("分组联动（AC9）", () => {
   const items = [
-    makeItem("AAPL-USDT-SWAP", { change: "1" }),
-    makeItem("NVDA-USDT-SWAP", { change: null }),
-    makeItem("BTC-USDT-SWAP", { change: "3", assetType: "crypto" }),
+    makeItem("AAPL-USDT-SWAP", { change: "1", group: "美股" }),
+    makeItem("NVDA-USDT-SWAP", { change: null, group: "美股" }),
+    makeItem("BTC-USDT-SWAP", { change: "3", group: "加密", assetType: "crypto" }),
   ];
   const alerts = [
     makeAlert("al_aapl", "持仓缺少止损", "AAPL-USDT"),
@@ -214,7 +214,7 @@ describe("分组联动（AC9）", () => {
   ];
 
   it("选中美股后汇总只统计美股标的与它们的提醒", () => {
-    const usStocks = items.filter((item) => matchesCategory(item.instrument, "stock_swap"));
+    const usStocks = items.filter((item) => matchesGroup(item, "美股"));
     const aggregate = aggregateWatchlist(usStocks);
     const pending = buildPendingDigest(usStocks, alerts);
 

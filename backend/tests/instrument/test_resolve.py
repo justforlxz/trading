@@ -14,19 +14,11 @@ from __future__ import annotations
 import pytest
 
 from app.core import ValidationError
-from app.db import init_db
 from app.exchange.okx.instruments import parse_instruments
 from app.instrument import list_tradable, resolve_instrument, sync_instruments
 from tests.factories.instruments import load_instruments, make_ref, make_swap_ref
 
 INST_TYPES = ("SPOT", "SWAP")
-
-
-@pytest.fixture(autouse=True)
-def _schema() -> None:
-    """每个用例一个临时 schema，表结构走迁移（与生产同一条路径）。"""
-
-    init_db()
 
 
 @pytest.fixture

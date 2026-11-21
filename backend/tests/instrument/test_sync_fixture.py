@@ -13,22 +13,14 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-import pytest
 from sqlalchemy import func, select
 
-from app.db import init_db, session_scope
+from app.db import session_scope
 from app.exchange.okx.instruments import parse_instruments
 from app.instrument import Instrument, SyncReport, sync_instruments
 
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "okx"
 FIXTURE_PATH = FIXTURES_DIR / "instruments_spot_live_2026-11-10.json"
-
-
-@pytest.fixture(autouse=True)
-def _schema() -> None:
-    """每个用例都在临时 schema 里执行迁移。"""
-
-    init_db()
 
 
 def _document() -> dict[str, Any]:

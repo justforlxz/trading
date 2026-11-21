@@ -9,7 +9,7 @@
 于是 A-B = (-3-3-1-9)/20 = -0.8，A-C = (-6+2+2-6)/√320 = -8/√320，
 B-C = (2-6-2+6)/√320 = 0.0，对角线为 1.0。
 
-每个用例一个临时 schema（根 conftest 负责），表结构由 Alembic 迁移建出。
+每个用例一个独立临时库（根 conftest 负责），表结构由 Alembic 迁移建出。
 """
 
 from __future__ import annotations

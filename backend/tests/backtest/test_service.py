@@ -48,7 +48,7 @@ COSTS = CostModel(
 
 @pytest.fixture()
 def backtest_schema() -> None:
-    """执行迁移建表；schema 由根 conftest 隔离，用完整块删掉。"""
+    """执行迁移建表；库由根 conftest 隔离，用完整个删掉。"""
 
     init_db()
 

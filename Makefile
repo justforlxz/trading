@@ -14,7 +14,7 @@ DB_PASSWORD ?= trading
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install test lint format verify-live db-up db-down migrate
+.PHONY: help install test test-clean lint format verify-live db-up db-down migrate
 
 help: ## 列出可用目标
 	@grep -hE '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -66,6 +66,11 @@ db-down: ## 停止本地 PostgreSQL 容器（数据保留在容器内）
 
 migrate: ## 把数据库结构推进到最新版本（等价于 alembic upgrade head）
 	cd $(BACKEND) && $(PYTHON) -m alembic upgrade head
+
+# 跑测试时每个用例都会克隆一个 trading_test_* 库并在结束时删掉；进程被强杀会留下
+# 残库，这个目标按前缀清理，正常跑完不需要执行。
+test-clean: ## 清理残留的测试数据库（trading_test_* / trading_tmpl_*）
+	cd $(BACKEND) && $(PYTHON) -m tests.clean_databases
 
 # 真实进程探活：起一个 uvicorn，打一次 /api/health 后退出。
 # 与单测的区别是不用 TestClient，验证「uvicorn app.main:app」这条真实启动路径。

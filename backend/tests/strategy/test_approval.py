@@ -6,7 +6,7 @@
   `check_transition`；期望的允许集在测试里逐条写死，不从 `TRANSITIONS` 反推——否则实现
   改错、测试跟着改对，门禁就不再拦人。
 - 写库那一半只保留必要的几条：达标报告门禁、跳步与驳回出口、每条转移写一条记录、
-  实例上的凭据列。这几条要真落库才能验证，因此请求根 `conftest.py` 的临时 schema。
+  实例上的凭据列。这几条要真落库才能验证，因此请求根 `conftest.py` 的独立临时库。
 
 纯函数用例不请求库夹具：每请求一次就要把八个迁移重跑一遍。
 """
@@ -83,7 +83,7 @@ METRICS: dict[str, Decimal] = {
 
 @pytest.fixture()
 def approval_schema() -> None:
-    """执行迁移建表；schema 由根 conftest 隔离，用完整块删掉。"""
+    """确保表结构已建好；库由根 conftest 隔离，用完整个删掉。"""
 
     init_db()
 

@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.core import ValidationError
-from app.db import init_db, session_scope
+from app.db import session_scope
 from app.exchange.okx.instruments import parse_instruments
 from app.instrument import (
     Instrument,
@@ -20,13 +20,6 @@ from app.instrument import (
     trading_categories,
 )
 from tests.factories.instruments import SAMPLE_LIST_TIME, load_instruments, make_ref, make_swap_ref
-
-
-@pytest.fixture(autouse=True)
-def _schema() -> None:
-    """每个用例都在临时 schema 里执行迁移（Instrument 已随导入注册到 metadata）。"""
-
-    init_db()
 
 
 def _by_symbol() -> dict[str, Instrument]:

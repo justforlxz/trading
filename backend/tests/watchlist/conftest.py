@@ -1,20 +1,10 @@
-"""watchlist 域测试装配：每个用例一个临时 schema，这里只负责执行迁移。
+"""watchlist 域测试装配：表元数据注册。
 
-根 `conftest.py` 已把引擎指向本用例独有的 schema。
+库与表结构都由根 `conftest.py` 准备好（每个用例独立库，从已迁移的模板库克隆），
+这里没有需要额外做的装配。
 """
-
-import pytest
-
-from app.db import init_db
 
 # 导入即注册表元数据（与 `app.main` 的装配路径一致）。
 from app.instrument import Instrument  # noqa: F401
 from app.market import Candle  # noqa: F401
 from app.watchlist import WatchlistItemRow  # noqa: F401
-
-
-@pytest.fixture(autouse=True)
-def _watchlist_schema() -> None:
-    """每个用例开始前执行迁移建好表；schema 由根 conftest 隔离。"""
-
-    init_db()

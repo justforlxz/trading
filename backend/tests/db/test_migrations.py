@@ -1,6 +1,6 @@
 """迁移链与模型的一致性：正向建出全部表、反向删干净、重复执行无副作用。
 
-每个用例都在根 `conftest.py` 给的独立临时 schema 里跑，因此可以放心 `downgrade base`
+每个用例都在根 `conftest.py` 给的独立临时库里跑，因此可以放心 `downgrade base`
 再 `upgrade head`，不影响别的用例。
 
 `alembic_version` 是迁移自己的记账表，不属于业务表，比对时单独摘出来。
@@ -62,6 +62,17 @@ def _migration_heads() -> list[str]:
     return list(ScriptDirectory.from_config(alembic_config()).get_heads())
 
 
+def _upgrade_from_empty(revision: str) -> None:
+    """把库退回空库，再升级到指定版本：用例要的是「迁移链停在中间」的库。
+
+    每个用例的库都是从模板库克隆来的（已在最新版本），所以要先把迁移链退干净，
+    再从零走一遍，才能复现「升级前只有旧表」的状态。
+    """
+
+    command.downgrade(alembic_config(), "base")
+    command.upgrade(alembic_config(), revision)
+
+
 def _tables() -> set[str]:
     with session_scope() as session:
         return set(
@@ -115,7 +126,7 @@ def test_upgrade_removes_backtest_runs_that_cannot_describe_their_instrument() -
     依赖数据库默认值）。
     """
 
-    command.upgrade(alembic_config(), "0009")
+    _upgrade_from_empty("0009")
     with session_scope() as session:
         session.execute(
             text(
@@ -233,7 +244,7 @@ def test_external_market_tables_are_removed_at_head() -> None:
 def test_0020_removes_external_sync_data_proxy_rows_and_provider_setting() -> None:
     """0020 只保留 OKX 同步数据集与 OKX K 线，并清掉设置里的 Provider 键。"""
 
-    command.upgrade(alembic_config(), "0019")
+    _upgrade_from_empty("0019")
     with session_scope() as session:
         session.execute(
             text(
@@ -296,7 +307,7 @@ def test_0020_removes_external_sync_data_proxy_rows_and_provider_setting() -> No
 def test_account_snapshot_migration_backfills_position_batch_marker() -> None:
     """0019 按同一采集时刻的持仓行回填标记，没有持仓行的历史快照保持未知。"""
 
-    command.upgrade(alembic_config(), "0018")
+    _upgrade_from_empty("0018")
     with session_scope() as session:
         session.execute(
             text(

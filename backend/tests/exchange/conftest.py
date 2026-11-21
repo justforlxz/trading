@@ -65,7 +65,7 @@ SWAP_INSTRUMENT = {
 
 @pytest.fixture()
 def trade_schema() -> None:
-    """建表（迁移）：幂等登记表与标的表都要真的存在，schema 由根 conftest 隔离。"""
+    """建表（迁移）：幂等登记表与标的表都要真的存在，库由根 conftest 隔离。"""
 
     init_db()
 

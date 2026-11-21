@@ -1,6 +1,6 @@
 """历史 K 线同步：分页、窗口过滤、只写已收盘、幂等落库。
 
-拓扑固定：真实 `OkxMarketData` → 线程内假 OKX → 临时 schema 的 PostgreSQL。
+拓扑固定：真实 `OkxMarketData` → 线程内假 OKX → 独立临时库的 PostgreSQL。
 期望值全部由窗口与周期反推，不依赖上游返回顺序。
 """
 

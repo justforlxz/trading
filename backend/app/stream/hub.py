@@ -1,8 +1,9 @@
 """浏览器推送订阅管理：聚合 OKX 行情与私有快照，按订阅分发。
 
 单进程部署没有消息队列与独立 worker：一个 `StreamHub` 挂在应用生命周期内，持有
-所有浏览器连接与上游连接。上游连接按需启动——只有第一个浏览器订阅行情或私有频道
-时才连 OKX，没有订阅就不产生后台网络请求。
+所有浏览器连接与上游连接。公共行情连接由**常驻订阅集合**驱动：关注列表里的标的在
+启动后就订阅，与有没有浏览器连着无关（`WatchRegistry`）；浏览器订阅只是在它之上
+追加。私有连接仍按需启动——没有浏览器订阅账户或持仓时不连 OKX，不产生后台网络请求。
 
 三条边界：
 
@@ -34,6 +35,7 @@ from app.core import (
     ValidationError,
     utc_from_millis,
 )
+from app.events import DomainEvent, emit
 from app.exchange import (
     MarketPush,
     OkxPublicWebSocket,
@@ -54,6 +56,7 @@ from app.positions import (
     record_exchange_snapshot,
     sync_account,
 )
+from app.watchlist import WatchRegistry
 
 __all__ = [
     "EVENT_TYPES",
@@ -116,6 +119,7 @@ class StreamClient:
     account: bool = False
     positions: bool = False
     status: bool = False
+    alerts: bool = False
 
     def wants(self, inst_id: str) -> bool:
         return inst_id in self.quotes
@@ -242,6 +246,7 @@ class StreamHub:
         public_factory: Callable[[Callable[[bool, str], None]], Any] | None = None,
         private_factory: Callable[[Callable[[bool, str], None]], Any] | None = None,
         credentials_configured: Callable[[], bool] | None = None,
+        watch_registry: WatchRegistry | None = None,
     ) -> None:
         self._clock = clock or SystemClock()
         self._quote_loader = quote_loader or load_quote_snapshot
@@ -256,6 +261,9 @@ class StreamHub:
             lambda on_status: OkxWebSocket(channels=PRIVATE_CHANNELS, on_status=on_status)
         )
         self._credentials_configured = credentials_configured or _credentials_configured
+        # 常驻订阅集合：装配根注入进程内那一份；未注入时常驻部分为空，只有浏览器
+        # 订阅生效（单元测试与最小装配走这条路）。
+        self._watch_registry = watch_registry or WatchRegistry(tracked=lambda: [])
 
         self._clients: dict[str, StreamClient] = {}
         self._quotes: dict[str, _QuoteState] = {}
@@ -330,6 +338,8 @@ class StreamHub:
             elif kind == "status":
                 ask_status = True
                 client.status = True
+            elif kind == "alerts":
+                client.alerts = True
             else:
                 self._send_error(client, f"不支持的订阅类型 {kind!r}")
 
@@ -348,9 +358,8 @@ class StreamHub:
     # ------------------------------------------------------------------ 上游连接
 
     def _sync_upstreams(self) -> None:
-        wanted_quotes = sorted(
-            {inst for client in self._clients.values() for inst in client.quotes}
-        )
+        # 常驻订阅集合 = 关注列表 ∪ 浏览器订阅：没有浏览器时关注列表照样订着。
+        wanted_quotes = self._watch_registry.instruments()
         if wanted_quotes:
             if self._public_client is None:
                 self._public_client = self._public_factory(self._status_callback(PUBLIC_DATASET))
@@ -378,6 +387,16 @@ class StreamHub:
             self._private_task.cancel()
             self._private_task = None
             self._private_client = None
+
+    def refresh_subscriptions(self) -> None:
+        """重算上游订阅：启动、关注列表变化与浏览器订阅变化都走这里。"""
+
+        self._sync_upstreams()
+
+    def browser_instruments(self) -> set[str]:
+        """当前浏览器连接订阅的标的；注入常驻订阅集合时用来取并集。"""
+
+        return {inst for client in self._clients.values() for inst in client.quotes}
 
     async def _run_public(self, client: Any) -> None:
         try:
@@ -454,7 +473,7 @@ class StreamHub:
     async def _reconcile_quotes(self) -> None:
         """重连后用 REST 对账一次；值没变就不重复推送。"""
 
-        inst_ids = sorted({inst for client in self._clients.values() for inst in client.quotes})
+        inst_ids = self._watch_registry.instruments()
         if not inst_ids:
             return
         try:
@@ -498,6 +517,22 @@ class StreamHub:
             source=SOURCE_WS,
         )
         self._queue_quote(push.inst_id, snapshot=False, source=SOURCE_WS)
+        self._emit_quote(push.inst_id)
+
+    def _emit_quote(self, inst_id: str) -> None:
+        """把合并后的这笔行情交给事件管线；没有安装管线时 `emit` 什么也不做。"""
+
+        state = self._quotes.get(inst_id)
+        if state is None or not state.values:
+            return
+        emit(
+            DomainEvent(
+                kind="quote",
+                inst_id=inst_id,
+                payload=state.payload(source=state.source or SOURCE_WS, snapshot=False),
+                occurred_at=state.as_of() or self._clock.now(),
+            )
+        )
 
     def _apply_snapshot_row(
         self,
@@ -647,6 +682,14 @@ class StreamHub:
             as_of=captured_at,
             predicate=lambda client: client.account,
         )
+        emit(
+            DomainEvent(
+                kind="account",
+                inst_id=None,
+                payload=data,
+                occurred_at=captured_at,
+            )
+        )
 
     def _merge_account_details(self, row: dict[str, Any]) -> dict[str, Any]:
         """把推送里的币种明细并入缓存，返回带完整 `details` 的账户行。
@@ -702,6 +745,14 @@ class StreamHub:
             payload,
             as_of=captured_at,
             predicate=lambda client: client.positions,
+        )
+        emit(
+            DomainEvent(
+                kind="position",
+                inst_id=item.inst_id,
+                payload=payload,
+                occurred_at=captured_at,
+            )
         )
 
     async def _persist(
@@ -872,12 +923,16 @@ class StreamHub:
         data: dict[str, Any],
         *,
         as_of: datetime | None = None,
+        predicate: Callable[[StreamClient], bool] | None = None,
     ) -> None:
-        """供提醒、活动、策略、回测等业务包发布低频事件。"""
+        """供提醒、活动、策略、回测与通知通道发布低频事件。
+
+        `predicate` 只让声明接收这类事件的连接收到；缺省广播给所有连接，与旧行为一致。
+        """
 
         if event_type not in EVENT_TYPES:
             raise ValidationError(f"未知推送事件类型 {event_type!r}")
-        self._broadcast_envelope(event_type, data, as_of=as_of)
+        self._broadcast_envelope(event_type, data, as_of=as_of, predicate=predicate)
 
     async def stop(self) -> None:
         """应用退出或测试收尾：取消上游任务与节流定时器。"""

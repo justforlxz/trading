@@ -9,6 +9,8 @@
  * - 行情数据 `{inst_id, last, mark, index, source, stale, snapshot}`：`hub.py:157-166`
  * - 账户数据：`hub.py:895-930`；持仓数据：`hub.py:932-955`
  * - 数据源状态 `{dataset, connected, ...}`：`hub.py:779-791`
+ * - 告警 `{id, type, severity, instrument_id, title, detail, triggered_at}`：由
+ *   `app/events/sinks/browser.py` 广播，只有订阅了 `{type: "alerts"}` 的连接才收到
  *
  * 后端没有退订消息，订阅集合只能通过关闭连接清除；集合缩小时本客户端重连一次。
  */
@@ -45,6 +47,16 @@ export type PositionData = {
   margin: string | null;
 };
 
+export type AlertCreatedData = {
+  id: string;
+  type: string;
+  severity: string;
+  instrument_id: string | null;
+  title: string;
+  detail: string;
+  triggered_at: string | null;
+};
+
 export type AccountData = {
   account_id: string;
   currency: string | null;
@@ -70,6 +82,7 @@ export type StreamEvent =
   | ({ type: "market.quote.updated"; data: QuoteData } & Envelope)
   | ({ type: "position.updated"; data: PositionData } & Envelope)
   | ({ type: "account.snapshot.updated"; data: AccountData } & Envelope)
+  | ({ type: "alert.created"; data: AlertCreatedData } & Envelope)
   | ({
       type: "data_source.status.updated";
       data: { dataset: string; connected: boolean };
@@ -95,6 +108,7 @@ export type StreamSubscription = {
   status?: boolean;
   account?: boolean;
   positions?: boolean;
+  alerts?: boolean;
 };
 
 export type SocketLike = Pick<WebSocket, "readyState" | "send" | "close"> & {
@@ -111,9 +125,16 @@ type Normalized = {
   status: boolean;
   account: boolean;
   positions: boolean;
+  alerts: boolean;
 };
 
-const EMPTY: Normalized = { quotes: [], status: false, account: false, positions: false };
+const EMPTY: Normalized = {
+  quotes: [],
+  status: false,
+  account: false,
+  positions: false,
+  alerts: false,
+};
 const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_MAX_MS = 15_000;
 
@@ -140,6 +161,7 @@ function normalize(subscription: StreamSubscription): Normalized {
     status: subscription.status === true,
     account: subscription.account === true,
     positions: subscription.positions === true,
+    alerts: subscription.alerts === true,
   };
 }
 
@@ -148,6 +170,7 @@ function same(left: Normalized, right: Normalized): boolean {
     left.status === right.status &&
     left.account === right.account &&
     left.positions === right.positions &&
+    left.alerts === right.alerts &&
     left.quotes.length === right.quotes.length &&
     left.quotes.every((item, index) => item === right.quotes[index])
   );
@@ -159,13 +182,15 @@ function mergedSubscription(subscriptions: Map<symbol, Normalized>): Normalized 
   let status = false;
   let account = false;
   let positions = false;
+  let alerts = false;
   for (const item of subscriptions.values()) {
     for (const instId of item.quotes) quotes.add(instId);
     if (item.status) status = true;
     if (item.account) account = true;
     if (item.positions) positions = true;
+    if (item.alerts) alerts = true;
   }
-  return { quotes: [...quotes].sort(), status, account, positions };
+  return { quotes: [...quotes].sort(), status, account, positions, alerts };
 }
 
 /** 后端只能追加订阅，`outer` 包含 `inner` 时不必重连。 */
@@ -173,6 +198,7 @@ function contains(outer: Normalized, inner: Normalized): boolean {
   if (inner.status && !outer.status) return false;
   if (inner.account && !outer.account) return false;
   if (inner.positions && !outer.positions) return false;
+  if (inner.alerts && !outer.alerts) return false;
   return inner.quotes.every((item) => outer.quotes.includes(item));
 }
 
@@ -257,6 +283,24 @@ function parseEvent(value: Record<string, unknown>): StreamEvent | null {
           margin_usage_pct: text(data.margin_usage_pct),
           captured_at: text(data.captured_at),
           source: text(data.source),
+        },
+      };
+    }
+    case "alert.created": {
+      const id = text(data.id);
+      if (id === null) return null;
+      return {
+        type: "alert.created",
+        asOf,
+        receivedAt,
+        data: {
+          id,
+          type: text(data.type) ?? "price",
+          severity: text(data.severity) ?? "info",
+          instrument_id: text(data.instrument_id),
+          title: text(data.title) ?? "新提醒",
+          detail: text(data.detail) ?? "",
+          triggered_at: text(data.triggered_at),
         },
       };
     }
@@ -463,6 +507,7 @@ export class StreamClient {
     if (subscription.status) topics.push({ type: "status" });
     if (subscription.account) topics.push({ type: "account" });
     if (subscription.positions) topics.push({ type: "positions" });
+    if (subscription.alerts) topics.push({ type: "alerts" });
     this.applied = subscription;
     if (topics.length === 0 || this.socket === null || this.socket.readyState !== 1) return;
     this.socket.send(JSON.stringify({ action: "subscribe", topics }));

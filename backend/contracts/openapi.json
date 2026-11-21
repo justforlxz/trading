@@ -8475,6 +8475,39 @@
         "title": "MomentumIndicators",
         "type": "object"
       },
+      "NotificationSettings": {
+        "additionalProperties": false,
+        "description": "通知通道开关；本期只有 `browser` 一种实现，关闭后不再广播告警。",
+        "properties": {
+          "channels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Channels",
+            "type": "array"
+          }
+        },
+        "title": "NotificationSettings",
+        "type": "object"
+      },
+      "NotificationSettingsUpdate": {
+        "additionalProperties": false,
+        "description": "只改通道清单；空列表表示一个通道都不开。",
+        "properties": {
+          "channels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Channels",
+            "type": "array"
+          }
+        },
+        "required": [
+          "channels"
+        ],
+        "title": "NotificationSettingsUpdate",
+        "type": "object"
+      },
       "Opportunity": {
         "description": "一条机会记录。\n\n`evidence` 是判定依据的 JSON 文本（相关系数、广度、共振强度等），原样透传，\n不在契约层二次解释；`score` 是筛选用的综合分数。",
         "examples": [
@@ -10189,6 +10222,11 @@
             "execution": {
               "auto_trading_enabled": false
             },
+            "notifications": {
+              "channels": [
+                "browser"
+              ]
+            },
             "risk_defaults": {
               "default_leverage": "3",
               "risk_budget_per_trade": "100",
@@ -10211,6 +10249,9 @@
           "execution": {
             "$ref": "#/components/schemas/ExecutionSettings"
           },
+          "notifications": {
+            "$ref": "#/components/schemas/NotificationSettings"
+          },
           "risk_defaults": {
             "$ref": "#/components/schemas/RiskDefaults"
           },
@@ -10227,6 +10268,7 @@
           "risk_defaults",
           "execution",
           "data_sources",
+          "notifications",
           "secrets",
           "updated_at"
         ],
@@ -10271,6 +10313,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ExecutionSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notifications": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NotificationSettingsUpdate"
               },
               {
                 "type": "null"

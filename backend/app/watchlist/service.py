@@ -29,6 +29,7 @@ from app.instrument import Instrument
 from app.market import correlation, load_candles
 from app.watchlist.metrics import MIN_QUOTE_BARS, DailySnapshot, summarize_daily
 from app.watchlist.model import WatchlistGroup, WatchlistItemRow
+from app.watchlist.watch_registry import watch_registry
 
 __all__ = [
     "DEFAULT_GROUP",
@@ -206,12 +207,16 @@ def add_item(inst_id: str, group: str = DEFAULT_GROUP) -> WatchlistEntry | None:
             summary=f"将 {symbol} 加入自选分组「{name}」",
             payload={"inst_id": symbol, "group": name},
         )
-        return WatchlistEntry(
+        entry = WatchlistEntry(
             instrument=instrument,
             group=name,
             added_at=added_at,
             quote=entry_quote,
         )
+
+    # 关注列表变了：常驻订阅集合要在提交之后重算，与有没有浏览器无关。
+    watch_registry().notify()
+    return entry
 
 
 def move_item(inst_id: str, group: str) -> WatchlistEntry | None:
@@ -242,12 +247,15 @@ def move_item(inst_id: str, group: str) -> WatchlistEntry | None:
             summary=f"将 {symbol} 从分组「{previous}」移到「{name}」",
             payload={"inst_id": symbol, "from": previous, "to": name},
         )
-        return WatchlistEntry(
+        entry = WatchlistEntry(
             instrument=instrument,
             group=name,
             added_at=row.added_at,
             quote=entry_quote,
         )
+
+    watch_registry().notify()
+    return entry
 
 
 def remove_item(inst_id: str) -> bool:
@@ -272,7 +280,8 @@ def remove_item(inst_id: str) -> bool:
             summary=f"将 {symbol} 从自选分组「{previous}」移除",
             payload={"inst_id": symbol, "group": previous},
         )
-        return True
+    watch_registry().notify()
+    return True
 
 
 def related_instruments(inst_id: str, window_days: int) -> list[RelatedCandidate] | None:

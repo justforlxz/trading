@@ -19,6 +19,12 @@ import {
 } from "../../lib/api";
 import { formatBeijingTime } from "../../lib/display";
 import {
+  currentPermissionState,
+  notificationPermissionLabel,
+  permissionState,
+  type NotificationPermissionState,
+} from "../../lib/notifications";
+import {
   instrumentsToText,
   parseInstruments,
   toSettingsDraft,
@@ -205,6 +211,7 @@ export type SettingsViewProps = {
   busy: boolean;
   error: string | null;
   notice: string | null;
+  notificationPermission: NotificationPermissionState;
   onDraftChange: <K extends keyof SettingsDraft>(
     group: K,
     patch: Partial<SettingsDraft[K]>,
@@ -214,6 +221,7 @@ export type SettingsViewProps = {
   onColorSchemeChange: (value: DisplaySettings["color_scheme"]) => void;
   onSave: () => void;
   onRefreshHealth: () => void;
+  onRequestNotificationPermission: () => void;
 };
 
 /** 纯展示组件：测试直接渲染它，不依赖网络与浏览器。 */
@@ -228,12 +236,14 @@ export function SettingsView({
   busy,
   error,
   notice,
+  notificationPermission,
   onDraftChange,
   onInstrumentsTextChange,
   onApiKeyChange,
   onColorSchemeChange,
   onSave,
   onRefreshHealth,
+  onRequestNotificationPermission,
 }: SettingsViewProps) {
   return (
     <>
@@ -395,6 +405,46 @@ export function SettingsView({
 
         <Card>
           <CardHeader>
+            <CardTitle>通知</CardTitle>
+            <CardDescription>
+              浏览器通知使用浏览器内置的 Notification API，不需要额外凭据。权限只能由
+              你在这里点按钮申请，服务端无法替你授权。
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            <div className="rounded-md border px-3 py-1">
+              <FactRow label="浏览器权限" value={notificationPermissionLabel(notificationPermission)} />
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onRequestNotificationPermission}
+                disabled={notificationPermission === "granted"}
+              >
+                {notificationPermission === "granted" ? "已允许" : "开启浏览器通知"}
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                被拒绝后需要到浏览器的站点设置里手动改回允许。
+              </span>
+            </div>
+            <CheckField
+              label="浏览器通知通道"
+              checked={(draft.notifications.channels ?? []).includes("browser")}
+              onChange={(checked) =>
+                onDraftChange("notifications", { channels: checked ? ["browser"] : [] })
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              关闭后服务端不再广播告警，页面也不会收到。通知只在页面打开时有效（含后台
+              标签页）；关闭页面后不再有弹窗。
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle>密钥状态</CardTitle>
             <CardDescription>
               只展示掩码后的 API Key 与配置状态。Secret 与 Passphrase 由环境变量注入，
@@ -448,6 +498,8 @@ export default function SettingsPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [notificationPermission, setNotificationPermission] =
+    useState<NotificationPermissionState>("unsupported");
 
   useEffect(() => {
     let active = true;
@@ -479,6 +531,22 @@ export default function SettingsPage() {
     loadHealth();
   }, []);
 
+  // 权限状态只能问浏览器；不支持时显示「不支持」，不伪造 granted。
+  useEffect(() => {
+    setNotificationPermission(currentPermissionState());
+  }, []);
+
+  const requestNotificationPermission = () => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      setNotificationPermission("unsupported");
+      return;
+    }
+    // 必须在本函数（用户点击）的同步调用栈里申请，否则浏览器会直接拒绝。
+    window.Notification.requestPermission()
+      .then((value) => setNotificationPermission(permissionState(value)))
+      .catch(() => setNotificationPermission(currentPermissionState()));
+  };
+
   const update = <K extends keyof SettingsDraft>(
     group: K,
     patch: Partial<SettingsDraft[K]>,
@@ -501,6 +569,7 @@ export default function SettingsPage() {
         data_sources: {
           subscribed_instruments: parseInstruments(instrumentsText),
         },
+        notifications: { channels: draft.notifications.channels ?? [] },
         exchange: apiKey.trim() ? { api_key: apiKey.trim() } : null,
       });
       setSettings(updated);
@@ -552,6 +621,7 @@ export default function SettingsPage() {
       busy={busy}
       error={error}
       notice={notice}
+      notificationPermission={notificationPermission}
       onDraftChange={update}
       onInstrumentsTextChange={setInstrumentsText}
       onApiKeyChange={setApiKey}
@@ -562,6 +632,7 @@ export default function SettingsPage() {
       }}
       onSave={save}
       onRefreshHealth={loadHealth}
+      onRequestNotificationPermission={requestNotificationPermission}
     />
   );
 }

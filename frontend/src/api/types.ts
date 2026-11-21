@@ -5086,6 +5086,22 @@ export interface components {
             rsi14?: string | null;
         };
         /**
+         * NotificationSettings
+         * @description 通知通道开关；本期只有 `browser` 一种实现，关闭后不再广播告警。
+         */
+        NotificationSettings: {
+            /** Channels */
+            channels?: string[];
+        };
+        /**
+         * NotificationSettingsUpdate
+         * @description 只改通道清单；空列表表示一个通道都不开。
+         */
+        NotificationSettingsUpdate: {
+            /** Channels */
+            channels: string[];
+        };
+        /**
          * Opportunity
          * @description 一条机会记录。
          *
@@ -5872,6 +5888,11 @@ export interface components {
          *       "execution": {
          *         "auto_trading_enabled": false
          *       },
+         *       "notifications": {
+         *         "channels": [
+         *           "browser"
+         *         ]
+         *       },
          *       "risk_defaults": {
          *         "default_leverage": "3",
          *         "risk_budget_per_trade": "100",
@@ -5888,6 +5909,7 @@ export interface components {
             data_sources: components["schemas"]["DataSourceSettings"];
             display: components["schemas"]["DisplaySettings"];
             execution: components["schemas"]["ExecutionSettings"];
+            notifications: components["schemas"]["NotificationSettings"];
             risk_defaults: components["schemas"]["RiskDefaults"];
             secrets: components["schemas"]["SecretSettings"];
             /** Updated At */
@@ -5902,6 +5924,7 @@ export interface components {
             display?: components["schemas"]["DisplaySettings"] | null;
             exchange?: components["schemas"]["ExchangeSettingsUpdate"] | null;
             execution?: components["schemas"]["ExecutionSettings"] | null;
+            notifications?: components["schemas"]["NotificationSettingsUpdate"] | null;
             risk_defaults?: components["schemas"]["RiskDefaults"] | null;
         };
         /**

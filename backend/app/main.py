@@ -27,6 +27,13 @@ from app.backtest import (  # noqa: F401
 )
 from app.config import get_settings
 from app.db import init_db
+from app.events import (
+    NotificationDeliveryRow,  # noqa: F401  迁移要认得的投递台账表
+    build_pipeline,
+    build_sinks,
+    install,
+    uninstall,
+)
 from app.exchange import OrderSubmission  # noqa: F401
 from app.instrument import Instrument  # noqa: F401
 from app.jobs import OnDemandSyncScheduler, start_equity_snapshot_scheduler
@@ -49,7 +56,7 @@ from app.positions import (  # noqa: F401
     PositionRiskConfigRow,
 )
 from app.research import ResearchNoteRow  # noqa: F401
-from app.settings import SettingsRow, apply_saved_settings  # noqa: F401
+from app.settings import SettingsRow, apply_saved_settings, load_settings  # noqa: F401
 from app.strategy import (  # noqa: F401
     StrategyInstanceRow,
     StrategyInstrumentRow,
@@ -60,7 +67,7 @@ from app.strategy import (  # noqa: F401
     UserStrategyRow,
 )
 from app.stream import StreamHub
-from app.watchlist import WatchlistItemRow  # noqa: F401
+from app.watchlist import WatchlistItemRow, watch_registry  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +80,9 @@ async def lifespan(_app: FastAPI) -> Iterator[None]:
     apply_saved_settings()
     stop_scheduler = Event()
     scheduler = start_equity_snapshot_scheduler(stop_scheduler)
-    hub = StreamHub()
+    # 常驻订阅集合：关注列表的标的在服务启动后就订阅，与有没有浏览器无关。
+    registry = watch_registry()
+    hub = StreamHub(watch_registry=registry)
     _app.state.stream_hub = hub
     loop = asyncio.get_running_loop()
 
@@ -83,10 +92,44 @@ async def lifespan(_app: FastAPI) -> Iterator[None]:
         asyncio.run_coroutine_threadsafe(hub.publish(event_type, data, as_of=as_of), loop)
 
     set_event_publisher(_publish)
+
+    def _broadcast(
+        event_type: str,
+        data: dict[str, Any],
+        as_of: datetime | None,
+        predicate: Any = None,
+    ) -> None:
+        """通知通道的推送入口：同一条 WS，只让声明接收这类事件的连接收到。"""
+
+        asyncio.run_coroutine_threadsafe(
+            hub.publish(event_type, data, as_of=as_of, predicate=predicate), loop
+        )
+
+    install(
+        build_pipeline(
+            sinks=build_sinks(
+                channels=load_settings().notifications.get("channels", []),
+                broadcast=_broadcast,
+            )
+        ),
+        loop=loop,
+    )
+
+    def _refresh_subscriptions() -> None:
+        loop.call_soon_threadsafe(hub.refresh_subscriptions)
+
+    registry.set_browser_source(hub.browser_instruments)
+    registry.add_listener(_refresh_subscriptions)
+    # 常驻集合只在这里读一次库；之后由关注列表的变化推过来，推送层不再查库。
+    registry.refresh()
+    hub.refresh_subscriptions()
     logger.info("trading api ready: version=%s", __version__)
     try:
         yield
     finally:
+        registry.remove_listener(_refresh_subscriptions)
+        registry.set_browser_source(None)
+        uninstall()
         set_event_publisher(None)
         stop_scheduler.set()
         scheduler.join(timeout=5.0)

@@ -163,6 +163,20 @@ describe("StreamClient 连接与订阅", () => {
     expect(client.getState().datasets.public_ws).toBe(true);
   });
 
+  it("告警订阅单独发一条 alerts 主题", () => {
+    const client = createClient();
+    client.start();
+    const socket = FakeSocket.instances[0];
+    socket.open();
+
+    const owner = Symbol("alerts");
+    client.setSubscription(owner, { alerts: true });
+
+    // 空订阅不发消息，因此这次订阅就是第一条发送内容。
+    expect(topicsOf(socket, 0)).toEqual([{ type: "alerts" }]);
+    client.clearSubscription(owner);
+  });
+
   it("一处订阅卸载后保留其余订阅", () => {
     const client = createClient();
     const quotesOwner = Symbol("quotes");
@@ -294,6 +308,37 @@ describe("StreamClient 事件解析", () => {
 
     expect(client.getState().datasets.public_ws).toBe(false);
     expect(streamLiveness(client.getState(), "public_ws")).toBe("stale");
+  });
+
+  it("解析告警事件，字段与提醒接口一致", () => {
+    const client = createClient();
+    const events: StreamEvent[] = [];
+    client.subscribeEvents((event) => events.push(event));
+    client.start();
+    const socket = FakeSocket.instances[0];
+    socket.open();
+
+    socket.message({
+      type: "alert.created",
+      as_of: "2026-11-20T12:00:00Z",
+      received_at: "2026-11-20T12:00:01Z",
+      data: {
+        id: "al_1",
+        type: "price",
+        severity: "warning",
+        instrument_id: "XAAPL-USDT",
+        title: "价格偏离参考价",
+        detail: "XAAPL-USDT 最新成交价 110 高于 指数价 100",
+        triggered_at: "2026-11-20T12:00:00Z",
+      },
+    });
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      type: "alert.created",
+      asOf: "2026-11-20T12:00:00Z",
+      data: { id: "al_1", instrument_id: "XAAPL-USDT", severity: "warning" },
+    });
   });
 
   it("忽略格式错误的消息", () => {

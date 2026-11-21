@@ -26,6 +26,7 @@ const SETTINGS: SettingsResponse = {
     last_sync_at: "2026-11-15T06:00:00Z",
     failure_count: 2,
   },
+  notifications: { channels: ["browser"] },
   secrets: {
     okx_api_key_masked: "********",
     okx_configured: true,
@@ -88,12 +89,14 @@ function props(overrides: Partial<SettingsViewProps> = {}): SettingsViewProps {
     busy: false,
     error: null,
     notice: null,
+    notificationPermission: "default",
     onDraftChange: () => undefined,
     onInstrumentsTextChange: () => undefined,
     onApiKeyChange: () => undefined,
     onColorSchemeChange: () => undefined,
     onSave: () => undefined,
     onRefreshHealth: () => undefined,
+    onRequestNotificationPermission: () => undefined,
     ...overrides,
   };
 }

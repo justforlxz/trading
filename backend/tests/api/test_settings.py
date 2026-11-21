@@ -1,4 +1,4 @@
-"""设置端点：四类设置、分组更新、密钥只写不读与数据源同步状态。"""
+"""设置端点：五类设置、分组更新、密钥只写不读与数据源同步状态。"""
 
 from __future__ import annotations
 
@@ -52,6 +52,7 @@ def test_get_returns_v6_defaults_and_hides_internal_groups(client: TestClient) -
         "last_sync_at": None,
         "failure_count": 0,
     }
+    assert body["notifications"] == {"channels": ["browser"]}
     assert body["secrets"] == {
         "okx_api_key_masked": None,
         "okx_configured": False,
@@ -104,6 +105,35 @@ def test_patch_updates_each_group_and_persists(client: TestClient) -> None:
     assert again["display"] == body["display"]
     assert again["risk_defaults"] == body["risk_defaults"]
     assert again["execution"] == body["execution"]
+
+
+def test_notification_channels_can_be_turned_off_and_back_on(client: TestClient) -> None:
+    """通知通道开关存在设置文档里；关掉后不再有通道，打开后恢复。"""
+
+    off = client.patch("/api/settings", json={"notifications": {"channels": []}})
+
+    assert off.status_code == 200, off.text
+    assert off.json()["notifications"] == {"channels": []}
+    assert client.get("/api/settings").json()["notifications"] == {"channels": []}
+
+    on = client.patch("/api/settings", json={"notifications": {"channels": ["browser", " "]}})
+
+    assert on.status_code == 200, on.text
+    assert on.json()["notifications"] == {"channels": ["browser"]}
+
+
+def test_patch_applies_notification_channels_to_the_running_registry(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """保存通道开关时通知正在运行的通道注册表，不需要重启进程。"""
+
+    applied: list[list[str]] = []
+    monkeypatch.setattr("app.api.routes.settings.apply_channels", applied.append)
+
+    response = client.patch("/api/settings", json={"notifications": {"channels": []}})
+
+    assert response.status_code == 200, response.text
+    assert applied == [[]]
 
 
 def test_patch_requires_at_least_one_group(client: TestClient) -> None:

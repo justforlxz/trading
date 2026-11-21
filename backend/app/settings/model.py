@@ -32,5 +32,7 @@ class SettingsRow(Base):
     display: Mapped[str] = mapped_column(Text, nullable=False)
     risk_defaults: Mapped[str] = mapped_column(Text, nullable=False)
     data_sources: Mapped[str] = mapped_column(Text, nullable=False)
+    # 通知通道开关（`settings.notifications`）；敏感字段只存引用，明文不进这一列。
+    notifications: Mapped[str] = mapped_column(Text, nullable=False)
     okx_api_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)

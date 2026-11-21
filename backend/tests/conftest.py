@@ -30,6 +30,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
+from sqlalchemy.engine import make_url
 
 from app.config import Settings, get_settings
 from app.db import init_db
@@ -133,9 +134,13 @@ def _database_session() -> Iterator[None]:
         engine.connect().close()
     except Exception as exc:
         engine.dispose()
+        target = make_url(_base_database_url)
+        # 不串接原始异常：pytest 会把第三方库帧的局部变量打进 traceback，而 psycopg 的帧里
+        # 就带着明文口令。失败原因已按「类型 + 消息」写进本条报错，不再需要原始 traceback。
         raise RuntimeError(
-            f"连接测试数据库失败({_base_database_url}), 先执行 `make db-up` 起本地 PostgreSQL"
-        ) from exc
+            f"连接测试数据库失败({target.host}:{target.port}/{target.database}): "
+            f"{type(exc).__name__}: {exc}; 先执行 `make db-up` 起本地 PostgreSQL"
+        ) from None
     _admin_engine = engine
 
     _template_database = template_database_name()

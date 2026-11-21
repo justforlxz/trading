@@ -104,12 +104,16 @@ def _route(sink: RecordingSink):
     return middleware
 
 
-def test_default_registry_is_the_four_documented_stages() -> None:
-    """注册表就是契约：增加一步要显式写在列表里，顺序即执行顺序。"""
+def test_default_registry_is_the_five_documented_stages() -> None:
+    """注册表就是契约：增加一步要显式写在列表里，顺序即执行顺序。
+
+    `technical` 紧跟 `rule_engine`：两者都是产出告警的工序，产出的告警事件必须再经过
+    `dedupe` 与 `route` 才能投递。
+    """
 
     names = [factory.__module__.rsplit(".", 1)[-1] for factory in DEFAULT_MIDDLEWARES]
 
-    assert names == ["normalize", "rule_engine", "dedupe", "route"]
+    assert names == ["normalize", "rule_engine", "technical", "dedupe", "route"]
 
 
 def test_middlewares_run_as_an_onion_in_registration_order() -> None:

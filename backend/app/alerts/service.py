@@ -51,6 +51,7 @@ __all__ = [
     "ScanResult",
     "get_alert",
     "list_alerts",
+    "record_candidate",
     "scan_alerts",
     "update_alert_status",
 ]
@@ -260,6 +261,30 @@ def scan_alerts(*, clock: Clock | None = None) -> ScanResult:
 
         expired = _expire_stale(session, unique.values(), new_groups, moment, clock=clock)
     return ScanResult(created=created, expired=expired)
+
+
+def record_candidate(candidate: AlertCandidate) -> dict[str, object] | None:
+    """把一条候选提醒写成一行，返回推送载荷；同一 `dedup_key` 已存在时返回 `None`。
+
+    与提醒扫描共用同一套落库字段与推送载荷形状（`GET /api/alerts` 的条目），区别只在
+    调用方：扫描按周期覆盖全部规则，事件管道只处理刚收到的那根 K 线。唯一约束是唯一
+    保证，同一候选并发写入时后到的安静跳过，因此调用方可以按「返回 `None` 就不投递」
+    处理，不需要自己判重。
+
+    事件管道不写活动流水，与事件管道的价格偏离提醒一致：提醒行本身就是记录。
+    """
+
+    with session_scope() as session:
+        statement = (
+            pg_insert(AlertEventRow)
+            .values(**_row_values(candidate))
+            .on_conflict_do_nothing(index_elements=[AlertEventRow.dedup_key])
+            .returning(AlertEventRow.id)
+        )
+        inserted_id = session.scalar(statement)
+    if inserted_id is None:
+        return None
+    return _candidate_event(candidate, inserted_id)
 
 
 def _drop_unknown_instruments(candidates: list[AlertCandidate]) -> list[AlertCandidate]:

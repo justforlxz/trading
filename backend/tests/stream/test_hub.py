@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from types import SimpleNamespace
@@ -13,11 +14,11 @@ from typing import Any, ClassVar
 
 from app.activity import list_activity
 from app.db import init_db
-from app.exchange import MarketPush
+from app.exchange import CandleShape, MarketPush
 from app.instrument import sync_instruments
 from app.positions import ExchangePositionView
 from app.stream import StreamHub
-from app.stream.hub import PRIVATE_CHANNELS
+from app.stream.hub import CANDLE_DATASET, PRIVATE_CHANNELS
 from app.watchlist import WatchRegistry
 from tests.factories.instruments import make_swap_ref
 
@@ -43,6 +44,9 @@ def _hub(**overrides: Any) -> StreamHub:
         "account_loader": lambda: SimpleNamespace(captured_at=None),
         "positions_loader": lambda: SimpleNamespace(items=(), as_of=None),
         "public_factory": IdlePublic,
+        # K 线另开一条连接：默认同样用不会连上游、不会推送的占位客户端。
+        "candle_bar": "1h",
+        "candle_factory": IdlePublic,
         "credentials_configured": lambda: False,
         # 常驻订阅集合默认空：这些用例只关心浏览器订阅；常驻订阅另有专门用例。
         "watch_registry": WatchRegistry(tracked=lambda: []),
@@ -706,3 +710,110 @@ def test_private_updates_are_emitted_to_the_pipeline(monkeypatch: Any, client: A
     assert [event.kind for event in emitted] == ["account", "position"]
     assert emitted[0].payload["equity"] == "100"
     assert emitted[1].inst_id == "AAPL-USDT-SWAP"
+
+
+def test_only_closed_candles_reach_the_event_pipeline(monkeypatch: Any) -> None:
+    """AC2：`confirm=0` 的推送不产生任何事件；`confirm=1` 只交出一根完整 K 线。"""
+
+    emitted: list[Any] = []
+    monkeypatch.setattr("app.stream.hub.emit", emitted.append)
+    moment = datetime(2026, 11, 20, 12, 0, tzinfo=UTC)
+    candle = CandleShape(
+        bar="1h",
+        open_time=moment,
+        open=Decimal("90"),
+        high=Decimal("110"),
+        low=Decimal("80"),
+        close=Decimal("100"),
+        volume=Decimal("12"),
+        confirm=True,
+    )
+    hub = _hub()
+
+    hub._handle_market(
+        MarketPush(
+            channel="candle1H",
+            inst_id="XAAPL-USDT",
+            row={"ts": "1794284760000", "confirm": "0"},
+            candle=replace(candle, confirm=False),
+        )
+    )
+    assert emitted == []
+
+    hub._handle_market(
+        MarketPush(
+            channel="candle1H",
+            inst_id="XAAPL-USDT",
+            row={"ts": "1794284760000", "confirm": "1"},
+            candle=candle,
+        )
+    )
+
+    assert [event.kind for event in emitted] == ["candle.closed"]
+    event = emitted[0]
+    assert event.inst_id == "XAAPL-USDT"
+    assert event.occurred_at == moment
+    assert event.payload == {
+        "bar": "1h",
+        "open_time": "2026-11-20T12:00:00Z",
+        "open": "90",
+        "high": "110",
+        "low": "80",
+        "close": "100",
+        "volume": "12",
+        "confirm": True,
+    }
+
+
+def test_the_candle_connection_subscribes_the_same_instruments() -> None:
+    """AC1：行情与 K 线两条连接订同一批标的，二者都只来自常驻集合。"""
+
+    class Recording(IdlePublic):
+        instances: ClassVar[list[Recording]] = []
+
+        def __init__(self, on_status: Any) -> None:
+            super().__init__(on_status)
+            Recording.instances.append(self)
+
+    async def scenario() -> None:
+        Recording.instances.clear()
+        hub = _hub(
+            public_factory=Recording,
+            candle_factory=Recording,
+            watch_registry=WatchRegistry(tracked=lambda: ["XAAPL-USDT", "AAPL-USDT-SWAP"]),
+        )
+        hub.refresh_subscriptions()
+
+        public, candles = Recording.instances
+        assert public.instruments == {"XAAPL-USDT", "AAPL-USDT-SWAP"}
+        assert candles.instruments == {"XAAPL-USDT", "AAPL-USDT-SWAP"}
+        await hub.stop()
+
+    asyncio.run(scenario())
+
+
+def test_status_snapshot_reports_how_many_instruments_each_connection_subscribed() -> None:
+    """AC5：健康接口读到的是连接真实的订阅数量与跳过数量，不是估出来的。"""
+
+    hub = _hub()
+    hub._public_client = SimpleNamespace(subscriptions=("XAAPL-USDT", "AAPL-USDT-SWAP"), skipped=1)
+    hub._candle_client = SimpleNamespace(subscriptions=("XAAPL-USDT",), skipped=0)
+
+    snapshot = hub.status_snapshot()
+
+    assert (snapshot["subscriptions"], snapshot["skipped"]) == (2, 1)
+    assert (snapshot["candle"]["subscriptions"], snapshot["candle"]["skipped"]) == (1, 0)
+
+
+def test_a_candle_reconnect_does_not_trigger_a_private_reconcile(client: Any) -> None:
+    """K 线重连只恢复订阅：账户对账属于私有连接，不能被这一路重连带起来。"""
+
+    calls: list[str] = []
+    hub = _hub(account_sync=lambda: calls.append("account"))
+
+    hub._set_status(CANDLE_DATASET, True, "")
+    hub._set_status(CANDLE_DATASET, False, "断开")
+    hub._set_status(CANDLE_DATASET, True, "")
+
+    assert hub._reconcile_tasks == set()
+    assert calls == []

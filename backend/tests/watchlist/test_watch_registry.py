@@ -19,6 +19,16 @@ def test_instruments_is_the_union_of_watchlist_and_browser_subscriptions() -> No
     assert registry.instruments() == ["AAPL-USDT-SWAP", "BTC-USDT", "XAAPL-USDT"]
 
 
+def test_ordered_instruments_puts_the_watchlist_first() -> None:
+    """订阅超限时按这个顺序截断：关注列表（提醒规则按它跑）先占用名额。"""
+
+    registry = WatchRegistry(tracked=lambda: ["XAAPL-USDT"])
+    registry.set_browser_source(lambda: ["AAPL-USDT-SWAP", "BTC-USDT"])
+
+    assert registry.ordered_instruments() == ["XAAPL-USDT", "AAPL-USDT-SWAP", "BTC-USDT"]
+    assert registry.instruments() == ["AAPL-USDT-SWAP", "BTC-USDT", "XAAPL-USDT"]
+
+
 def test_watchlist_instruments_stay_subscribed_without_any_browser() -> None:
     """AC1 的集合侧：没有浏览器来源时集合仍包含关注列表标的。"""
 

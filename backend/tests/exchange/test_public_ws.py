@@ -7,13 +7,21 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from collections import deque
 from collections.abc import Callable, Iterator
+from decimal import Decimal
 from typing import Any
 
 import pytest
 
-from app.exchange import ExchangeError, MarketPush, OkxPublicWebSocket
+from app.exchange import ExchangeError, MarketPush, OkxPublicWebSocket, candle_channel
+from app.exchange.okx.market_ws import (
+    MAX_SUBSCRIBE_FRAME_BYTES,
+    SUBSCRIBE_FRAME_SAFETY_MARGIN,
+    _frame,
+    fit_subscription,
+)
 
 
 class FakeSocket:
@@ -154,3 +162,143 @@ def test_gives_up_after_the_attempt_limit() -> None:
 
     with pytest.raises(ExchangeError):
         asyncio.run(_take(client, 1))
+
+
+# ---------------------------------------------------------------- K 线频道
+
+
+def _candle_push(inst_id: str, ts: str, *, confirm: str, close: str = "100") -> str:
+    return json.dumps(
+        {
+            "arg": {"channel": "candle1H", "instId": inst_id},
+            "data": [[ts, "90", "110", "80", close, "12", "12", "1200", confirm]],
+        }
+    )
+
+
+def test_candle_channel_is_subscribed_next_to_the_quote_channels() -> None:
+    """AC1：K 线另开一条连接，订阅帧里是 `candle1H`，推送按九列数组解析。"""
+
+    socket = FakeSocket(
+        [_candle_push("XAAPL-USDT", "1794284760000", confirm="1")], block_when_empty=True
+    )
+    client = OkxPublicWebSocket(
+        connect=_connect_script(socket),
+        sleep=_no_sleep(),
+        channels=(candle_channel("1h"),),
+    )
+    client.set_instruments({"XAAPL-USDT"})
+
+    rows = asyncio.run(_take(client, 1))
+
+    assert socket.sent[0] == {
+        "op": "subscribe",
+        "args": [{"channel": "candle1H", "instId": "XAAPL-USDT"}],
+    }
+    candle = rows[0].candle
+    assert candle is not None
+    assert (rows[0].inst_id, candle.bar, candle.confirm) == ("XAAPL-USDT", "1h", True)
+    assert candle.close == Decimal("100")
+    assert candle.open_time.timestamp() == 1794284760
+
+
+def test_a_forming_candle_does_not_swallow_the_closed_one_for_the_same_bar() -> None:
+    """同一根 K 线先推 confirm=0、再推 confirm=1：收盘那根不能被当成重放丢掉。"""
+
+    socket = FakeSocket(
+        [
+            _candle_push("XAAPL-USDT", "1794284760000", confirm="0", close="99"),
+            _candle_push("XAAPL-USDT", "1794284760000", confirm="1", close="100"),
+            _candle_push("XAAPL-USDT", "1794284760000", confirm="1", close="100"),
+        ],
+        block_when_empty=True,
+    )
+    client = OkxPublicWebSocket(
+        connect=_connect_script(socket),
+        sleep=_no_sleep(),
+        channels=(candle_channel("1h"),),
+    )
+    client.set_instruments({"XAAPL-USDT"})
+
+    rows = asyncio.run(_take(client, 2))
+
+    assert [(row.candle.confirm, row.candle.close) for row in rows if row.candle] == [
+        (False, Decimal("99")),
+        (True, Decimal("100")),
+    ]
+
+
+def _frame_size(
+    inst_ids: tuple[str, ...], channels: tuple[str, ...], *, op: str = "subscribe"
+) -> int:
+    return len(json.dumps(_frame(op, inst_ids, channels)).encode())
+
+
+def test_a_truncated_frame_really_fits_the_upstream_limit() -> None:
+    """AC5 回归：截断后的帧本身必须装得下。
+
+    旧实现按「参数字节 + 1」累加，实际帧比估算多 `参数数 - 2` 字节（参数之间是 `", "`），
+    于是一旦触发截断，帧必然超过 64 KB，上游以 `1009 (message too big)` 关掉连接，
+    一个标的都订不上。
+    """
+
+    channels = ("tickers", "mark-price", "index-tickers", "candle1H")
+    ordered = tuple(f"INST{index:04d}-USDT-SWAP" for index in range(2000))
+
+    kept, skipped = fit_subscription(ordered, channels)
+
+    assert skipped == 2000 - len(kept)
+    assert 0 < len(kept) < 2000
+    assert _frame_size(kept, channels) <= MAX_SUBSCRIBE_FRAME_BYTES - SUBSCRIBE_FRAME_SAFETY_MARGIN
+    # 再放一个就超限：保留的是能装下的最长前缀，不是保守地少订一堆。
+    assert _frame_size((*kept, ordered[len(kept)]), channels) > (
+        MAX_SUBSCRIBE_FRAME_BYTES - SUBSCRIBE_FRAME_SAFETY_MARGIN
+    )
+
+
+def test_the_truncation_keeps_the_priority_order_and_reports_the_rest() -> None:
+    """装不下的标的按给定顺序从尾部截断，跳过数量可读，不静默丢弃。"""
+
+    channels = ("candle1H",)
+    ordered = tuple(f"INST{index:04d}-USDT-SWAP" for index in range(400))
+    # 预算按实现使用的 op（`unsubscribe`，比 `subscribe` 长两字节）量，正好装 5 个。
+    budget = _frame_size(ordered[:5], channels, op="unsubscribe")
+
+    kept, skipped = fit_subscription(ordered, channels, budget=budget)
+
+    assert kept == ordered[:5]
+    assert skipped == 395
+
+
+def test_a_client_that_does_not_fit_everything_reports_the_skipped_count() -> None:
+    """`skipped` 来自连接自身：健康接口读它，不靠调用方估算。"""
+
+    client = OkxPublicWebSocket(
+        connect=_connect_script(FakeSocket([], block_when_empty=True)),
+        sleep=_no_sleep(),
+        channels=(candle_channel("1h"),),
+    )
+    client.set_instruments(["B-USDT", "A-USDT"])
+
+    assert client.subscriptions == ("B-USDT", "A-USDT")
+    assert client.skipped == 0
+
+
+def test_an_upstream_subscription_error_is_logged_and_yields_no_push(caplog) -> None:
+    """上游拒绝某个频道时必须留痕：不能静默当作「没有推送」。"""
+
+    socket = FakeSocket(
+        [
+            json.dumps({"event": "error", "code": "60018", "msg": "doesn't exist"}),
+            _push("tickers", "XAAPL-USDT", "1", last="100"),
+        ],
+        block_when_empty=True,
+    )
+    client = OkxPublicWebSocket(connect=_connect_script(socket), sleep=_no_sleep())
+    client.set_instruments({"XAAPL-USDT"})
+
+    with caplog.at_level(logging.WARNING):
+        rows = asyncio.run(_take(client, 1))
+
+    assert [row.row["last"] for row in rows] == ["100"]
+    assert "60018" in caplog.text

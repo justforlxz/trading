@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -61,6 +62,9 @@ class Settings(BaseSettings):
     # 私有 WebSocket 地址。留空按 `okx_demo` 推导：模拟盘 `wspap`、实盘 `ws`；
     # 只有上游迁移地址时才需要显式覆盖。
     okx_ws_private_url: str = ""
+    # 技术类提醒用的 K 线周期：订阅这个周期的 K 线，只在这根确认收盘时产生事件。
+    # 只开放 1h / 4h / 1d；上游频道名（candle1H 等）由交易所适配层转换。
+    okx_candle_bar: Literal["1h", "4h", "1d"] = "1h"
 
     @property
     def ws_private_url(self) -> str:

@@ -20,8 +20,11 @@ from app.exchange.okx.client import OkxClient
 from app.exchange.okx.ledger import OrderSubmission
 from app.exchange.okx.market import OkxMarketData, TickerQuote
 from app.exchange.okx.market_ws import (
+    DEFAULT_BUSINESS_WS_URL,
+    CandleShape,
     MarketPush,
     OkxPublicWebSocket,
+    candle_channel,
     load_quote_snapshot,
 )
 from app.exchange.okx.private import OkxPrivateClient, create_trade_port
@@ -32,6 +35,8 @@ from app.exchange.okx.snapshots import (
 from app.exchange.okx.ws import OkxWebSocket
 
 __all__ = [
+    "DEFAULT_BUSINESS_WS_URL",
+    "CandleShape",
     "ExchangeError",
     "MarketPush",
     "OkxClient",
@@ -42,6 +47,7 @@ __all__ = [
     "OrderSubmission",
     "RateLimitedError",
     "TickerQuote",
+    "candle_channel",
     "create_market_data",
     "create_trade_port",
     "load_quote_snapshot",

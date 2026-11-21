@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi.testclient import TestClient
 
-from app.market import finish_sync_job, start_sync_job
+from app.market import finish_sync_job, start_sync_job, system_health
 
 
 class _FixedClock:
@@ -110,3 +110,22 @@ def test_health_job_queue_stays_stale_when_failure_is_newer(client: TestClient) 
     queue = _components(body)["job_queue"]
     assert queue["status"] == "stale"
     assert "上游不可用" in queue["error"]
+
+
+def test_health_detail_reports_subscription_counts_and_skipped(client: TestClient) -> None:
+    """AC5：超限跳过的订阅写在 `okx_ws` 的 detail 里，不静默丢弃。"""
+
+    health = system_health(
+        ws_status={
+            "provider": "okx",
+            "dataset": "public_ws",
+            "connected": True,
+            "subscriptions": 40,
+            "skipped": 2,
+            "candle": {"connected": True, "subscriptions": 40, "skipped": 0},
+        }
+    )
+
+    ws = {item.name: item for item in health.components}["okx_ws"]
+    assert ws.status == "ok"
+    assert ws.detail == "okx / public_ws；订阅 40 个标的，跳过 2 个（超限）；K 线订阅 40 个标的"

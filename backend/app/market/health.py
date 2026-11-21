@@ -188,8 +188,36 @@ def _okx_ws(ws_status: Mapping[str, Any] | None) -> ComponentHealth:
         status=status,
         last_success_at=last_success,
         error=None if error is None else "推送连接异常",
-        detail=f"{ws_status.get('provider', 'okx')} / {ws_status.get('dataset', 'public_ws')}",
+        detail=_ws_detail(ws_status),
     )
+
+
+def _ws_detail(ws_status: Mapping[str, Any]) -> str:
+    """连接身份 + 两路行情连接真实提交的订阅数量。
+
+    超限跳过必须写出来：`fit_subscription` 在订阅请求装不下时按优先级截断，不静默
+    丢弃；这里把跳过数量放进 `okx_ws` 的 detail，用户与验收都能直接读到。
+    """
+
+    detail = f"{ws_status.get('provider', 'okx')} / {ws_status.get('dataset', 'public_ws')}"
+    detail += _subscriptions_text("", ws_status)
+    candle = ws_status.get("candle")
+    if isinstance(candle, Mapping):
+        detail += _subscriptions_text("K 线", candle)
+    return detail
+
+
+def _subscriptions_text(label: str, block: Mapping[str, Any]) -> str:
+    """`；K 线订阅 40 个标的，跳过 2 个（超限）`；没有订阅数量时不追加任何内容。"""
+
+    subscriptions = block.get("subscriptions")
+    if not isinstance(subscriptions, int):
+        return ""
+    text = f"；{label}订阅 {subscriptions} 个标的"
+    skipped = block.get("skipped")
+    if isinstance(skipped, int) and skipped > 0:
+        text += f"，跳过 {skipped} 个（超限）"
+    return text
 
 
 def _job_queue() -> ComponentHealth:

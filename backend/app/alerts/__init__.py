@@ -4,17 +4,22 @@
 """
 
 from app.alerts.model import AlertEventRow
+from app.alerts.rules import AlertCandidate, technical_candidates
 from app.alerts.service import (
     AlertRecord,
     list_alerts,
+    record_candidate,
     scan_alerts,
     update_alert_status,
 )
 
 __all__ = [
+    "AlertCandidate",
     "AlertEventRow",
     "AlertRecord",
     "list_alerts",
+    "record_candidate",
     "scan_alerts",
+    "technical_candidates",
     "update_alert_status",
 ]

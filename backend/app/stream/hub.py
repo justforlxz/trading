@@ -5,6 +5,11 @@
 启动后就订阅，与有没有浏览器连着无关（`WatchRegistry`）；浏览器订阅只是在它之上
 追加。私有连接仍按需启动——没有浏览器订阅账户或持仓时不连 OKX，不产生后台网络请求。
 
+K 线与行情不在同一个上游地址（`tickers` 等在公共地址，`candle{周期}` 只在业务地址，
+见 `app.exchange.okx.market_ws`），因此同一批标的会开两条连接：行情一条、K 线一条。
+K 线连接只服务服务端规则，不向浏览器广播；它只把**确认收盘**的那根交成 `candle.closed`
+事件，未收盘的推送直接丢弃，不产生任何事件。
+
 三条边界：
 
 - 浏览器只收到自己订阅的标的；同一标的的高频行情按 1 秒窗口合并，只推窗口内最后
@@ -37,9 +42,12 @@ from app.core import (
 )
 from app.events import DomainEvent, emit
 from app.exchange import (
+    DEFAULT_BUSINESS_WS_URL,
+    CandleShape,
     MarketPush,
     OkxPublicWebSocket,
     OkxWebSocket,
+    candle_channel,
     load_quote_snapshot,
     parse_account_snapshot_row,
     parse_exchange_position_row,
@@ -90,6 +98,8 @@ EVENT_TYPES: frozenset[str] = frozenset(
 )
 
 PUBLIC_DATASET = "public_ws"
+#: K 线是同一个「公共、无需登录」的频道，但上游只在业务地址推送，因此单独记一路连接。
+CANDLE_DATASET = "candle_ws"
 PRIVATE_DATASET = "private_ws"
 SOURCE_WS = "okx_ws"
 SOURCE_REST = "okx_rest"
@@ -244,6 +254,8 @@ class StreamHub:
         persist_snapshot: Callable[..., AccountView | None] = record_exchange_snapshot,
         account_sync: Callable[[], AccountSyncView] = sync_account,
         public_factory: Callable[[Callable[[bool, str], None]], Any] | None = None,
+        candle_bar: str | None = None,
+        candle_factory: Callable[[Callable[[bool, str], None]], Any] | None = None,
         private_factory: Callable[[Callable[[bool, str], None]], Any] | None = None,
         credentials_configured: Callable[[], bool] | None = None,
         watch_registry: WatchRegistry | None = None,
@@ -256,6 +268,15 @@ class StreamHub:
         self._account_sync = account_sync
         self._public_factory = public_factory or (
             lambda on_status: OkxPublicWebSocket(on_status=on_status)
+        )
+        # K 线频道只在业务地址推送，因此对同一个标的集合另开一条连接；周期来自配置。
+        self._candle_bar = candle_bar or get_settings().okx_candle_bar
+        self._candle_factory = candle_factory or (
+            lambda on_status: OkxPublicWebSocket(
+                url=DEFAULT_BUSINESS_WS_URL,
+                channels=(candle_channel(self._candle_bar),),
+                on_status=on_status,
+            )
         )
         self._private_factory = private_factory or (
             lambda on_status: OkxWebSocket(channels=PRIVATE_CHANNELS, on_status=on_status)
@@ -276,11 +297,14 @@ class StreamHub:
         self._account_captured_at: datetime | None = None
         self._status: dict[str, _SourceStatus] = {
             PUBLIC_DATASET: _SourceStatus("okx", PUBLIC_DATASET),
+            CANDLE_DATASET: _SourceStatus("okx", CANDLE_DATASET),
             PRIVATE_DATASET: _SourceStatus("okx", PRIVATE_DATASET),
         }
         self._public_client: Any | None = None
+        self._candle_client: Any | None = None
         self._private_client: Any | None = None
         self._public_task: asyncio.Task[None] | None = None
+        self._candle_task: asyncio.Task[None] | None = None
         self._private_task: asyncio.Task[None] | None = None
         self._reconcile_tasks: set[asyncio.Task[None]] = set()
         self._batcher = _QuoteBatcher(quote_interval, self._publish_quote)
@@ -359,18 +383,32 @@ class StreamHub:
 
     def _sync_upstreams(self) -> None:
         # 常驻订阅集合 = 关注列表 ∪ 浏览器订阅：没有浏览器时关注列表照样订着。
-        wanted_quotes = self._watch_registry.instruments()
+        # 顺序即截断优先级：关注列表（提醒规则按它跑）在前，只被浏览器打开的在后。
+        wanted_quotes = self._watch_registry.ordered_instruments()
         if wanted_quotes:
             if self._public_client is None:
                 self._public_client = self._public_factory(self._status_callback(PUBLIC_DATASET))
                 self._public_task = asyncio.create_task(
-                    self._run_public(self._public_client), name="trading-stream-public"
+                    self._run_market(self._public_client, PUBLIC_DATASET),
+                    name="trading-stream-public",
                 )
             self._public_client.set_instruments(wanted_quotes)
-        elif self._public_task is not None:
-            self._public_task.cancel()
+            # K 线在业务地址，另开一条连接订同一批标的。
+            if self._candle_client is None:
+                self._candle_client = self._candle_factory(self._status_callback(CANDLE_DATASET))
+                self._candle_task = asyncio.create_task(
+                    self._run_market(self._candle_client, CANDLE_DATASET),
+                    name="trading-stream-candle",
+                )
+            self._candle_client.set_instruments(wanted_quotes)
+        else:
+            for task in (self._public_task, self._candle_task):
+                if task is not None:
+                    task.cancel()
             self._public_task = None
             self._public_client = None
+            self._candle_task = None
+            self._candle_client = None
 
         wanted_private = any(
             client.account or client.positions for client in self._clients.values()
@@ -398,15 +436,17 @@ class StreamHub:
 
         return {inst for client in self._clients.values() for inst in client.quotes}
 
-    async def _run_public(self, client: Any) -> None:
+    async def _run_market(self, client: Any, dataset: str) -> None:
+        """一条行情连接的消费循环：上游放弃重连后把原因留在该路的状态里。"""
+
         try:
             async for push in client.messages():
                 self._handle_market(push)
         except asyncio.CancelledError:
             raise
-        except Exception as exc:  # 上游放弃重连后把原因留在状态里
-            logger.exception("公共行情推送停止")
-            self._set_status(PUBLIC_DATASET, False, str(exc))
+        except Exception as exc:
+            logger.exception("行情推送停止: %s", dataset)
+            self._set_status(dataset, False, str(exc))
 
     async def _run_private(self, client: Any) -> None:
         try:
@@ -463,10 +503,13 @@ class StreamHub:
             task = asyncio.create_task(
                 self._reconcile_quotes(), name="trading-stream-quote-reconcile"
             )
-        else:
+        elif dataset == PRIVATE_DATASET:
             task = asyncio.create_task(
                 self._reconcile_private(), name="trading-stream-private-reconcile"
             )
+        else:
+            # K 线连接重连不需要 REST 对账：历史由已有的按需同步维护，事件管道只消费推送。
+            return
         self._reconcile_tasks.add(task)
         task.add_done_callback(self._reconcile_tasks.discard)
 
@@ -502,6 +545,9 @@ class StreamHub:
     # -------------------------------------------------------------- 行情事件处理
 
     def _handle_market(self, push: MarketPush) -> None:
+        if push.candle is not None:
+            self._handle_candle(push, push.candle)
+            return
         mapping = _QUOTE_FIELDS.get(push.channel)
         if mapping is None:
             return
@@ -518,6 +564,28 @@ class StreamHub:
         )
         self._queue_quote(push.inst_id, snapshot=False, source=SOURCE_WS)
         self._emit_quote(push.inst_id)
+
+    def _handle_candle(self, push: MarketPush, candle: CandleShape) -> None:
+        """K 线推送：只把确认收盘的那根交给事件管线，未收盘的直接丢弃。
+
+        未收盘的 K 线还会继续变动，把它当事实会产生「事后被改写的提醒」；因此这里
+        不产生任何事件，连队列都不进。
+        """
+
+        status = self._status[CANDLE_DATASET]
+        now = self._clock.now()
+        status.last_message_at = now
+        status.last_success_at = now
+        if not candle.confirm:
+            return
+        emit(
+            DomainEvent(
+                kind="candle.closed",
+                inst_id=push.inst_id,
+                payload=_candle_payload(candle),
+                occurred_at=candle.open_time,
+            )
+        )
 
     def _emit_quote(self, inst_id: str) -> None:
         """把合并后的这笔行情交给事件管线；没有安装管线时 `emit` 什么也不做。"""
@@ -849,12 +917,15 @@ class StreamHub:
         )
 
     def _broadcast_status(self, dataset: str) -> None:
-        if dataset == PUBLIC_DATASET:
-            predicate = lambda client: client.status or bool(client.quotes)  # noqa: E731
-        else:
-            predicate = lambda client: (  # noqa: E731
-                client.status or client.account or client.positions
-            )
+        # 只有浏览器订阅的两路数据源把连接状态推给页面；K 线连接是服务端规则用的，
+        # 页面不消费它，状态只留在活动流水与健康接口里。
+        predicates: dict[str, Callable[[StreamClient], bool]] = {
+            PUBLIC_DATASET: lambda client: client.status or bool(client.quotes),
+            PRIVATE_DATASET: lambda client: client.status or client.account or client.positions,
+        }
+        predicate = predicates.get(dataset)
+        if predicate is None:
+            return
         self._broadcast_envelope(
             "data_source.status.updated",
             self._status_payload(dataset),
@@ -863,9 +934,21 @@ class StreamHub:
         )
 
     def status_snapshot(self) -> dict[str, Any]:
-        """公共行情连接的最新状态；健康接口读取它，不临时探测上游。"""
+        """公共行情连接的最新状态与两路行情连接的订阅数量。
 
-        return self._status_payload(PUBLIC_DATASET)
+        健康接口读取它，不临时探测上游。`subscriptions` / `skipped` 是公共行情连接
+        这次真实提交的标的数量与超限跳过数量，`candle` 是 K 线连接的同名字段。
+        """
+
+        payload = self._status_payload(PUBLIC_DATASET)
+        payload["subscriptions"], payload["skipped"] = _subscription_counts(self._public_client)
+        candle_subscriptions, candle_skipped = _subscription_counts(self._candle_client)
+        payload["candle"] = {
+            **self._status_payload(CANDLE_DATASET),
+            "subscriptions": candle_subscriptions,
+            "skipped": candle_skipped,
+        }
+        return payload
 
     def _status_payload(self, dataset: str) -> dict[str, Any]:
         status = self._status[dataset]
@@ -939,7 +1022,12 @@ class StreamHub:
 
         tasks = [
             task
-            for task in (self._public_task, self._private_task, *self._reconcile_tasks)
+            for task in (
+                self._public_task,
+                self._candle_task,
+                self._private_task,
+                *self._reconcile_tasks,
+            )
             if task is not None
         ]
         for task in tasks:
@@ -947,8 +1035,10 @@ class StreamHub:
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
         self._public_task = None
+        self._candle_task = None
         self._private_task = None
         self._public_client = None
+        self._candle_client = None
         self._private_client = None
         await self._batcher.close()
 
@@ -966,6 +1056,29 @@ def _envelope(
         "received_at": _iso(now),
         "data": data,
     }
+
+
+def _candle_payload(candle: CandleShape) -> dict[str, Any]:
+    """K 线事件的载荷：这根 K 线本身的完整字段，不掺任何派生值。"""
+
+    return {
+        "bar": candle.bar,
+        "open_time": _iso(candle.open_time),
+        "open": _decimal_text(candle.open),
+        "high": _decimal_text(candle.high),
+        "low": _decimal_text(candle.low),
+        "close": _decimal_text(candle.close),
+        "volume": _decimal_text(candle.volume),
+        "confirm": candle.confirm,
+    }
+
+
+def _subscription_counts(client: Any | None) -> tuple[int, int]:
+    """一条上游连接真实的订阅数量与跳过数量；还没建立连接时为 0。"""
+
+    if client is None:
+        return 0, 0
+    return len(getattr(client, "subscriptions", ())), int(getattr(client, "skipped", 0))
 
 
 def _exchange_position_from_view(view: ExchangePositionView) -> ExchangePosition:

@@ -1,13 +1,13 @@
 """领域事件的形状：只带最小字段，富化放在中间件里。
 
 本模块不决定事件从哪来、往哪去。上游推送落到 `StreamHub` 之后由它构造一条
-`DomainEvent` 交给 `emit`；中间件在链路上补充字段、判定规则、过滤投递。
+`DomainEvent` 交给 `emit`；中间件在链路上补充字段、判定规则、过滤投递。K 线与行情
+来自两个上游连接（`ws/v5/public` 与 `ws/v5/business`），但落到同一条队列、同一条管线。
 
-事件种类只登记当前真的有产出方的四种：`quote` / `account` / `position` 由推送层
-产出，`alert` 由 `rule_engine` 中间件产出。`candle` 故意不登记：公共 WS 目前没有
-订阅 candle 频道（`DEFAULT_PUBLIC_CHANNELS` 只有 tickers / mark-price /
-index-tickers），没有事件源就没有事件类型；接入 candle 订阅后在这里补一个 `candle`
-种类，并在 `rule_engine` 里接上对应规则，不需要定时器凑。
+事件种类只登记当前真的有产出方的五种：`quote` / `account` / `position` /
+`candle.closed` 由推送层产出，`alert` 由 `rule_engine` 与 `technical` 中间件产出。
+K 线只在**确认收盘**（上游 `confirm=1`）时产生 `candle.closed`；未收盘的推送在推送层
+就被丢弃，不进队列，因此下游不需要再判一次收没收盘。
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from typing import Any, Literal
 
 __all__ = ["DomainEvent", "EventKind"]
 
-EventKind = Literal["quote", "account", "position", "alert"]
+EventKind = Literal["quote", "account", "position", "alert", "candle.closed"]
 
 
 @dataclass(frozen=True, slots=True)

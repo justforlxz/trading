@@ -65,15 +65,32 @@ class WatchRegistry:
         缓存没初始化时只按空集合处理并警告一次——这里不读库，读库只在 `refresh()`。
         """
 
+        return sorted(self._resident_set() | self._browser_set())
+
+    def ordered_instruments(self) -> list[str]:
+        """同 `instruments()`，但关注列表在前、只在浏览器里打开的标的在后。
+
+        上游一次订阅请求有长度上限，超限时按这个顺序从尾部截断：提醒规则按关注列表
+        跑，因此那部分标的优先占用订阅名额。
+        """
+
+        resident = self._resident_set()
+        return sorted(resident) + sorted(self._browser_set() - resident)
+
+    def _resident_set(self) -> set[str]:
+        """关注列表的内存缓存；没初始化时警告一次并按空集合处理。"""
+
         if self._resident is None:
             if not self._warned:
                 self._warned = True
                 logger.warning("常驻订阅集合尚未初始化；先按空集合处理，装配根应调用 refresh()")
             self._resident = ()
-        wanted = set(self._resident)
-        if self._browser is not None:
-            wanted.update(item.strip() for item in self._browser() if item and item.strip())
-        return sorted(wanted)
+        return set(self._resident)
+
+    def _browser_set(self) -> set[str]:
+        if self._browser is None:
+            return set()
+        return {item.strip() for item in self._browser() if item and item.strip()}
 
     def add_listener(self, listener: Listener) -> None:
         if listener not in self._listeners:

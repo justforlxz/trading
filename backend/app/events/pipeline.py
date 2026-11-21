@@ -15,7 +15,7 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 
 from app.events.event import DomainEvent
-from app.events.middlewares import dedupe, normalize, route, rule_engine
+from app.events.middlewares import dedupe, normalize, route, rule_engine, technical
 from app.events.sinks.registry import SinkRegistry
 
 __all__ = [
@@ -46,6 +46,7 @@ MiddlewareFactory = Callable[[PipelineDeps], Middleware]
 DEFAULT_MIDDLEWARES: tuple[MiddlewareFactory, ...] = (
     normalize.middleware,
     rule_engine.middleware,
+    technical.middleware,
     dedupe.middleware,
     route.middleware,
 )

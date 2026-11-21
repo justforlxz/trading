@@ -278,6 +278,7 @@ podman exec trading-db psql -U trading -d trading -v ON_ERROR_STOP=1 \
 | H-03 | 3.1 设置 / 风险默认值：默认杠杆、单笔风险预算、预警阈值、止损规则 | `/settings` | 修改四项风险默认值；保存；刷新；再改回原值 | 四项保存成功；刷新后保留；与执行风控限额分开；非法值被拒绝 | E1、E2、E3 |
 | H-04 | 3.1 设置 / 交易连接和密钥状态：API Key 只写不读、Secret 和 Passphrase 不回显 | `/settings` | 打开连接与密钥区；检查页面和 `GET /api/settings` 的 `secrets`；在 DevTools 查看响应 | 页面不显示 API Key 明文；`GET /api/settings` 只返回 `okx_api_key_masked`、`okx_configured`、`okx_permission`；Secret 和 Passphrase 不出现在响应或页面；不提交真实 Key | E1、E2 |
 | H-05 | 3.1 设置 / 系统健康：数据库、OKX REST、OKX WebSocket、任务队列、K 线覆盖 | `/settings` | 打开系统健康；逐项检查五项状态、最后成功时间、错误和详情；与 `GET /api/system/health` 对比 | 五项独立检查，单项异常不影响其他项；每项有 `status`、`last_success_at`、`error`、`detail`；`components` 不含 `external_provider`；异常项排在前面；缺失最后成功时间写“暂无成功记录”；不把陈旧数据报告为 `ok` | E1、E2 |
+| H-06 | 3.1 设置 / 通知：浏览器通知通道开关与权限状态 | `/settings` | 打开设置页的通知卡；查看浏览器权限文案；点击「开启浏览器通知」；关闭「浏览器通知通道」并保存；刷新页面后再打开；重新开启通道并保存 | 权限状态按三种情况显示：已允许、已被浏览器拒绝、尚未授权，浏览器不支持系统通知时写「不支持」；「开启浏览器通知」在已允许时禁用并显示「已允许」，未授权时点击后由浏览器询问，被拒绝时提示到浏览器站点设置里手动改回允许；关闭通道后服务端不再广播告警，页面也不弹通知，`GET /api/settings` 的 `notifications.channels` 为空数组；重新开启并保存后恢复弹窗，`GET` 与页面开关一致；页面明说通知只在页面打开时有效 | E1、E2、E3 |
 
 ### 2.10 数据推送
 
@@ -311,7 +312,7 @@ export API="http://127.0.0.1:8000/api"
 | P-11 | 3.2 回测 / `POST /api/backtests`、`GET /api/backtests/{id}` | 回测发起与详情 | 用页面发出的真实请求体重放 `POST /api/backtests`；读取返回的运行；再请求 `GET /api/backtests/{id}` | 只接受 `strategy_version_id`；返回 `run_ids`、`combination`、`group_equity`；写入策略与回测关联；详情与列表一致；缺少数据时明确阻止或降级 | E2、E3 |
 | P-12 | 3.2 回测 / `GET /api/backtests/{id}/chart`、`/equity`、`/trades`、`/trades.csv`、`/replay` | 五个回测详情接口 | 对同一条回测依次请求五个接口； CSV 用 `curl -o` 保存后检查 BOM 和列顺序；回放检查只读已保存序列 | 五个接口都 200；图表标记来自 `backtest_trades`；净值基准缺失时为 `null`；交易筛选与分页正确；CSV 编码和列顺序正确；回放不访问实时行情 | E2、E3 |
 | P-13 | 3.2 记录 / `GET`、`POST /api/research-notes`；`PUT`、`DELETE /api/research-notes/{id}` | 研究记录接口 | 创建记录；列表按类型和关联对象筛选；更新；删除；再读取 | 创建 201；列表支持筛选、排序和游标；更新成功；删除 204；不存在返回 404；关联对象不存在返回 404 | E2、E3 |
-| P-14 | 3.2 设置 / `GET`、`PATCH /api/settings` 的 v6 分组 | 设置接口 | `GET /api/settings`；`PATCH` 修改 `display` 或 `risk_defaults`；再 `GET`；恢复原值 | 只返回 `display`、`risk_defaults`、`execution.auto_trading_enabled`、`data_sources` 与只读 `secrets`；不返回成本、回测默认值和执行风控限额；PATCH 后 GET 一致；响应不含 API Key 明文 | E2、E3 |
+| P-14 | 3.2 设置 / `GET`、`PATCH /api/settings` 的 v6 分组 | 设置接口 | `GET /api/settings`；`PATCH` 修改 `display`、`risk_defaults` 或 `notifications.channels`；再 `GET`；恢复原值 | 只返回 `display`、`risk_defaults`、`execution.auto_trading_enabled`、`data_sources`、`notifications` 与只读 `secrets`；不返回成本、回测默认值和执行风控限额；`GET` 返回 `notifications.channels`，`PATCH` 改 `channels` 后 `GET` 一致；PATCH 后 GET 一致；响应不含 API Key 明文 | E2、E3 |
 | P-15 | 3.2 健康 / `GET /api/system/health` | 健康接口 | `curl -sS -w '\n%{http_code}\n' "$API/system/health"` | 200；五项组件各自有 `status`、`last_success_at`、`error`、`detail`；`components` 不含 `external_provider`；单项异常不影响其他项；不把陈旧数据报告为 `ok` | E2 |
 | P-15a | 3.4 已删除 / 外部 Provider 与代理行情 | 健康与回测接口 | `GET /api/system/health` 检查组件名；`GET /api/backtests?data_source=us_equity_proxy` 与不合法 `data_source` 各请求一次 | `components` 不含 `external_provider`；`GET /api/settings` 的 `data_sources` 不含 `provider`；回测接口拒绝 `us_equity_proxy`；数据库没有该来源的 K 线 | E2、E3 |
 | P-16 | 3.2 同步 / `POST /api/system/sync` | 手动同步接口 | 用 `dataset=instruments` 请求同步；再请求未知数据集与仍在运行的数据集 | 合法请求成功并写 `data_sync_jobs`；未知数据集或参数不合法返回 400；同一数据集仍在运行返回 409；响应包含本次结果；请求不再接受 `provider` | E2、E3 |

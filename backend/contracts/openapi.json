@@ -5407,6 +5407,88 @@
         "title": "DataSourceSettingsUpdate",
         "type": "object"
       },
+      "DeliveryItem": {
+        "description": "一行投递台账：哪条告警、走哪个通道、成没成、失败原因与时间。",
+        "properties": {
+          "alert_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alert Id"
+          },
+          "channel": {
+            "title": "Channel",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "delivered",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "status",
+          "created_at"
+        ],
+        "title": "DeliveryItem",
+        "type": "object"
+      },
+      "DeliveryListResponse": {
+        "description": "最近若干条投递记录，新的在前；条数由查询上限限制，不做定期清理。",
+        "examples": [
+          {
+            "items": [
+              {
+                "alert_id": "al_XAAPL-USDT_20261120120000000000",
+                "channel": "telegram",
+                "created_at": "2026-11-20T12:00:03Z",
+                "id": "nd_3f9c1a7b5e2d4c6f8a0b1c2d",
+                "status": "delivered"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DeliveryItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "title": "DeliveryListResponse",
+        "type": "object"
+      },
       "DisplaySettings": {
         "additionalProperties": false,
         "description": "显示偏好；前端可缓存，后端持久化。",
@@ -8475,9 +8557,68 @@
         "title": "MomentumIndicators",
         "type": "object"
       },
+      "NotificationChannelTestRequest": {
+        "additionalProperties": false,
+        "description": "测试发送：只针对两个外部通道，浏览器通道不需要（页面自己就能验证）。",
+        "properties": {
+          "channel": {
+            "enum": [
+              "telegram",
+              "webhook"
+            ],
+            "title": "Channel",
+            "type": "string"
+          }
+        },
+        "required": [
+          "channel"
+        ],
+        "title": "NotificationChannelTestRequest",
+        "type": "object"
+      },
+      "NotificationChannelTestResponse": {
+        "description": "测试发送的结果：与投递台账同一套状态与失败原因。",
+        "examples": [
+          {
+            "channel": "telegram",
+            "status": "delivered"
+          }
+        ],
+        "properties": {
+          "channel": {
+            "title": "Channel",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "status": {
+            "enum": [
+              "delivered",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "channel",
+          "status"
+        ],
+        "title": "NotificationChannelTestResponse",
+        "type": "object"
+      },
       "NotificationSettings": {
         "additionalProperties": false,
-        "description": "通知通道开关；本期只有 `browser` 一种实现，关闭后不再广播告警。",
+        "description": "通知通道开关与两个可编辑的接收方；三个通道都可独立开关。",
         "properties": {
           "channels": {
             "items": {
@@ -8485,6 +8626,12 @@
             },
             "title": "Channels",
             "type": "array"
+          },
+          "telegram": {
+            "$ref": "#/components/schemas/TelegramSettings"
+          },
+          "webhook": {
+            "$ref": "#/components/schemas/WebhookSettings"
           }
         },
         "title": "NotificationSettings",
@@ -8492,19 +8639,43 @@
       },
       "NotificationSettingsUpdate": {
         "additionalProperties": false,
-        "description": "只改通道清单；空列表表示一个通道都不开。",
+        "description": "按子项改通知设置：不提交的子项保持原值，空通道清单表示一个通道都不开。",
         "properties": {
           "channels": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Channels",
-            "type": "array"
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channels"
+          },
+          "telegram": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TelegramSettingsUpdate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "webhook": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WebhookSettingsUpdate"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
-        "required": [
-          "channels"
-        ],
         "title": "NotificationSettingsUpdate",
         "type": "object"
       },
@@ -10225,7 +10396,15 @@
             "notifications": {
               "channels": [
                 "browser"
-              ]
+              ],
+              "telegram": {
+                "chat_id": "",
+                "token_configured": false
+              },
+              "webhook": {
+                "secret_configured": false,
+                "url": ""
+              }
             },
             "risk_defaults": {
               "default_leverage": "3",
@@ -12234,6 +12413,38 @@
         "title": "SystemSyncResponse",
         "type": "object"
       },
+      "TelegramSettings": {
+        "additionalProperties": false,
+        "description": "Telegram 接收方：`chat_id` 可读写，token 只报「是否已配置」。",
+        "properties": {
+          "chat_id": {
+            "default": "",
+            "title": "Chat Id",
+            "type": "string"
+          },
+          "token_configured": {
+            "default": false,
+            "title": "Token Configured",
+            "type": "boolean"
+          }
+        },
+        "title": "TelegramSettings",
+        "type": "object"
+      },
+      "TelegramSettingsUpdate": {
+        "additionalProperties": false,
+        "description": "Telegram 可写字段：只有 `chat_id`。空字符串表示「清空接收方」。",
+        "properties": {
+          "chat_id": {
+            "default": "",
+            "maxLength": 64,
+            "title": "Chat Id",
+            "type": "string"
+          }
+        },
+        "title": "TelegramSettingsUpdate",
+        "type": "object"
+      },
       "TimeSplit": {
         "properties": {
           "end_date": {
@@ -12835,6 +13046,38 @@
           "group"
         ],
         "title": "WatchlistUpdateRequest",
+        "type": "object"
+      },
+      "WebhookSettings": {
+        "additionalProperties": false,
+        "description": "Webhook 接收方：地址可读写，签名密钥只报「是否已配置」。",
+        "properties": {
+          "secret_configured": {
+            "default": false,
+            "title": "Secret Configured",
+            "type": "boolean"
+          },
+          "url": {
+            "default": "",
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "title": "WebhookSettings",
+        "type": "object"
+      },
+      "WebhookSettingsUpdate": {
+        "additionalProperties": false,
+        "description": "Webhook 可写字段：只有接收地址，必须是 http 或 https。",
+        "properties": {
+          "url": {
+            "default": "",
+            "maxLength": 2048,
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "title": "WebhookSettingsUpdate",
         "type": "object"
       }
     }
@@ -16030,6 +16273,94 @@
           }
         },
         "summary": "Patch Settings Document",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/notifications/deliveries": {
+      "get": {
+        "description": "最近若干条投递记录，新的在前。",
+        "operationId": "get_notification_deliveries_api_settings_notifications_deliveries_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Notification Deliveries",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/notifications/test": {
+      "post": {
+        "description": "用同一个通道实现投一条测试事件，并把这次投递写进台账。",
+        "operationId": "test_notification_channel_api_settings_notifications_test_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationChannelTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationChannelTestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Test Notification Channel",
         "tags": [
           "settings"
         ]

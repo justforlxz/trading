@@ -10,10 +10,14 @@ import {
   CardTitle,
 } from "../../components/ui/card";
 import {
+  fetchNotificationDeliveries,
   fetchSettings,
   fetchSystemHealth,
+  testNotificationChannel,
   updateSettings,
+  type DeliveryItem,
   type DisplaySettings,
+  type NotificationChannel,
   type SettingsResponse,
   type SystemHealthResponse,
 } from "../../lib/api";
@@ -25,9 +29,14 @@ import {
   type NotificationPermissionState,
 } from "../../lib/notifications";
 import {
+  NOTIFICATION_CHANNELS,
+  channelLabel,
+  credentialText,
   instrumentsToText,
+  notificationsPatch,
   parseInstruments,
   toSettingsDraft,
+  withChannel,
   type SettingsDraft,
 } from "../../lib/settings-draft";
 import {
@@ -208,6 +217,10 @@ export type SettingsViewProps = {
   health: SystemHealthResponse | null;
   healthLoading: boolean;
   healthError: string | null;
+  deliveries: DeliveryItem[];
+  deliveriesLoading: boolean;
+  deliveriesError: string | null;
+  testingChannel: NotificationChannel | null;
   busy: boolean;
   error: string | null;
   notice: string | null;
@@ -221,6 +234,8 @@ export type SettingsViewProps = {
   onColorSchemeChange: (value: DisplaySettings["color_scheme"]) => void;
   onSave: () => void;
   onRefreshHealth: () => void;
+  onRefreshDeliveries: () => void;
+  onTestChannel: (channel: NotificationChannel) => void;
   onRequestNotificationPermission: () => void;
 };
 
@@ -233,6 +248,10 @@ export function SettingsView({
   health,
   healthLoading,
   healthError,
+  deliveries,
+  deliveriesLoading,
+  deliveriesError,
+  testingChannel,
   busy,
   error,
   notice,
@@ -243,6 +262,8 @@ export function SettingsView({
   onColorSchemeChange,
   onSave,
   onRefreshHealth,
+  onRefreshDeliveries,
+  onTestChannel,
   onRequestNotificationPermission,
 }: SettingsViewProps) {
   return (
@@ -407,8 +428,8 @@ export function SettingsView({
           <CardHeader>
             <CardTitle>通知</CardTitle>
             <CardDescription>
-              浏览器通知使用浏览器内置的 Notification API，不需要额外凭据。权限只能由
-              你在这里点按钮申请，服务端无法替你授权。
+              三个通道各自投递、各自记一行台账。浏览器通知用浏览器内置的 Notification
+              API；Telegram 与 Webhook 由服务端直接发出，页面关闭后仍然有效。
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3">
@@ -429,17 +450,133 @@ export function SettingsView({
                 被拒绝后需要到浏览器的站点设置里手动改回允许。
               </span>
             </div>
-            <CheckField
-              label="浏览器通知通道"
-              checked={(draft.notifications.channels ?? []).includes("browser")}
-              onChange={(checked) =>
-                onDraftChange("notifications", { channels: checked ? ["browser"] : [] })
-              }
-            />
+            <div className="grid gap-2 sm:grid-cols-3">
+              {NOTIFICATION_CHANNELS.map((channel) => (
+                <CheckField
+                  key={channel}
+                  label={`${channelLabel(channel)} 通道`}
+                  checked={draft.notifications.channels.includes(channel)}
+                  onChange={(checked) =>
+                    onDraftChange("notifications", {
+                      channels: withChannel(draft.notifications.channels, channel, checked),
+                    })
+                  }
+                />
+              ))}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-2 rounded-md border p-3">
+                <h3 className="text-sm font-medium">Telegram</h3>
+                <TextField
+                  label="chat_id"
+                  value={draft.notifications.telegramChatId}
+                  onChange={(value) =>
+                    onDraftChange("notifications", { telegramChatId: value })
+                  }
+                />
+                <FactRow
+                  label="Bot token"
+                  value={`${credentialText(
+                    settings.notifications.telegram?.token_configured ?? false,
+                  )}（环境变量 TELEGRAM_BOT_TOKEN）`}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onTestChannel("telegram")}
+                  disabled={testingChannel !== null}
+                >
+                  {testingChannel === "telegram" ? "发送中…" : "测试发送"}
+                </Button>
+                {draft.notifications.telegramChatId.trim() === "" ? (
+                  <p className="text-xs text-muted-foreground">
+                    先在上面填写 chat_id 再测试发送；chat_id 由给 bot 发过消息后取得。
+                  </p>
+                ) : null}
+              </div>
+              <div className="grid gap-2 rounded-md border p-3">
+                <h3 className="text-sm font-medium">Webhook</h3>
+                <TextField
+                  label="接收地址"
+                  value={draft.notifications.webhookUrl}
+                  onChange={(value) => onDraftChange("notifications", { webhookUrl: value })}
+                />
+                <FactRow
+                  label="签名密钥"
+                  value={`${credentialText(
+                    settings.notifications.webhook?.secret_configured ?? false,
+                  )}（环境变量 WEBHOOK_SIGNING_SECRET，未配置就不加签）`}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onTestChannel("webhook")}
+                  disabled={testingChannel !== null}
+                >
+                  {testingChannel === "webhook" ? "发送中…" : "测试发送"}
+                </Button>
+                {draft.notifications.webhookUrl.trim() === "" ? (
+                  <p className="text-xs text-muted-foreground">
+                    先在上面填写接收地址再测试发送；保存后立即生效，不用重启进程。
+                  </p>
+                ) : null}
+              </div>
+            </div>
             <p className="text-xs text-muted-foreground">
-              关闭后服务端不再广播告警，页面也不会收到。通知只在页面打开时有效（含后台
-              标签页）；关闭页面后不再有弹窗。
+              保存后通道开关立即生效，不用重启进程；接收方留空表示未配置，投递会记一条
+              「未配置」的失败。浏览器通知只在页面打开时有效（含后台标签页）。
             </p>
+            <div className="border-t pt-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-medium">最近投递</h3>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onRefreshDeliveries}
+                  disabled={deliveriesLoading}
+                >
+                  {deliveriesLoading ? "刷新中…" : "刷新投递"}
+                </Button>
+              </div>
+              {deliveriesError ? (
+                <div className="mt-2">
+                  <ErrorNotice message={deliveriesError} />
+                </div>
+              ) : null}
+              {deliveries.length === 0 ? (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {deliveriesLoading ? "正在读取最近投递…" : "还没有投递记录。"}
+                </p>
+              ) : (
+                <ul className="mt-2 grid gap-2">
+                  {deliveries.map((item) => (
+                    <li
+                      key={item.id}
+                      className="rounded-md border px-3 py-2 text-sm"
+                      data-delivery-status={item.status}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          {formatBeijingTime(item.created_at)}（北京时间）
+                        </span>
+                        <span className="font-mono text-xs">
+                          {channelLabel(item.channel)} ·{" "}
+                          {item.status === "delivered" ? "成功" : "失败"}
+                        </span>
+                      </div>
+                      {item.error ? (
+                        <p className="mt-1 break-words text-xs text-destructive">
+                          错误：{item.error}
+                        </p>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -495,6 +632,10 @@ export default function SettingsPage() {
   const [health, setHealth] = useState<SystemHealthResponse | null>(null);
   const [healthLoading, setHealthLoading] = useState(true);
   const [healthError, setHealthError] = useState<string | null>(null);
+  const [deliveries, setDeliveries] = useState<DeliveryItem[]>([]);
+  const [deliveriesLoading, setDeliveriesLoading] = useState(true);
+  const [deliveriesError, setDeliveriesError] = useState<string | null>(null);
+  const [testingChannel, setTestingChannel] = useState<NotificationChannel | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -527,9 +668,39 @@ export default function SettingsPage() {
       .finally(() => setHealthLoading(false));
   };
 
+  const loadDeliveries = () => {
+    setDeliveriesLoading(true);
+    setDeliveriesError(null);
+    fetchNotificationDeliveries()
+      .then((value) => setDeliveries(value.items ?? []))
+      .catch((reason: unknown) => setDeliveriesError(messageOf(reason, "最近投递读取失败")))
+      .finally(() => setDeliveriesLoading(false));
+  };
+
   useEffect(() => {
     loadHealth();
+    loadDeliveries();
   }, []);
+
+  const testChannel = async (channel: NotificationChannel) => {
+    setTestingChannel(channel);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await testNotificationChannel(channel);
+      if (result.status === "delivered") {
+        setNotice(`${channelLabel(channel)} 测试消息已投递`);
+      } else {
+        setError(`${channelLabel(channel)} 测试发送失败：${result.error ?? "未返回原因"}`);
+      }
+    } catch (reason) {
+      setError(messageOf(reason, "测试发送失败"));
+    } finally {
+      setTestingChannel(null);
+      // 台账由服务端写入：测试完再读一次，页面不自己编造投递记录。
+      loadDeliveries();
+    }
+  };
 
   // 权限状态只能问浏览器；不支持时显示「不支持」，不伪造 granted。
   useEffect(() => {
@@ -569,7 +740,7 @@ export default function SettingsPage() {
         data_sources: {
           subscribed_instruments: parseInstruments(instrumentsText),
         },
-        notifications: { channels: draft.notifications.channels ?? [] },
+        notifications: notificationsPatch(draft.notifications),
         exchange: apiKey.trim() ? { api_key: apiKey.trim() } : null,
       });
       setSettings(updated);
@@ -577,6 +748,7 @@ export default function SettingsPage() {
       setInstrumentsText(instrumentsToText(updated.data_sources.subscribed_instruments ?? []));
       setApiKey("");
       setNotice("设置已保存");
+      loadDeliveries();
     } catch (reason) {
       setError(messageOf(reason, "保存失败"));
       try {
@@ -618,6 +790,10 @@ export default function SettingsPage() {
       health={health}
       healthLoading={healthLoading}
       healthError={healthError}
+      deliveries={deliveries}
+      deliveriesLoading={deliveriesLoading}
+      deliveriesError={deliveriesError}
+      testingChannel={testingChannel}
       busy={busy}
       error={error}
       notice={notice}
@@ -632,6 +808,8 @@ export default function SettingsPage() {
       }}
       onSave={save}
       onRefreshHealth={loadHealth}
+      onRefreshDeliveries={loadDeliveries}
+      onTestChannel={testChannel}
       onRequestNotificationPermission={requestNotificationPermission}
     />
   );

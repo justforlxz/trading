@@ -57,6 +57,8 @@ import patchRiskEventsEventIdResolve from "./fixtures/risk/patch-risk-events-eve
 import getRiskExposure from "./fixtures/risk/get-risk-exposure.json";
 import getSettings from "./fixtures/settings/get-settings.json";
 import patchSettings from "./fixtures/settings/patch-settings.json";
+import getSettingsNotificationsDeliveries from "./fixtures/settings/get-settings-notifications-deliveries.json";
+import postSettingsNotificationsTest from "./fixtures/settings/post-settings-notifications-test.json";
 import getStrategies from "./fixtures/strategy/get-strategies.json";
 import postStrategies from "./fixtures/strategy/post-strategies.json";
 import getStrategiesRuntime from "./fixtures/strategy/get-strategies-runtime.json";
@@ -132,6 +134,8 @@ export const handlers = [
   http.get("*/api/risk/exposure", () => HttpResponse.json(getRiskExposure)),
   http.get("*/api/settings", () => HttpResponse.json(getSettings)),
   http.patch("*/api/settings", () => HttpResponse.json(patchSettings)),
+  http.get("*/api/settings/notifications/deliveries", () => HttpResponse.json(getSettingsNotificationsDeliveries)),
+  http.post("*/api/settings/notifications/test", () => HttpResponse.json(postSettingsNotificationsTest)),
   http.get("*/api/strategies", () => HttpResponse.json(getStrategies)),
   http.post("*/api/strategies", () => HttpResponse.json(postStrategies, { status: 201 })),
   http.get("*/api/strategies/runtime", () => HttpResponse.json(getStrategiesRuntime)),

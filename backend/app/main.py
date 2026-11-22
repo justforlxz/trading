@@ -28,9 +28,11 @@ from app.backtest import (  # noqa: F401
 from app.config import get_settings
 from app.db import init_db
 from app.events import (
+    ChannelConfig,
     NotificationDeliveryRow,  # noqa: F401  迁移要认得的投递台账表
     build_pipeline,
     build_sinks,
+    config_from_notifications,
     install,
     uninstall,
 )
@@ -105,11 +107,26 @@ async def lifespan(_app: FastAPI) -> Iterator[None]:
             hub.publish(event_type, data, as_of=as_of, predicate=predicate), loop
         )
 
+    def _channel_config() -> ChannelConfig:
+        """外部通道的配置：接收方读设置文档，令牌与签名密钥读环境变量。
+
+        每次投递现读，设置页改完地址立即生效；事件层不依赖设置域。
+        """
+
+        runtime = get_settings()
+        return config_from_notifications(
+            load_settings().notifications,
+            telegram_bot_token=runtime.telegram_bot_token,
+            telegram_api_base=runtime.telegram_api_base,
+            webhook_signing_secret=runtime.webhook_signing_secret,
+        )
+
     install(
         build_pipeline(
             sinks=build_sinks(
                 channels=load_settings().notifications.get("channels", []),
                 broadcast=_broadcast,
+                config=_channel_config,
             )
         ),
         loop=loop,

@@ -126,7 +126,7 @@ def test_turning_a_channel_off_at_runtime_stops_broadcasting() -> None:
 
 
 def test_unknown_channel_names_are_ignored_not_faked() -> None:
-    registry = build_sinks(channels=["telegram", "browser"], broadcast=RecordingBroadcast())
+    registry = build_sinks(channels=["imessage", "browser"], broadcast=RecordingBroadcast())
 
     assert registry.channels == ("browser",)
 

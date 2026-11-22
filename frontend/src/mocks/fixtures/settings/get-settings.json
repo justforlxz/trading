@@ -15,7 +15,15 @@
   "notifications": {
     "channels": [
       "browser"
-    ]
+    ],
+    "telegram": {
+      "chat_id": "",
+      "token_configured": false
+    },
+    "webhook": {
+      "secret_configured": false,
+      "url": ""
+    }
   },
   "risk_defaults": {
     "default_leverage": "3",

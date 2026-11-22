@@ -1,0 +1,11 @@
+{
+  "items": [
+    {
+      "alert_id": "al_XAAPL-USDT_20261120120000000000",
+      "channel": "telegram",
+      "created_at": "2026-11-20T12:00:03Z",
+      "id": "nd_3f9c1a7b5e2d4c6f8a0b1c2d",
+      "status": "delivered"
+    }
+  ]
+}

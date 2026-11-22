@@ -8,9 +8,10 @@ HTTP 层拿到的只有 `api_configured` 与全掩码字符串。Secret 与 Pass
 
 ## 分组
 
-v6 只经 HTTP 暴露五类：显示偏好、风险默认值、自动执行开关、数据源状态与通知通道，
-另有只读的密钥状态。`risk`（执行风控限额）、`costs` 与 `backtest` 仍是服务端内部参数，保留在
-设置文档里，但不进入 `GET` / `PATCH /api/settings` 的响应与请求。
+v6 只经 HTTP 暴露五类：显示偏好、风险默认值、自动执行开关、数据源状态与通知通道
+（通道开关、Telegram chat_id、Webhook 接收地址），另有只读的密钥状态。`risk`（执行
+风控限额）、`costs` 与 `backtest` 仍是服务端内部参数，保留在设置文档里，但不进入
+`GET` / `PATCH /api/settings` 的响应与请求。
 
 ## 生效方式
 
@@ -95,8 +96,12 @@ DEFAULT_DATA_SOURCES: dict[str, Any] = {
     "subscribed_instruments": [],
 }
 # 通知通道默认只开浏览器：浏览器通知是内置能力，不需要任何凭据。
+# `telegram.chat_id` 与 `webhook.url` 是非敏感的接收方信息，可以落库；对应的 bot token
+# 与签名密钥只经环境变量注入，不在这份文档里，也不经 HTTP 回读。
 DEFAULT_NOTIFICATIONS: dict[str, Any] = {
     "channels": ["browser"],
+    "telegram": {"chat_id": ""},
+    "webhook": {"url": ""},
 }
 
 
@@ -173,7 +178,7 @@ def _data_sources_view(value: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _notifications_view(value: Mapping[str, Any]) -> dict[str, Any]:
-    """只保留非空的通道名，去重且保持提交顺序；空列表表示一个通道都不开。"""
+    """收紧通知分组：通道名去重、去空白（空列表表示一个通道都不开），接收方信息去空白。"""
 
     channels = value.get("channels", [])
     if not isinstance(channels, list):
@@ -183,8 +188,19 @@ def _notifications_view(value: Mapping[str, Any]) -> dict[str, Any]:
             dict.fromkeys(
                 item.strip() for item in channels if isinstance(item, str) and item.strip()
             )
-        )
+        ),
+        "telegram": {"chat_id": _nested_text(value.get("telegram"), "chat_id")},
+        "webhook": {"url": _nested_text(value.get("webhook"), "url")},
     }
+
+
+def _nested_text(group: Any, key: str) -> str:
+    """子分组里的一个文本字段；缺失或类型不对时给空字符串。"""
+
+    if not isinstance(group, Mapping):
+        return ""
+    value = group.get(key)
+    return value.strip() if isinstance(value, str) else ""
 
 
 def _default_row(moment: datetime) -> SettingsRow:
@@ -258,6 +274,7 @@ def save_settings(
 
     `api_key` 只在非空时覆盖；空字符串表示「本次不修改」，不会把已有密钥清空。
     `subscribed_instruments` 单独给出时只替换订阅清单。
+    `notifications` 按子项合并：只提交 `channels` 时，已有的 chat_id 与接收地址保持原值。
     """
 
     moment = (clock or SystemClock()).now()
@@ -286,7 +303,8 @@ def save_settings(
             ]
             row.data_sources = _dump(current)
         if notifications is not None:
-            row.notifications = _dump(_notifications_view(notifications))
+            current = _notifications_view(_parse("notifications", row.notifications))
+            row.notifications = _dump(_notifications_view({**current, **notifications}))
         if api_key is not None and api_key.strip():
             row.okx_api_key = api_key.strip()
         row.updated_at = moment

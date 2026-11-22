@@ -11,8 +11,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Literal, Protocol
+from datetime import UTC, datetime
+from typing import Any, Literal, Protocol
 
 from sqlalchemy import Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -20,7 +20,14 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db import Base, UtcDateTime
 from app.events.event import DomainEvent
 
-__all__ = ["DeliveryResult", "DeliveryStatus", "NotificationDeliveryRow", "Sink"]
+__all__ = [
+    "DeliveryResult",
+    "DeliveryStatus",
+    "NotificationDeliveryRow",
+    "Sink",
+    "alert_payload",
+    "utc_moment",
+]
 
 DeliveryStatus = Literal["delivered", "failed"]
 
@@ -59,3 +66,22 @@ class NotificationDeliveryRow(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+
+
+def alert_payload(event: DomainEvent) -> dict[str, Any] | None:
+    """事件里的提醒正文；不是告警、或载荷里没有正文时返回 `None`。
+
+    外部通道（Telegram、Webhook）都只投这一类事件，取正文的方式也一致，因此放在
+    协议旁边而不是各写一遍。
+    """
+
+    if event.kind != "alert":
+        return None
+    alert = event.payload.get("alert")
+    return dict(alert) if isinstance(alert, dict) else None
+
+
+def utc_moment(value: datetime) -> str:
+    """带时区时间 → `2026-11-10T08:00:00Z`（与 HTTP 契约同一写法）。"""
+
+    return value.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")

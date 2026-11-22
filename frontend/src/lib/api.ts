@@ -97,6 +97,13 @@ export type ExecutionSettings = SettingsResponse["execution"];
 export type RiskDefaults = SettingsResponse["risk_defaults"];
 export type DataSourceSettings = SettingsResponse["data_sources"];
 export type NotificationSettings = SettingsResponse["notifications"];
+export type NotificationSettingsUpdate = components["schemas"]["NotificationSettingsUpdate"];
+/** 可以做「测试发送」的两个外部通道；浏览器通道的权限由页面自己申请。 */
+export type NotificationChannel = "telegram" | "webhook";
+export type DeliveryItem = components["schemas"]["DeliveryItem"];
+export type DeliveryListResponse = components["schemas"]["DeliveryListResponse"];
+export type NotificationChannelTestResponse =
+  components["schemas"]["NotificationChannelTestResponse"];
 export type SecretSettings = SettingsResponse["secrets"];
 export type SystemHealthResponse = components["schemas"]["SystemHealthResponse"];
 export type SystemComponent = components["schemas"]["SystemComponent"];
@@ -513,6 +520,20 @@ export function fetchSettings(): Promise<SettingsResponse> {
 
 export function updateSettings(body: SettingsUpdateRequest): Promise<SettingsResponse> {
   return send<SettingsResponse>("/settings", "PATCH", body);
+}
+
+/** 测试发送：走服务端同一个通道实现投一条测试事件，结果与失败原因原样返回。 */
+export function testNotificationChannel(
+  channel: NotificationChannel,
+): Promise<NotificationChannelTestResponse> {
+  return send<NotificationChannelTestResponse>("/settings/notifications/test", "POST", {
+    channel,
+  });
+}
+
+/** 最近投递：服务端按时间倒序返回，条数由 `limit` 限制。 */
+export function fetchNotificationDeliveries(limit = 20): Promise<DeliveryListResponse> {
+  return request<DeliveryListResponse>(`/settings/notifications/deliveries?limit=${limit}`);
 }
 
 /** 系统健康：六项都来自后端已有事实，页面只展示，不补造时间或推断状态。 */

@@ -66,6 +66,13 @@ class Settings(BaseSettings):
     # 只开放 1h / 4h / 1d；上游频道名（candle1H 等）由交易所适配层转换。
     okx_candle_bar: Literal["1h", "4h", "1d"] = "1h"
 
+    # 通知通道的敏感值与交易所密钥同一约定：只经环境变量注入，不落库、不回显。
+    # 非敏感部分（Telegram chat_id、Webhook 接收地址）在设置文档的 notifications 分组里。
+    telegram_bot_token: str = ""
+    webhook_signing_secret: str = ""
+    # Telegram 机器人接口地址。字面量 URL 只允许出现在本文件，通道从配置读。
+    telegram_api_base: str = "https://api.telegram.org"
+
     @property
     def ws_private_url(self) -> str:
         """私有 WebSocket 地址：显式覆盖优先，否则按模拟盘/实盘选择。"""

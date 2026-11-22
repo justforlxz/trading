@@ -988,6 +988,46 @@ export interface paths {
         patch: operations["patch_settings_document_api_settings_patch"];
         trace?: never;
     };
+    "/api/settings/notifications/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Notification Deliveries
+         * @description 最近若干条投递记录，新的在前。
+         */
+        get: operations["get_notification_deliveries_api_settings_notifications_deliveries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/notifications/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Notification Channel
+         * @description 用同一个通道实现投一条测试事件，并把这次投递写进台账。
+         */
+        post: operations["test_notification_channel_api_settings_notifications_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/signals": {
         parameters: {
             query?: never;
@@ -3683,6 +3723,46 @@ export interface components {
             subscribed_instruments?: string[] | null;
         };
         /**
+         * DeliveryItem
+         * @description 一行投递台账：哪条告警、走哪个通道、成没成、失败原因与时间。
+         */
+        DeliveryItem: {
+            /** Alert Id */
+            alert_id?: string | null;
+            /** Channel */
+            channel: string;
+            /** Created At */
+            created_at: string;
+            /** Error */
+            error?: string | null;
+            /** Id */
+            id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "delivered" | "failed";
+        };
+        /**
+         * DeliveryListResponse
+         * @description 最近若干条投递记录，新的在前；条数由查询上限限制，不做定期清理。
+         * @example {
+         *       "items": [
+         *         {
+         *           "alert_id": "al_XAAPL-USDT_20261120120000000000",
+         *           "channel": "telegram",
+         *           "created_at": "2026-11-20T12:00:03Z",
+         *           "id": "nd_3f9c1a7b5e2d4c6f8a0b1c2d",
+         *           "status": "delivered"
+         *         }
+         *       ]
+         *     }
+         */
+        DeliveryListResponse: {
+            /** Items */
+            items?: components["schemas"]["DeliveryItem"][];
+        };
+        /**
          * DisplaySettings
          * @description 显示偏好；前端可缓存，后端持久化。
          */
@@ -5086,20 +5166,54 @@ export interface components {
             rsi14?: string | null;
         };
         /**
+         * NotificationChannelTestRequest
+         * @description 测试发送：只针对两个外部通道，浏览器通道不需要（页面自己就能验证）。
+         */
+        NotificationChannelTestRequest: {
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "telegram" | "webhook";
+        };
+        /**
+         * NotificationChannelTestResponse
+         * @description 测试发送的结果：与投递台账同一套状态与失败原因。
+         * @example {
+         *       "channel": "telegram",
+         *       "status": "delivered"
+         *     }
+         */
+        NotificationChannelTestResponse: {
+            /** Channel */
+            channel: string;
+            /** Error */
+            error?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "delivered" | "failed";
+        };
+        /**
          * NotificationSettings
-         * @description 通知通道开关；本期只有 `browser` 一种实现，关闭后不再广播告警。
+         * @description 通知通道开关与两个可编辑的接收方；三个通道都可独立开关。
          */
         NotificationSettings: {
             /** Channels */
             channels?: string[];
+            telegram?: components["schemas"]["TelegramSettings"];
+            webhook?: components["schemas"]["WebhookSettings"];
         };
         /**
          * NotificationSettingsUpdate
-         * @description 只改通道清单；空列表表示一个通道都不开。
+         * @description 按子项改通知设置：不提交的子项保持原值，空通道清单表示一个通道都不开。
          */
         NotificationSettingsUpdate: {
             /** Channels */
-            channels: string[];
+            channels?: string[] | null;
+            telegram?: components["schemas"]["TelegramSettingsUpdate"] | null;
+            webhook?: components["schemas"]["WebhookSettingsUpdate"] | null;
         };
         /**
          * Opportunity
@@ -5891,7 +6005,15 @@ export interface components {
          *       "notifications": {
          *         "channels": [
          *           "browser"
-         *         ]
+         *         ],
+         *         "telegram": {
+         *           "chat_id": "",
+         *           "token_configured": false
+         *         },
+         *         "webhook": {
+         *           "secret_configured": false,
+         *           "url": ""
+         *         }
          *       },
          *       "risk_defaults": {
          *         "default_leverage": "3",
@@ -6797,6 +6919,33 @@ export interface components {
             /** Status */
             status: string;
         };
+        /**
+         * TelegramSettings
+         * @description Telegram 接收方：`chat_id` 可读写，token 只报「是否已配置」。
+         */
+        TelegramSettings: {
+            /**
+             * Chat Id
+             * @default
+             */
+            chat_id: string;
+            /**
+             * Token Configured
+             * @default false
+             */
+            token_configured: boolean;
+        };
+        /**
+         * TelegramSettingsUpdate
+         * @description Telegram 可写字段：只有 `chat_id`。空字符串表示「清空接收方」。
+         */
+        TelegramSettingsUpdate: {
+            /**
+             * Chat Id
+             * @default
+             */
+            chat_id: string;
+        };
         /** TimeSplit */
         TimeSplit: {
             /**
@@ -7041,6 +7190,33 @@ export interface components {
         WatchlistUpdateRequest: {
             /** Group */
             group: string;
+        };
+        /**
+         * WebhookSettings
+         * @description Webhook 接收方：地址可读写，签名密钥只报「是否已配置」。
+         */
+        WebhookSettings: {
+            /**
+             * Secret Configured
+             * @default false
+             */
+            secret_configured: boolean;
+            /**
+             * Url
+             * @default
+             */
+            url: string;
+        };
+        /**
+         * WebhookSettingsUpdate
+         * @description Webhook 可写字段：只有接收地址，必须是 http 或 https。
+         */
+        WebhookSettingsUpdate: {
+            /**
+             * Url
+             * @default
+             */
+            url: string;
         };
     };
     responses: never;
@@ -8839,6 +9015,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SettingsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_notification_deliveries_api_settings_notifications_deliveries_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_notification_channel_api_settings_notifications_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationChannelTestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationChannelTestResponse"];
                 };
             };
             /** @description Validation Error */

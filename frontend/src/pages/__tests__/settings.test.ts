@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { describe, expect, it } from "vitest";
 
-import type { SettingsResponse, SystemHealthResponse } from "../../lib/api";
+import type { DeliveryItem, SettingsResponse, SystemHealthResponse } from "../../lib/api";
 import { toSettingsDraft } from "../../lib/settings-draft";
 import { SettingsView, type SettingsViewProps } from "../settings";
 
@@ -26,7 +26,11 @@ const SETTINGS: SettingsResponse = {
     last_sync_at: "2026-11-15T06:00:00Z",
     failure_count: 2,
   },
-  notifications: { channels: ["browser"] },
+  notifications: {
+    channels: ["browser", "telegram"],
+    telegram: { chat_id: "-1001234567890", token_configured: true },
+    webhook: { url: "https://example.invalid/hooks/trading", secret_configured: false },
+  },
   secrets: {
     okx_api_key_masked: "********",
     okx_configured: true,
@@ -34,6 +38,25 @@ const SETTINGS: SettingsResponse = {
   },
   updated_at: "2026-11-15T06:10:00Z",
 };
+
+const DELIVERIES: DeliveryItem[] = [
+  {
+    id: "nd_3f9c1a7b5e2d4c6f8a0b1c2d",
+    channel: "telegram",
+    alert_id: "al_XAAPL-USDT_20261120120000000000",
+    status: "delivered",
+    error: null,
+    created_at: "2026-11-20T12:00:03Z",
+  },
+  {
+    id: "nd_7a1c3e5b9d2f4a6c8e0b1d3f",
+    channel: "webhook",
+    alert_id: null,
+    status: "failed",
+    error: "HTTP 404（永久错误，不重试）",
+    created_at: "2026-11-20T12:01:03Z",
+  },
+];
 
 const HEALTH: SystemHealthResponse = {
   status: "degraded",
@@ -86,6 +109,10 @@ function props(overrides: Partial<SettingsViewProps> = {}): SettingsViewProps {
     health: HEALTH,
     healthLoading: false,
     healthError: null,
+    deliveries: DELIVERIES,
+    deliveriesLoading: false,
+    deliveriesError: null,
+    testingChannel: null,
     busy: false,
     error: null,
     notice: null,
@@ -96,6 +123,8 @@ function props(overrides: Partial<SettingsViewProps> = {}): SettingsViewProps {
     onColorSchemeChange: () => undefined,
     onSave: () => undefined,
     onRefreshHealth: () => undefined,
+    onRefreshDeliveries: () => undefined,
+    onTestChannel: () => undefined,
     onRequestNotificationPermission: () => undefined,
     ...overrides,
   };
@@ -108,7 +137,7 @@ function render(overrides: Partial<SettingsViewProps> = {}): string {
 describe("设置页", () => {
   it("只展示 v6 的四类设置与规格保留的自动执行开关", () => {
     const html = render();
-    for (const title of ["数据连接", "显示偏好", "风险默认值", "自动执行", "密钥状态"]) {
+    for (const title of ["数据连接", "显示偏好", "风险默认值", "自动执行", "通知", "密钥状态"]) {
       expect(html).toContain(title);
     }
     expect(html).not.toContain("执行模式");
@@ -186,5 +215,69 @@ describe("设置页", () => {
     expect(html).toContain("正在读取系统健康…");
     expect(html).not.toContain("全部正常");
     expect(html).not.toContain("最后成功时间");
+  });
+
+  it("三个通道各自一个开关，接收方与凭据状态分开展示", () => {
+    const html = render();
+    for (const label of ["浏览器 通道", "Telegram 通道", "Webhook 通道"]) {
+      expect(html).toContain(label);
+    }
+    expect(html).toContain("chat_id");
+    expect(html).toContain("-1001234567890");
+    expect(html).toContain("https://example.invalid/hooks/trading");
+    // token 已配置、签名密钥未配置：页面只说这两种说法，不给输入框。
+    expect(html).toContain("已配置（环境变量 TELEGRAM_BOT_TOKEN）");
+    expect(html).toContain("未配置（环境变量 WEBHOOK_SIGNING_SECRET，未配置就不加签）");
+    expect(html).not.toContain("bot-token");
+    expect(html).not.toContain("signing-secret");
+  });
+
+  it("勾选的通道与接口返回的清单一致", () => {
+    const html = render();
+    // 响应里开着 browser 与 telegram：两个复选框勾上，webhook 不勾。
+    expect((html.match(/checked=""/g) ?? []).length).toBe(2);
+    expect(html).toContain("Webhook 通道");
+  });
+
+  it("最近投递逐条展示时间、通道、状态与失败原因", () => {
+    const html = render();
+    expect(html).toContain("最近投递");
+    expect(html).toContain("2026-11-20 20:00（北京时间）");
+    expect(html).toContain("Telegram · 成功");
+    expect(html).toContain("Webhook · 失败");
+    expect(html).toContain("错误：HTTP 404（永久错误，不重试）");
+  });
+
+  it("没有投递记录时如实显示空状态", () => {
+    const html = render({ deliveries: [] });
+    expect(html).toContain("还没有投递记录。");
+  });
+
+  it("投递读取中与读取失败都不伪造记录", () => {
+    expect(render({ deliveries: [], deliveriesLoading: true })).toContain("正在读取最近投递…");
+    const failed = render({ deliveries: [], deliveriesError: "最近投递读取失败（HTTP 500）" });
+    expect(failed).toContain("最近投递读取失败（HTTP 500）");
+    expect(failed).toContain("还没有投递记录。");
+  });
+
+  it("测试发送进行中时按钮显示发送中", () => {
+    expect(render({ testingChannel: "telegram" })).toContain("发送中…");
+  });
+
+  it("chat_id 为空时提示先去填写，而不是静默失败", () => {
+    const draft = toSettingsDraft(SETTINGS);
+    const html = render({
+      draft: {
+        ...draft,
+        notifications: { ...draft.notifications, telegramChatId: "", webhookUrl: "" },
+      },
+    });
+    expect(html).toContain("先在上面填写 chat_id 再测试发送");
+    expect(html).toContain("先在上面填写接收地址再测试发送");
+  });
+
+  it("chat_id 已填时不显示填写提示", () => {
+    const html = render();
+    expect(html).not.toContain("先在上面填写 chat_id 再测试发送");
   });
 });

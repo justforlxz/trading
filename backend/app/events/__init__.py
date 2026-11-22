@@ -1,6 +1,6 @@
 """事件驱动通知：上游推送 → 中间件管线 → 投递通道。
 
-跨包只允许 `from app.events import ...`，且只发布四样东西：
+跨包只允许 `from app.events import ...`，且只发布下面这些：
 
 - `DomainEvent`：事件的形状，推送层构造它；
 - `emit`：全项目唯一的事件入口；
@@ -11,21 +11,37 @@
 扩展点只有两个注册表：`app.events.pipeline.DEFAULT_MIDDLEWARES`（新增规则或处理）
 与 `app.events.sinks.registry.CHANNEL_BUILDERS`（新增通道）。两者都不需要改
 `stream/hub.py` 或 `alerts/`。
+
+外部通道（`telegram` / `webhook`）的地址与凭据由装配根合成为 `ChannelConfig` 注入；
+设置页的「测试发送」用 `build_channel` 单独构造一个通道，「最近投递」用
+`list_deliveries` 读同一张台账。
 """
 
 from app.events.bus import apply_channels, emit, install, uninstall
 from app.events.event import DomainEvent
 from app.events.pipeline import build_pipeline
-from app.events.sinks.base import NotificationDeliveryRow
-from app.events.sinks.registry import build_sinks
+from app.events.sinks.base import DeliveryResult, NotificationDeliveryRow
+from app.events.sinks.config import ChannelConfig, config_from_notifications
+from app.events.sinks.registry import (
+    build_channel,
+    build_sinks,
+    list_deliveries,
+    record_delivery,
+)
 
 __all__ = [
+    "ChannelConfig",
+    "DeliveryResult",
     "DomainEvent",
     "NotificationDeliveryRow",
     "apply_channels",
+    "build_channel",
     "build_pipeline",
     "build_sinks",
+    "config_from_notifications",
     "emit",
     "install",
+    "list_deliveries",
+    "record_delivery",
     "uninstall",
 ]

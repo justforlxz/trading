@@ -67,8 +67,9 @@ db-down: ## 停止本地 PostgreSQL 容器（数据保留在容器内）
 migrate: ## 把数据库结构推进到最新版本（等价于 alembic upgrade head）
 	cd $(BACKEND) && $(PYTHON) -m alembic upgrade head
 
-# 跑测试时每个用例都会克隆一个 trading_test_* 库并在结束时删掉；进程被强杀会留下
-# 残库，这个目标按前缀清理，正常跑完不需要执行。
+# 跑测试时整场会话用一个 trading_test_<进程号> 库，标了 dedicated_database 的用例
+# 另克隆 trading_test_* 并在结束时删掉；进程被强杀会留下残库，这个目标按前缀清理，
+# 正常跑完不需要执行。
 test-clean: ## 清理残留的测试数据库（trading_test_* / trading_tmpl_*）
 	cd $(BACKEND) && $(PYTHON) -m tests.clean_databases
 

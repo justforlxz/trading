@@ -78,7 +78,7 @@ Influence: <对系统/用户的影响>
 
 - 新增或修改业务逻辑必须带测试；纯函数（相关性、成本、指标）必须有「已知答案」用例。
 - 测试默认不连真实交易所、不发真实订单；外部响应必须用录制的真实 fixture。
-- 每个测试用例用一个独立的 PostgreSQL 数据库（用例第一次真的连库时从本进程的模板库克隆，用完连库一起删掉），用例之间不共享任何数据；表结构只由模板库上的一次 `alembic upgrade head` 产生，不为每个用例重跑迁移。本地 PostgreSQL 要先 `make db-up` 起好，进程被强杀留下的测试库用 `make test-clean` 清理。
+- 测试隔离用「一条连接 + 外层事务 + 每个用例一个 savepoint」：整个进程共用一个已迁移的库（`trading_test_<进程号>`），会话开始时由 `alembic upgrade head` 推一次，每个用例的改动关在自己的 savepoint 里，用例结束整体回滚，因此每个用例看到的仍然是空表。用例确实需要独立库（跑 `alembic downgrade`、跨连接读已提交的数据、多线程各自连库）时标 `@pytest.mark.dedicated_database`，它从模板库克隆一份独立库，用完连库一起删掉。表结构只由 `alembic upgrade head` 产生。本地 PostgreSQL 要先 `make db-up` 起好，进程被强杀留下的测试库用 `make test-clean` 清理。
 - 门禁命令（提交前必跑，等价于 `make lint && make test`）：
 
 ```bash

@@ -200,6 +200,7 @@ def test_upsert_counts_unique_keys_when_a_batch_repeats() -> None:
     assert len(load_candles(SYMBOL, "1h")) == 5
 
 
+@pytest.mark.dedicated_database
 def test_upsert_splits_statements_by_batch_size(monkeypatch) -> None:
     """把批大小压到 4 行：20 行必须分成 5 条 INSERT 语句，计数仍按唯一主键算。
 

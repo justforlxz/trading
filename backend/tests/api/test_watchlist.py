@@ -440,6 +440,7 @@ def test_add_succeeds_when_scheduler_rejects(quote_less_instrument: TestClient) 
     )
 
 
+@pytest.mark.dedicated_database
 def test_add_upstream_failure_keeps_item_and_records_failed_job(
     client: TestClient,
     fake_okx: None,

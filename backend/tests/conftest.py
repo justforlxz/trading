@@ -1,16 +1,26 @@
 """测试装配：TestClient 直连应用实例，不启动真实 uvicorn。
 
-数据库隔离单位是「每个用例一个独立库」：session 开始时先用 `alembic upgrade head`
-把一个模板库迁移到最新版本，之后用例第一次连库时（不是每个用例开始时）从模板库
-克隆一份 `trading_test_*`，用完连库一起删掉。表结构仍然只由迁移产生，用例之间也
-没有任何残留数据，但既不用为每个用例把 34 张表从头迁移，纯逻辑用例也不必付建库的
-代价。
+## 数据库隔离
+
+整个进程共用一个已迁移的库（`trading_test_<进程号>`），会话开始时用
+`alembic upgrade head` 推一次，之后用例之间靠事务回滚隔离，不再为每个用例建库删库：
+
+- 默认：会话绑到「一条连接 + 外层事务」上（`set_session_scope_factory`），每个用例
+  再套一层 savepoint，用例结束整体回滚，表回到空状态。
+- 用例确实需要独立库时才标 `@pytest.mark.dedicated_database`：这类用例要跑
+  `alembic downgrade`、要看跨连接已提交的数据，或要让多个线程各自连库。它们从模板库
+  克隆一份 `trading_test_*`，用完连库一起删掉。
+
+两种情况表结构都只由 `alembic upgrade head` 产生（共享库与模板库各推一次）。
 
 模板库名带进程号（`trading_tmpl_<进程号>`），只在本进程内删除与重建：同一台机器上
 同时跑两份测试（QA 全量、返工另跑一次）时各用各的模板库，互不删库。
 
-库是「第一次真的要连数据库时」才建的，因此不依赖用例请求了哪个夹具：任何一条连接
-（应用引擎、`session_scope`、迁移）都会先经过 psycopg 的连接入口，等在那里补建。
+## 测试模式
+
+会话开始就把 `TEST_MODE=1` 写进环境：应用的 lifespan 因此不跑迁移、不启动权益快照
+线程与常驻推送集线器、也不装通知管道——这些由测试装配自己准备，用例需要时再覆盖
+`TEST_MODE` 后建应用。生产路径不受影响（`TEST_MODE` 默认关闭）。
 
 数据库本身要先用 `make db-up` 起好（本地 podman 容器），所有用例共用这一台
 PostgreSQL；进程被强杀留下的测试库用 `make test-clean` 清理。
@@ -23,17 +33,18 @@ PostgreSQL；进程被强杀留下的测试库用 `make test-clean` 清理。
 
 import os
 from collections.abc import Iterator
+from contextlib import contextmanager
 from uuid import uuid4
 
-import psycopg
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine
+from sqlalchemy import Connection, Engine
 from sqlalchemy.engine import make_url
+from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
-from app.db import init_db
+from app.db import init_db, set_session_scope_factory
 from app.db.engine import get_engine
 from app.main import create_app
 from tests.db_admin import (
@@ -48,7 +59,7 @@ from tests.fakes.okx.app import create_app as create_fake_okx_app
 from tests.fakes.okx.server import FakeOkxServer, start_server
 from tests.fakes.on_demand import RecordingScheduler
 
-_real_psycopg_connect = psycopg.connect
+_DATABASE_URL_ENV = "DATABASE_URL"
 
 #: 本进程配置里的库地址（不含用例库名）；会话开始时固定，之后不再从环境变量读。
 _base_database_url = ""
@@ -56,9 +67,10 @@ _base_database_url = ""
 _admin_engine: Engine | None = None
 #: 本进程的模板库名：会话开始时按进程号定下，同机并发跑测试时各用各的。
 _template_database = ""
-#: 用例库名，以及「这一份是否已经建出来」——决定连接前要不要补建、结束时要不要删。
-_current_database = ""
-_current_database_created = False
+#: 全进程共用的那个库，以及它上面那条「外层事务」连接。
+_shared_database = ""
+_shared_engine: Engine | None = None
+_shared_connection: Connection | None = None
 
 
 def _admin() -> Engine:
@@ -68,43 +80,12 @@ def _admin() -> Engine:
     return _admin_engine
 
 
-def _create_current_database() -> None:
-    """把本用例的库从模板库克隆出来；同一个用例只建一次。"""
-
-    global _current_database_created
-
-    if not _current_database or _current_database_created:
-        return
-    # 先置位再建：建库本身要连维护库，别让连接入口重入。
-    _current_database_created = True
-    create_database(_admin(), _current_database, template=_template_database)
-
-
-def _requested_database(args: tuple[object, ...], kwargs: dict[str, object]) -> str | None:
-    """从 psycopg 的连接参数里取出目标库名（SQLAlchemy 传关键字，也兼容 conninfo 串）。"""
-
-    dbname = kwargs.get("dbname")
-    if dbname:
-        return str(dbname)
-    if args and isinstance(args[0], str):
-        return psycopg.conninfo.conninfo_to_dict(args[0]).get("dbname")
-    return None
-
-
-def _connect_creating_current_database(*args: object, **kwargs: object) -> object:
-    """连接入口：目标是本用例的库、且还没建，就先从模板库克隆出来。"""
-
-    if _requested_database(args, kwargs) == _current_database:
-        _create_current_database()
-    return _real_psycopg_connect(*args, **kwargs)
-
-
 def _migrate(base_url: str, database: str) -> None:
     """在指定库上执行 `alembic upgrade head`：表结构的唯一产生路径。"""
 
-    previous_url = os.environ.get("DATABASE_URL")
+    previous_url = os.environ.get(_DATABASE_URL_ENV)
     previous_schema = os.environ.pop("DATABASE_SCHEMA", None)
-    os.environ["DATABASE_URL"] = database_url_with(base_url, database)
+    os.environ[_DATABASE_URL_ENV] = database_url_with(base_url, database)
     get_settings.cache_clear()
     get_engine.cache_clear()
     try:
@@ -114,18 +95,39 @@ def _migrate(base_url: str, database: str) -> None:
         get_engine.cache_clear()
         get_settings.cache_clear()
         if previous_url is None:
-            os.environ.pop("DATABASE_URL", None)
+            os.environ.pop(_DATABASE_URL_ENV, None)
         else:
-            os.environ["DATABASE_URL"] = previous_url
+            os.environ[_DATABASE_URL_ENV] = previous_url
         if previous_schema is not None:
             os.environ["DATABASE_SCHEMA"] = previous_schema
 
 
+@contextmanager
+def _savepoint_session() -> Iterator[Session]:
+    """用例内的会话：绑在共享连接上，一次提交只释放自己的 savepoint。
+
+    `create_savepoint` 让会话不接管外层事务：进入发 `SAVEPOINT`，提交发 `RELEASE`，
+    异常发 `ROLLBACK TO SAVEPOINT`。外层事务由夹具在用例结束时统一回滚。
+    """
+
+    assert _shared_connection is not None, "共享连接还没建立"
+    with (
+        Session(
+            bind=_shared_connection,
+            expire_on_commit=False,
+            join_transaction_mode="create_savepoint",
+        ) as session,
+        session.begin(),
+    ):
+        yield session
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _database_session() -> Iterator[None]:
-    """把模板库迁移到最新版本，并把库的建删接到 psycopg 的连接入口上。"""
+    """建好本进程共用的库并迁移到最新版本，再建模板库供独立库用例克隆。"""
 
     global _base_database_url, _admin_engine, _template_database
+    global _shared_database, _shared_engine, _shared_connection
 
     get_settings.cache_clear()
     _base_database_url = get_settings().database_url
@@ -144,47 +146,88 @@ def _database_session() -> Iterator[None]:
     _admin_engine = engine
 
     _template_database = template_database_name()
+    _shared_database = f"{TEST_DATABASE_PREFIX}{os.getpid()}"
     try:
-        # 只处理本进程自己的模板库：同机并发的另一个 pytest 进程有它自己的模板库，
+        # 只处理本进程自己的库：同机并发的另一个 pytest 进程有它自己的库名，
         # 无条件按固定名字删会把别人正在迁移的库强杀掉。
         drop_database(engine, _template_database)
         create_database(engine, _template_database)
         _migrate(_base_database_url, _template_database)
-        patch = pytest.MonkeyPatch()
-        patch.setattr(psycopg, "connect", _connect_creating_current_database)
+
+        # 共享库直接克隆迁移好的模板库：整场会话只跑一次迁移。
+        drop_database(engine, _shared_database)
+        create_database(engine, _shared_database, template=_template_database)
+
+        # 整场会话都指向共享库；用例不再改这一项。
+        os.environ[_DATABASE_URL_ENV] = database_url_with(_base_database_url, _shared_database)
+        os.environ.pop("DATABASE_SCHEMA", None)
+        os.environ["TEST_MODE"] = "1"
+        get_settings.cache_clear()
+        get_engine.cache_clear()
+
+        _shared_engine = get_engine()
+        _shared_connection = _shared_engine.connect()
+        # 外层事务贯穿整场会话，任何用例的提交都只落在这里，结束时一次回滚。
+        _shared_connection.begin()
         try:
             yield
         finally:
-            patch.undo()
+            _shared_connection.rollback()
+            _shared_connection.close()
+            _shared_connection = None
+            _shared_engine.dispose()
+            _shared_engine = None
+            get_engine.cache_clear()
+            drop_database(engine, _shared_database)
             drop_database(engine, _template_database)
     finally:
         _admin_engine = None
         engine.dispose()
 
 
-@pytest.fixture(autouse=True)
-def _isolated_database(monkeypatch: pytest.MonkeyPatch, _database_session: None) -> Iterator[None]:
-    """把本用例指向自己的库；真的连库时才建，用完连库一起删掉（失败也照删）。"""
+@contextmanager
+def _dedicated_database(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """给单个用例从模板库克隆一个独立库；用完连库一起删掉（失败也照删）。
 
-    global _current_database, _current_database_created
+    独立库用例不经过共享连接，因此可以跑迁移、跨连接读已提交数据、多线程各自连库。
+    """
 
-    monkeypatch.delenv("DATABASE_SCHEMA", raising=False)
     database = f"{TEST_DATABASE_PREFIX}{uuid4().hex}"
-    _current_database, _current_database_created = database, False
-    monkeypatch.setenv("DATABASE_URL", database_url_with(_base_database_url, database))
+    create_database(_admin(), database, template=_template_database)
+    monkeypatch.setenv(_DATABASE_URL_ENV, database_url_with(_base_database_url, database))
+    monkeypatch.delenv("DATABASE_SCHEMA", raising=False)
     get_settings.cache_clear()
     get_engine.cache_clear()
+    engine = get_engine()
     try:
         yield
     finally:
         # 先关掉本用例的连接池再删库：池里残留的连接会让库删不掉。
-        get_engine().dispose()
+        engine.dispose()
         get_engine.cache_clear()
         get_settings.cache_clear()
-        created = _current_database_created
-        _current_database, _current_database_created = "", False
-        if created:
-            drop_database(_admin(), database)
+        drop_database(_admin(), database)
+
+
+@pytest.fixture(autouse=True)
+def _isolated_database(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[None]:
+    """把本用例的数据改动关在 savepoint 里（`dedicated_database` 用例改用独立库）。"""
+
+    if request.node.get_closest_marker("dedicated_database"):
+        with _dedicated_database(monkeypatch):
+            yield
+        return
+
+    assert _shared_connection is not None, "共享连接还没建立"
+    set_session_scope_factory(_savepoint_session)
+    savepoint = _shared_connection.begin_nested()
+    try:
+        yield
+    finally:
+        set_session_scope_factory(None)
+        savepoint.rollback()
 
 
 @pytest.fixture()
@@ -196,7 +239,7 @@ def sync_scheduler() -> RecordingScheduler:
 
 @pytest.fixture()
 def client(sync_scheduler: RecordingScheduler) -> Iterator[TestClient]:
-    """会触发 lifespan 的客户端；库从模板库克隆而来，lifespan 里的迁移是空操作。
+    """会触发 lifespan 的客户端；库结构已由会话夹具推好，lifespan 在测试模式下跳过它。
 
     默认不启动真实按需同步线程：加入自选的用例很多，不能因为一次测试就访问上游。
     需要真实队列的用例自行替换 `client.app.state.on_demand_sync`。

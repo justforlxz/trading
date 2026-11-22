@@ -1,7 +1,8 @@
 """测试脚手架用到的临时数据库操作。
 
-每个用例一个从模板库克隆出来的独立库：表结构由模板库上的一次
-`alembic upgrade head` 产生，用例之间不共享任何数据。
+标了 `@pytest.mark.dedicated_database` 的用例各用一个从模板库克隆出来的独立库：
+表结构由模板库上的一次 `alembic upgrade head` 产生，用完连库一起删掉。其余用例走
+根 `conftest.py` 的 savepoint 隔离，不经过这里。
 
 建库、删库、查库都必须连维护库（`postgres`）：`CREATE DATABASE` / `DROP DATABASE`
 不能在事务块里执行，也不能删掉自己所在的库，所以这些语句走自动提交的独立引擎。
@@ -18,7 +19,7 @@ from sqlalchemy.engine import make_url
 #: 建库删库连的维护库；测试库不能删自己。
 MAINTENANCE_DATABASE = "postgres"
 
-#: 模板库名前缀：一次迁移到最新版本，之后每个用例从它克隆。
+#: 模板库名前缀：一次迁移到最新版本，之后需要独立库的用例从它克隆。
 TEMPLATE_DATABASE_PREFIX = "trading_tmpl_"
 
 #: 用例库名前缀：一眼能看出是测试产物，也方便 `make test-clean` 清理。

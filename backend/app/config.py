@@ -32,6 +32,10 @@ class Settings(BaseSettings):
 
     app_env: str = "dev"
     log_level: str = "INFO"
+    # 测试模式：装配根跳过「启动即要花钱、测试装配自己会准备」的部分——库结构推进、
+    # 每日权益快照线程、常驻推送集线器与事件管道。生产环境必须保持关闭（默认值）；
+    # 需要这些后台服务的用例自行覆盖 `TEST_MODE` 后再建应用。
+    test_mode: bool = False
 
     # PostgreSQL 连接串，必须由外部注入（`.env.example` 是清单）。
     # 没有内建默认值：本地地址属于「怎么起库」，由 `make db-up` 与测试各自决定。

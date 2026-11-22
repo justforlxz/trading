@@ -1,7 +1,7 @@
 """迁移链与模型的一致性：正向建出全部表、反向删干净、重复执行无副作用。
 
-每个用例都在根 `conftest.py` 给的独立临时库里跑，因此可以放心 `downgrade base`
-再 `upgrade head`，不影响别的用例。
+本模块要真的对库执行 `downgrade base` 与 `upgrade head`，因此标 `dedicated_database`：
+每个用例拿到根 `conftest.py` 克隆出来的独立临时库，迁移只影响自己。
 
 `alembic_version` 是迁移自己的记账表，不属于业务表，比对时单独摘出来。
 """
@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import pytest
 from alembic import command
 from alembic.script import ScriptDirectory
 from sqlalchemy import text
@@ -52,6 +53,8 @@ from app.strategy import (  # noqa: F401
     UserStrategyRow,
 )
 from app.watchlist import WatchlistItemRow  # noqa: F401
+
+pytestmark = pytest.mark.dedicated_database
 
 BOOKKEEPING = "alembic_version"
 

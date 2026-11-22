@@ -8,10 +8,12 @@ import {
 } from "../lib/dashboard";
 import {
   fetchAiSummary,
+  fetchMacroOverview,
   fetchMarketOverview,
   updateAlertStatus,
   type AiSummaryResponse,
   type AlertStatusUpdate,
+  type MacroOverviewResponse,
   type MarketSnapshotResponse,
 } from "../lib/api";
 import { streamLiveness } from "../lib/stream";
@@ -30,6 +32,10 @@ function summaryMessage(reason: unknown): string {
   return reason instanceof Error ? reason.message : "读取市场摘要失败";
 }
 
+function macroMessage(reason: unknown): string {
+  return reason instanceof Error ? reason.message : "读取宏观数据失败";
+}
+
 /** 首页 v6：一次取汇总，再按页面订阅把推送值合并到价格、持仓与账户上。 */
 export default function OverviewPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -40,6 +46,9 @@ export default function OverviewPage() {
   const [marketOverview, setMarketOverview] = useState<MarketSnapshotResponse | null>(null);
   const [marketOverviewError, setMarketOverviewError] = useState<string | null>(null);
   const [marketOverviewLoading, setMarketOverviewLoading] = useState(true);
+  const [macroOverview, setMacroOverview] = useState<MacroOverviewResponse | null>(null);
+  const [macroOverviewError, setMacroOverviewError] = useState<string | null>(null);
+  const [macroOverviewLoading, setMacroOverviewLoading] = useState(true);
   const [aiSummary, setAiSummary] = useState<AiSummaryResponse | null>(null);
   const [aiSummaryError, setAiSummaryError] = useState<string | null>(null);
   const [aiSummaryLoading, setAiSummaryLoading] = useState(true);
@@ -81,6 +90,22 @@ export default function OverviewPage() {
       })
       .finally(() => {
         if (active) setMarketOverviewLoading(false);
+      });
+
+    setMacroOverviewLoading(true);
+    setMacroOverview(null);
+    setMacroOverviewError(null);
+    fetchMacroOverview()
+      .then((payload) => {
+        if (!active) return;
+        setMacroOverview(payload);
+      })
+      .catch((reason: unknown) => {
+        if (!active) return;
+        setMacroOverviewError(macroMessage(reason));
+      })
+      .finally(() => {
+        if (active) setMacroOverviewLoading(false);
       });
 
     setAiSummaryLoading(true);
@@ -150,6 +175,9 @@ export default function OverviewPage() {
       marketOverview={marketOverview}
       marketOverviewError={marketOverviewError}
       marketOverviewLoading={marketOverviewLoading}
+      macroOverview={macroOverview}
+      macroOverviewError={macroOverviewError}
+      macroOverviewLoading={macroOverviewLoading}
       aiSummary={aiSummary}
       aiSummaryError={aiSummaryError}
       aiSummaryLoading={aiSummaryLoading}

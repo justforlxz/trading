@@ -92,8 +92,18 @@ DEFAULT_RISK_DEFAULTS: dict[str, Any] = {
     "warning_threshold": "80",
     "stop_rule": "fixed_pct",
 }
+#: 宏观数据源的默认配置：序列 → 粒度 → provider，以及调度周期。
+#: 上游地址不在设置文档里，它跟 OKX 一样只从 `app/config.py`（环境变量）读取。
 DEFAULT_DATA_SOURCES: dict[str, Any] = {
     "subscribed_instruments": [],
+    "macro": {
+        "series": {
+            "us10y": {"minute": "yahoo", "daily": "treasury"},
+            "us2y": {"daily": "treasury"},
+            "vix": {"minute": "yahoo", "daily": "cboe"},
+        },
+        "scheduler": {"minute": "1m"},
+    },
 }
 # 通知通道默认只开浏览器：浏览器通知是内置能力，不需要任何凭据。
 # `telegram.chat_id` 与 `webhook.url` 是非敏感的接收方信息，可以落库；对应的 bot token
@@ -174,7 +184,85 @@ def _data_sources_view(value: Mapping[str, Any]) -> dict[str, Any]:
         "subscribed_instruments": [
             item for item in subscribed if isinstance(item, str) and item.strip()
         ],
+        "macro": _macro_view(value.get("macro")),
     }
+
+
+def _macro_series_view(value: Any) -> dict[str, dict[str, str]]:
+    """`{序列: {粒度: provider}}` 的形状收紧：只留非空字符串。"""
+
+    if not isinstance(value, Mapping):
+        return {}
+    cleaned: dict[str, dict[str, str]] = {}
+    for series_id, entry in value.items():
+        if not isinstance(series_id, str) or not isinstance(entry, Mapping):
+            continue
+        granularities = {
+            key: item.strip()
+            for key, item in entry.items()
+            if isinstance(key, str) and isinstance(item, str) and item.strip()
+        }
+        if granularities:
+            cleaned[series_id] = granularities
+    return cleaned
+
+
+def _merge_series(base: Any, incoming: Any) -> dict[str, dict[str, str]]:
+    merged = _macro_series_view(base)
+    for series_id, entry in _macro_series_view(incoming).items():
+        merged[series_id] = {**merged.get(series_id, {}), **entry}
+    return merged
+
+
+def _merge_scheduler(base: Any, incoming: Any) -> dict[str, str]:
+    merged: dict[str, str] = {}
+    for source in (base, incoming):
+        if not isinstance(source, Mapping):
+            continue
+        merged.update(
+            {
+                key: item.strip()
+                for key, item in source.items()
+                if isinstance(key, str) and isinstance(item, str) and item.strip()
+            }
+        )
+    return merged
+
+
+def _macro_view(value: Any) -> dict[str, Any]:
+    """宏观分组：缺项用默认值补齐，已保存的值优先。"""
+
+    defaults = DEFAULT_DATA_SOURCES["macro"]
+    macro = value if isinstance(value, Mapping) else {}
+    return {
+        "series": _merge_series(defaults.get("series"), macro.get("series")),
+        "scheduler": _merge_scheduler(defaults.get("scheduler"), macro.get("scheduler")),
+    }
+
+
+def _merge_data_sources(
+    current: Mapping[str, Any],
+    incoming: Mapping[str, Any],
+) -> dict[str, Any]:
+    """按分组合并数据源设置；`macro` 再下探一层。
+
+    直接 `{**current, **incoming}` 会让「只改 vix.minute」把其它序列与调度周期一起覆盖
+    掉。设置页只提交改动的字段，因此合并必须下探到 `series`、`scheduler` 与 `providers`。
+    """
+
+    merged = dict(current)
+    macro = incoming.get("macro")
+    for key, value in incoming.items():
+        if key != "macro":
+            merged[key] = value
+    if isinstance(macro, Mapping):
+        base = current.get("macro")
+        base = base if isinstance(base, Mapping) else {}
+        merged["macro"] = {
+            "series": _merge_series(base.get("series"), macro.get("series")),
+            "scheduler": _merge_scheduler(base.get("scheduler"), macro.get("scheduler")),
+        }
+    return _data_sources_view(merged)
 
 
 def _notifications_view(value: Mapping[str, Any]) -> dict[str, Any]:
@@ -293,9 +381,8 @@ def save_settings(
         if risk_defaults is not None:
             row.risk_defaults = _dump(_merged(DEFAULT_RISK_DEFAULTS, risk_defaults))
         if data_sources is not None:
-            row.data_sources = _dump(
-                _data_sources_view({**_parse("data_sources", row.data_sources), **data_sources})
-            )
+            current_sources = _data_sources_view(_parse("data_sources", row.data_sources))
+            row.data_sources = _dump(_merge_data_sources(current_sources, data_sources))
         if subscribed_instruments is not None:
             current = _data_sources_view(_parse("data_sources", row.data_sources))
             current["subscribed_instruments"] = [

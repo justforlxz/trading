@@ -666,6 +666,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/macro/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Macro Overview
+         * @description 首页与关注列表的宏观读数；只读库，不触发上游请求。
+         */
+        get: operations["get_macro_overview_api_macro_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/macro/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Macro Sync
+         * @description 手动刷新：同一单元正在运行或处于退避时返回 `skipped`，不排队。
+         */
+        post: operations["post_macro_sync_api_macro_sync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/manual-positions": {
         parameters: {
             query?: never;
@@ -1163,7 +1203,7 @@ export interface paths {
         };
         /**
          * Get System Health
-         * @description 数据库、OKX REST、OKX WebSocket、任务队列与 K 线覆盖。
+         * @description 数据库、OKX REST、OKX WebSocket、任务队列、K 线覆盖与宏观调度。
          */
         get: operations["get_system_health_api_system_health_get"];
         put?: never;
@@ -3711,6 +3751,7 @@ export interface components {
             failure_count: number;
             /** Last Sync At */
             last_sync_at?: string | null;
+            macro: components["schemas"]["MacroSettings"];
             /** Subscribed Instruments */
             subscribed_instruments?: string[];
         };
@@ -3719,6 +3760,7 @@ export interface components {
          * @description 数据源可写字段；最后同步时间与失败次数只读。
          */
         DataSourceSettingsUpdate: {
+            macro?: components["schemas"]["MacroSettingsUpdate"] | null;
             /** Subscribed Instruments */
             subscribed_instruments?: string[] | null;
         };
@@ -4659,6 +4701,299 @@ export interface components {
             evidence?: string | null;
             /** Note */
             note?: string | null;
+        };
+        /**
+         * MacroOverviewResponse
+         * @description 首页与关注列表要的宏观读数；`stale` 表示上游失败、数值来自上次落库。
+         * @example {
+         *       "as_of": "2026-11-22T07:01:00Z",
+         *       "readings": [
+         *         {
+         *           "as_of": "2026-11-20T20:59:00Z",
+         *           "change": "-0.13",
+         *           "granularity": "minute",
+         *           "is_delayed": true,
+         *           "market_session": "open",
+         *           "name": "美国 10 年期国债",
+         *           "provider": "yahoo",
+         *           "quality_status": "normal",
+         *           "series_id": "us10y",
+         *           "unit": "%",
+         *           "value": "4.92"
+         *         },
+         *         {
+         *           "as_of": "2026-11-20T21:00:00Z",
+         *           "change": "-0.12",
+         *           "granularity": "daily",
+         *           "is_delayed": false,
+         *           "market_session": "closed",
+         *           "name": "美国 10 年期国债",
+         *           "provider": "treasury",
+         *           "quality_status": "normal",
+         *           "series_id": "us10y",
+         *           "unit": "%",
+         *           "value": "4.92"
+         *         },
+         *         {
+         *           "as_of": "2026-11-20T21:00:00Z",
+         *           "change": "-0.13",
+         *           "granularity": "daily",
+         *           "is_delayed": false,
+         *           "market_session": "closed",
+         *           "name": "美国 2 年期国债",
+         *           "provider": "treasury",
+         *           "quality_status": "normal",
+         *           "series_id": "us2y",
+         *           "unit": "%",
+         *           "value": "4.63"
+         *         },
+         *         {
+         *           "as_of": "2026-11-20T20:59:00Z",
+         *           "change": "7.45",
+         *           "granularity": "minute",
+         *           "is_delayed": true,
+         *           "market_session": "open",
+         *           "name": "恐慌指数 VIX",
+         *           "provider": "yahoo",
+         *           "quality_status": "normal",
+         *           "regime": "panic",
+         *           "series_id": "vix",
+         *           "unit": "点",
+         *           "value": "35.89"
+         *         },
+         *         {
+         *           "as_of": "2026-11-20T21:00:00Z",
+         *           "change": "7.45",
+         *           "granularity": "daily",
+         *           "is_delayed": false,
+         *           "market_session": "closed",
+         *           "name": "恐慌指数 VIX",
+         *           "provider": "cboe",
+         *           "quality_status": "normal",
+         *           "regime": "panic",
+         *           "series_id": "vix",
+         *           "unit": "点",
+         *           "value": "35.89"
+         *         }
+         *       ],
+         *       "spread": {
+         *         "available": true,
+         *         "inverted": false,
+         *         "quality_status": "normal",
+         *         "sources": [
+         *           {
+         *             "provider": "treasury"
+         *           }
+         *         ],
+         *         "trading_day": "2026-11-20",
+         *         "value_bp": "29"
+         *       },
+         *       "stale": false
+         *     }
+         */
+        MacroOverviewResponse: {
+            /** As Of */
+            as_of: string;
+            /** Readings */
+            readings: components["schemas"]["MacroReading"][];
+            spread: components["schemas"]["MacroSpread"];
+            /** Stale */
+            stale: boolean;
+            /** Stale Reason */
+            stale_reason: string | null;
+        };
+        /**
+         * MacroReading
+         * @description 一个序列在一个粒度上的读数；缺数据时 `value` 为空并给出 `error`。
+         */
+        MacroReading: {
+            /** As Of */
+            as_of?: string | null;
+            /** Change */
+            change?: string | null;
+            /** Error */
+            error?: string | null;
+            /**
+             * Granularity
+             * @enum {string}
+             */
+            granularity: "minute" | "daily";
+            /**
+             * Is Delayed
+             * @default false
+             */
+            is_delayed: boolean;
+            /** Market Session */
+            market_session?: string | null;
+            /** Name */
+            name: string;
+            /** Provider */
+            provider: string;
+            /**
+             * Quality Status
+             * @enum {string}
+             */
+            quality_status: "normal" | "stale" | "missing";
+            /** Regime */
+            regime?: ("low" | "normal" | "elevated" | "panic") | null;
+            /** Series Id */
+            series_id: string;
+            /** Source Url */
+            source_url?: string | null;
+            /** Unit */
+            unit: string;
+            /** Value */
+            value?: string | null;
+        };
+        /**
+         * MacroSchedulerSettings
+         * @description 宏观调度周期：`1m` / `5m`。
+         */
+        MacroSchedulerSettings: {
+            /** Minute */
+            minute: string;
+        };
+        /**
+         * MacroSchedulerSettingsUpdate
+         * @description 调度周期，只接受实现支持的取值。
+         */
+        MacroSchedulerSettingsUpdate: {
+            /** Minute */
+            minute?: ("1m" | "5m") | null;
+        };
+        /**
+         * MacroSeriesSettings
+         * @description 一个序列两个粒度的当前 provider；没有配置的粒度给 `null`。
+         */
+        MacroSeriesSettings: {
+            /** Daily */
+            daily?: string | null;
+            /** Minute */
+            minute?: string | null;
+        };
+        /**
+         * MacroSeriesSettingsUpdate
+         * @description 按粒度切换 provider；只提交改动的那一项。
+         */
+        MacroSeriesSettingsUpdate: {
+            /** Daily */
+            daily?: ("treasury" | "cboe" | "yahoo") | null;
+            /** Minute */
+            minute?: ("treasury" | "cboe" | "yahoo") | null;
+        };
+        /**
+         * MacroSettings
+         * @description 宏观数据源配置的只读视图；上游地址属于服务端内部参数，不经 HTTP 暴露。
+         */
+        MacroSettings: {
+            scheduler: components["schemas"]["MacroSchedulerSettings"];
+            /** Series */
+            series: {
+                [key: string]: components["schemas"]["MacroSeriesSettings"];
+            };
+        };
+        /**
+         * MacroSettingsUpdate
+         * @description 宏观分组的可写字段；未提交的序列与子项保持原值。
+         */
+        MacroSettingsUpdate: {
+            scheduler?: components["schemas"]["MacroSchedulerSettingsUpdate"] | null;
+            /** Series */
+            series?: {
+                [key: string]: components["schemas"]["MacroSeriesSettingsUpdate"];
+            } | null;
+        };
+        /**
+         * MacroSource
+         * @description 一个来源：provider 名与它的上游地址。
+         */
+        MacroSource: {
+            /** Provider */
+            provider: string;
+            /** Source Url */
+            source_url?: string | null;
+        };
+        /**
+         * MacroSpread
+         * @description 2Y→10Y 利差；`available=false` 时 `reason` 说明为什么算不出来。
+         *
+         *     `sources` 是配对实际用到的日线来源：默认配置下 2Y 与 10Y 都来自财政部，合成一条；
+         *     两个序列配成不同 provider 时给出两条，不把两个来源写成一个。
+         */
+        MacroSpread: {
+            /** Available */
+            available: boolean;
+            /**
+             * Inverted
+             * @default false
+             */
+            inverted: boolean;
+            /**
+             * Quality Status
+             * @enum {string}
+             */
+            quality_status: "normal" | "stale" | "missing";
+            /** Reason */
+            reason?: string | null;
+            /** Sources */
+            sources: components["schemas"]["MacroSource"][];
+            /** Trading Day */
+            trading_day?: string | null;
+            /** Value Bp */
+            value_bp?: string | null;
+        };
+        /**
+         * MacroSyncResponse
+         * @description 一次手动刷新的结果，按单元逐条返回。
+         * @example {
+         *       "as_of": "2026-11-22T07:01:00Z",
+         *       "results": [
+         *         {
+         *           "granularity": "minute",
+         *           "provider": "yahoo",
+         *           "rows": 400,
+         *           "series_id": "us10y",
+         *           "status": "synced"
+         *         },
+         *         {
+         *           "granularity": "minute",
+         *           "provider": "yahoo",
+         *           "rows": 0,
+         *           "series_id": "vix",
+         *           "status": "skipped"
+         *         }
+         *       ]
+         *     }
+         */
+        MacroSyncResponse: {
+            /** As Of */
+            as_of: string;
+            /** Results */
+            results: components["schemas"]["MacroSyncResultItem"][];
+        };
+        /**
+         * MacroSyncResultItem
+         * @description 一个抓取单元的手动刷新结果；`skipped` 表示同一单元正在跑。
+         */
+        MacroSyncResultItem: {
+            /** Error */
+            error?: string | null;
+            /**
+             * Granularity
+             * @enum {string}
+             */
+            granularity: "minute" | "daily";
+            /** Provider */
+            provider: string;
+            /** Rows */
+            rows: number;
+            /** Series Id */
+            series_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "synced" | "unchanged" | "skipped" | "failed";
         };
         /**
          * ManualPositionCreateRequest
@@ -5991,6 +6326,24 @@ export interface components {
          * @example {
          *       "data_sources": {
          *         "failure_count": 0,
+         *         "macro": {
+         *           "scheduler": {
+         *             "minute": "1m"
+         *           },
+         *           "series": {
+         *             "us10y": {
+         *               "daily": "treasury",
+         *               "minute": "yahoo"
+         *             },
+         *             "us2y": {
+         *               "daily": "treasury"
+         *             },
+         *             "vix": {
+         *               "daily": "cboe",
+         *               "minute": "yahoo"
+         *             }
+         *           }
+         *         },
          *         "subscribed_instruments": []
          *       },
          *       "display": {
@@ -8297,6 +8650,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_macro_overview_api_macro_overview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MacroOverviewResponse"];
+                };
+            };
+        };
+    };
+    post_macro_sync_api_macro_sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MacroSyncResponse"];
                 };
             };
         };

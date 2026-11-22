@@ -166,6 +166,7 @@ describe("关注汇总渲染（AC3 / AC4）", () => {
         createElement(WatchlistSummary, {
           aggregate: aggregateWatchlist(items),
           pending: buildPendingDigest(items, []),
+          marketRisk: null,
         }),
       ),
     );
@@ -197,6 +198,7 @@ describe("关注汇总渲染（AC3 / AC4）", () => {
         createElement(WatchlistSummary, {
           aggregate: aggregateWatchlist(quiet),
           pending: buildPendingDigest(quiet, alerts),
+          marketRisk: null,
         }),
       ),
     );
@@ -217,11 +219,62 @@ describe("关注汇总渲染（AC3 / AC4）", () => {
         createElement(WatchlistSummary, {
           aggregate: aggregateWatchlist(withSignals),
           pending: buildPendingDigest(withSignals, alerts),
+          marketRisk: null,
         }),
       ),
     );
 
     expect(crowded).toContain("需要处理7 项");
     expect(crowded).toContain("另有 1 项");
+  });
+});
+
+describe("市场风险块（AC4）", () => {
+  const vix = {
+    series_id: "vix",
+    name: "恐慌指数 VIX",
+    unit: "点",
+    granularity: "minute" as const,
+    provider: "yahoo",
+    source_url: null,
+    value: "35.89",
+    change: "7.45",
+    as_of: "2026-11-20T20:59:00Z",
+    is_delayed: true,
+    market_session: "open",
+    quality_status: "normal" as const,
+    regime: "panic" as const,
+    error: null,
+  };
+
+  function renderSummary(marketRisk: typeof vix | null): string {
+    return plainText(
+      renderToStaticMarkup(
+        createElement(WatchlistSummary, {
+          aggregate: aggregateWatchlist([makeItem("BTC-USDT-SWAP")]),
+          pending: buildPendingDigest([], []),
+          marketRisk,
+        }),
+      ),
+    );
+  }
+
+  it("只展示全局风险读数：数值、分级与更新时间", () => {
+    const text = renderSummary(vix);
+
+    expect(text).toContain("市场风险");
+    expect(text).toContain("35.89点");
+    expect(text).toContain("恐慌");
+    expect(text).toContain("更新");
+    expect(text).not.toContain("国债");
+    expect(text).not.toContain("利差");
+  });
+
+  it("读数缺失时写「缺失」，不编造数值", () => {
+    const text = renderSummary(null);
+
+    expect(text).toContain("市场风险");
+    expect(text).toContain("缺失");
+    expect(text).toContain("未分级");
   });
 });

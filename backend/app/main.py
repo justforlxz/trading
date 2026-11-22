@@ -38,7 +38,11 @@ from app.events import (
 )
 from app.exchange import OrderSubmission  # noqa: F401
 from app.instrument import Instrument  # noqa: F401
-from app.jobs import OnDemandSyncScheduler, start_equity_snapshot_scheduler
+from app.jobs import (
+    OnDemandSyncScheduler,
+    start_equity_snapshot_scheduler,
+    start_market_data_scheduler,
+)
 from app.journal import ExecutionSnapshot
 from app.market import (  # noqa: F401
     Candle,
@@ -93,6 +97,9 @@ async def lifespan(_app: FastAPI) -> Iterator[None]:
     apply_saved_settings()
     stop_scheduler = Event()
     scheduler = start_equity_snapshot_scheduler(stop_scheduler)
+    # 宏观数据的唯一定时源；下线时与权益快照线程一起停。
+    market_data = start_market_data_scheduler()
+    _app.state.market_data_scheduler = market_data
     # 常驻订阅集合：关注列表的标的在服务启动后就订阅，与有没有浏览器无关。
     registry = watch_registry()
     hub = StreamHub(watch_registry=registry)
@@ -161,6 +168,7 @@ async def lifespan(_app: FastAPI) -> Iterator[None]:
         set_event_publisher(None)
         stop_scheduler.set()
         scheduler.join(timeout=5.0)
+        market_data.shutdown()
         _app.state.on_demand_sync.shutdown()
         await hub.stop()
 

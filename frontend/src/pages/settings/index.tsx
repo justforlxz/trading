@@ -33,9 +33,11 @@ import {
   channelLabel,
   credentialText,
   instrumentsToText,
+  macroPatch,
   notificationsPatch,
   parseInstruments,
   toSettingsDraft,
+  VIX_MINUTE_PROVIDERS,
   withChannel,
   type SettingsDraft,
 } from "../../lib/settings-draft";
@@ -321,6 +323,22 @@ export function SettingsView({
             <p className="text-sm text-muted-foreground">
               失败次数：{settings.data_sources.failure_count}
             </p>
+            <label className="space-y-1.5 text-sm">
+              <span className="text-muted-foreground">VIX 分钟级数据源</span>
+              <select
+                className={INPUT_CLASS}
+                value={draft.macro.vixMinute}
+                onChange={(event) =>
+                  onDraftChange("macro", { vixMinute: event.target.value })
+                }
+              >
+                {VIX_MINUTE_PROVIDERS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <div className="sm:col-span-2">
               <HealthBlock
                 health={health}
@@ -752,6 +770,7 @@ export default function SettingsPage() {
         execution: draft.execution,
         data_sources: {
           subscribed_instruments: parseInstruments(instrumentsText),
+          ...(macroPatch(draft.macro) === null ? {} : { macro: macroPatch(draft.macro) }),
         },
         notifications: notificationsPatch(draft.notifications),
         exchange: apiKey.trim() ? { api_key: apiKey.trim() } : null,

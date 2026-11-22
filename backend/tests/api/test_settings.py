@@ -63,6 +63,14 @@ def test_get_returns_v6_defaults_and_hides_internal_groups(client: TestClient) -
         "subscribed_instruments": [],
         "last_sync_at": None,
         "failure_count": 0,
+        "macro": {
+            "series": {
+                "us10y": {"minute": "yahoo", "daily": "treasury"},
+                "us2y": {"minute": None, "daily": "treasury"},
+                "vix": {"minute": "yahoo", "daily": "cboe"},
+            },
+            "scheduler": {"minute": "1m"},
+        },
     }
     assert body["notifications"] == DEFAULT_NOTIFICATIONS
     assert body["secrets"] == {
@@ -538,3 +546,70 @@ def test_test_send_reports_a_missing_receiver_instead_of_a_crash(
         "status": "failed",
         "error": "未配置：请先在设置页填写 Telegram chat_id",
     }
+
+
+def test_macro_provider_name_must_be_registered(client: TestClient) -> None:
+    """未登记的名字在契约层被拒，不写进设置文档。"""
+
+    response = client.patch(
+        "/api/settings",
+        json={"data_sources": {"macro": {"series": {"vix": {"minute": "nope"}}}}},
+    )
+
+    assert response.status_code == 422
+
+
+def test_macro_provider_must_be_allowed_for_that_series(client: TestClient) -> None:
+    """已登记但不适用于该序列的 provider 返回 400，并列出可选值。"""
+
+    response = client.patch(
+        "/api/settings",
+        json={"data_sources": {"macro": {"series": {"vix": {"minute": "treasury"}}}}},
+    )
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "cboe" in detail and "yahoo" in detail
+
+
+def test_macro_provider_switch_persists_and_reads_back(client: TestClient) -> None:
+    response = client.patch(
+        "/api/settings",
+        json={"data_sources": {"macro": {"series": {"vix": {"minute": "cboe"}}}}},
+    )
+
+    assert response.status_code == 200, response.text
+    macro = response.json()["data_sources"]["macro"]
+    assert macro["series"]["vix"]["minute"] == "cboe"
+    # 其它序列不被顺手覆盖
+    assert macro["series"]["us10y"]["daily"] == "treasury"
+
+
+def test_macro_daily_slot_rejects_a_minute_only_provider(client: TestClient) -> None:
+    """日结槽填分钟级源：写入时就 400，不让「分钟级 10Y 减日线 2Y」的配置进库。"""
+
+    response = client.patch(
+        "/api/settings",
+        json={"data_sources": {"macro": {"series": {"us10y": {"daily": "yahoo"}}}}},
+    )
+
+    assert response.status_code == 400
+    assert "treasury" in response.json()["detail"]
+
+
+def test_macro_minute_slot_rejects_a_settlement_provider(client: TestClient) -> None:
+    response = client.patch(
+        "/api/settings",
+        json={"data_sources": {"macro": {"series": {"us10y": {"minute": "treasury"}}}}},
+    )
+
+    assert response.status_code == 400
+    assert "yahoo" in response.json()["detail"]
+
+
+def test_macro_scheduler_interval_is_restricted(client: TestClient) -> None:
+    response = client.patch(
+        "/api/settings", json={"data_sources": {"macro": {"scheduler": {"minute": "1h"}}}}
+    )
+
+    assert response.status_code == 422

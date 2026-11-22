@@ -1,3 +1,5 @@
+import { MarketRiskBlock } from "../../components/ui/market-risk";
+import type { MacroReading } from "../../lib/api";
 import { cn } from "../../lib/utils";
 import {
   averageChangeText,
@@ -11,7 +13,7 @@ import {
 } from "../../lib/watchlist-summary";
 
 /**
- * 关注汇总：只有三块——关注规模、涨跌分布、需要处理。
+ * 关注汇总：关注规模、涨跌分布、市场风险与需要处理。
  *
  * 分类筛选是联动的：入参是当前分类筛选后的标的列表，三块汇总跟着一起收窄。
  * 输入全部来自 `aggregateWatchlist` / `buildPendingDigest`，这里不重新算数，
@@ -20,9 +22,15 @@ import {
 export function WatchlistSummary({
   aggregate,
   pending,
+  marketRisk,
+  marketRiskLoading = false,
+  marketRiskError = null,
 }: {
   aggregate: WatchlistAggregate;
   pending: PendingDigest;
+  marketRisk: MacroReading | null;
+  marketRiskLoading?: boolean;
+  marketRiskError?: string | null;
 }) {
   const segments = CHANGE_BUCKETS.filter((bucket) => aggregate.distribution[bucket] > 0);
 
@@ -92,6 +100,20 @@ export function WatchlistSummary({
               {CHANGE_BUCKET_LABELS.flat} {aggregate.distribution.flat}
             </span>
           </div>
+        </div>
+      </section>
+
+      <section className="border-b px-4 py-3 last:border-b-0">
+        <div className="flex items-baseline justify-between gap-2">
+          <h3 className="text-[11px] font-medium text-muted-foreground">市场风险</h3>
+          <span className="text-[11px] text-muted-foreground">全局</span>
+        </div>
+        <div className="mt-2">
+          <MarketRiskBlock
+            reading={marketRisk}
+            loading={marketRiskLoading}
+            error={marketRiskError}
+          />
         </div>
       </section>
 

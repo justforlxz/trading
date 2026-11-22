@@ -1,6 +1,24 @@
 {
   "data_sources": {
     "failure_count": 0,
+    "macro": {
+      "scheduler": {
+        "minute": "1m"
+      },
+      "series": {
+        "us10y": {
+          "daily": "treasury",
+          "minute": "yahoo"
+        },
+        "us2y": {
+          "daily": "treasury"
+        },
+        "vix": {
+          "daily": "cboe",
+          "minute": "yahoo"
+        }
+      }
+    },
     "subscribed_instruments": []
   },
   "display": {

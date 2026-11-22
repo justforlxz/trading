@@ -8,6 +8,10 @@
  * 通知分组在接口里是嵌套的（`channels` / `telegram.chat_id` / `webhook.url`），
  * 界面上是三条独立输入。草稿因此拍平成三个字段，保存时再由 `notificationsPatch`
  * 组装回接口形状：这样切换某个通道开关不会顺手覆盖另一个通道的接收方。
+ *
+ * 宏观分组同理：界面上只有「VIX 的分钟级 provider」一个可写项，草稿只存这一项，
+ * 保存时由 `macroPatch` 组装成 `data_sources.macro.series.vix.minute`；其它序列与调度
+ * 周期不在页面上改，也就不会被顺手覆盖。
  */
 
 import type {
@@ -17,7 +21,13 @@ import type {
   NotificationSettingsUpdate,
   RiskDefaults,
   SettingsResponse,
+  SettingsUpdateRequest,
 } from "./api";
+
+/** 契约为宏观序列覆盖生成的写入形状；provider 名是枚举，不是任意字符串。 */
+export type MacroSeriesUpdate = NonNullable<
+  NonNullable<NonNullable<SettingsUpdateRequest["data_sources"]>["macro"]>["series"]
+>[string];
 
 /** 通知分组在草稿里的扁平形状：接收方各自一条，与界面输入一一对应。 */
 export type NotificationDraft = {
@@ -26,13 +36,40 @@ export type NotificationDraft = {
   webhookUrl: string;
 };
 
+/** 宏观分组在草稿里只有一项：VIX 的分钟级取数 provider。 */
+export type MacroDraft = {
+  vixMinute: string;
+};
+
 /** 设置页的草稿：只放可编辑字段，订阅标的原文由页面单独持有。 */
 export type SettingsDraft = {
   display: DisplaySettings;
   risk_defaults: RiskDefaults;
   execution: ExecutionSettings;
   notifications: NotificationDraft;
+  macro: MacroDraft;
 };
+
+/** 可选的两个 VIX 分钟级 provider；标签写明它实际提供什么粒度。 */
+export const VIX_MINUTE_PROVIDERS: readonly { value: string; label: string }[] = [
+  { value: "yahoo", label: "Yahoo（分钟级）" },
+  { value: "cboe", label: "CBOE（日结 CSV）" },
+];
+
+export function toMacroDraft(
+  macro: SettingsResponse["data_sources"]["macro"],
+): MacroDraft {
+  return { vixMinute: macro?.series?.vix?.minute ?? "" };
+}
+
+/** 草稿 → 宏观分组的 PATCH 载荷；空值表示不修改（不写空字符串覆盖配置）。 */
+export function macroPatch(draft: MacroDraft): { series: { vix: MacroSeriesUpdate } } | null {
+  const minute = draft.vixMinute.trim();
+  if (minute === "") return null;
+  return {
+    series: { vix: { minute: minute as MacroSeriesUpdate["minute"] } },
+  };
+}
 
 /** 三个通道的固定顺序：界面按这个顺序排列开关。 */
 export const NOTIFICATION_CHANNELS: readonly string[] = ["browser", "telegram", "webhook"];
@@ -43,6 +80,7 @@ export function toSettingsDraft(settings: SettingsResponse): SettingsDraft {
     risk_defaults: settings.risk_defaults,
     execution: settings.execution,
     notifications: toNotificationDraft(settings.notifications),
+    macro: toMacroDraft(settings.data_sources.macro),
   };
 }
 

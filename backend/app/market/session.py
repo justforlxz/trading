@@ -40,8 +40,11 @@ __all__ = [
     "day_asset_type",
     "exchange_session",
     "is_trading_day",
+    "last_settled_trading_day",
     "next_daily_open_time",
     "primary_source",
+    "settlement_epoch",
+    "trading_day_of",
 ]
 
 # 资产类别：与 `app.instrument.model` 的落库取值一致。
@@ -215,6 +218,44 @@ def day_asset_type(asset_type: str, source: str | None = None) -> str:
     if source is not None and (source == SOURCE_OKX or source.startswith(f"{SOURCE_OKX}_")):
         return CRYPTO
     return asset_type
+
+
+def trading_day_of(ts: datetime) -> date:
+    """`ts` 归属于哪个美股交易日：按美东本地日期，不按 UTC 日期。
+
+    收盘后的 20:00 美东仍是当天；同一时刻在 UTC 已经是第二天。用 UTC 日期归类会把
+    盘后观测算到错误的交易日上。
+    """
+
+    return _require_aware(ts).astimezone(EASTERN).date()
+
+
+def settlement_epoch(day: date) -> int:
+    """某个交易日正常时段收盘（美东 16:00）的 epoch 秒：日线结算值的时刻。
+
+    结算值没有「盘中」时间，用该交易日的收盘时刻表示，`exchange_session()` 对它
+    自然给出 `closed`。不做「必须是交易日」的校验：上游偶尔给出临时休市日的值，
+    拒收整份数据比多存一行更糟。
+    """
+
+    return int(datetime.combine(day, REGULAR_CLOSE, tzinfo=EASTERN).timestamp())
+
+
+def last_settled_trading_day(now: datetime) -> date:
+    """`now` 时点最近一个**已经收盘**的美股交易日（美东日期）。
+
+    当天已过正常时段收盘就算当天，否则往前找到最近的交易日。日线结算源只在交易日
+    产生一行，因此「这一行抓过没有」用它与 `trading_day` 比对即可，不必每分钟重抓。
+    """
+
+    local = _require_aware(now).astimezone(EASTERN)
+    day = local.date()
+    if is_trading_day(day) and local.time() >= REGULAR_CLOSE:
+        return day
+    day -= _ONE_DAY
+    while not is_trading_day(day):
+        day -= _ONE_DAY
+    return day
 
 
 def is_trading_day(day: date) -> bool:

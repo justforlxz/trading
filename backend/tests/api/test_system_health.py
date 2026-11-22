@@ -34,6 +34,7 @@ def test_health_reports_every_component(client: TestClient) -> None:
         "okx_ws",
         "job_queue",
         "candle_coverage",
+        "macro",
     ]
     assert "external_provider" not in names
     database = _components(body)["database"]

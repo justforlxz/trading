@@ -1,0 +1,85 @@
+{
+  "as_of": "2026-11-22T07:01:00Z",
+  "readings": [
+    {
+      "as_of": "2026-11-20T20:59:00Z",
+      "change": "-0.13",
+      "granularity": "minute",
+      "is_delayed": true,
+      "market_session": "open",
+      "name": "美国 10 年期国债",
+      "provider": "yahoo",
+      "quality_status": "normal",
+      "series_id": "us10y",
+      "unit": "%",
+      "value": "4.92"
+    },
+    {
+      "as_of": "2026-11-20T21:00:00Z",
+      "change": "-0.12",
+      "granularity": "daily",
+      "is_delayed": false,
+      "market_session": "closed",
+      "name": "美国 10 年期国债",
+      "provider": "treasury",
+      "quality_status": "normal",
+      "series_id": "us10y",
+      "unit": "%",
+      "value": "4.92"
+    },
+    {
+      "as_of": "2026-11-20T21:00:00Z",
+      "change": "-0.13",
+      "granularity": "daily",
+      "is_delayed": false,
+      "market_session": "closed",
+      "name": "美国 2 年期国债",
+      "provider": "treasury",
+      "quality_status": "normal",
+      "series_id": "us2y",
+      "unit": "%",
+      "value": "4.63"
+    },
+    {
+      "as_of": "2026-11-20T20:59:00Z",
+      "change": "7.45",
+      "granularity": "minute",
+      "is_delayed": true,
+      "market_session": "open",
+      "name": "恐慌指数 VIX",
+      "provider": "yahoo",
+      "quality_status": "normal",
+      "regime": "panic",
+      "series_id": "vix",
+      "unit": "点",
+      "value": "35.89"
+    },
+    {
+      "as_of": "2026-11-20T21:00:00Z",
+      "change": "7.45",
+      "granularity": "daily",
+      "is_delayed": false,
+      "market_session": "closed",
+      "name": "恐慌指数 VIX",
+      "provider": "cboe",
+      "quality_status": "normal",
+      "regime": "panic",
+      "series_id": "vix",
+      "unit": "点",
+      "value": "35.89"
+    }
+  ],
+  "spread": {
+    "available": true,
+    "inverted": false,
+    "quality_status": "normal",
+    "sources": [
+      {
+        "provider": "treasury"
+      }
+    ],
+    "trading_day": "2026-11-20",
+    "value_bp": "29"
+  },
+  "stale": false
+}

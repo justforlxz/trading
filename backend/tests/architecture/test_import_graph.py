@@ -44,6 +44,7 @@ PACKAGES: tuple[str, ...] = (
     "instrument",
     "jobs",
     "journal",
+    "macro",
     "market",
     "opportunity",
     "portfolio",
@@ -101,6 +102,9 @@ ALLOWED_DEPS: dict[str, frozenset[str]] = {
     # `db` 是下单幂等键登记表（`order_submissions`）的落点：同一 `clientOrderId`
     # 只允许产生一张上游单，判重必须落在库里而不是进程内存里。
     "exchange": frozenset({"shared", "db", "instrument"}),
+    # 宏观域：读设置里的 provider 配置、复用行情域的交易日与时段纯函数；不写行情表，
+    # 也不被行情域反向依赖（健康组件由装配层拼装）。
+    "macro": frozenset({"shared", "db", "market", "settings"}),
     "instrument": frozenset({"shared", "db"}),
     "market": frozenset({"shared", "db", "exchange", "instrument"}),
     # 自选行要在后端补趋势、RSI 与 ATR，指标计算必须复用 `app.indicators`，

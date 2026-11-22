@@ -10,6 +10,7 @@ import {
   type DashboardPushed,
   type DashboardSummary,
 } from "../../lib/dashboard";
+import type { MacroOverviewResponse } from "../../lib/api";
 import type { AiSummary, MarketSnapshot } from "../../lib/market";
 import type { StreamLiveness } from "../../lib/stream";
 import type { AlertStatusUpdate } from "../../lib/alerts";
@@ -35,6 +36,9 @@ export type OverviewViewProps = {
   marketOverview: MarketSnapshot | null;
   marketOverviewError: string | null;
   marketOverviewLoading: boolean;
+  macroOverview: MacroOverviewResponse | null;
+  macroOverviewError: string | null;
+  macroOverviewLoading: boolean;
   aiSummary: AiSummary | null;
   aiSummaryError: string | null;
   aiSummaryLoading: boolean;
@@ -54,6 +58,9 @@ export function OverviewView({
   marketOverview,
   marketOverviewError,
   marketOverviewLoading,
+  macroOverview,
+  macroOverviewError,
+  macroOverviewLoading,
   aiSummary,
   aiSummaryError,
   aiSummaryLoading,
@@ -67,6 +74,9 @@ export function OverviewView({
       overview={marketOverview}
       error={marketOverviewError}
       loading={marketOverviewLoading}
+      macro={macroOverview}
+      macroError={macroOverviewError}
+      macroLoading={macroOverviewLoading}
     />
   );
   const marketSummaryCard = (

@@ -5374,6 +5374,9 @@
             ],
             "title": "Last Sync At"
           },
+          "macro": {
+            "$ref": "#/components/schemas/MacroSettings"
+          },
           "subscribed_instruments": {
             "items": {
               "type": "string"
@@ -5382,6 +5385,9 @@
             "type": "array"
           }
         },
+        "required": [
+          "macro"
+        ],
         "title": "DataSourceSettings",
         "type": "object"
       },
@@ -5389,6 +5395,16 @@
         "additionalProperties": false,
         "description": "数据源可写字段；最后同步时间与失败次数只读。",
         "properties": {
+          "macro": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MacroSettingsUpdate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "subscribed_instruments": {
             "anyOf": [
               {
@@ -7324,6 +7340,629 @@
           "capital_budget"
         ],
         "title": "LiveAuthorizationRequest",
+        "type": "object"
+      },
+      "MacroOverviewResponse": {
+        "description": "首页与关注列表要的宏观读数；`stale` 表示上游失败、数值来自上次落库。",
+        "examples": [
+          {
+            "as_of": "2026-11-22T07:01:00Z",
+            "readings": [
+              {
+                "as_of": "2026-11-20T20:59:00Z",
+                "change": "-0.13",
+                "granularity": "minute",
+                "is_delayed": true,
+                "market_session": "open",
+                "name": "美国 10 年期国债",
+                "provider": "yahoo",
+                "quality_status": "normal",
+                "series_id": "us10y",
+                "unit": "%",
+                "value": "4.92"
+              },
+              {
+                "as_of": "2026-11-20T21:00:00Z",
+                "change": "-0.12",
+                "granularity": "daily",
+                "is_delayed": false,
+                "market_session": "closed",
+                "name": "美国 10 年期国债",
+                "provider": "treasury",
+                "quality_status": "normal",
+                "series_id": "us10y",
+                "unit": "%",
+                "value": "4.92"
+              },
+              {
+                "as_of": "2026-11-20T21:00:00Z",
+                "change": "-0.13",
+                "granularity": "daily",
+                "is_delayed": false,
+                "market_session": "closed",
+                "name": "美国 2 年期国债",
+                "provider": "treasury",
+                "quality_status": "normal",
+                "series_id": "us2y",
+                "unit": "%",
+                "value": "4.63"
+              },
+              {
+                "as_of": "2026-11-20T20:59:00Z",
+                "change": "7.45",
+                "granularity": "minute",
+                "is_delayed": true,
+                "market_session": "open",
+                "name": "恐慌指数 VIX",
+                "provider": "yahoo",
+                "quality_status": "normal",
+                "regime": "panic",
+                "series_id": "vix",
+                "unit": "点",
+                "value": "35.89"
+              },
+              {
+                "as_of": "2026-11-20T21:00:00Z",
+                "change": "7.45",
+                "granularity": "daily",
+                "is_delayed": false,
+                "market_session": "closed",
+                "name": "恐慌指数 VIX",
+                "provider": "cboe",
+                "quality_status": "normal",
+                "regime": "panic",
+                "series_id": "vix",
+                "unit": "点",
+                "value": "35.89"
+              }
+            ],
+            "spread": {
+              "available": true,
+              "inverted": false,
+              "quality_status": "normal",
+              "sources": [
+                {
+                  "provider": "treasury"
+                }
+              ],
+              "trading_day": "2026-11-20",
+              "value_bp": "29"
+            },
+            "stale": false
+          }
+        ],
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "readings": {
+            "items": {
+              "$ref": "#/components/schemas/MacroReading"
+            },
+            "title": "Readings",
+            "type": "array"
+          },
+          "spread": {
+            "$ref": "#/components/schemas/MacroSpread"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "stale_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stale Reason"
+          }
+        },
+        "required": [
+          "as_of",
+          "stale",
+          "stale_reason",
+          "readings",
+          "spread"
+        ],
+        "title": "MacroOverviewResponse",
+        "type": "object"
+      },
+      "MacroReading": {
+        "description": "一个序列在一个粒度上的读数；缺数据时 `value` 为空并给出 `error`。",
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "change": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "granularity": {
+            "enum": [
+              "minute",
+              "daily"
+            ],
+            "title": "Granularity",
+            "type": "string"
+          },
+          "is_delayed": {
+            "default": false,
+            "title": "Is Delayed",
+            "type": "boolean"
+          },
+          "market_session": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Session"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "quality_status": {
+            "enum": [
+              "normal",
+              "stale",
+              "missing"
+            ],
+            "title": "Quality Status",
+            "type": "string"
+          },
+          "regime": {
+            "anyOf": [
+              {
+                "enum": [
+                  "low",
+                  "normal",
+                  "elevated",
+                  "panic"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regime"
+          },
+          "series_id": {
+            "title": "Series Id",
+            "type": "string"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "series_id",
+          "name",
+          "unit",
+          "granularity",
+          "provider",
+          "quality_status"
+        ],
+        "title": "MacroReading",
+        "type": "object"
+      },
+      "MacroSchedulerSettings": {
+        "description": "宏观调度周期：`1m` / `5m`。",
+        "properties": {
+          "minute": {
+            "title": "Minute",
+            "type": "string"
+          }
+        },
+        "required": [
+          "minute"
+        ],
+        "title": "MacroSchedulerSettings",
+        "type": "object"
+      },
+      "MacroSchedulerSettingsUpdate": {
+        "additionalProperties": false,
+        "description": "调度周期，只接受实现支持的取值。",
+        "properties": {
+          "minute": {
+            "anyOf": [
+              {
+                "enum": [
+                  "1m",
+                  "5m"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minute"
+          }
+        },
+        "title": "MacroSchedulerSettingsUpdate",
+        "type": "object"
+      },
+      "MacroSeriesSettings": {
+        "description": "一个序列两个粒度的当前 provider；没有配置的粒度给 `null`。",
+        "properties": {
+          "daily": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily"
+          },
+          "minute": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minute"
+          }
+        },
+        "title": "MacroSeriesSettings",
+        "type": "object"
+      },
+      "MacroSeriesSettingsUpdate": {
+        "additionalProperties": false,
+        "description": "按粒度切换 provider；只提交改动的那一项。",
+        "properties": {
+          "daily": {
+            "anyOf": [
+              {
+                "enum": [
+                  "treasury",
+                  "cboe",
+                  "yahoo"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily"
+          },
+          "minute": {
+            "anyOf": [
+              {
+                "enum": [
+                  "treasury",
+                  "cboe",
+                  "yahoo"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minute"
+          }
+        },
+        "title": "MacroSeriesSettingsUpdate",
+        "type": "object"
+      },
+      "MacroSettings": {
+        "description": "宏观数据源配置的只读视图；上游地址属于服务端内部参数，不经 HTTP 暴露。",
+        "properties": {
+          "scheduler": {
+            "$ref": "#/components/schemas/MacroSchedulerSettings"
+          },
+          "series": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/MacroSeriesSettings"
+            },
+            "title": "Series",
+            "type": "object"
+          }
+        },
+        "required": [
+          "series",
+          "scheduler"
+        ],
+        "title": "MacroSettings",
+        "type": "object"
+      },
+      "MacroSettingsUpdate": {
+        "additionalProperties": false,
+        "description": "宏观分组的可写字段；未提交的序列与子项保持原值。",
+        "properties": {
+          "scheduler": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MacroSchedulerSettingsUpdate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "series": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/MacroSeriesSettingsUpdate"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series"
+          }
+        },
+        "title": "MacroSettingsUpdate",
+        "type": "object"
+      },
+      "MacroSource": {
+        "description": "一个来源：provider 名与它的上游地址。",
+        "properties": {
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          }
+        },
+        "required": [
+          "provider"
+        ],
+        "title": "MacroSource",
+        "type": "object"
+      },
+      "MacroSpread": {
+        "description": "2Y→10Y 利差；`available=false` 时 `reason` 说明为什么算不出来。\n\n`sources` 是配对实际用到的日线来源：默认配置下 2Y 与 10Y 都来自财政部，合成一条；\n两个序列配成不同 provider 时给出两条，不把两个来源写成一个。",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "inverted": {
+            "default": false,
+            "title": "Inverted",
+            "type": "boolean"
+          },
+          "quality_status": {
+            "enum": [
+              "normal",
+              "stale",
+              "missing"
+            ],
+            "title": "Quality Status",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/MacroSource"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "trading_day": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trading Day"
+          },
+          "value_bp": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Bp"
+          }
+        },
+        "required": [
+          "available",
+          "quality_status",
+          "sources"
+        ],
+        "title": "MacroSpread",
+        "type": "object"
+      },
+      "MacroSyncResponse": {
+        "description": "一次手动刷新的结果，按单元逐条返回。",
+        "examples": [
+          {
+            "as_of": "2026-11-22T07:01:00Z",
+            "results": [
+              {
+                "granularity": "minute",
+                "provider": "yahoo",
+                "rows": 400,
+                "series_id": "us10y",
+                "status": "synced"
+              },
+              {
+                "granularity": "minute",
+                "provider": "yahoo",
+                "rows": 0,
+                "series_id": "vix",
+                "status": "skipped"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/MacroSyncResultItem"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "as_of",
+          "results"
+        ],
+        "title": "MacroSyncResponse",
+        "type": "object"
+      },
+      "MacroSyncResultItem": {
+        "description": "一个抓取单元的手动刷新结果；`skipped` 表示同一单元正在跑。",
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "granularity": {
+            "enum": [
+              "minute",
+              "daily"
+            ],
+            "title": "Granularity",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "rows": {
+            "minimum": 0.0,
+            "title": "Rows",
+            "type": "integer"
+          },
+          "series_id": {
+            "title": "Series Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "synced",
+              "unchanged",
+              "skipped",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "series_id",
+          "granularity",
+          "provider",
+          "status",
+          "rows"
+        ],
+        "title": "MacroSyncResultItem",
         "type": "object"
       },
       "ManualPositionCreateRequest": {
@@ -10382,6 +11021,24 @@
           {
             "data_sources": {
               "failure_count": 0,
+              "macro": {
+                "scheduler": {
+                  "minute": "1m"
+                },
+                "series": {
+                  "us10y": {
+                    "daily": "treasury",
+                    "minute": "yahoo"
+                  },
+                  "us2y": {
+                    "daily": "treasury"
+                  },
+                  "vix": {
+                    "daily": "cboe",
+                    "minute": "yahoo"
+                  }
+                }
+              },
               "subscribed_instruments": []
             },
             "display": {
@@ -15054,6 +15711,50 @@
         ]
       }
     },
+    "/api/macro/overview": {
+      "get": {
+        "description": "首页与关注列表的宏观读数；只读库，不触发上游请求。",
+        "operationId": "get_macro_overview_api_macro_overview_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MacroOverviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Macro Overview",
+        "tags": [
+          "macro"
+        ]
+      }
+    },
+    "/api/macro/sync": {
+      "post": {
+        "description": "手动刷新：同一单元正在运行或处于退避时返回 `skipped`，不排队。",
+        "operationId": "post_macro_sync_api_macro_sync_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MacroSyncResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Post Macro Sync",
+        "tags": [
+          "macro"
+        ]
+      }
+    },
     "/api/manual-positions": {
       "get": {
         "operationId": "get_manual_positions_api_manual_positions_get",
@@ -16794,7 +17495,7 @@
     },
     "/api/system/health": {
       "get": {
-        "description": "数据库、OKX REST、OKX WebSocket、任务队列与 K 线覆盖。",
+        "description": "数据库、OKX REST、OKX WebSocket、任务队列、K 线覆盖与宏观调度。",
         "operationId": "get_system_health_api_system_health_get",
         "responses": {
           "200": {

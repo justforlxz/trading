@@ -91,18 +91,72 @@ class ExecutionSettings(BaseModel):
     auto_trading_enabled: bool = False
 
 
+#: 已实现的宏观 provider 名；未登记的名字在写侧直接 422，不落进设置文档。
+MacroProviderName = Literal["treasury", "cboe", "yahoo"]
+#: 允许的调度周期。
+MacroInterval = Literal["1m", "5m"]
+
+
+class MacroSeriesSettings(BaseModel):
+    """一个序列两个粒度的当前 provider；没有配置的粒度给 `null`。"""
+
+    minute: str | None = None
+    daily: str | None = None
+
+
+class MacroSchedulerSettings(BaseModel):
+    """宏观调度周期：`1m` / `5m`。"""
+
+    minute: str
+
+
+class MacroSettings(BaseModel):
+    """宏观数据源配置的只读视图；上游地址属于服务端内部参数，不经 HTTP 暴露。"""
+
+    series: dict[str, MacroSeriesSettings]
+    scheduler: MacroSchedulerSettings
+
+
+class MacroSeriesSettingsUpdate(BaseModel):
+    """按粒度切换 provider；只提交改动的那一项。"""
+
+    minute: MacroProviderName | None = None
+    daily: MacroProviderName | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class MacroSchedulerSettingsUpdate(BaseModel):
+    """调度周期，只接受实现支持的取值。"""
+
+    minute: MacroInterval | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class MacroSettingsUpdate(BaseModel):
+    """宏观分组的可写字段；未提交的序列与子项保持原值。"""
+
+    series: dict[str, MacroSeriesSettingsUpdate] | None = None
+    scheduler: MacroSchedulerSettingsUpdate | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class DataSourceSettings(BaseModel):
     """数据源配置与同步状态；状态字段由服务端读取同步任务表填写。"""
 
     subscribed_instruments: list[str] = Field(default_factory=list)
     last_sync_at: UtcDatetime | None = None
     failure_count: int = Field(default=0, ge=0)
+    macro: MacroSettings
 
 
 class DataSourceSettingsUpdate(BaseModel):
     """数据源可写字段；最后同步时间与失败次数只读。"""
 
     subscribed_instruments: list[str] | None = None
+    macro: MacroSettingsUpdate | None = None
 
     model_config = ConfigDict(extra="forbid")
 
@@ -287,6 +341,14 @@ class SettingsResponse(BaseModel):
                         "subscribed_instruments": [],
                         "last_sync_at": None,
                         "failure_count": 0,
+                        "macro": {
+                            "series": {
+                                "us10y": {"minute": "yahoo", "daily": "treasury"},
+                                "us2y": {"minute": None, "daily": "treasury"},
+                                "vix": {"minute": "yahoo", "daily": "cboe"},
+                            },
+                            "scheduler": {"minute": "1m"},
+                        },
                     },
                     "notifications": {
                         "channels": ["browser"],

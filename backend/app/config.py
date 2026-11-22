@@ -48,6 +48,21 @@ class Settings(BaseSettings):
     okx_rate_limit_capacity: int = 20
     okx_rate_limit_refill_per_second: float = 10.0
 
+    # 宏观数据源的上游地址：与 OKX 一样只从配置读取，provider 实现里不写 URL。
+    # 财政部 CSV 的 `{year}` 由 treasury provider 替换成当前年份。
+    macro_treasury_url: str = (
+        "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/"
+        "daily-treasury-rates.csv/{year}/all?type=daily_treasury_yield_curve"
+        "&field_tdr_date_value={year}&page&_format=csv"
+    )
+    macro_cboe_url: str = "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv"
+    macro_yahoo_tnx_url: str = (
+        "https://query1.finance.yahoo.com/v8/finance/chart/%5ETNX?interval=1m&range=1d"
+    )
+    macro_yahoo_vix_url: str = (
+        "https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1m&range=1d"
+    )
+
     # 按需 K 线同步在进程内的并发上限：单进程部署没有独立 worker，线程数即上限。
     on_demand_sync_max_concurrency: int = Field(default=2, ge=1)
 

@@ -1,0 +1,19 @@
+{
+  "as_of": "2026-11-22T07:01:00Z",
+  "results": [
+    {
+      "granularity": "minute",
+      "provider": "yahoo",
+      "rows": 400,
+      "series_id": "us10y",
+      "status": "synced"
+    },
+    {
+      "granularity": "minute",
+      "provider": "yahoo",
+      "rows": 0,
+      "series_id": "vix",
+      "status": "skipped"
+    }
+  ]
+}

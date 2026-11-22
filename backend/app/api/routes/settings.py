@@ -28,6 +28,9 @@ from app.api.schemas import (
     DeliveryListResponse,
     DisplaySettings,
     ExecutionSettings,
+    MacroSchedulerSettings,
+    MacroSeriesSettings,
+    MacroSettings,
     NotificationChannelTestRequest,
     NotificationChannelTestResponse,
     NotificationSettings,
@@ -51,6 +54,7 @@ from app.events import (
     record_delivery,
 )
 from app.jobs import OKX_PROVIDER
+from app.macro import validate_series_override
 from app.market import sync_summary
 from app.settings import SettingsRecord, load_settings, save_settings
 
@@ -72,6 +76,7 @@ def get_settings_document() -> SettingsResponse:
 def patch_settings_document(payload: SettingsUpdateRequest) -> SettingsResponse:
     """按分组部分更新；未提交的分组保持原值。"""
 
+    _validate_macro(payload)
     record = save_settings(
         display=None if payload.display is None else payload.display.model_dump(mode="json"),
         risk_defaults=None
@@ -209,6 +214,45 @@ def _test_event() -> DomainEvent:
     )
 
 
+def _validate_macro(payload: SettingsUpdateRequest) -> None:
+    """写侧校验宏观分组的 provider 名；不合法当场 400，并列出该序列可选的值。
+
+    契约层的 `Literal` 已经挡住未登记的名字；这里再按「序列」校验一次——同一个已登记的
+    provider 未必适用于某个序列（例如国债只有财政部官方源）。校验推迟到读配置时，写入
+    会先返回成功，之后首页整体报错、调度器每轮空转。
+    """
+
+    if payload.data_sources is None or payload.data_sources.macro is None:
+        return
+    series = payload.data_sources.macro.series or {}
+    validate_series_override(
+        {series_id: entry.model_dump(exclude_none=True) for series_id, entry in series.items()}
+    )
+
+
+def _macro_settings(record: SettingsRecord) -> MacroSettings:
+    """宏观分组 → 契约模型；只暴露序列→provider 与调度周期，上游地址留在服务端。"""
+
+    macro = record.data_sources.get("macro")
+    macro = macro if isinstance(macro, dict) else {}
+    raw_series = macro.get("series")
+    raw_series = raw_series if isinstance(raw_series, dict) else {}
+    series = {
+        series_id: MacroSeriesSettings(
+            minute=None if not isinstance(entry, dict) else entry.get("minute"),
+            daily=None if not isinstance(entry, dict) else entry.get("daily"),
+        )
+        for series_id, entry in raw_series.items()
+        if isinstance(series_id, str)
+    }
+    scheduler = macro.get("scheduler")
+    interval = scheduler.get("minute") if isinstance(scheduler, dict) else None
+    return MacroSettings(
+        series=series,
+        scheduler=MacroSchedulerSettings(minute=interval if isinstance(interval, str) else "1m"),
+    )
+
+
 def _delivery(row: NotificationDeliveryRow) -> DeliveryItem:
     return DeliveryItem(
         id=row.id,
@@ -230,6 +274,7 @@ def _response(record: SettingsRecord) -> SettingsResponse:
             subscribed_instruments=list(record.data_sources.get("subscribed_instruments", [])),
             last_sync_at=last_sync_at,
             failure_count=failure_count,
+            macro=_macro_settings(record),
         ),
         notifications=_notification_settings(record),
         secrets=SecretSettings(

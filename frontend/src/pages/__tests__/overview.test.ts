@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 
 import { describe, expect, it } from "vitest";
 
+import type { MacroOverviewResponse } from "../../lib/api";
 import type { DashboardSummary } from "../../lib/dashboard";
 import type { AiSummary, MarketSnapshot } from "../../lib/market";
 import type { OverviewViewProps } from "../overview/view";
@@ -174,6 +175,89 @@ function marketOverview(): MarketSnapshot {
   };
 }
 
+function macroOverview(): MacroOverviewResponse {
+  return {
+    as_of: "2026-11-15T06:10:00Z",
+    stale: false,
+    stale_reason: null,
+    readings: [
+      {
+        series_id: "us10y",
+        name: "美国 10 年期国债",
+        unit: "%",
+        granularity: "minute",
+        provider: "yahoo",
+        source_url: null,
+        value: "4.92",
+        change: "-0.13",
+        as_of: "2026-11-15T05:59:00Z",
+        is_delayed: true,
+        market_session: "open",
+        quality_status: "normal",
+        regime: null,
+        error: null,
+      },
+      {
+        series_id: "us10y",
+        name: "美国 10 年期国债",
+        unit: "%",
+        granularity: "daily",
+        provider: "treasury",
+        source_url: null,
+        value: "4.92",
+        change: "-0.12",
+        as_of: "2026-11-14T21:00:00Z",
+        is_delayed: false,
+        market_session: "closed",
+        quality_status: "normal",
+        regime: null,
+        error: null,
+      },
+      {
+        series_id: "us2y",
+        name: "美国 2 年期国债",
+        unit: "%",
+        granularity: "daily",
+        provider: "treasury",
+        source_url: null,
+        value: "4.63",
+        change: "-0.13",
+        as_of: "2026-11-14T21:00:00Z",
+        is_delayed: false,
+        market_session: "closed",
+        quality_status: "normal",
+        regime: null,
+        error: null,
+      },
+      {
+        series_id: "vix",
+        name: "恐慌指数 VIX",
+        unit: "点",
+        granularity: "minute",
+        provider: "yahoo",
+        source_url: null,
+        value: "35.89",
+        change: "7.45",
+        as_of: "2026-11-15T05:59:00Z",
+        is_delayed: true,
+        market_session: "open",
+        quality_status: "normal",
+        regime: "panic",
+        error: null,
+      },
+    ],
+    spread: {
+      available: true,
+      value_bp: "29",
+      inverted: false,
+      trading_day: "2026-11-14",
+      quality_status: "normal",
+      reason: null,
+      sources: [{ provider: "treasury", source_url: null }],
+    },
+  };
+}
+
 function aiSummary(): AiSummary {
   return {
     generated_at: "2026-11-15T06:10:00Z",
@@ -211,6 +295,9 @@ function render(overrides: Partial<OverviewViewProps> = {}): string {
         marketOverview: marketOverview(),
         marketOverviewError: null,
         marketOverviewLoading: false,
+        macroOverview: macroOverview(),
+        macroOverviewError: null,
+        macroOverviewLoading: false,
         aiSummary: aiSummary(),
         aiSummaryError: null,
         aiSummaryLoading: false,
@@ -399,20 +486,97 @@ describe("首页 v6", () => {
     expect(section).not.toContain("偏强，波动率抬升");
   });
 
-  it("市场概况只展示 BTC、OKX 来源、报价时间与状态", () => {
+  it("市场概况的指数项只有 BTC，不出现已删除的外部指数占位项", () => {
     const html = render();
     expect(html).toContain('data-market-symbol="BTC"');
-    for (const symbol of ["NASDAQ", "SP500", "DOW", "VIX"]) {
+    // VIX 现在有真实来源，单独走宏观行（见下一条用例），不再是占位项。
+    for (const symbol of ["NASDAQ", "SP500", "DOW"]) {
       expect(html).not.toContain(`data-market-symbol="${symbol}"`);
     }
     const start = html.indexOf('data-module="market"');
     const end = html.indexOf('data-module="account"', start);
     const section = html.slice(start, end);
-    expect(section).toContain("OKX 公共行情");
+    expect(section).toContain("来源：逐行标注");
     expect(section).toContain("okx_spot");
     expect(section).toContain("2026-11-15 14:00");
     expect(section).toContain("实时");
     expect(section).toContain("https://www.okx.com/trade-spot/btc-usdt");
+  });
+
+  it("市场概况卡的宏观三行：10Y、利差与 VIX 分级都来自接口", () => {
+    const html = render();
+    const start = html.indexOf('data-module="market"');
+    const end = html.indexOf('data-module="account"', start);
+    const section = html.slice(start, end);
+
+    expect(section).toContain('data-macro-series="us10y"');
+    expect(section).toContain('data-macro-series="spread"');
+    expect(section).toContain('data-macro-series="vix"');
+    expect(section).toContain("4.92%");
+    expect(section).toContain("+29bp");
+    expect(section).toContain('data-regime="panic"');
+    expect(section).toContain("恐慌");
+    expect(section).toContain("延迟");
+    // AC3：三行都要有来源。利差行的来源由后端给出（配对用的日结 provider）。
+    const macroStart = html.indexOf('aria-label="宏观数据"');
+    const macroSection = html.slice(macroStart, end);
+    expect(macroSection.match(/来源：/g)?.length).toBe(3);
+    expect(macroSection).toContain("结算日：2026-11-14");
+    expect(macroSection).toContain("treasury");
+  });
+
+  it("利差为负时标红并写「倒挂」", () => {
+    const macro = macroOverview();
+    const html = render({
+      macroOverview: {
+        ...macro,
+        spread: {
+          available: true,
+          value_bp: "-53",
+          inverted: true,
+          trading_day: "2026-11-14",
+          quality_status: "normal",
+          reason: null,
+          sources: [{ provider: "treasury", source_url: null }],
+        },
+      },
+    });
+
+    expect(html).toContain("倒挂");
+    expect(html).toContain("-53bp");
+    expect(html).toContain("text-rose-600");
+  });
+
+  it("宏观数据过期时给出提示，数值保持后端给的原值", () => {
+    const macro = macroOverview();
+    const html = render({
+      macroOverview: { ...macro, stale: true, stale_reason: "上游 503" },
+    });
+
+    expect(html).toContain("宏观数据已过期");
+    expect(html).toContain("上游 503");
+    expect(html).toContain("4.92%");
+  });
+
+  it("利差不可用时显示原因，不用分钟级顶替", () => {
+    const macro = macroOverview();
+    const html = render({
+      macroOverview: {
+        ...macro,
+        spread: {
+          available: false,
+          value_bp: null,
+          inverted: false,
+          trading_day: null,
+          quality_status: "missing",
+          reason: "2Y 结算日 2026-11-14 与 10Y 结算日 2026-11-13 不同, 无法配对",
+          sources: [{ provider: "treasury", source_url: null }],
+        },
+      },
+    });
+
+    expect(html).toContain("无法配对");
+    expect(html).toContain("不可用");
   });
 
   it("市场概况读取失败时显示原因，不显示旧值", () => {

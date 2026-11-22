@@ -19,7 +19,9 @@ import {
   type MarketOverviewItem,
   type MarketSnapshot,
 } from "../../lib/market";
+import type { MacroOverviewResponse } from "../../lib/api";
 import { cn } from "../../lib/utils";
+import { MacroRows } from "./macro-rows";
 import { StatusBadge } from "./module-card";
 
 const ITEM_OK_TONE =
@@ -173,10 +175,16 @@ export function MarketOverviewCard({
   overview,
   error,
   loading,
+  macro,
+  macroError,
+  macroLoading,
 }: {
   overview: MarketSnapshot | null;
   error: string | null;
   loading: boolean;
+  macro: MacroOverviewResponse | null;
+  macroError: string | null;
+  macroLoading: boolean;
 }) {
   const status = cardStatus(overview, error, loading, overview?.stale ?? false);
   return (
@@ -194,11 +202,15 @@ export function MarketOverviewCard({
         <CardDescription className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span>数据时间：{asOfText(overview?.as_of)}</span>
           <span aria-hidden="true">·</span>
-          <span>来源：OKX 公共行情</span>
+          <span>来源：逐行标注</span>
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         <MarketOverviewBody overview={overview} error={error} loading={loading} />
+        <section className="space-y-2 border-t pt-3">
+          <h4 className="text-xs font-medium text-muted-foreground">全球宏观</h4>
+          <MacroRows overview={macro} error={macroError} loading={macroLoading} />
+        </section>
       </CardContent>
     </Card>
   );

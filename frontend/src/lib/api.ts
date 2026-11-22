@@ -110,6 +110,10 @@ export type SystemComponent = components["schemas"]["SystemComponent"];
 export type MarketBreadthResponse = components["schemas"]["MarketBreadthResponse"];
 export type MarketSnapshotResponse = components["schemas"]["MarketSnapshotResponse"];
 export type MarketOverviewItem = components["schemas"]["MarketOverviewItem"];
+export type MacroOverviewResponse = components["schemas"]["MacroOverviewResponse"];
+export type MacroReading = components["schemas"]["MacroReading"];
+export type MacroSpread = components["schemas"]["MacroSpread"];
+
 export type AiSummaryResponse = components["schemas"]["AiSummaryResponse"];
 export type ResearchNoteItem = components["schemas"]["ResearchNoteItem"];
 export type ResearchNoteListResponse = components["schemas"]["ResearchNoteListResponse"];
@@ -197,6 +201,12 @@ export function fetchMarketBreadth(
 export function fetchMarketOverview(): Promise<MarketSnapshotResponse> {
   return request<MarketSnapshotResponse>("/market/overview");
 }
+
+/** 宏观读数：只读库，不触发上游请求；上游失败时后端返回缓存值并标 `stale`。 */
+export function fetchMacroOverview(): Promise<MacroOverviewResponse> {
+  return request<MacroOverviewResponse>("/macro/overview");
+}
+
 
 /** 带来源的市场摘要；只归纳市场概况与待处理提醒，请求没有输入。 */
 export function fetchAiSummary(): Promise<AiSummaryResponse> {

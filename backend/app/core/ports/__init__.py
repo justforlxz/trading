@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from app.core.ports.market_data import MarketDataPort, Ticker
+from app.core.ports.observations import Observation, ObservationProvider
 from app.core.ports.trade import (
     AccountSnapshot,
     ExchangePosition,
@@ -21,6 +22,8 @@ __all__ = [
     "ExchangePosition",
     "Fill",
     "MarketDataPort",
+    "Observation",
+    "ObservationProvider",
     "Order",
     "Position",
     "Ticker",

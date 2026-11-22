@@ -13,6 +13,7 @@ from app.api.routes.backtest import backtest_router
 from app.api.routes.dashboard import dashboard_router
 from app.api.routes.indicators import indicators_router
 from app.api.routes.instruments import instruments_router
+from app.api.routes.macro import macro_router
 from app.api.routes.market import market_router
 from app.api.routes.opportunity import opportunity_router
 from app.api.routes.positions import positions_router
@@ -35,6 +36,7 @@ def include_routers(app: FastAPI) -> None:
     app.include_router(instruments_router, prefix="/api")
     app.include_router(indicators_router, prefix="/api")
     app.include_router(market_router, prefix="/api")
+    app.include_router(macro_router, prefix="/api")
     app.include_router(ai_router, prefix="/api")
     app.include_router(system_router, prefix="/api")
     app.include_router(opportunity_router, prefix="/api")

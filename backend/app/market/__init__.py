@@ -45,6 +45,8 @@ from app.market.model import (
     Candle,
     CorrelationSnapshot,
     DataSyncJobRow,
+    from_epoch,
+    to_epoch,
 )
 from app.market.overview import (
     MarketOverviewItem,
@@ -77,7 +79,10 @@ from app.market.session import (
     daily_open_time,
     exchange_session,
     is_trading_day,
+    last_settled_trading_day,
     primary_source,
+    settlement_epoch,
+    trading_day_of,
 )
 from app.market.sync import (
     candle_sources,
@@ -140,9 +145,11 @@ __all__ = [
     "find_gaps",
     "finish_sync_job",
     "floor_open_time",
+    "from_epoch",
     "integrity",
     "is_trading_day",
     "lagged_correlation",
+    "last_settled_trading_day",
     "latest_candle",
     "latest_sync_job",
     "load_candles",
@@ -160,11 +167,14 @@ __all__ = [
     "rolling_correlation",
     "rolling_sign_agreement",
     "save_snapshot",
+    "settlement_epoch",
     "spearman",
     "start_sync_job",
     "sync_candles",
     "sync_summary",
     "system_health",
+    "to_epoch",
+    "trading_day_of",
     "upsert_candles",
     "upsert_funding",
 ]

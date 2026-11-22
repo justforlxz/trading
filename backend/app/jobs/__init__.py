@@ -15,6 +15,10 @@ from app.jobs.equity import (
     next_beijing_midnight,
     start_equity_snapshot_scheduler,
 )
+from app.jobs.market_data import (
+    MarketDataScheduler,
+    start_market_data_scheduler,
+)
 from app.jobs.on_demand import (
     DEFAULT_DAYS_BY_BAR,
     WATCHLIST_BAR,
@@ -53,6 +57,7 @@ __all__ = [
     "SYNC_DATASETS",
     "WATCHLIST_BAR",
     "WATCHLIST_DAYS",
+    "MarketDataScheduler",
     "OnDemandSyncScheduler",
     "QueueOutcome",
     "QueueReport",
@@ -68,4 +73,5 @@ __all__ = [
     "run_sweep",
     "run_tasks",
     "start_equity_snapshot_scheduler",
+    "start_market_data_scheduler",
 ]

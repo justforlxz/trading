@@ -187,6 +187,17 @@ def _isolated_database(monkeypatch: pytest.MonkeyPatch, _database_session: None)
             drop_database(_admin(), database)
 
 
+@pytest.fixture(autouse=True)
+def _reset_macro_runtime() -> Iterator[None]:
+    """宏观同步状态是进程内的：用例之间清空，避免失败/退避互相污染。"""
+
+    from app.macro import service
+
+    service.reset_runtime()
+    yield
+    service.reset_runtime()
+
+
 @pytest.fixture()
 def sync_scheduler() -> RecordingScheduler:
     """默认注入的记录型调度器；自选用例据此断言同步被请求了一次。"""

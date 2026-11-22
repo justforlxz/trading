@@ -15,6 +15,7 @@ import {
   addWatchlistItem,
   fetchAlerts,
   fetchCandles,
+  fetchMacroOverview,
   fetchMarketBreadth,
   fetchWatchlist,
   okxCandleSource,
@@ -22,11 +23,13 @@ import {
   updateWatchlistItem,
   type AlertItem,
   type InstrumentRef,
+  type MacroOverviewResponse,
   type MarketBreadthResponse,
   type WatchlistItem,
   type WatchlistResponse,
 } from "../../lib/api";
 import { instTypeLabel } from "../../lib/display";
+import { vixReading } from "../../lib/macro";
 import { useQuoteStream } from "../../lib/stream-hooks";
 import {
   assetTypeLabel,
@@ -270,6 +273,9 @@ export default function WatchlistPage() {
   const [market, setMarket] = useState<MarketBreadthResponse[] | null>(null);
   const [marketError, setMarketError] = useState<string | null>(null);
 
+  const [macro, setMacro] = useState<MacroOverviewResponse | null>(null);
+  const [macroError, setMacroError] = useState<string | null>(null);
+  const [macroLoading, setMacroLoading] = useState(true);
   const [pendingAlerts, setPendingAlerts] = useState<readonly AlertItem[]>([]);
   const [alertsError, setAlertsError] = useState<string | null>(null);
   /** 每个标的最近 24 根 1 小时收盘；取不到就是空数组，图里画灰虚线。 */
@@ -312,6 +318,29 @@ export default function WatchlistPage() {
       active = false;
     };
   }, []);
+
+  /** 全局风险读数：只取 VIX 一条。 */
+  useEffect(() => {
+    let active = true;
+    setMacroLoading(true);
+    fetchMacroOverview()
+      .then((value) => {
+        if (!active) return;
+        setMacro(value);
+        setMacroError(null);
+      })
+      .catch((reason: unknown) => {
+        if (!active) return;
+        setMacro(null);
+        setMacroError(messageOf(reason, "市场风险读数加载失败"));
+      })
+      .finally(() => {
+        if (active) setMacroLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [reloadToken]);
 
   /** 「需要处理」里的待处理提醒；拿不到时如实说明，不把条数当成 0。 */
   useEffect(() => {
@@ -644,7 +673,13 @@ export default function WatchlistPage() {
               )}
             </section>
 
-            <WatchlistSummary aggregate={aggregate} pending={pending} />
+            <WatchlistSummary
+              aggregate={aggregate}
+              pending={pending}
+              marketRisk={vixReading(macro)}
+              marketRiskLoading={macroLoading}
+              marketRiskError={macroError}
+            />
           </div>
         </>
       ) : null}

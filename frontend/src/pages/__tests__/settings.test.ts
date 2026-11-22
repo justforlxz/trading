@@ -25,6 +25,14 @@ const SETTINGS: SettingsResponse = {
     subscribed_instruments: ["BTC-USDT", "ETH-USDT-SWAP"],
     last_sync_at: "2026-11-15T06:00:00Z",
     failure_count: 2,
+    macro: {
+      series: {
+        us10y: { minute: "yahoo", daily: "treasury" },
+        us2y: { minute: null, daily: "treasury" },
+        vix: { minute: "yahoo", daily: "cboe" },
+      },
+      scheduler: { minute: "1m" },
+    },
   },
   notifications: {
     channels: ["browser", "telegram"],

@@ -243,6 +243,7 @@ def test_an_adjustment_cannot_be_decided_twice(seeded: TestClient) -> None:
     assert list_adjustments()[1] == 1
 
 
+@pytest.mark.dedicated_database
 def test_concurrent_decisions_leave_one_consistent_result(seeded: TestClient) -> None:
     """两个并发决定只能有一个成功；批准失败时不会留下已生效目标。"""
 

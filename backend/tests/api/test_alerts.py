@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from decimal import Decimal
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
@@ -190,6 +191,7 @@ def test_activity_is_filtered_and_paginated_by_cursor(market_data: TestClient) -
     assert [item["event_type"] for item in moved] == ["watchlist.item.moved"]
 
 
+@pytest.mark.dedicated_database
 def test_concurrent_scans_keep_one_alert_per_rule(market_data: TestClient) -> None:
     """两个扫描同时落库时，唯一约束由数据库兜住，不抛 500。"""
 
@@ -205,6 +207,7 @@ def test_concurrent_scans_keep_one_alert_per_rule(market_data: TestClient) -> No
     assert len(keys) == len(set(keys))
 
 
+@pytest.mark.dedicated_database
 def test_concurrent_status_update_only_one_wins(market_data: TestClient) -> None:
     """并发处置同一条提醒时，行锁让后到的请求读到新状态并返回冲突。"""
 

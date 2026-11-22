@@ -540,6 +540,7 @@ def test_manual_position_flow_matches_hand_calculation(api: TestClient) -> None:
     assert delete_with_trades.status_code == 409, delete_with_trades.text
 
 
+@pytest.mark.dedicated_database
 def test_concurrent_duplicate_idempotency_key_returns_the_original_position(
     api: TestClient,
 ) -> None:

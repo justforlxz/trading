@@ -21,7 +21,7 @@ from sqlalchemy import text
 
 from app.config import get_settings
 from app.core import Bar, Timeframe
-from app.db.engine import get_engine
+from app.db import session_scope
 from app.instrument import sync_instruments
 from app.market import upsert_candles
 from app.strategy import create_instance, update_strategy
@@ -143,13 +143,16 @@ def unconfigured(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
 
 def _table_snapshot() -> dict[str, tuple[int, str]]:
-    """每张关键表的行数与整表内容摘要；用来证明一次请求不写库。"""
+    """每张关键表的行数与整表内容摘要；用来证明一次请求不写库。
 
-    engine = get_engine()
+    走 `session_scope` 而不是另起连接：测试装配把用例的会话都绑在同一条连接上，
+    另起连接看不到用例尚未提交的写入，快照会永远读成空表，断言就失去意义。
+    """
+
     snapshot: dict[str, tuple[int, str]] = {}
-    with engine.connect() as connection:
+    with session_scope() as session:
         for table in TRACKED_TABLES:
-            exists = connection.execute(text("SELECT to_regclass(:name)"), {"name": table}).scalar()
+            exists = session.execute(text("SELECT to_regclass(:name)"), {"name": table}).scalar()
             if exists is None:
                 snapshot[table] = (0, "")
                 continue
@@ -158,7 +161,7 @@ def _table_snapshot() -> dict[str, tuple[int, str]]:
                 "coalesce(md5(string_agg(t::text, '|' ORDER BY t::text)), '') "
                 f'FROM "{table}" t'
             )
-            count, digest = connection.execute(text(statement)).one()
+            count, digest = session.execute(text(statement)).one()
             snapshot[table] = (int(count), str(digest))
     return snapshot
 

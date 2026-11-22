@@ -46,3 +46,7 @@ ignore = ["B008", "RUF001", "RUF002", "RUF003"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+  # 用例要用独立临时数据库（跑 `alembic downgrade`、跨连接读已提交数据、多线程各自连库）。
+  "dedicated_database: 该用例从模板库克隆一个独立库，而不是走共用的 savepoint 会话",
+]

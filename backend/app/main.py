@@ -76,7 +76,18 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> Iterator[None]:
-    """启动时把库结构推进到最新版本；退出无需清理（连接池随进程关闭）。"""
+    """启动时把库结构推进到最新版本；退出无需清理（连接池随进程关闭）。
+
+    测试模式（`TEST_MODE=1`）只装配请求处理路径：库结构由测试装配用自己的迁移推好，
+    权益快照线程、常驻推送集线器与通知管道都不启动，用例需要它们时自行覆盖配置。
+    """
+
+    if get_settings().test_mode:
+        try:
+            yield
+        finally:
+            _app.state.on_demand_sync.shutdown()
+        return
 
     init_db()
     apply_saved_settings()

@@ -239,6 +239,14 @@ export type SettingsViewProps = {
   onRequestNotificationPermission: () => void;
 };
 
+/**
+ * 测试发送只读已保存的接收方（服务端每次投递现读设置表）：草稿与保存值不一致，
+ * 或者还没有保存值（首次配置）时都要提示「先保存再测试」，别让人以为输入框里的值会生效。
+ */
+function needsSavedReceiverHint(draft: string, saved: string): boolean {
+  return saved === "" || draft.trim() !== saved;
+}
+
 /** 纯展示组件：测试直接渲染它，不依赖网络与浏览器。 */
 export function SettingsView({
   settings,
@@ -266,6 +274,10 @@ export function SettingsView({
   onTestChannel,
   onRequestNotificationPermission,
 }: SettingsViewProps) {
+  // 测试发送只读已保存的接收方，输入框里的草稿值不参与投递：两种情况都要提醒。
+  // 一是草稿与保存值不一致（改了没保存），二是还没有保存值（首次配置）。
+  const savedTelegramChatId = (settings.notifications.telegram?.chat_id ?? "").trim();
+  const savedWebhookUrl = (settings.notifications.webhook?.url ?? "").trim();
   return (
     <>
       <PageHeading
@@ -489,9 +501,10 @@ export function SettingsView({
                 >
                   {testingChannel === "telegram" ? "发送中…" : "测试发送"}
                 </Button>
-                {draft.notifications.telegramChatId.trim() === "" ? (
+                {needsSavedReceiverHint(draft.notifications.telegramChatId, savedTelegramChatId) ? (
                   <p className="text-xs text-muted-foreground">
-                    先在上面填写 chat_id 再测试发送；chat_id 由给 bot 发过消息后取得。
+                    测试发送只用已保存的 chat_id：填好后先保存，再测试发送；chat_id
+                    由给 bot 发过消息后取得。
                   </p>
                 ) : null}
               </div>
@@ -517,9 +530,9 @@ export function SettingsView({
                 >
                   {testingChannel === "webhook" ? "发送中…" : "测试发送"}
                 </Button>
-                {draft.notifications.webhookUrl.trim() === "" ? (
+                {needsSavedReceiverHint(draft.notifications.webhookUrl, savedWebhookUrl) ? (
                   <p className="text-xs text-muted-foreground">
-                    先在上面填写接收地址再测试发送；保存后立即生效，不用重启进程。
+                    测试发送只用已保存的接收地址：填好后先保存，再测试发送。
                   </p>
                 ) : null}
               </div>

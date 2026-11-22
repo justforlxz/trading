@@ -24,6 +24,7 @@ from app.core.errors import (
 )
 from app.core.ports import (
     AccountSnapshot,
+    BarProvider,
     ExchangePosition,
     Fill,
     MarketDataPort,
@@ -40,6 +41,7 @@ from app.core.types import Bar, InstrumentRef, Money, OrderIntent, Signal, Timef
 __all__ = [
     "AccountSnapshot",
     "Bar",
+    "BarProvider",
     "Clock",
     "Conflict",
     "DataUnavailable",

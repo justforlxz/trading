@@ -27,6 +27,8 @@ from app.api.schemas import (
     DeliveryItem,
     DeliveryListResponse,
     DisplaySettings,
+    EquitySchedulerSettings,
+    EquitySettings,
     ExecutionSettings,
     MacroSchedulerSettings,
     MacroSeriesSettings,
@@ -42,6 +44,7 @@ from app.api.schemas import (
     WebhookSettings,
 )
 from app.config import get_settings as runtime_settings
+from app.equity import validate_equity_override
 from app.events import (
     ChannelConfig,
     DeliveryResult,
@@ -77,6 +80,7 @@ def patch_settings_document(payload: SettingsUpdateRequest) -> SettingsResponse:
     """按分组部分更新；未提交的分组保持原值。"""
 
     _validate_macro(payload)
+    _validate_equity(payload)
     record = save_settings(
         display=None if payload.display is None else payload.display.model_dump(mode="json"),
         risk_defaults=None
@@ -230,6 +234,37 @@ def _validate_macro(payload: SettingsUpdateRequest) -> None:
     )
 
 
+def _validate_equity(payload: SettingsUpdateRequest) -> None:
+    """写侧校验美股分组：provider 名与标的清单不合法当场 400。
+
+    契约层的 `Literal` 已经挡住未登记的名字；这里再按「标的」校验一次——空的清单与
+    带空白的代码能存进设置文档，但下一次读配置时首页美股区整体报错、调度器每轮空转。
+    """
+
+    if payload.data_sources is None or payload.data_sources.equity is None:
+        return
+    group = payload.data_sources.equity
+    validate_equity_override(provider=group.provider, symbols=group.symbols)
+
+
+def _equity_settings(record: SettingsRecord) -> EquitySettings:
+    """美股分组 → 契约模型；上游地址留在服务端，不经 HTTP 暴露。"""
+
+    equity = record.data_sources.get("equity")
+    equity = equity if isinstance(equity, dict) else {}
+    provider = equity.get("provider")
+    symbols = equity.get("symbols")
+    scheduler = equity.get("scheduler")
+    interval = scheduler.get("minute") if isinstance(scheduler, dict) else None
+    return EquitySettings(
+        provider=provider if isinstance(provider, str) else "",
+        symbols=[item for item in symbols if isinstance(item, str)]
+        if isinstance(symbols, list)
+        else [],
+        scheduler=EquitySchedulerSettings(minute=interval if isinstance(interval, str) else "1m"),
+    )
+
+
 def _macro_settings(record: SettingsRecord) -> MacroSettings:
     """宏观分组 → 契约模型；只暴露序列→provider 与调度周期，上游地址留在服务端。"""
 
@@ -275,6 +310,7 @@ def _response(record: SettingsRecord) -> SettingsResponse:
             last_sync_at=last_sync_at,
             failure_count=failure_count,
             macro=_macro_settings(record),
+            equity=_equity_settings(record),
         ),
         notifications=_notification_settings(record),
         secrets=SecretSettings(

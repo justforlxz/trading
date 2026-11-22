@@ -94,6 +94,9 @@ DEFAULT_RISK_DEFAULTS: dict[str, Any] = {
 }
 #: 宏观数据源的默认配置：序列 → 粒度 → provider，以及调度周期。
 #: 上游地址不在设置文档里，它跟 OKX 一样只从 `app/config.py`（环境变量）读取。
+#:
+#: 美股分组同理：`provider` 决定用哪个实现（`yahoo` / `stooq`），`symbols` 是首页
+#: 「市场概况」要显示的美股标的。周期由 provider 声明，不在这里配置。
 DEFAULT_DATA_SOURCES: dict[str, Any] = {
     "subscribed_instruments": [],
     "macro": {
@@ -102,6 +105,11 @@ DEFAULT_DATA_SOURCES: dict[str, Any] = {
             "us2y": {"daily": "treasury"},
             "vix": {"minute": "yahoo", "daily": "cboe"},
         },
+        "scheduler": {"minute": "1m"},
+    },
+    "equity": {
+        "provider": "yahoo",
+        "symbols": ["SPY", "QQQ"],
         "scheduler": {"minute": "1m"},
     },
 }
@@ -185,6 +193,7 @@ def _data_sources_view(value: Mapping[str, Any]) -> dict[str, Any]:
             item for item in subscribed if isinstance(item, str) and item.strip()
         ],
         "macro": _macro_view(value.get("macro")),
+        "equity": _equity_view(value.get("equity")),
     }
 
 
@@ -240,20 +249,42 @@ def _macro_view(value: Any) -> dict[str, Any]:
     }
 
 
+def _equity_view(value: Any) -> dict[str, Any]:
+    """美股分组：缺项用默认值补齐，已保存的值优先。"""
+
+    defaults = DEFAULT_DATA_SOURCES["equity"]
+    equity = value if isinstance(value, Mapping) else {}
+    provider = equity.get("provider")
+    symbols = equity.get("symbols")
+    return {
+        "provider": provider.strip()
+        if isinstance(provider, str) and provider.strip()
+        else defaults["provider"],
+        "symbols": (
+            [item.strip() for item in symbols if isinstance(item, str) and item.strip()]
+            if isinstance(symbols, list)
+            else list(defaults["symbols"])
+        ),
+        "scheduler": _merge_scheduler(defaults.get("scheduler"), equity.get("scheduler")),
+    }
+
+
 def _merge_data_sources(
     current: Mapping[str, Any],
     incoming: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """按分组合并数据源设置；`macro` 再下探一层。
+    """按分组合并数据源设置；`macro` 与 `equity` 再下探一层。
 
     直接 `{**current, **incoming}` 会让「只改 vix.minute」把其它序列与调度周期一起覆盖
     掉。设置页只提交改动的字段，因此合并必须下探到 `series`、`scheduler` 与 `providers`。
+    美股的标的清单整体替换（提交的是完整清单），provider 与调度周期按提交项覆盖。
     """
 
     merged = dict(current)
     macro = incoming.get("macro")
+    equity = incoming.get("equity")
     for key, value in incoming.items():
-        if key != "macro":
+        if key not in {"macro", "equity"}:
             merged[key] = value
     if isinstance(macro, Mapping):
         base = current.get("macro")
@@ -262,6 +293,21 @@ def _merge_data_sources(
             "series": _merge_series(base.get("series"), macro.get("series")),
             "scheduler": _merge_scheduler(base.get("scheduler"), macro.get("scheduler")),
         }
+    if isinstance(equity, Mapping):
+        base = current.get("equity")
+        base = base if isinstance(base, Mapping) else {}
+        merged_equity: dict[str, Any] = dict(base)
+        if isinstance(equity.get("provider"), str) and equity["provider"].strip():
+            merged_equity["provider"] = equity["provider"].strip()
+        if isinstance(equity.get("symbols"), list):
+            merged_equity["symbols"] = [
+                item.strip() for item in equity["symbols"] if isinstance(item, str) and item.strip()
+            ]
+        if isinstance(equity.get("scheduler"), Mapping):
+            merged_equity["scheduler"] = _merge_scheduler(
+                base.get("scheduler"), equity.get("scheduler")
+            )
+        merged["equity"] = merged_equity
     return _data_sources_view(merged)
 
 

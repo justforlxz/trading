@@ -35,6 +35,7 @@ __all__ = [
     "SESSION_REGULAR",
     "TOKENIZED_EQUITY",
     "UNKNOWN_ASSET",
+    "US_EQUITY",
     "asset_session",
     "daily_open_time",
     "day_asset_type",
@@ -52,6 +53,9 @@ CRYPTO = "crypto"
 TOKENIZED_EQUITY = "tokenized_equity"
 COMMODITY_TOKEN = "commodity_token"
 UNKNOWN_ASSET = "unknown"
+# 真实美股（Yahoo / Stooq 直连的 SPY、QQQ 这类标的）。它的行情不来自 OKX，日界与
+# 时段按美股市场本身算；`tokenized_equity` 是 OKX 上的代币化股票，两者不是一回事。
+US_EQUITY = "us_equity"
 
 # 资产时段取值。
 SESSION_PRE = "pre"
@@ -88,6 +92,7 @@ _ASSET_KINDS: dict[str, str] = {
     TOKENIZED_EQUITY: _KIND_EQUITY,
     COMMODITY_TOKEN: _KIND_EQUITY,
     UNKNOWN_ASSET: _KIND_EQUITY,
+    US_EQUITY: _KIND_EQUITY,
 }
 
 # 交易所全休市日（NYSE），按年硬编码。

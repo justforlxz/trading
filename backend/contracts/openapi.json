@@ -5357,6 +5357,9 @@
       "DataSourceSettings": {
         "description": "数据源配置与同步状态；状态字段由服务端读取同步任务表填写。",
         "properties": {
+          "equity": {
+            "$ref": "#/components/schemas/EquitySettings"
+          },
           "failure_count": {
             "default": 0,
             "minimum": 0.0,
@@ -5386,7 +5389,8 @@
           }
         },
         "required": [
-          "macro"
+          "macro",
+          "equity"
         ],
         "title": "DataSourceSettings",
         "type": "object"
@@ -5395,6 +5399,16 @@
         "additionalProperties": false,
         "description": "数据源可写字段；最后同步时间与失败次数只读。",
         "properties": {
+          "equity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EquitySettingsUpdate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "macro": {
             "anyOf": [
               {
@@ -5567,6 +5581,115 @@
           "equity"
         ],
         "title": "EquityPoint",
+        "type": "object"
+      },
+      "EquitySchedulerSettings": {
+        "description": "美股调度周期：`1m` / `5m`。",
+        "properties": {
+          "minute": {
+            "title": "Minute",
+            "type": "string"
+          }
+        },
+        "required": [
+          "minute"
+        ],
+        "title": "EquitySchedulerSettings",
+        "type": "object"
+      },
+      "EquitySchedulerSettingsUpdate": {
+        "additionalProperties": false,
+        "description": "调度周期，只接受实现支持的取值。",
+        "properties": {
+          "minute": {
+            "anyOf": [
+              {
+                "enum": [
+                  "1m",
+                  "5m"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minute"
+          }
+        },
+        "title": "EquitySchedulerSettingsUpdate",
+        "type": "object"
+      },
+      "EquitySettings": {
+        "description": "美股数据源的只读视图；周期由 provider 声明，因此不在这里配置。",
+        "properties": {
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "scheduler": {
+            "$ref": "#/components/schemas/EquitySchedulerSettings"
+          },
+          "symbols": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Symbols",
+            "type": "array"
+          }
+        },
+        "required": [
+          "provider",
+          "scheduler"
+        ],
+        "title": "EquitySettings",
+        "type": "object"
+      },
+      "EquitySettingsUpdate": {
+        "additionalProperties": false,
+        "description": "美股分组的可写字段；未提交的子项保持原值，标的清单整体替换。",
+        "properties": {
+          "provider": {
+            "anyOf": [
+              {
+                "enum": [
+                  "yahoo",
+                  "stooq"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "scheduler": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EquitySchedulerSettingsUpdate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "symbols": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbols"
+          }
+        },
+        "title": "EquitySettingsUpdate",
         "type": "object"
       },
       "ExchangePositionItem": {
@@ -11020,6 +11143,16 @@
         "examples": [
           {
             "data_sources": {
+              "equity": {
+                "provider": "yahoo",
+                "scheduler": {
+                  "minute": "1m"
+                },
+                "symbols": [
+                  "SPY",
+                  "QQQ"
+                ]
+              },
               "failure_count": 0,
               "macro": {
                 "scheduler": {
@@ -16081,7 +16214,7 @@
     },
     "/api/market/overview": {
       "get": {
-        "description": "BTC 的最新值、24 小时涨跌、时段、来源与报价时间。",
+        "description": "BTC 与美股指数的最新值、时段、来源与报价时间；两个域各自降级。",
         "operationId": "get_market_snapshot_api_market_overview_get",
         "responses": {
           "200": {
@@ -17495,7 +17628,7 @@
     },
     "/api/system/health": {
       "get": {
-        "description": "数据库、OKX REST、OKX WebSocket、任务队列、K 线覆盖与宏观调度。",
+        "description": "数据库、OKX REST、OKX WebSocket、任务队列、K 线覆盖、宏观与美股渠道。",
         "operationId": "get_system_health_api_system_health_get",
         "responses": {
           "200": {

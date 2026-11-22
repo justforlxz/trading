@@ -1,7 +1,11 @@
-"""市场端点：BTC 市场概况与类别广度。
+"""市场端点：BTC + 美股指数市场概况与类别广度。
 
-`/market/overview` 只返回 BTC 的最新价、24 小时涨跌、市场时段与报价时间，数据来自
-OKX 公共 ticker；取不到时数值为 `null`、`quality_status=missing`，顶层 `stale` 为真。
+`/market/overview` 返回两组读数：BTC 的最新价、24 小时涨跌、市场时段与报价时间（数据
+来自 OKX 公共 ticker），以及配置的美股指数（SPY / QQQ，读 `candles` 里最近的已收盘
+K 线）。取不到时数值为 `null`、`quality_status=missing`，顶层 `stale` 为真。
+
+美股读数由 `app.equity.equity_overview()` 组装后在这里与 BTC 合并：行情域不 import
+美股域，两个域的降级原因也各自带出，一个域挂掉不影响另一个域的行。
 `/market/breadth` 保留按 `SPOT` / `SWAP` 统计的涨跌家数与共振，两类标的的交易时段
 不同，广度不能混成同一个横截面。
 """
@@ -22,6 +26,8 @@ from app.api.schemas import (
     MarketSnapshotResponse,
 )
 from app.api.schemas.common import Bar, InstType
+from app.equity import EquityReading
+from app.equity import equity_overview as _equity_overview
 from app.market import MarketOverviewItem as OverviewItem
 from app.market import (
     MarketOverviewSnapshot,
@@ -67,16 +73,37 @@ def _overview_item(item: OverviewItem) -> MarketOverviewItem:
     )
 
 
+def _equity_item(item: EquityReading) -> MarketOverviewItem:
+    """美股读数 → 市场概况的一项；涨跌额与涨跌幅本单不计算，如实给 `null`。"""
+
+    return MarketOverviewItem(
+        symbol=item.symbol,
+        name=item.name,
+        value=None if item.value is None else decimal_str(item.value),
+        change=None,
+        change_pct=None,
+        market_session=item.market_session or "",
+        source=item.provider,
+        as_of=item.as_of,
+        is_delayed=item.is_delayed,
+        quality_status=item.quality_status,
+        source_url=item.source_url,
+    )
+
+
 @market_router.get("/market/overview", response_model=MarketSnapshotResponse)
 def get_market_snapshot() -> MarketSnapshotResponse:
-    """BTC 的最新值、24 小时涨跌、时段、来源与报价时间。"""
+    """BTC 与美股指数的最新值、时段、来源与报价时间；两个域各自降级。"""
 
     overview = _market_overview()
+    equities = _equity_overview()
+    reasons = [reason for reason in (overview.stale_reason, equities.stale_reason) if reason]
     return MarketSnapshotResponse(
         as_of=overview.as_of,
-        stale=overview.stale,
-        stale_reason=overview.stale_reason,
-        items=[_overview_item(item) for item in overview.items],
+        stale=overview.stale or equities.stale,
+        stale_reason="；".join(reasons) if reasons else None,
+        items=[_overview_item(item) for item in overview.items]
+        + [_equity_item(item) for item in equities.readings],
     )
 
 

@@ -40,14 +40,20 @@ system_router = APIRouter(tags=["system"])
 
 @system_router.get("/system/health", response_model=SystemHealthResponse)
 def get_system_health(request: Request) -> SystemHealthResponse:
-    """数据库、OKX REST、OKX WebSocket、任务队列、K 线覆盖与宏观调度。"""
+    """数据库、OKX REST、OKX WebSocket、任务队列、K 线覆盖、宏观与美股渠道。"""
 
     hub: Any = getattr(request.app.state, "stream_hub", None)
     ws_status = hub.status_snapshot() if hub is not None else None
-    # 宏观调度器与推送层同样是装配层挂在 app.state 上的组件；健康只读它记下的事实。
+    # 调度器与推送层同样是装配层挂在 app.state 上的组件；健康只读它记下的事实。
+    # 宏观与美股各有一份快照：一个域挂掉不能让另一个域的读数也变成 error。
     scheduler: Any = getattr(request.app.state, "market_data_scheduler", None)
     macro_status = scheduler.status_snapshot() if scheduler is not None else None
-    health = system_health(ws_status=ws_status, macro_status=macro_status)
+    equity_status = scheduler.equity_status_snapshot() if scheduler is not None else None
+    health = system_health(
+        ws_status=ws_status,
+        macro_status=macro_status,
+        equity_status=equity_status,
+    )
     return SystemHealthResponse(
         status=health.status,
         checked_at=health.checked_at,

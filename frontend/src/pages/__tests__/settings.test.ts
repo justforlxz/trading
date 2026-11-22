@@ -33,6 +33,11 @@ const SETTINGS: SettingsResponse = {
       },
       scheduler: { minute: "1m" },
     },
+    equity: {
+      provider: "yahoo",
+      symbols: ["SPY", "QQQ"],
+      scheduler: { minute: "1m" },
+    },
   },
   notifications: {
     channels: ["browser", "telegram"],
@@ -175,12 +180,21 @@ describe("设置页", () => {
     expect(html.indexOf("OKX WebSocket")).toBeLessThan(html.indexOf("数据库"));
   });
 
-  it("数据连接不含 Provider 输入，只保留订阅标的与 OKX 同步状态", () => {
+  it("数据连接只暴露可切换的数据源，不暴露上游地址与任意 provider 名", () => {
     const html = render();
     expect(html).not.toContain("Provider");
     expect(html).toContain("订阅标的（逗号分隔）");
     expect(html).toContain("最后同步：");
     expect(html).toContain("失败次数：2");
+    // 美股数据源是下拉选择：可选值来自实现，界面不能自由输入。
+    expect(html).toContain("美股数据源");
+    expect(html).toContain("Yahoo（分钟级，延迟 15 分钟）");
+    expect(html).toContain("Stooq（日线，延迟，备用）");
+    expect(html).toContain("美股标的（逗号分隔）");
+    expect(html).toContain("SPY, QQQ");
+    // 上游地址是服务端配置，页面不出现。
+    expect(html).not.toContain("query1.finance.yahoo.com");
+    expect(html).not.toContain("stooq.com");
   });
 
   it("密钥区只显示掩码和配置状态，不出现 Secret 与 Passphrase 的值", () => {

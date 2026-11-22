@@ -189,3 +189,60 @@ def test_scheduler_plans_next_before_first_tick() -> None:
 
     assert status["last_run_at"] is None
     assert status["next_run_at"] is not None
+
+
+def test_equity_tick_records_its_own_status(monkeypatch: pytest.MonkeyPatch) -> None:
+    """美股 tick 与宏观分开记状态：最近运行、下次计划与耗时都可读。"""
+
+    from app.equity import reset_runtime as reset_equity_runtime
+    from app.equity import runtime as equity_runtime
+    from app.equity import service as equity_service
+
+    recorded: list[tuple[object, object]] = []
+
+    def fake_sync(**_: object):
+        recorded.append(("sync", None))
+        return ()
+
+    reset_equity_runtime()
+    monkeypatch.setattr(equity_service, "sync", fake_sync)
+    monkeypatch.setattr(
+        "app.jobs.market_data.equity_sync",
+        fake_sync,
+    )
+
+    try:
+        scheduler = MarketDataScheduler()
+        results = scheduler.run_equity_once(now=NOW)
+        status = scheduler.equity_status_snapshot()
+    finally:
+        reset_equity_runtime()
+
+    assert results == ()
+    assert recorded == [("sync", None)]
+    assert status["last_run_at"] == "2026-11-22T07:01:00Z"
+    assert status["next_run_at"] is not None
+    assert status["duration_ms"] is not None
+    assert equity_runtime().status()["last_run_at"] is None  # 重置后回到空状态
+
+
+def test_equity_tick_failure_does_not_block_the_macro_tick() -> None:
+    """一个域抛异常不能拖累另一个域：`_tick` 分别兜住。"""
+
+    scheduler = MarketDataScheduler()
+    calls: list[str] = []
+
+    def broken_macro(**_: object) -> None:
+        calls.append("macro")
+        raise RuntimeError("宏观配置写坏了")
+
+    def ok_equity(**_: object) -> tuple[()]:
+        calls.append("equity")
+        return ()
+
+    scheduler.run_once = broken_macro  # type: ignore[method-assign]
+    scheduler.run_equity_once = ok_equity  # type: ignore[method-assign]
+
+    scheduler._tick()
+
+    assert calls == ["macro", "equity"]

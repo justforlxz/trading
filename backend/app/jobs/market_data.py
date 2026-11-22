@@ -1,12 +1,18 @@
-"""宏观数据的进程内定时调度器：本域**唯一**的定时来源。
+"""市场数据的进程内定时调度器：本域**唯一**的定时来源（宏观 + 美股）。
 
-一个 tick 周期（`settings.data_sources.macro.scheduler.minute`，支持 `1m` / `5m`）：
+一个 tick 周期（`settings.data_sources.macro.scheduler.minute` 与
+`settings.data_sources.equity.scheduler.minute`，支持 `1m` / `5m`）依次做两件事：
 
-1. 分钟级序列每次都拉；
-2. 日线结算序列按「上一个已结算美股交易日」判重，该日已有观测就跳过，不发上游请求。
+1. **宏观**：分钟级序列每次都拉；日线结算序列按「上一个已结算美股交易日」判重，
+   该日已有观测就跳过，不发上游请求。
+2. **美股**：按配置的 provider 抓 1 个窗口（Yahoo 分钟级 / Stooq 日线），
+   交给 `app/equity/pipeline.py` 的中间件链落 `candles`。
 
-调度只决定「什么时候跑」；抓取、加锁、退避与落库都在 `app.macro.sync` 里。调度器
-持有最近一次 tick 的时间与耗时，健康组件通过 `app.state` 读到它。
+两个域各自记自己的状态：一个域的配置写坏或上游挂掉，不能让另一个域也停摆，因此
+`_tick` 分别兜住异常，健康组件也分别读两份快照。
+
+调度只决定「什么时候跑」；抓取、加锁、退避与落库都在各域的 `sync` 里。调度器持有
+最近一次 tick 的时间与耗时，健康组件通过 `app.state` 读到它。
 
 线程写法沿用 `app/jobs/equity.py` 的先例：守护线程等一个 `threading.Event`，停止事件
 一到立即结束等待，应用退出不会留下悬挂线程。**启动后先等一个周期再跑第一次**，不在
@@ -23,6 +29,15 @@ from threading import Event, Thread
 from typing import Any
 
 from app.core import Clock, SystemClock
+from app.equity import (
+    EquityConfig,
+)
+from app.equity import (
+    SyncResult as EquitySyncResult,
+)
+from app.equity import resolve_config as resolve_equity_config
+from app.equity import runtime as equity_runtime
+from app.equity import sync as equity_sync
 from app.macro import SyncResult, resolve_config, runtime, sync
 from app.settings import load_settings
 
@@ -32,6 +47,8 @@ logger = logging.getLogger(__name__)
 
 #: 停止时给正在跑的那一次 tick 的收尾时间。
 STOP_TIMEOUT_SECONDS = 5.0
+#: 配置读不出来时的等待秒数：一分钟，与默认周期一致。
+FALLBACK_INTERVAL_SECONDS = 60
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,7 +62,7 @@ class _FixedClock:
 
 
 class MarketDataScheduler:
-    """按配置周期抓宏观数据；一个进程只起一条线程。"""
+    """按配置周期抓宏观与美股数据；一个进程只起一条线程。"""
 
     def __init__(self, *, clock: Clock | None = None) -> None:
         self._clock = clock or SystemClock()
@@ -65,7 +82,13 @@ class MarketDataScheduler:
         self._thread.start()
         # 首次 tick 要等一个周期；先把「下次计划」登记下来，健康组件不必等到第一次
         # 运行才有可读的时间。
-        runtime().plan_next(self._clock.now() + timedelta(seconds=_interval_seconds(60)))
+        moment = self._clock.now()
+        runtime().plan_next(
+            moment + timedelta(seconds=_interval_seconds(FALLBACK_INTERVAL_SECONDS))
+        )
+        equity_runtime().plan_next(
+            moment + timedelta(seconds=_equity_interval_seconds(FALLBACK_INTERVAL_SECONDS))
+        )
 
     def join(self, timeout: float = STOP_TIMEOUT_SECONDS) -> None:
         thread = self._thread
@@ -77,12 +100,17 @@ class MarketDataScheduler:
         self.join(timeout=timeout)
 
     def status_snapshot(self) -> dict[str, Any]:
-        """健康组件读的快照：最近一次运行的时间、下次计划与耗时，以及逐单元状态。"""
+        """健康组件读的宏观快照：最近一次运行的时间、下次计划与耗时，以及逐单元状态。"""
 
         return runtime().status()
 
+    def equity_status_snapshot(self) -> dict[str, Any]:
+        """健康组件读的美股快照：最近运行、下次计划、耗时与最近一次错误。"""
+
+        return equity_runtime().status()
+
     def run_once(self, *, now: datetime | None = None) -> tuple[SyncResult, ...]:
-        """执行一个 tick；测试直接调用它，不依赖线程与等待。"""
+        """执行一个宏观 tick；测试直接调用它，不依赖线程与等待。"""
 
         moment = now or self._clock.now()
         config = resolve_config(load_settings().data_sources)
@@ -106,26 +134,66 @@ class MarketDataScheduler:
         )
         return results
 
+    def run_equity_once(self, *, now: datetime | None = None) -> tuple[EquitySyncResult, ...]:
+        """执行一个美股 tick；与宏观分开记状态，一个域失败不影响另一个。"""
+
+        moment = now or self._clock.now()
+        config: EquityConfig = resolve_equity_config(load_settings().data_sources)
+        started = time.monotonic()
+        results = equity_sync(respect_backoff=True, clock=_FixedClock(moment))
+        duration_ms = int((time.monotonic() - started) * 1000)
+        equity_runtime().record_tick(
+            now=moment,
+            next_run_at=moment + timedelta(seconds=config.interval_seconds),
+            duration_ms=duration_ms,
+        )
+        logger.info(
+            "美股调度 tick 完成: interval=%s provider=%s 耗时=%dms 结果=%s",
+            config.interval,
+            config.provider,
+            duration_ms,
+            ", ".join(f"{item.provider}/{item.bar}={item.status}" for item in results),
+        )
+        return results
+
     def _loop(self) -> None:
         """等一个周期再跑一次；周期每轮重读，改配置后下一轮生效。"""
 
         while not self._stop.is_set():
-            interval = _interval_seconds(60)
-            if self._stop.wait(interval):
+            if self._stop.wait(_interval_seconds(FALLBACK_INTERVAL_SECONDS)):
                 return
-            try:
-                self.run_once()
-            except Exception:
-                logger.exception("宏观调度 tick 失败")
+            self._tick()
+
+    def _tick(self) -> None:
+        """跑一个完整周期；两个域各自兜住异常，一个挂掉不拖累另一个。"""
+
+        try:
+            self.run_once()
+        except Exception:
+            logger.exception("宏观调度 tick 失败")
+        try:
+            self.run_equity_once()
+        except Exception:
+            logger.exception("美股调度 tick 失败")
 
 
 def _interval_seconds(fallback: int) -> int:
-    """当前配置的 tick 周期；配置读不出来时按 `fallback` 等，不中断调度线程。"""
+    """当前配置的宏观 tick 周期；配置读不出来时按 `fallback` 等，不中断调度线程。"""
 
     try:
         return resolve_config(load_settings().data_sources).interval_seconds
     except Exception:
         logger.exception("宏观调度周期读取失败, 本轮按 %d 秒等待", fallback)
+        return fallback
+
+
+def _equity_interval_seconds(fallback: int) -> int:
+    """当前配置的美股 tick 周期；配置读不出来时按 `fallback` 等。"""
+
+    try:
+        return resolve_equity_config(load_settings().data_sources).interval_seconds
+    except Exception:
+        logger.exception("美股调度周期读取失败, 本轮按 %d 秒等待", fallback)
         return fallback
 
 

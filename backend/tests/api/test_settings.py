@@ -71,6 +71,11 @@ def test_get_returns_v6_defaults_and_hides_internal_groups(client: TestClient) -
             },
             "scheduler": {"minute": "1m"},
         },
+        "equity": {
+            "provider": "yahoo",
+            "symbols": ["SPY", "QQQ"],
+            "scheduler": {"minute": "1m"},
+        },
     }
     assert body["notifications"] == DEFAULT_NOTIFICATIONS
     assert body["secrets"] == {
@@ -610,6 +615,65 @@ def test_macro_minute_slot_rejects_a_settlement_provider(client: TestClient) -> 
 def test_macro_scheduler_interval_is_restricted(client: TestClient) -> None:
     response = client.patch(
         "/api/settings", json={"data_sources": {"macro": {"scheduler": {"minute": "1h"}}}}
+    )
+
+    assert response.status_code == 422
+
+
+def test_equity_provider_switch_persists_and_reads_back(client: TestClient) -> None:
+    """AC1 的配置侧：改 `equity.provider` 就换实现，其它子项保持原值。"""
+
+    response = client.patch(
+        "/api/settings", json={"data_sources": {"equity": {"provider": "stooq"}}}
+    )
+
+    assert response.status_code == 200, response.text
+    equity = response.json()["data_sources"]["equity"]
+    assert equity["provider"] == "stooq"
+    # 未提交的标的清单与调度周期保持原值，不被顺手覆盖成空。
+    assert equity["symbols"] == ["SPY", "QQQ"]
+    assert equity["scheduler"] == {"minute": "1m"}
+
+    again = client.get("/api/settings").json()["data_sources"]["equity"]
+    assert again["provider"] == "stooq"
+
+
+def test_equity_provider_name_must_be_registered(client: TestClient) -> None:
+    response = client.patch(
+        "/api/settings", json={"data_sources": {"equity": {"provider": "polygon"}}}
+    )
+
+    assert response.status_code == 422
+
+
+def test_equity_symbols_replace_the_whole_list(client: TestClient) -> None:
+    response = client.patch(
+        "/api/settings", json={"data_sources": {"equity": {"symbols": ["SPY"]}}}
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["data_sources"]["equity"]["symbols"] == ["SPY"]
+
+
+def test_equity_symbols_must_not_be_empty(client: TestClient) -> None:
+    response = client.patch("/api/settings", json={"data_sources": {"equity": {"symbols": []}}})
+
+    assert response.status_code == 400
+    assert "不能为空" in response.json()["detail"]
+
+
+def test_equity_symbols_reject_whitespace(client: TestClient) -> None:
+    response = client.patch(
+        "/api/settings", json={"data_sources": {"equity": {"symbols": ["SP Y"]}}}
+    )
+
+    assert response.status_code == 400
+    assert "空白" in response.json()["detail"]
+
+
+def test_equity_scheduler_interval_is_restricted(client: TestClient) -> None:
+    response = client.patch(
+        "/api/settings", json={"data_sources": {"equity": {"scheduler": {"minute": "1h"}}}}
     )
 
     assert response.status_code == 422

@@ -29,9 +29,11 @@ import {
   type NotificationPermissionState,
 } from "../../lib/notifications";
 import {
+  EQUITY_PROVIDERS,
   NOTIFICATION_CHANNELS,
   channelLabel,
   credentialText,
+  equityPatch,
   instrumentsToText,
   macroPatch,
   notificationsPatch,
@@ -305,7 +307,8 @@ export function SettingsView({
             <CardTitle>数据连接</CardTitle>
             <CardDescription>
               订阅标的写入设置文档；最后同步时间与失败次数由服务端 OKX 同步任务表提供。
-              系统健康只读后端已有的检查结果，页面不临时探测上游。
+              美股数据源决定首页「市场概况」里的 SPY / QQQ 用哪个实现抓取（两个免费源都是
+              延迟行情）；系统健康只读后端已有的检查结果，页面不临时探测上游。
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
@@ -339,6 +342,27 @@ export function SettingsView({
                 ))}
               </select>
             </label>
+            <label className="space-y-1.5 text-sm">
+              <span className="text-muted-foreground">美股数据源</span>
+              <select
+                className={INPUT_CLASS}
+                value={draft.equity.provider}
+                onChange={(event) =>
+                  onDraftChange("equity", { provider: event.target.value })
+                }
+              >
+                {EQUITY_PROVIDERS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <TextField
+              label="美股标的（逗号分隔）"
+              value={draft.equity.symbols}
+              onChange={(value) => onDraftChange("equity", { symbols: value })}
+            />
             <div className="sm:col-span-2">
               <HealthBlock
                 health={health}
@@ -771,6 +795,7 @@ export default function SettingsPage() {
         data_sources: {
           subscribed_instruments: parseInstruments(instrumentsText),
           ...(macroPatch(draft.macro) === null ? {} : { macro: macroPatch(draft.macro) }),
+          ...(equityPatch(draft.equity) === null ? {} : { equity: equityPatch(draft.equity) }),
         },
         notifications: notificationsPatch(draft.notifications),
         exchange: apiKey.trim() ? { api_key: apiKey.trim() } : null,

@@ -264,20 +264,50 @@ describe("设置页", () => {
     expect(render({ testingChannel: "telegram" })).toContain("发送中…");
   });
 
-  it("chat_id 为空时提示先去填写，而不是静默失败", () => {
+  it("填了 chat_id 但没保存时，提示测试发送只用已保存值", () => {
     const draft = toSettingsDraft(SETTINGS);
     const html = render({
       draft: {
         ...draft,
-        notifications: { ...draft.notifications, telegramChatId: "", webhookUrl: "" },
+        notifications: {
+          ...draft.notifications,
+          telegramChatId: "11111111",
+          webhookUrl: "https://draft.invalid/hooks/trading",
+        },
       },
     });
-    expect(html).toContain("先在上面填写 chat_id 再测试发送");
-    expect(html).toContain("先在上面填写接收地址再测试发送");
+    // 输入框里已经有值，就不能再要求「先在上面填写」——测试发送根本读不到草稿值。
+    expect(html).toContain("测试发送只用已保存的 chat_id");
+    expect(html).toContain("测试发送只用已保存的接收地址");
+    expect(html).not.toContain("先在上面填写");
   });
 
-  it("chat_id 已填时不显示填写提示", () => {
+  it("还没有保存过接收方（首次配置）时提示先保存再测试", () => {
+    const html = render({
+      settings: {
+        ...SETTINGS,
+        notifications: {
+          channels: SETTINGS.notifications.channels,
+          telegram: { chat_id: "", token_configured: true },
+          webhook: { url: "", secret_configured: false },
+        },
+      },
+      draft: toSettingsDraft({
+        ...SETTINGS,
+        notifications: {
+          channels: SETTINGS.notifications.channels,
+          telegram: { chat_id: "", token_configured: true },
+          webhook: { url: "", secret_configured: false },
+        },
+      }),
+    });
+    expect(html).toContain("测试发送只用已保存的 chat_id");
+    expect(html).toContain("测试发送只用已保存的接收地址");
+    expect(html).toContain("chat_id 由给 bot 发过消息后取得");
+  });
+
+  it("草稿与已保存值一致时不显示测试发送的提示", () => {
     const html = render();
-    expect(html).not.toContain("先在上面填写 chat_id 再测试发送");
+    expect(html).not.toContain("测试发送只用已保存的");
   });
 });

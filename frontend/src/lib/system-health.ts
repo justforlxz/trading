@@ -18,6 +18,7 @@ const HEALTH_COMPONENT_LABELS: Record<string, string> = {
   okx_ws: "OKX WebSocket",
   job_queue: "任务队列",
   candle_coverage: "K 线覆盖",
+  equity: "美股行情",
 };
 
 export function healthComponentLabel(name: string): string {

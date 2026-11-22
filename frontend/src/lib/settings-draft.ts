@@ -12,6 +12,9 @@
  * 宏观分组同理：界面上只有「VIX 的分钟级 provider」一个可写项，草稿只存这一项，
  * 保存时由 `macroPatch` 组装成 `data_sources.macro.series.vix.minute`；其它序列与调度
  * 周期不在页面上改，也就不会被顺手覆盖。
+ *
+ * 美股分组有两个可写项：`provider`（换实现）与 `symbols`（首页要显示哪些美股指数）。
+ * 标的清单与订阅标的同一套输入约定——草稿里保留用户原文，保存时才拆分。
  */
 
 import type {
@@ -41,6 +44,17 @@ export type MacroDraft = {
   vixMinute: string;
 };
 
+/** 美股分组的写入形状；provider 名是枚举，不是任意字符串。 */
+export type EquityProviderName = NonNullable<
+  NonNullable<SettingsUpdateRequest["data_sources"]>["equity"]
+>["provider"];
+
+/** 美股分组在草稿里的两项：provider 是枚举，标的清单是逗号分隔的原文。 */
+export type EquityDraft = {
+  provider: string;
+  symbols: string;
+};
+
 /** 设置页的草稿：只放可编辑字段，订阅标的原文由页面单独持有。 */
 export type SettingsDraft = {
   display: DisplaySettings;
@@ -48,6 +62,7 @@ export type SettingsDraft = {
   execution: ExecutionSettings;
   notifications: NotificationDraft;
   macro: MacroDraft;
+  equity: EquityDraft;
 };
 
 /** 可选的两个 VIX 分钟级 provider；标签写明它实际提供什么粒度。 */
@@ -55,6 +70,38 @@ export const VIX_MINUTE_PROVIDERS: readonly { value: string; label: string }[] =
   { value: "yahoo", label: "Yahoo（分钟级）" },
   { value: "cboe", label: "CBOE（日结 CSV）" },
 ];
+
+/** 可选的美股 provider；标签写明它实际提供什么粒度、是不是延迟行情。 */
+export const EQUITY_PROVIDERS: readonly { value: string; label: string }[] = [
+  { value: "yahoo", label: "Yahoo（分钟级，延迟 15 分钟）" },
+  { value: "stooq", label: "Stooq（日线，延迟，备用）" },
+];
+
+export function toEquityDraft(
+  equity: SettingsResponse["data_sources"]["equity"] | undefined,
+): EquityDraft {
+  return {
+    provider: equity?.provider ?? "",
+    symbols: (equity?.symbols ?? []).join(", "),
+  };
+}
+
+/**
+ * 草稿 → 美股分组的 PATCH 载荷。
+ *
+ * 两个子项都可缺省：provider 为空表示不改（不写空字符串覆盖配置），标的清单为空表示
+ * 保持原值（后端不允许空清单，提交空数组只会换来一次 400）。
+ */
+export function equityPatch(
+  draft: EquityDraft,
+): NonNullable<NonNullable<SettingsUpdateRequest["data_sources"]>["equity"]> | null {
+  const provider = draft.provider.trim();
+  const symbols = parseInstruments(draft.symbols);
+  const patch: { provider?: EquityProviderName; symbols?: string[] } = {};
+  if (provider !== "") patch.provider = provider as EquityProviderName;
+  if (symbols.length > 0) patch.symbols = symbols;
+  return Object.keys(patch).length === 0 ? null : patch;
+}
 
 export function toMacroDraft(
   macro: SettingsResponse["data_sources"]["macro"],
@@ -81,6 +128,7 @@ export function toSettingsDraft(settings: SettingsResponse): SettingsDraft {
     execution: settings.execution,
     notifications: toNotificationDraft(settings.notifications),
     macro: toMacroDraft(settings.data_sources.macro),
+    equity: toEquityDraft(settings.data_sources.equity),
   };
 }
 

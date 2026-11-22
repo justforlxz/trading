@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import type { NotificationSettings } from "./api";
 import {
+  EQUITY_PROVIDERS,
   channelLabel,
   credentialText,
+  equityPatch,
   instrumentsToText,
   notificationsPatch,
   parseInstruments,
+  toEquityDraft,
   toNotificationDraft,
   withChannel,
 } from "./settings-draft";
@@ -102,5 +105,33 @@ describe("通知设置草稿", () => {
     expect(channelLabel("imessage")).toBe("imessage");
     expect(credentialText(true)).toBe("已配置");
     expect(credentialText(false)).toBe("未配置");
+  });
+});
+
+describe("美股数据源", () => {
+  it("接口返回的标的清单 → 逗号分隔的输入原文", () => {
+    expect(toEquityDraft({ provider: "yahoo", symbols: ["SPY", "QQQ"], scheduler: { minute: "1m" } })).toEqual({
+      provider: "yahoo",
+      symbols: "SPY, QQQ",
+    });
+    expect(toEquityDraft(undefined)).toEqual({ provider: "", symbols: "" });
+  });
+
+  it("保存时把两个子项拆回接口字段", () => {
+    expect(equityPatch({ provider: "stooq", symbols: "SPY, QQQ" })).toEqual({
+      provider: "stooq",
+      symbols: ["SPY", "QQQ"],
+    });
+    // 只改 provider 时不顺手覆盖标的清单。
+    expect(equityPatch({ provider: "stooq", symbols: "  " })).toEqual({ provider: "stooq" });
+    // 什么都不提交时返回 null：空 provider 与空清单都不该覆盖已保存的值。
+    expect(equityPatch({ provider: "", symbols: "" })).toBeNull();
+  });
+
+  it("可选实现都是延迟行情，标签写明粒度", () => {
+    expect(EQUITY_PROVIDERS.map((item) => item.value)).toEqual(["yahoo", "stooq"]);
+    for (const option of EQUITY_PROVIDERS) {
+      expect(option.label).toContain("延迟");
+    }
   });
 });

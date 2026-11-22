@@ -1,5 +1,15 @@
 {
   "data_sources": {
+    "equity": {
+      "provider": "yahoo",
+      "scheduler": {
+        "minute": "1m"
+      },
+      "symbols": [
+        "SPY",
+        "QQQ"
+      ]
+    },
     "failure_count": 0,
     "macro": {
       "scheduler": {

@@ -38,6 +38,7 @@ PACKAGES: tuple[str, ...] = (
     "dashboard",
     "db",
     "events",
+    "equity",
     "exchange",
     "execution",
     "indicators",
@@ -105,6 +106,9 @@ ALLOWED_DEPS: dict[str, frozenset[str]] = {
     # 宏观域：读设置里的 provider 配置、复用行情域的交易日与时段纯函数；不写行情表，
     # 也不被行情域反向依赖（健康组件由装配层拼装）。
     "macro": frozenset({"shared", "db", "market", "settings"}),
+    # 美股行情域：provider 实现放在 `exchange`（与 OKX 同一处上游适配层），落库复用
+    # 行情域的 `candles` 与时段纯函数，K 线事件走 `events` 的唯一下游。
+    "equity": frozenset({"shared", "db", "market", "exchange", "events", "settings"}),
     "instrument": frozenset({"shared", "db"}),
     "market": frozenset({"shared", "db", "exchange", "instrument"}),
     # 自选行要在后端补趋势、RSI 与 ATR，指标计算必须复用 `app.indicators`，

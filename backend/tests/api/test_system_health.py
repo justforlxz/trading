@@ -1,4 +1,8 @@
-"""系统健康：真实检查、失败降级与已删除的外部 Provider 组件不再出现。"""
+"""系统健康：真实检查、失败降级与已删除的外部 Provider 组件不再出现。
+
+`macro` 与 `equity` 两组件的状态由装配层从调度器读来；没有调度器时如实报未配置，
+本文件只断言组件的存在与降级口径。
+"""
 
 from __future__ import annotations
 
@@ -7,6 +11,7 @@ from datetime import UTC, datetime, timedelta
 from fastapi.testclient import TestClient
 
 from app.market import finish_sync_job, start_sync_job, system_health
+from app.market.health import ComponentHealth
 
 
 class _FixedClock:
@@ -35,6 +40,7 @@ def test_health_reports_every_component(client: TestClient) -> None:
         "job_queue",
         "candle_coverage",
         "macro",
+        "equity",
     ]
     assert "external_provider" not in names
     database = _components(body)["database"]
@@ -130,3 +136,65 @@ def test_health_detail_reports_subscription_counts_and_skipped(client: TestClien
     ws = {item.name: item for item in health.components}["okx_ws"]
     assert ws.status == "ok"
     assert ws.detail == "okx / public_ws；订阅 40 个标的，跳过 2 个（超限）；K 线订阅 40 个标的"
+
+
+def _equity_component(status: dict | None) -> ComponentHealth:
+    health = system_health(
+        macro_status=None,
+        equity_status=status,
+        clock=_FixedClock(datetime(2026, 11, 22, 7, 30, tzinfo=UTC)),
+    )
+    return {item.name: item for item in health.components}["equity"]
+
+
+def test_equity_component_reports_ok_inside_the_freshness_window() -> None:
+    component = _equity_component(
+        {
+            "last_success_at": "2026-11-22T07:25:00Z",
+            "last_run_at": "2026-11-22T07:25:00Z",
+            "next_run_at": "2026-11-22T07:26:00Z",
+            "duration_ms": 812,
+            "last_error": None,
+            "failures": 0,
+            "degraded": False,
+        }
+    )
+
+    assert component.status == "ok"
+    assert "耗时 812ms" in (component.detail or "")
+    assert component.last_success_at == datetime(2026, 11, 22, 7, 25, tzinfo=UTC)
+
+
+def test_equity_component_reports_stale_after_an_hour() -> None:
+    component = _equity_component(
+        {
+            "last_success_at": "2026-11-22T05:00:00Z",
+            "last_error": None,
+            "degraded": False,
+        }
+    )
+
+    assert component.status == "stale"
+    assert "1 小时" in (component.detail or "")
+
+
+def test_equity_component_reports_error_with_the_upstream_message() -> None:
+    component = _equity_component(
+        {
+            "last_success_at": "2026-11-22T07:25:00Z",
+            "last_error": "Yahoo 行情上游返回 HTTP 429",
+            "degraded": True,
+            "failures": 3,
+        }
+    )
+
+    assert component.status == "error"
+    assert component.error == "Yahoo 行情上游返回 HTTP 429"
+    assert "连续失败 3 次" in (component.detail or "")
+
+
+def test_equity_component_is_unconfigured_without_a_scheduler() -> None:
+    component = _equity_component(None)
+
+    assert component.status == "unconfigured"
+    assert component.last_success_at is None

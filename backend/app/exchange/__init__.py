@@ -7,7 +7,9 @@
 下单意图的幂等键表（`OrderSubmission`）也在这里发布：它是业务表，需要被装配根
 导入一次才会进 `Base.metadata`。
 
-本包只发布 OKX 的公开行情与私有交易实现。
+本包发布两类实现：OKX 的公开行情与私有交易实现，以及第三方行情源
+（`providers/` 的 Yahoo / Stooq）。第三方源的地址与凭据只从配置读，实现里不写 URL，
+「换一个源」只改设置里的 provider 名。
 """
 
 from __future__ import annotations
@@ -33,6 +35,14 @@ from app.exchange.okx.snapshots import (
     parse_exchange_position_row,
 )
 from app.exchange.okx.ws import OkxWebSocket
+from app.exchange.providers import (
+    build_source,
+    source_bar,
+    source_delayed,
+    source_names,
+    source_template,
+    source_url,
+)
 
 __all__ = [
     "DEFAULT_BUSINESS_WS_URL",
@@ -47,12 +57,18 @@ __all__ = [
     "OrderSubmission",
     "RateLimitedError",
     "TickerQuote",
+    "build_source",
     "candle_channel",
     "create_market_data",
     "create_trade_port",
     "load_quote_snapshot",
     "parse_account_snapshot_row",
     "parse_exchange_position_row",
+    "source_bar",
+    "source_delayed",
+    "source_names",
+    "source_template",
+    "source_url",
 ]
 
 

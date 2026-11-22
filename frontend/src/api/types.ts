@@ -804,7 +804,7 @@ export interface paths {
         };
         /**
          * Get Market Snapshot
-         * @description BTC 的最新值、24 小时涨跌、时段、来源与报价时间。
+         * @description BTC 与美股指数的最新值、时段、来源与报价时间；两个域各自降级。
          */
         get: operations["get_market_snapshot_api_market_overview_get"];
         put?: never;
@@ -1203,7 +1203,7 @@ export interface paths {
         };
         /**
          * Get System Health
-         * @description 数据库、OKX REST、OKX WebSocket、任务队列、K 线覆盖与宏观调度。
+         * @description 数据库、OKX REST、OKX WebSocket、任务队列、K 线覆盖、宏观与美股渠道。
          */
         get: operations["get_system_health_api_system_health_get"];
         put?: never;
@@ -3744,6 +3744,7 @@ export interface components {
          * @description 数据源配置与同步状态；状态字段由服务端读取同步任务表填写。
          */
         DataSourceSettings: {
+            equity: components["schemas"]["EquitySettings"];
             /**
              * Failure Count
              * @default 0
@@ -3760,6 +3761,7 @@ export interface components {
          * @description 数据源可写字段；最后同步时间与失败次数只读。
          */
         DataSourceSettingsUpdate: {
+            equity?: components["schemas"]["EquitySettingsUpdate"] | null;
             macro?: components["schemas"]["MacroSettingsUpdate"] | null;
             /** Subscribed Instruments */
             subscribed_instruments?: string[] | null;
@@ -3838,6 +3840,44 @@ export interface components {
             equity: string;
             /** Time */
             time: string;
+        };
+        /**
+         * EquitySchedulerSettings
+         * @description 美股调度周期：`1m` / `5m`。
+         */
+        EquitySchedulerSettings: {
+            /** Minute */
+            minute: string;
+        };
+        /**
+         * EquitySchedulerSettingsUpdate
+         * @description 调度周期，只接受实现支持的取值。
+         */
+        EquitySchedulerSettingsUpdate: {
+            /** Minute */
+            minute?: ("1m" | "5m") | null;
+        };
+        /**
+         * EquitySettings
+         * @description 美股数据源的只读视图；周期由 provider 声明，因此不在这里配置。
+         */
+        EquitySettings: {
+            /** Provider */
+            provider: string;
+            scheduler: components["schemas"]["EquitySchedulerSettings"];
+            /** Symbols */
+            symbols?: string[];
+        };
+        /**
+         * EquitySettingsUpdate
+         * @description 美股分组的可写字段；未提交的子项保持原值，标的清单整体替换。
+         */
+        EquitySettingsUpdate: {
+            /** Provider */
+            provider?: ("yahoo" | "stooq") | null;
+            scheduler?: components["schemas"]["EquitySchedulerSettingsUpdate"] | null;
+            /** Symbols */
+            symbols?: string[] | null;
         };
         /** ExchangePositionItem */
         ExchangePositionItem: {
@@ -6325,6 +6365,16 @@ export interface components {
          * SettingsResponse
          * @example {
          *       "data_sources": {
+         *         "equity": {
+         *           "provider": "yahoo",
+         *           "scheduler": {
+         *             "minute": "1m"
+         *           },
+         *           "symbols": [
+         *             "SPY",
+         *             "QQQ"
+         *           ]
+         *         },
          *         "failure_count": 0,
          *         "macro": {
          *           "scheduler": {

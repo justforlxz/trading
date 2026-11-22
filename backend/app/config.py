@@ -67,6 +67,16 @@ class Settings(BaseSettings):
         "https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1m&range=1d"
     )
 
+    # 美股行情源的上游地址模板：`{symbol}` 由 provider 替换成标的名（`SPY`）。
+    # 与宏观、OKX 同一约定——地址只从配置读，provider 实现里不写 URL。
+    # 需要 API key 的供应商（Alpha Vantage / Finnhub / Polygon）同样只从这里读密钥，
+    # 本单只实现无需 key 的 Yahoo 与 Stooq。
+    equity_yahoo_url: str = (
+        "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1m&range=1d"
+    )
+    # Stooq 的代码是小写 + 市场后缀（`SPY` → `spy.us`），后缀写在这份模板里。
+    equity_stooq_url: str = "https://stooq.com/q/d/l/?s={symbol}.us&i=d"
+
     # 按需 K 线同步在进程内的并发上限：单进程部署没有独立 worker，线程数即上限。
     on_demand_sync_max_concurrency: int = Field(default=2, ge=1)
 

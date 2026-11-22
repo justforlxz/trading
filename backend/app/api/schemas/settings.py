@@ -25,6 +25,10 @@ __all__ = [
     "DeliveryItem",
     "DeliveryListResponse",
     "DisplaySettings",
+    "EquitySchedulerSettings",
+    "EquitySchedulerSettingsUpdate",
+    "EquitySettings",
+    "EquitySettingsUpdate",
     "ExchangeSettingsUpdate",
     "ExecutionSettings",
     "NotificationChannelTestRequest",
@@ -143,6 +147,42 @@ class MacroSettingsUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+#: 已实现的美股 provider 名；未登记的名字在写侧直接 422，不落进设置文档。
+EquityProviderName = Literal["yahoo", "stooq"]
+
+
+class EquitySchedulerSettings(BaseModel):
+    """美股调度周期：`1m` / `5m`。"""
+
+    minute: str
+
+
+class EquitySettings(BaseModel):
+    """美股数据源的只读视图；周期由 provider 声明，因此不在这里配置。"""
+
+    provider: str
+    symbols: list[str] = Field(default_factory=list)
+    scheduler: EquitySchedulerSettings
+
+
+class EquitySchedulerSettingsUpdate(BaseModel):
+    """调度周期，只接受实现支持的取值。"""
+
+    minute: MacroInterval | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class EquitySettingsUpdate(BaseModel):
+    """美股分组的可写字段；未提交的子项保持原值，标的清单整体替换。"""
+
+    provider: EquityProviderName | None = None
+    symbols: list[str] | None = None
+    scheduler: EquitySchedulerSettingsUpdate | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class DataSourceSettings(BaseModel):
     """数据源配置与同步状态；状态字段由服务端读取同步任务表填写。"""
 
@@ -150,6 +190,7 @@ class DataSourceSettings(BaseModel):
     last_sync_at: UtcDatetime | None = None
     failure_count: int = Field(default=0, ge=0)
     macro: MacroSettings
+    equity: EquitySettings
 
 
 class DataSourceSettingsUpdate(BaseModel):
@@ -157,6 +198,7 @@ class DataSourceSettingsUpdate(BaseModel):
 
     subscribed_instruments: list[str] | None = None
     macro: MacroSettingsUpdate | None = None
+    equity: EquitySettingsUpdate | None = None
 
     model_config = ConfigDict(extra="forbid")
 
@@ -347,6 +389,11 @@ class SettingsResponse(BaseModel):
                                 "us2y": {"minute": None, "daily": "treasury"},
                                 "vix": {"minute": "yahoo", "daily": "cboe"},
                             },
+                            "scheduler": {"minute": "1m"},
+                        },
+                        "equity": {
+                            "provider": "yahoo",
+                            "symbols": ["SPY", "QQQ"],
                             "scheduler": {"minute": "1m"},
                         },
                     },

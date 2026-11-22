@@ -40,11 +40,14 @@ COMPONENT_NAMES: tuple[str, ...] = (
     "job_queue",
     "candle_coverage",
     "macro",
+    "equity",
 )
 OKX_PROVIDER = "okx"
 CANDLE_STALE_AFTER = timedelta(days=3)
 #: 宏观调度器每分钟一跳；一小时没有任何成功记录说明它已经停摆或持续失败。
 MACRO_STALE_AFTER = timedelta(hours=1)
+#: 美股渠道与宏观同一节奏（`1m` / `5m` 一跳）；阈值同样取一小时。
+EQUITY_STALE_AFTER = timedelta(hours=1)
 
 
 def _window_label(window: timedelta) -> str:
@@ -295,6 +298,77 @@ def _macro_detail(status: Mapping[str, Any]) -> str:
     return "，".join(parts)
 
 
+def _equity(now: datetime, status: Mapping[str, Any] | None) -> ComponentHealth:
+    """美股行情渠道的最近状态；状态由 `app/jobs/market_data.py` 挂在 `app.state` 上。
+
+    只读它已经记下的事实，不在这里探测上游，也不推断「上次成功」的时间。渠道失败时
+    首页仍然读库里的旧值并标 `stale`，不会返回 500。
+    """
+
+    if not status:
+        return ComponentHealth(
+            name="equity",
+            status="unconfigured",
+            last_success_at=None,
+            error=None,
+            detail="美股调度器尚未启动",
+        )
+    last_success = _parse_iso(status.get("last_success_at"))
+    error = status.get("last_error")
+    error_text = None if not isinstance(error, str) or not error else error
+    detail = _equity_detail(status)
+    if status.get("degraded") or error_text is not None:
+        return ComponentHealth(
+            name="equity",
+            status="error",
+            last_success_at=last_success,
+            error=error_text or "美股同步连续失败",
+            detail=detail,
+        )
+    if last_success is None:
+        return ComponentHealth(
+            name="equity",
+            status="unconfigured",
+            last_success_at=None,
+            error=None,
+            detail=detail or "美股行情尚未同步",
+        )
+    if last_success < now - EQUITY_STALE_AFTER:
+        return ComponentHealth(
+            name="equity",
+            status="stale",
+            last_success_at=last_success,
+            error=None,
+            detail=detail or f"超过 {_window_label(EQUITY_STALE_AFTER)}未成功同步",
+        )
+    return ComponentHealth(
+        name="equity",
+        status="ok",
+        last_success_at=last_success,
+        error=None,
+        detail=detail,
+    )
+
+
+def _equity_detail(status: Mapping[str, Any]) -> str:
+    """`上次运行 …，下次 …，耗时 …ms，连续失败 N 次`：调度可观测性写在 detail 里。"""
+
+    parts: list[str] = []
+    last_run = _parse_iso(status.get("last_run_at"))
+    next_run = _parse_iso(status.get("next_run_at"))
+    if last_run is not None:
+        parts.append(f"上次运行 {last_run.isoformat().replace('+00:00', 'Z')}")
+    if next_run is not None:
+        parts.append(f"下次 {next_run.isoformat().replace('+00:00', 'Z')}")
+    duration = status.get("duration_ms")
+    if isinstance(duration, int):
+        parts.append(f"耗时 {duration}ms")
+    failures = status.get("failures")
+    if isinstance(failures, int) and failures > 0:
+        parts.append(f"连续失败 {failures} 次")
+    return "，".join(parts)
+
+
 def _job_queue() -> ComponentHealth:
     view = sync_jobs.queue_sync_status()
     return ComponentHealth(
@@ -362,12 +436,13 @@ def system_health(
     *,
     ws_status: Mapping[str, Any] | None = None,
     macro_status: Mapping[str, Any] | None = None,
+    equity_status: Mapping[str, Any] | None = None,
     clock: Clock | None = None,
 ) -> SystemHealth:
     """执行一次健康检查；任何一项失败都只降级该项。
 
-    `macro_status` 由装配层从调度器读来（与 `ws_status` 同一做法）：`app/market` 不
-    import `app/macro`，避免两个业务包互相依赖。
+    `macro_status` / `equity_status` 由装配层从调度器读来（与 `ws_status` 同一做法）：
+    `app/market` 不 import `app/macro` 或 `app/equity`，避免业务包互相依赖。
     """
 
     now = (clock or SystemClock()).now().replace(microsecond=0)
@@ -389,6 +464,7 @@ def system_health(
         _safe("job_queue", _job_queue),
         _candle_component(now, coverage, coverage_error),
         _safe("macro", lambda: _macro(now, macro_status)),
+        _safe("equity", lambda: _equity(now, equity_status)),
     )
     status = "ok" if all(item.status == "ok" for item in components) else "degraded"
     return SystemHealth(status=status, checked_at=now, components=components)

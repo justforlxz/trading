@@ -54,6 +54,8 @@ export type AlertCreatedData = {
   instrument_id: string | null;
   title: string;
   detail: string;
+  /** 服务端渲染好的正文：三个通知通道共用的同一段文字。 */
+  message: string | null;
   triggered_at: string | null;
 };
 
@@ -300,6 +302,7 @@ function parseEvent(value: Record<string, unknown>): StreamEvent | null {
           instrument_id: text(data.instrument_id),
           title: text(data.title) ?? "新提醒",
           detail: text(data.detail) ?? "",
+          message: text(data.message),
           triggered_at: text(data.triggered_at),
         },
       };

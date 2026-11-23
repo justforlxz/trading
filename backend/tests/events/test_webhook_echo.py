@@ -18,7 +18,8 @@ from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, cast
 
-from app.events import DomainEvent
+from app.events import DeliveryDigest, digest_of
+from app.events.event import DomainEvent
 from app.events.sinks.config import ChannelConfig
 from app.events.sinks.webhook import SIGNATURE_HEADER, WebhookSink
 
@@ -69,13 +70,16 @@ def _echo_server() -> Iterator[_EchoServer]:
         thread.join(timeout=5.0)
 
 
-def _event() -> DomainEvent:
-    return DomainEvent(
+def _digest() -> DeliveryDigest:
+    event = DomainEvent(
         kind="alert",
         inst_id="XAAPL-USDT",
         payload={"rule_id": "price_deviation", "alert": dict(ALERT)},
         occurred_at=MOMENT,
     )
+    digest = digest_of(event)
+    assert digest is not None
+    return digest
 
 
 def test_webhook_is_signed_over_the_bytes_an_echo_server_receives() -> None:
@@ -88,7 +92,7 @@ def test_webhook_is_signed_over_the_bytes_an_echo_server_receives() -> None:
             webhook_signing_secret=SECRET,
         )
 
-        result = asyncio.run(WebhookSink(lambda: config).deliver(_event()))
+        result = asyncio.run(WebhookSink(lambda: config).deliver(_digest()))
 
         received = server.received
         expected = hmac.new(SECRET.encode(), received["body"], hashlib.sha256).hexdigest()
@@ -104,5 +108,10 @@ def test_webhook_is_signed_over_the_bytes_an_echo_server_receives() -> None:
         "title": ALERT["title"],
         "detail": ALERT["detail"],
         "instrument_id": ALERT["instrument_id"],
+        "message": (
+            "⚠️ 价格区间 · 警告\n"
+            "XAAPL-USDT 最新成交价 101.5 高于 指数价 100，偏离 1.5%\n"
+            "2026-11-20T12:00:00Z"
+        ),
         "occurred_at": "2026-11-20T12:00:00Z",
     }

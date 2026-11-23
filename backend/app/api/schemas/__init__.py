@@ -198,6 +198,7 @@ from app.api.schemas.risk_exposure import (
     SectorExposureItem,
 )
 from app.api.schemas.settings import (
+    ChannelSubscriptionSettings,
     DataSourceSettings,
     DataSourceSettingsUpdate,
     DeliveryItem,
@@ -216,6 +217,8 @@ from app.api.schemas.settings import (
     NotificationChannelTestResponse,
     NotificationSettings,
     NotificationSettingsUpdate,
+    NotificationSubscriptions,
+    NotificationSubscriptionsUpdate,
     RiskDefaults,
     SecretSettings,
     SettingsResponse,
@@ -327,6 +330,7 @@ __all__ = [
     "BacktestTradeListResponse",
     "Candle",
     "CandleSeriesResponse",
+    "ChannelSubscriptionSettings",
     "ComponentStatus",
     "CorrelationCell",
     "CorrelationMatrixResponse",
@@ -426,6 +430,8 @@ __all__ = [
     "NotificationChannelTestResponse",
     "NotificationSettings",
     "NotificationSettingsUpdate",
+    "NotificationSubscriptions",
+    "NotificationSubscriptionsUpdate",
     "Opportunity",
     "OpportunityLeg",
     "OpportunityListResponse",

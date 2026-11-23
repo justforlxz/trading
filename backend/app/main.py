@@ -125,6 +125,11 @@ async def lifespan(_app: FastAPI) -> Iterator[None]:
             hub.publish(event_type, data, as_of=as_of, predicate=predicate), loop
         )
 
+    def _subscriptions() -> Any:
+        """按通道的类型订阅：每次投递现读设置文档，保存后下一轮评估立即生效。"""
+
+        return load_settings().notifications.get("subscriptions", {})
+
     def _channel_config() -> ChannelConfig:
         """外部通道的配置：接收方读设置文档，令牌与签名密钥读环境变量。
 
@@ -145,6 +150,7 @@ async def lifespan(_app: FastAPI) -> Iterator[None]:
                 channels=load_settings().notifications.get("channels", []),
                 broadcast=_broadcast,
                 config=_channel_config,
+                subscriptions=_subscriptions,
             )
         ),
         loop=loop,

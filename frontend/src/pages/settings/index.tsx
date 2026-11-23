@@ -29,6 +29,10 @@ import {
   type NotificationPermissionState,
 } from "../../lib/notifications";
 import {
+  ALERT_SEVERITY_OPTIONS,
+  ALERT_TYPE_OPTIONS,
+} from "../../lib/alerts";
+import {
   EQUITY_PROVIDERS,
   NOTIFICATION_CHANNELS,
   channelLabel,
@@ -41,6 +45,8 @@ import {
   toSettingsDraft,
   VIX_MINUTE_PROVIDERS,
   withChannel,
+  withMinSeverity,
+  withSubscriptionType,
   type SettingsDraft,
 } from "../../lib/settings-draft";
 import {
@@ -483,7 +489,8 @@ export function SettingsView({
             <CardTitle>通知</CardTitle>
             <CardDescription>
               三个通道各自投递、各自记一行台账。浏览器通知用浏览器内置的 Notification
-              API；Telegram 与 Webhook 由服务端直接发出，页面关闭后仍然有效。
+              API；Telegram 与 Webhook 由服务端直接发出，页面关闭后仍然有效。每个通道
+              可以只订阅几类提醒，并设一个最低严重度：低于门槛的不投递，也不记台账。
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3">
@@ -517,6 +524,73 @@ export function SettingsView({
                   }
                 />
               ))}
+            </div>
+            <div className="grid gap-2">
+              <h3 className="text-sm font-medium">按通道订阅</h3>
+              <p className="text-xs text-muted-foreground">
+                勾选要收的提醒类型；低于最低严重度的不投递。浏览器默认全收，Telegram
+                默认只收持仓风险与策略信号且警告以上，Webhook 默认为空。保存后下一轮
+                评估即按新配置过滤，不用重启进程。
+              </p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {NOTIFICATION_CHANNELS.map((channel) => {
+                  const subscription = draft.notifications.subscriptions[channel] ?? {
+                    types: [],
+                    minSeverity: "info",
+                  };
+                  return (
+                    <div key={channel} className="grid gap-2 rounded-md border p-3">
+                      <h4 className="text-sm font-medium">{channelLabel(channel)}</h4>
+                      <div className="grid gap-1.5">
+                        {ALERT_TYPE_OPTIONS.map((option) => (
+                          <label
+                            key={option.value}
+                            className="flex items-center gap-2 text-sm"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={subscription.types.includes(option.value)}
+                              onChange={(event) =>
+                                onDraftChange("notifications", {
+                                  subscriptions: withSubscriptionType(
+                                    draft.notifications.subscriptions,
+                                    channel,
+                                    option.value,
+                                    event.target.checked,
+                                  ),
+                                })
+                              }
+                            />
+                            <span>{option.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <label className="space-y-1.5 text-sm">
+                        <span className="text-muted-foreground">最低严重度</span>
+                        <select
+                          className={INPUT_CLASS}
+                          value={subscription.minSeverity}
+                          onChange={(event) =>
+                            onDraftChange("notifications", {
+                              subscriptions: withMinSeverity(
+                                draft.notifications.subscriptions,
+                                channel,
+                                event.target.value,
+                              ),
+                            })
+                          }
+                        >
+                          {ALERT_SEVERITY_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="grid gap-2 rounded-md border p-3">
@@ -580,8 +654,8 @@ export function SettingsView({
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              保存后通道开关立即生效，不用重启进程；接收方留空表示未配置，投递会记一条
-              「未配置」的失败。浏览器通知只在页面打开时有效（含后台标签页）。
+              保存后通道开关与订阅立即生效，不用重启进程；接收方留空表示未配置，投递
+              会记一条「未配置」的失败。浏览器通知只在页面打开时有效（含后台标签页）。
             </p>
             <div className="border-t pt-3">
               <div className="flex flex-wrap items-center justify-between gap-2">

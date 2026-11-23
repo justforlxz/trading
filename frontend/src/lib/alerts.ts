@@ -27,18 +27,34 @@ export type AlertView = {
 };
 
 const SEVERITY_LABELS: Record<string, string> = {
-  critical: "严重",
+  critical: "紧急",
   warning: "警告",
   info: "提示",
 };
 
 const TYPE_LABELS: Record<AlertType, string> = {
-  indicator: "指标",
-  price: "价格",
-  risk: "风险",
-  strategy: "策略",
-  data: "数据",
+  indicator: "技术形态",
+  price: "价格区间",
+  risk: "持仓风险",
+  strategy: "策略信号",
+  data: "数据缺口",
 };
+
+/**
+ * 提醒类型的中文标签，按「风险 → 信号 → 形态 → 价格 → 数据」排列。
+ *
+ * 与后端 `backend/app/events/sinks/render.py` 的 `TYPE_LABELS` 同一套措辞：同一条
+ * 提醒在通知正文、提醒列表与设置页的复选框里必须是同一个说法。设置页直接用它渲染
+ * 复选框，不再自己维护第二张表。
+ */
+export const ALERT_TYPE_OPTIONS: readonly { value: AlertType; label: string }[] = (
+  ["risk", "strategy", "indicator", "price", "data"] as const
+).map((value) => ({ value, label: TYPE_LABELS[value] }));
+
+/** 提醒级别选项：与后端 `SEVERITY_LABELS` 同一套措辞，供设置页的下拉使用。 */
+export const ALERT_SEVERITY_OPTIONS: readonly { value: string; label: string }[] = (
+  ["info", "warning", "critical"] as const
+).map((value) => ({ value, label: SEVERITY_LABELS[value] }));
 
 const STATUS_LABELS: Record<AlertStatus, string> = {
   pending: "待处理",

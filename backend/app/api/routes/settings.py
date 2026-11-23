@@ -23,6 +23,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 
 from app.api.schemas import (
+    ChannelSubscriptionSettings,
     DataSourceSettings,
     DeliveryItem,
     DeliveryListResponse,
@@ -36,6 +37,7 @@ from app.api.schemas import (
     NotificationChannelTestRequest,
     NotificationChannelTestResponse,
     NotificationSettings,
+    NotificationSubscriptions,
     RiskDefaults,
     SecretSettings,
     SettingsResponse,
@@ -53,8 +55,10 @@ from app.events import (
     apply_channels,
     build_channel,
     config_from_notifications,
+    digest_of,
     list_deliveries,
     record_delivery,
+    resolve_subscriptions,
 )
 from app.jobs import OKX_PROVIDER
 from app.macro import validate_series_override
@@ -110,8 +114,11 @@ async def test_notification_channel(
     sink = build_channel(payload.channel, config=_config_provider())
     if sink is None:
         raise HTTPException(status_code=404, detail=f"未实现的通道 {payload.channel}")
+    digest = digest_of(_test_event())
+    if digest is None:  # 防御：测试事件永远是告警，构造失败说明代码被改坏了
+        raise HTTPException(status_code=500, detail="测试事件不是告警")
     try:
-        result = await sink.deliver(_test_event())
+        result = await sink.deliver(digest)
     except Exception as exc:  # 通道自己抛错也要给出可读结果，不能让设置页 500
         logger.exception("测试发送失败: channel=%s", payload.channel)
         result = DeliveryResult(channel=payload.channel, status="failed", error=str(exc))
@@ -144,6 +151,9 @@ def _notifications(payload: SettingsUpdateRequest) -> dict[str, Any] | None:
     values: dict[str, Any] = {}
     if group.channels is not None:
         values["channels"] = list(group.channels)
+    if group.subscriptions is not None:
+        # 只带提交出来的通道与字段：未提交的由 `save_settings` 保留库中原值。
+        values["subscriptions"] = group.subscriptions.model_dump(mode="json", exclude_none=True)
     if group.telegram is not None:
         values["telegram"] = {"chat_id": group.telegram.chat_id}
     if group.webhook is not None:
@@ -163,6 +173,7 @@ def _notification_settings(record: SettingsRecord) -> NotificationSettings:
     webhook = record.notifications.get("webhook", {})
     return NotificationSettings(
         channels=[str(item) for item in record.notifications.get("channels", [])],
+        subscriptions=_notification_subscriptions(record),
         telegram=TelegramSettings(
             chat_id=str(telegram.get("chat_id", "")),
             token_configured=bool(runtime.telegram_bot_token.strip()),
@@ -171,6 +182,21 @@ def _notification_settings(record: SettingsRecord) -> NotificationSettings:
             url=str(webhook.get("url", "")),
             secret_configured=bool(runtime.webhook_signing_secret.strip()),
         ),
+    )
+
+
+def _notification_subscriptions(record: SettingsRecord) -> NotificationSubscriptions:
+    """生效订阅：设置文档里的值优先，缺项按投递侧的默认值补齐。"""
+
+    resolved = resolve_subscriptions(record.notifications.get("subscriptions"))
+    return NotificationSubscriptions(
+        **{
+            channel: ChannelSubscriptionSettings(
+                types=list(subscription.types),
+                min_severity=subscription.min_severity,
+            )
+            for channel, subscription in resolved.items()
+        }
     )
 
 

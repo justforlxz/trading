@@ -2979,6 +2979,30 @@ export interface components {
             inst_id: string;
         };
         /**
+         * ChannelSubscriptionSettings
+         * @description 一个通道的订阅：收哪几类提醒、最低到什么严重度才收。
+         */
+        ChannelSubscriptionSettings: {
+            /**
+             * Min Severity
+             * @default info
+             * @enum {string}
+             */
+            min_severity: "info" | "warning" | "critical";
+            /** Types */
+            types?: string[];
+        };
+        /**
+         * ChannelSubscriptionUpdate
+         * @description 一个通道的订阅写入：只覆盖提交出来的字段，未提交的字段保持库中原值。
+         */
+        ChannelSubscriptionUpdate: {
+            /** Min Severity */
+            min_severity?: ("info" | "warning" | "critical") | null;
+            /** Types */
+            types?: string[] | null;
+        };
+        /**
          * CorrelationCell
          * @description 矩阵的一格；`coefficient` 为 `null` 表示该格样本不足。
          */
@@ -5572,11 +5596,12 @@ export interface components {
         };
         /**
          * NotificationSettings
-         * @description 通知通道开关与两个可编辑的接收方；三个通道都可独立开关。
+         * @description 通知通道开关、两个可编辑的接收方，以及按通道的类型订阅。
          */
         NotificationSettings: {
             /** Channels */
             channels?: string[];
+            subscriptions?: components["schemas"]["NotificationSubscriptions"];
             telegram?: components["schemas"]["TelegramSettings"];
             webhook?: components["schemas"]["WebhookSettings"];
         };
@@ -5587,8 +5612,27 @@ export interface components {
         NotificationSettingsUpdate: {
             /** Channels */
             channels?: string[] | null;
+            subscriptions?: components["schemas"]["NotificationSubscriptionsUpdate"] | null;
             telegram?: components["schemas"]["TelegramSettingsUpdate"] | null;
             webhook?: components["schemas"]["WebhookSettingsUpdate"] | null;
+        };
+        /**
+         * NotificationSubscriptions
+         * @description 三个通道各自的订阅；读取时缺项按默认值补齐。
+         */
+        NotificationSubscriptions: {
+            browser?: components["schemas"]["ChannelSubscriptionSettings"];
+            telegram?: components["schemas"]["ChannelSubscriptionSettings"];
+            webhook?: components["schemas"]["ChannelSubscriptionSettings"];
+        };
+        /**
+         * NotificationSubscriptionsUpdate
+         * @description 按通道、按字段部分更新订阅：只提交要改的通道与字段，其余保持原值。
+         */
+        NotificationSubscriptionsUpdate: {
+            browser?: components["schemas"]["ChannelSubscriptionUpdate"] | null;
+            telegram?: components["schemas"]["ChannelSubscriptionUpdate"] | null;
+            webhook?: components["schemas"]["ChannelSubscriptionUpdate"] | null;
         };
         /**
          * Opportunity
@@ -6409,6 +6453,29 @@ export interface components {
          *         "channels": [
          *           "browser"
          *         ],
+         *         "subscriptions": {
+         *           "browser": {
+         *             "min_severity": "info",
+         *             "types": [
+         *               "indicator",
+         *               "price",
+         *               "risk",
+         *               "strategy",
+         *               "data"
+         *             ]
+         *           },
+         *           "telegram": {
+         *             "min_severity": "warning",
+         *             "types": [
+         *               "risk",
+         *               "strategy"
+         *             ]
+         *           },
+         *           "webhook": {
+         *             "min_severity": "warning",
+         *             "types": []
+         *           }
+         *         },
          *         "telegram": {
          *           "chat_id": "",
          *           "token_configured": false

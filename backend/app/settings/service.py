@@ -312,7 +312,12 @@ def _merge_data_sources(
 
 
 def _notifications_view(value: Mapping[str, Any]) -> dict[str, Any]:
-    """收紧通知分组：通道名去重、去空白（空列表表示一个通道都不开），接收方信息去空白。"""
+    """收紧通知分组：通道名去重、去空白（空列表表示一个通道都不开），接收方信息去空白。
+
+    订阅分组只做纯结构清洗（通道名、类型清单去重去空白、最低严重度去空白），不在这里
+    补默认值也不判断类型是否有效：默认值属于投递语义，由事件层在投递时补齐；类型清单
+    的合法性由接口契约校验。
+    """
 
     channels = value.get("channels", [])
     if not isinstance(channels, list):
@@ -323,9 +328,53 @@ def _notifications_view(value: Mapping[str, Any]) -> dict[str, Any]:
                 item.strip() for item in channels if isinstance(item, str) and item.strip()
             )
         ),
+        "subscriptions": _subscriptions_view(value.get("subscriptions")),
         "telegram": {"chat_id": _nested_text(value.get("telegram"), "chat_id")},
         "webhook": {"url": _nested_text(value.get("webhook"), "url")},
     }
+
+
+def _subscriptions_view(value: Any) -> dict[str, Any]:
+    """`{通道: {types, min_severity}}` 的形状收紧；缺失的项不补，交给投递侧的默认值。"""
+
+    if not isinstance(value, Mapping):
+        return {}
+    cleaned: dict[str, Any] = {}
+    for channel, entry in value.items():
+        if not isinstance(channel, str) or not isinstance(entry, Mapping):
+            continue
+        name = channel.strip()
+        if not name:
+            continue
+        item: dict[str, Any] = {}
+        types = entry.get("types")
+        if isinstance(types, list):
+            item["types"] = list(
+                dict.fromkeys(
+                    text
+                    for text in (t.strip() if isinstance(t, str) else "" for t in types)
+                    if text
+                )
+            )
+        severity = entry.get("min_severity")
+        if isinstance(severity, str) and severity.strip():
+            item["min_severity"] = severity.strip()
+        if item:
+            cleaned[name] = item
+    return cleaned
+
+
+def _merge_subscriptions(current: Any, incoming: Any) -> dict[str, Any]:
+    """按通道、按字段合并订阅：请求里没出现的通道与字段保持库中原值。
+
+    不做整块替换：只改一个通道时，其余通道的订阅不能跟着变成默认值；只改最低严重度
+    时，该通道的类型清单也必须保留。
+    """
+
+    merged = _subscriptions_view(current)
+    for channel, entry in _subscriptions_view(incoming).items():
+        merged[channel] = {**merged.get(channel, {}), **entry}
+    return merged
 
 
 def _nested_text(group: Any, key: str) -> str:
@@ -437,7 +486,11 @@ def save_settings(
             row.data_sources = _dump(current)
         if notifications is not None:
             current = _notifications_view(_parse("notifications", row.notifications))
-            row.notifications = _dump(_notifications_view({**current, **notifications}))
+            merged = {**current, **notifications}
+            merged["subscriptions"] = _merge_subscriptions(
+                current.get("subscriptions"), notifications.get("subscriptions")
+            )
+            row.notifications = _dump(_notifications_view(merged))
         if api_key is not None and api_key.strip():
             row.okx_api_key = api_key.strip()
         row.updated_at = moment

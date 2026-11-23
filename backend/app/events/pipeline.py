@@ -4,8 +4,9 @@
 链路，调用前后都可以处理（洋葱）。`DEFAULT_MIDDLEWARES` 是**唯一**的注册表——新增
 能力时在它下面加一行，不改 `stream/hub.py`，也不改 `alerts/`。
 
-链路的末端不是通道本身：`route` 按通道声明的订阅过滤，再交给通道投递；没有通道接收
-就中止，不产生投递记录。
+链路的末端不是通道本身：`route` 把告警收进本轮批次，轮次结束时由通道注册表按订阅
+过滤、合并、渲染并投递；没有通道接收就什么也不写，不产生投递记录。轮次由 `run` 的
+开始与结束界定，没有定时器。
 """
 
 from __future__ import annotations
@@ -71,12 +72,25 @@ class Pipeline:
             self._sinks.set_channels(channels)
 
     async def run(self, event: DomainEvent) -> None:
-        """处理一条事件；链路上任何异常只记录，不向调用方抛出。"""
+        """处理一条事件；链路上任何异常只记录，不向调用方抛出。
 
+        一条事件就是一轮评估：开始时开一个投递批次，结束时（含中途失败）把这一轮
+        产出的告警一次性投出去，因此同一轮的多条不会各发一条消息。
+        """
+
+        sinks = self._sinks
+        if sinks is not None:
+            sinks.begin_round()
         try:
             await self._dispatch(event, 0)
         except Exception:
             logger.exception("事件处理失败: kind=%s inst=%s", event.kind, event.inst_id)
+        finally:
+            if sinks is not None:
+                try:
+                    await sinks.end_round()
+                except Exception:
+                    logger.exception("本轮投递失败: kind=%s inst=%s", event.kind, event.inst_id)
 
     async def _dispatch(self, event: DomainEvent, index: int) -> None:
         if index >= len(self._middlewares):

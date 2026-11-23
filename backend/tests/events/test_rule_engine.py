@@ -39,19 +39,30 @@ class RecordingBroadcast:
 
 
 class RecordingSink:
-    """接收除告警以外事件的假通道，用来核对中间件没有吞掉事实。"""
+    """记录每次投递，用来核对告警确实走到了通道。"""
 
     name = "recording"
 
     def __init__(self) -> None:
+        self.digests: list[Any] = []
+
+    async def deliver(self, digest: Any) -> DeliveryResult:
+        self.digests.append(digest)
+        return DeliveryResult(channel=self.name, status="delivered")
+
+
+class _Tracer:
+    """链路末端的观察点：非告警事件也要原样走到这里，不被中间件吞掉。"""
+
+    def __init__(self) -> None:
         self.events: list[DomainEvent] = []
 
-    def accepts(self, event: DomainEvent) -> bool:
-        return event.kind in {"account", "position"}
+    def factory(self, _deps: Any) -> Any:
+        async def middleware(event: DomainEvent, call_next: Any) -> None:
+            self.events.append(event)
+            await call_next(event)
 
-    async def deliver(self, event: DomainEvent) -> DeliveryResult:
-        self.events.append(event)
-        return DeliveryResult(channel=self.name, status="delivered")
+        return middleware
 
 
 class MemoryRecorder:
@@ -132,7 +143,11 @@ def test_a_pushed_quote_over_the_threshold_lands_one_alert_and_one_delivery() ->
 
 
 def test_five_consecutive_crossings_deliver_once_and_a_fall_back_rearms() -> None:
-    """AC5：连续 5 次越过阈值只投递 1 次；回落后再越界再投 1 次。"""
+    """AC5：连续 5 次越过阈值只产出一条提醒；回落后再越界再产出一条。
+
+    两条提醒只间隔 11 秒，同属 `(标的, 价格)` 的合并窗口，因此通道只收到 1 条投递：
+    台账记的是真实投递，不是提醒条数。
+    """
 
     sync_instruments([make_swap_ref()])
     broadcast = RecordingBroadcast()
@@ -151,8 +166,8 @@ def test_five_consecutive_crossings_deliver_once_and_a_fall_back_rearms() -> Non
     asyncio.run(scenario())
 
     assert len(_alerts()) == 2
-    assert len(broadcast.calls) == 2
-    assert [row.status for row in _deliveries()] == ["delivered", "delivered"]
+    assert len(broadcast.calls) == 1
+    assert [row.status for row in _deliveries()] == ["delivered"]
 
 
 def test_falling_back_closes_the_pending_alert() -> None:
@@ -242,11 +257,14 @@ def test_a_failed_alert_write_does_not_swallow_the_crossing(monkeypatch: Any) ->
     assert len(broadcast.calls) == 1
 
 
-def test_account_and_position_events_reach_the_sinks() -> None:
+def test_account_and_position_events_reach_the_chain_end() -> None:
     """非行情事件没有研判规则，但不能被规则中间件吞掉。"""
 
-    sink = RecordingSink()
-    pipeline = build_pipeline(sinks=SinkRegistry([sink], recorder=MemoryRecorder()))
+    tracer = _Tracer()
+    pipeline = build_pipeline(
+        sinks=SinkRegistry([RecordingSink()], recorder=MemoryRecorder()),
+        middlewares=(rule_engine.middleware, tracer.factory),
+    )
 
     async def scenario() -> None:
         await pipeline.run(
@@ -263,4 +281,4 @@ def test_account_and_position_events_reach_the_sinks() -> None:
 
     asyncio.run(scenario())
 
-    assert [event.kind for event in sink.events] == ["account", "position"]
+    assert [event.kind for event in tracer.events] == ["account", "position"]

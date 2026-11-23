@@ -10,7 +10,15 @@ import asyncio
 from datetime import UTC, datetime
 from typing import Any
 
-from app.events import DomainEvent, apply_channels, build_pipeline, install, uninstall
+from app.events import (
+    DeliveryDigest,
+    DomainEvent,
+    apply_channels,
+    build_pipeline,
+    digest_of,
+    install,
+    uninstall,
+)
 from app.events.pipeline import DEFAULT_MIDDLEWARES, Pipeline, PipelineDeps
 from app.events.sinks.base import DeliveryResult
 from app.events.sinks.registry import DeliveryRecorder, SinkRegistry
@@ -19,18 +27,15 @@ MOMENT = datetime(2026, 11, 20, 12, 0, tzinfo=UTC)
 
 
 class RecordingSink:
-    """记下收到的每一条事件。"""
+    """记下收到的每一次投递。"""
 
     name = "recording"
 
     def __init__(self) -> None:
-        self.events: list[DomainEvent] = []
+        self.digests: list[DeliveryDigest] = []
 
-    def accepts(self, event: DomainEvent) -> bool:
-        return event.kind == "alert"
-
-    async def deliver(self, event: DomainEvent) -> DeliveryResult:
-        self.events.append(event)
+    async def deliver(self, digest: DeliveryDigest) -> DeliveryResult:
+        self.digests.append(digest)
         return DeliveryResult(channel=self.name, status="delivered")
 
 
@@ -74,7 +79,18 @@ def _alert(alert_id: str = "al_1") -> DomainEvent:
     return DomainEvent(
         kind="alert",
         inst_id="XAAPL-USDT",
-        payload={"rule_id": "test_rule", "state": "triggered", "alert": {"id": alert_id}},
+        payload={
+            "rule_id": "test_rule",
+            "state": "triggered",
+            "alert": {
+                "id": alert_id,
+                "type": "price",
+                "severity": "warning",
+                "title": "价格偏离参考价",
+                "detail": "XAAPL-USDT 最新成交价 101.5 高于 指数价 100",
+                "instrument_id": "XAAPL-USDT",
+            },
+        },
         occurred_at=MOMENT,
     )
 
@@ -97,8 +113,9 @@ def _factory(name: str, log: list[str]):
 
 def _route(sink: RecordingSink):
     async def middleware(event: DomainEvent, call_next) -> None:
-        if sink.accepts(event):
-            await sink.deliver(event)
+        digest = digest_of(event)
+        if digest is not None:
+            await sink.deliver(digest)
         await call_next(event)
 
     return middleware
@@ -141,7 +158,7 @@ def test_not_calling_call_next_stops_the_rest_of_the_chain() -> None:
     asyncio.run(Pipeline([stopper, after_stopper, _route(sink)]).run(_alert()))
 
     assert log == ["stopper"]
-    assert sink.events == []
+    assert sink.digests == []
 
 
 def test_one_extra_registry_line_is_all_a_new_middleware_needs() -> None:
@@ -157,5 +174,5 @@ def test_one_extra_registry_line_is_all_a_new_middleware_needs() -> None:
     )
 
     assert log == ["extra:in", "extra:out"]
-    assert [event.kind for event in sink.events] == ["alert"]
+    assert [digest.items[0].alert["id"] for digest in sink.digests] == ["al_1"]
     assert recorder.rows == [("recording", "al_1")]

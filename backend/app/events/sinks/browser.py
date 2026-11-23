@@ -4,6 +4,9 @@
 带一个只看 `client.alerts` 的过滤条件——没订阅告警的页面不会收到，行情与账户推送
 也不受影响。
 
+推送的载荷仍是 `GET /api/alerts` 的条目形状，另外多一个 `message`：它就是三个通道
+共用的渲染结果，前端优先用它当通知正文，取不到才回落到 `detail`。
+
 浏览器通知本身的权限与展示在前端（`frontend/src/lib/notifications.ts`）：Notification
 API 只能由页面调用，服务端无法替用户授权，也无法在页面关闭后弹窗。
 """
@@ -14,8 +17,9 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from app.events.event import DomainEvent
 from app.events.sinks.base import DeliveryResult
+from app.events.sinks.digest import DeliveryDigest
+from app.events.sinks.render import render_message
 
 __all__ = ["BrowserSink"]
 
@@ -37,16 +41,14 @@ class BrowserSink:
     def __init__(self, broadcast: Broadcast) -> None:
         self._broadcast = broadcast
 
-    def accepts(self, event: DomainEvent) -> bool:
-        return event.kind == "alert" and isinstance(event.payload.get("alert"), dict)
-
-    async def deliver(self, event: DomainEvent) -> DeliveryResult:
-        alert = dict(event.payload["alert"])
+    async def deliver(self, digest: DeliveryDigest) -> DeliveryResult:
+        alert = dict(digest.alert)
+        alert["message"] = render_message(digest)
         try:
             self._broadcast(
                 "alert.created",
                 alert,
-                event.occurred_at,
+                digest.occurred_at,
                 _wants_alerts,
             )
         except Exception as exc:  # 推送失败要留在台账里，不能静默

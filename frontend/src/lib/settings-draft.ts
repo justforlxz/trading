@@ -5,9 +5,10 @@
  * 用户原始文本（包括刚键入、尚未写完的逗号），否则逐项键入时逗号会被立刻过滤掉。
  * 因此解析只在保存时发生，页面拿到的是纯函数结果。
  *
- * 通知分组在接口里是嵌套的（`channels` / `telegram.chat_id` / `webhook.url`），
- * 界面上是三条独立输入。草稿因此拍平成三个字段，保存时再由 `notificationsPatch`
- * 组装回接口形状：这样切换某个通道开关不会顺手覆盖另一个通道的接收方。
+ * 通知分组在接口里是嵌套的（`channels` / `subscriptions` / `telegram.chat_id` /
+ * `webhook.url`），界面上是三个通道开关、三组类型复选框与两条接收方输入。草稿因此
+ * 拍平成「开关、按通道的订阅、两条接收方」，保存时再由 `notificationsPatch` 组装回
+ * 接口形状：这样切换某个通道开关、改某一组订阅都不会顺手覆盖另一个通道的配置。
  *
  * 宏观分组同理：界面上只有「VIX 的分钟级 provider」一个可写项，草稿只存这一项，
  * 保存时由 `macroPatch` 组装成 `data_sources.macro.series.vix.minute`；其它序列与调度
@@ -32,9 +33,19 @@ export type MacroSeriesUpdate = NonNullable<
   NonNullable<NonNullable<SettingsUpdateRequest["data_sources"]>["macro"]>["series"]
 >[string];
 
-/** 通知分组在草稿里的扁平形状：接收方各自一条，与界面输入一一对应。 */
+/** 三个可订阅的通道；接口里 `subscriptions` 的三个键与之一一对应。 */
+export type NotificationChannelKey = "browser" | "telegram" | "webhook";
+
+/** 一个通道的订阅草稿：类型清单 + 最低严重度，与界面上的一组复选框一一对应。 */
+export type ChannelSubscriptionDraft = {
+  types: string[];
+  minSeverity: string;
+};
+
+/** 通知分组在草稿里的扁平形状：开关、按通道的订阅、接收方各自一块。 */
 export type NotificationDraft = {
   channels: string[];
+  subscriptions: Record<string, ChannelSubscriptionDraft>;
   telegramChatId: string;
   webhookUrl: string;
 };
@@ -119,7 +130,11 @@ export function macroPatch(draft: MacroDraft): { series: { vix: MacroSeriesUpdat
 }
 
 /** 三个通道的固定顺序：界面按这个顺序排列开关。 */
-export const NOTIFICATION_CHANNELS: readonly string[] = ["browser", "telegram", "webhook"];
+export const NOTIFICATION_CHANNELS: readonly NotificationChannelKey[] = [
+  "browser",
+  "telegram",
+  "webhook",
+];
 
 export function toSettingsDraft(settings: SettingsResponse): SettingsDraft {
   return {
@@ -134,11 +149,45 @@ export function toSettingsDraft(settings: SettingsResponse): SettingsDraft {
 
 /** 接口的通知分组 → 扁平草稿；缺项按「未配置」处理。 */
 export function toNotificationDraft(notifications: NotificationSettings): NotificationDraft {
+  const subscriptions: Record<string, ChannelSubscriptionDraft> = {};
+  for (const channel of NOTIFICATION_CHANNELS) {
+    const entry = notifications.subscriptions?.[channel];
+    subscriptions[channel] = {
+      types: [...(entry?.types ?? [])],
+      minSeverity: entry?.min_severity ?? "info",
+    };
+  }
   return {
     channels: [...(notifications.channels ?? [])],
+    subscriptions,
     telegramChatId: notifications.telegram?.chat_id ?? "",
     webhookUrl: notifications.webhook?.url ?? "",
   };
+}
+
+/** 勾选/取消一个类型，保留该通道已有的顺序与最低严重度。 */
+export function withSubscriptionType(
+  subscriptions: Record<string, ChannelSubscriptionDraft>,
+  channel: string,
+  type: string,
+  enabled: boolean,
+): Record<string, ChannelSubscriptionDraft> {
+  const current = subscriptions[channel] ?? { types: [], minSeverity: "info" };
+  const rest = current.types.filter((item) => item !== type);
+  return {
+    ...subscriptions,
+    [channel]: { ...current, types: enabled ? [...rest, type] : rest },
+  };
+}
+
+/** 改一个通道的最低严重度。 */
+export function withMinSeverity(
+  subscriptions: Record<string, ChannelSubscriptionDraft>,
+  channel: string,
+  severity: string,
+): Record<string, ChannelSubscriptionDraft> {
+  const current = subscriptions[channel] ?? { types: [], minSeverity: "info" };
+  return { ...subscriptions, [channel]: { ...current, minSeverity: severity } };
 }
 
 /**
@@ -155,10 +204,19 @@ export function withChannel(
   return enabled ? [...rest, channel] : rest;
 }
 
-/** 草稿 → 通知分组的 PATCH 载荷：三个子项一次给全，接收方为空表示清空。 */
+/** 草稿 → 通知分组的 PATCH 载荷：四个子项一次给全，接收方为空表示清空。 */
 export function notificationsPatch(draft: NotificationDraft): NotificationSettingsUpdate {
+  const subscriptions: NonNullable<NotificationSettingsUpdate["subscriptions"]> = {};
+  for (const channel of NOTIFICATION_CHANNELS) {
+    const current = draft.subscriptions[channel] ?? { types: [], minSeverity: "info" };
+    subscriptions[channel] = {
+      types: [...current.types],
+      min_severity: current.minSeverity as "info" | "warning" | "critical",
+    };
+  }
   return {
     channels: [...draft.channels],
+    subscriptions,
     telegram: { chat_id: draft.telegramChatId.trim() },
     webhook: { url: draft.webhookUrl.trim() },
   };

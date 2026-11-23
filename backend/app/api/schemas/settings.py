@@ -17,9 +17,13 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 
+from app.alerts import ALERT_TYPES
 from app.api.schemas.common import Bar, DecimalString, UtcDatetime
+from app.events import DEFAULT_SUBSCRIPTIONS
 
 __all__ = [
+    "ChannelSubscriptionSettings",
+    "ChannelSubscriptionUpdate",
     "DataSourceSettings",
     "DataSourceSettingsUpdate",
     "DeliveryItem",
@@ -35,6 +39,8 @@ __all__ = [
     "NotificationChannelTestResponse",
     "NotificationSettings",
     "NotificationSettingsUpdate",
+    "NotificationSubscriptions",
+    "NotificationSubscriptionsUpdate",
     "RiskDefaults",
     "SecretSettings",
     "SettingsResponse",
@@ -221,12 +227,99 @@ class WebhookSettings(BaseModel):
     secret_configured: bool = False
 
 
+#: 提醒严重度，与 `app.alerts.rules.ALERT_SEVERITIES` 同一组取值。
+AlertSeverity = Literal["info", "warning", "critical"]
+
+
+class ChannelSubscriptionSettings(BaseModel):
+    """一个通道的订阅：收哪几类提醒、最低到什么严重度才收。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    types: list[str] = Field(default_factory=list)
+    min_severity: AlertSeverity = "info"
+
+    @field_validator("types")
+    @classmethod
+    def _check_types(cls, value: list[str]) -> list[str]:
+        cleaned = list(dict.fromkeys(item.strip() for item in value if item.strip()))
+        unknown = [item for item in cleaned if item not in ALERT_TYPES]
+        if unknown:
+            raise ValueError(
+                f"未知提醒类型: {', '.join(unknown)}；可选值: {', '.join(ALERT_TYPES)}"
+            )
+        return cleaned
+
+
+def _default_subscription(channel: str) -> ChannelSubscriptionSettings:
+    return ChannelSubscriptionSettings(**DEFAULT_SUBSCRIPTIONS[channel])
+
+
+class ChannelSubscriptionUpdate(BaseModel):
+    """一个通道的订阅写入：只覆盖提交出来的字段，未提交的字段保持库中原值。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    types: list[str] | None = None
+    min_severity: AlertSeverity | None = None
+
+    @field_validator("types")
+    @classmethod
+    def _check_types(cls, value: list[str] | None) -> list[str] | None:
+        return None if value is None else ChannelSubscriptionSettings._check_types(value)
+
+    @model_validator(mode="after")
+    def _at_least_one(self) -> ChannelSubscriptionUpdate:
+        if self.types is None and self.min_severity is None:
+            raise ValueError("通道订阅至少提交一个字段")
+        return self
+
+
+class NotificationSubscriptions(BaseModel):
+    """三个通道各自的订阅；读取时缺项按默认值补齐。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    browser: ChannelSubscriptionSettings = Field(
+        default_factory=lambda: _default_subscription("browser")
+    )
+    telegram: ChannelSubscriptionSettings = Field(
+        default_factory=lambda: _default_subscription("telegram")
+    )
+    webhook: ChannelSubscriptionSettings = Field(
+        default_factory=lambda: _default_subscription("webhook")
+    )
+
+
+class NotificationSubscriptionsUpdate(BaseModel):
+    """按通道、按字段部分更新订阅：只提交要改的通道与字段，其余保持原值。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    browser: ChannelSubscriptionUpdate | None = None
+    telegram: ChannelSubscriptionUpdate | None = None
+    webhook: ChannelSubscriptionUpdate | None = None
+
+    @model_validator(mode="after")
+    def _at_least_one_channel(self) -> NotificationSubscriptionsUpdate:
+        if self.browser is None and self.telegram is None and self.webhook is None:
+            raise ValueError("订阅至少提交一个通道")
+        return self
+
+
+def _default_subscriptions() -> NotificationSubscriptions:
+    """三个通道的默认订阅：与投递侧共用同一份定义，页面显示的就是生效值。"""
+
+    return NotificationSubscriptions()
+
+
 class NotificationSettings(BaseModel):
-    """通知通道开关与两个可编辑的接收方；三个通道都可独立开关。"""
+    """通知通道开关、两个可编辑的接收方，以及按通道的类型订阅。"""
 
     model_config = ConfigDict(extra="forbid")
 
     channels: list[str] = Field(default_factory=lambda: ["browser"])
+    subscriptions: NotificationSubscriptions = Field(default_factory=_default_subscriptions)
     telegram: TelegramSettings = Field(default_factory=TelegramSettings)
     webhook: WebhookSettings = Field(default_factory=WebhookSettings)
 
@@ -261,12 +354,18 @@ class NotificationSettingsUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     channels: list[str] | None = None
+    subscriptions: NotificationSubscriptionsUpdate | None = None
     telegram: TelegramSettingsUpdate | None = None
     webhook: WebhookSettingsUpdate | None = None
 
     @model_validator(mode="after")
     def _at_least_one(self) -> NotificationSettingsUpdate:
-        if self.channels is None and self.telegram is None and self.webhook is None:
+        if (
+            self.channels is None
+            and self.subscriptions is None
+            and self.telegram is None
+            and self.webhook is None
+        ):
             raise ValueError("通知设置至少提交一个子项")
         return self
 
@@ -399,6 +498,14 @@ class SettingsResponse(BaseModel):
                     },
                     "notifications": {
                         "channels": ["browser"],
+                        "subscriptions": {
+                            "browser": {
+                                "types": list(ALERT_TYPES),
+                                "min_severity": "info",
+                            },
+                            "telegram": {"types": ["risk", "strategy"], "min_severity": "warning"},
+                            "webhook": {"types": [], "min_severity": "warning"},
+                        },
                         "telegram": {"chat_id": "", "token_configured": False},
                         "webhook": {"url": "", "secret_configured": False},
                     },

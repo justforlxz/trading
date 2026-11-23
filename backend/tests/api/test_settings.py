@@ -11,8 +11,10 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from app.alerts import ALERT_TYPES
 from app.config import get_settings
-from app.events import DeliveryResult, DomainEvent, record_delivery
+from app.events import DeliveryDigest, DeliveryResult, DomainEvent, record_delivery
+from app.events.sinks.registry import SinkRegistry
 from app.jobs import OKX_PROVIDER
 from app.market import finish_sync_job, start_sync_job
 
@@ -77,7 +79,14 @@ def test_get_returns_v6_defaults_and_hides_internal_groups(client: TestClient) -
             "scheduler": {"minute": "1m"},
         },
     }
-    assert body["notifications"] == DEFAULT_NOTIFICATIONS
+    assert body["notifications"] == {
+        **DEFAULT_NOTIFICATIONS,
+        "subscriptions": {
+            "browser": {"types": list(ALERT_TYPES), "min_severity": "info"},
+            "telegram": {"types": ["risk", "strategy"], "min_severity": "warning"},
+            "webhook": {"types": [], "min_severity": "warning"},
+        },
+    }
     assert body["secrets"] == {
         "okx_api_key_masked": None,
         "okx_configured": False,
@@ -342,17 +351,14 @@ class _FixedClock:
 
 
 class _StubSink:
-    """替身通道：记录收到的事件，按给定结果返回，不发任何请求。"""
+    """替身通道：记录收到的投递内容，按给定结果返回，不发任何请求。"""
 
     def __init__(self, result: DeliveryResult) -> None:
         self._result = result
-        self.events: list[DomainEvent] = []
+        self.digests: list[DeliveryDigest] = []
 
-    def accepts(self, event: DomainEvent) -> bool:
-        return event.kind == "alert"
-
-    async def deliver(self, event: DomainEvent) -> DeliveryResult:
-        self.events.append(event)
+    async def deliver(self, digest: DeliveryDigest) -> DeliveryResult:
+        self.digests.append(digest)
         return self._result
 
 
@@ -398,9 +404,9 @@ def test_test_send_uses_the_same_channel_config_and_records_delivery(
     assert config.telegram_api_base == "https://api.telegram.org"
     assert "bot-token-plain-value" not in response.text
 
-    event = sink.events[0]
-    assert event.kind == "alert"
-    assert event.payload["alert"]["title"] == "测试消息"
+    digest = sink.digests[0]
+    assert digest.total == 1
+    assert digest.items[0].alert["title"] == "测试消息"
 
     rows = client.get("/api/settings/notifications/deliveries").json()["items"]
     assert [(row["channel"], row["status"], row["error"]) for row in rows] == [
@@ -516,7 +522,8 @@ def test_test_send_walks_the_real_channel_wiring(
     if channel == "telegram":
         assert url == "https://api.telegram.org/botbot-token-plain-value/sendMessage"
         assert body["chat_id"] == "-1001234567890"
-        assert body["text"].startswith("[info] 测试消息")
+        assert body["text"].startswith("🔔 系统 · 提示")
+        assert "来自设置页的测试发送" in body["text"]
         assert body["disable_web_page_preview"] is True
     else:
         assert url == "https://example.invalid/hooks/trading"
@@ -677,3 +684,222 @@ def test_equity_scheduler_interval_is_restricted(client: TestClient) -> None:
     )
 
     assert response.status_code == 422
+
+
+# ------------------------------------------------- 按通道的类型订阅（AC2/AC3/AC6）
+
+
+class _RecordingSink:
+    """只记录投递内容的通道替身，名字与真实通道一致，便于按名字套订阅。"""
+
+    name = "telegram"
+
+    def __init__(self) -> None:
+        self.digests: list[DeliveryDigest] = []
+
+    async def deliver(self, digest: DeliveryDigest) -> DeliveryResult:
+        self.digests.append(digest)
+        return DeliveryResult(channel=self.name, status="delivered")
+
+
+class _MemoryRecorder:
+    def __init__(self) -> None:
+        self.rows: list[tuple[str, str | None]] = []
+
+    async def __call__(self, result: DeliveryResult, alert_id: str | None) -> None:
+        self.rows.append((result.channel, alert_id))
+
+
+def _alert_event(
+    *,
+    alert_id: str = "al_1",
+    type_: str = "indicator",
+    severity: str = "info",
+    minutes: int = 0,
+) -> DomainEvent:
+    from app.events import DomainEvent
+
+    return DomainEvent(
+        kind="alert",
+        inst_id="XAAPL-USDT",
+        payload={
+            "rule_id": "candle1h.ma20_cross",
+            "alert": {
+                "id": alert_id,
+                "type": type_,
+                "severity": severity,
+                "title": "收盘价跌破 MA20",
+                "detail": "XAAPL-USDT 收盘价 101 跌破 MA20（102）",
+                "instrument_id": "XAAPL-USDT",
+            },
+        },
+        occurred_at=datetime(2026, 11, 20, 12, 0, tzinfo=UTC) + timedelta(minutes=minutes),
+    )
+
+
+def _settings_bound_registry(sink: _RecordingSink) -> SinkRegistry:
+    """与装配根同一种接法：每次投递现读设置文档里的订阅。"""
+
+    from app.settings import load_settings
+
+    return SinkRegistry(
+        [sink],
+        enabled=["telegram"],
+        recorder=_MemoryRecorder(),
+        subscriptions=lambda: load_settings().notifications.get("subscriptions", {}),
+    )
+
+
+def test_default_subscriptions_are_reported_for_every_channel(client: TestClient) -> None:
+    """未配置时返回默认订阅，页面显示的就是生效值。"""
+
+    body = client.get("/api/settings").json()["notifications"]["subscriptions"]
+
+    assert body["telegram"] == {"types": ["risk", "strategy"], "min_severity": "warning"}
+    assert body["browser"] == {"types": list(ALERT_TYPES), "min_severity": "info"}
+    assert body["webhook"] == {"types": [], "min_severity": "warning"}
+
+
+def test_subscriptions_are_editable_and_persist(client: TestClient) -> None:
+    """AC6：设置页整组提交订阅，保存后读回的是保存值。"""
+
+    subscriptions = {
+        "browser": {"types": ["risk", "data"], "min_severity": "warning"},
+        "telegram": {"types": ["risk"], "min_severity": "critical"},
+        "webhook": {"types": ["strategy"], "min_severity": "info"},
+    }
+
+    response = client.patch(
+        "/api/settings", json={"notifications": {"subscriptions": subscriptions}}
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["notifications"]["subscriptions"] == subscriptions
+    assert client.get("/api/settings").json()["notifications"]["subscriptions"] == subscriptions
+
+
+def test_unknown_alert_type_in_subscriptions_is_rejected(client: TestClient) -> None:
+    response = client.patch(
+        "/api/settings",
+        json={"notifications": {"subscriptions": {"telegram": {"types": ["bracket"]}}}},
+    )
+
+    assert response.status_code == 422
+    assert "未知提醒类型" in response.text
+
+
+def test_editing_a_receiver_keeps_the_subscriptions(client: TestClient) -> None:
+    """只改 chat_id 时订阅保持原值：两个子项各自合并。"""
+
+    subscriptions = {
+        "browser": {"types": [], "min_severity": "info"},
+        "telegram": {"types": ["risk"], "min_severity": "info"},
+        "webhook": {"types": [], "min_severity": "warning"},
+    }
+    client.patch("/api/settings", json={"notifications": {"subscriptions": subscriptions}})
+
+    response = client.patch(
+        "/api/settings", json={"notifications": {"telegram": {"chat_id": "-100999"}}}
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()["notifications"]
+    assert body["subscriptions"] == subscriptions
+    assert body["telegram"]["chat_id"] == "-100999"
+
+
+def test_saved_subscriptions_drive_the_next_delivery(client: TestClient) -> None:
+    """AC2/AC3/AC6：默认订阅挡下提示级技术形态，改完订阅后下一次评估就投递。
+
+    投递侧与装配根一样「每次现读设置文档」，所以这里不需要重启、也不需要重新装配。
+    """
+
+    sink = _RecordingSink()
+    registry = _settings_bound_registry(sink)
+
+    async def scenario() -> None:
+        # 默认订阅：Telegram 只收 risk + strategy 且 warning 以上
+        await registry.deliver_round([_alert_event(alert_id="al_1")])
+        assert sink.digests == []
+        # 保存新订阅：telegram 收 indicator 且 info 以上
+        client.patch(
+            "/api/settings",
+            json={
+                "notifications": {
+                    "subscriptions": {
+                        "browser": {"types": list(ALERT_TYPES), "min_severity": "info"},
+                        "telegram": {"types": ["indicator"], "min_severity": "info"},
+                        "webhook": {"types": [], "min_severity": "warning"},
+                    }
+                }
+            },
+        )
+        await registry.deliver_round([_alert_event(alert_id="al_2", minutes=11)])
+
+    asyncio.run(scenario())
+
+    assert len(sink.digests) == 1
+    assert sink.digests[0].items[0].alert["id"] == "al_2"
+
+
+def test_submitting_one_channel_keeps_the_other_subscriptions(client: TestClient) -> None:
+    """只提交一个通道时，其余通道的订阅与门槛保持库中原值。"""
+
+    client.patch(
+        "/api/settings",
+        json={
+            "notifications": {
+                "subscriptions": {
+                    "browser": {"types": ["data"], "min_severity": "warning"},
+                    "webhook": {"types": ["strategy"], "min_severity": "critical"},
+                }
+            }
+        },
+    )
+
+    response = client.patch(
+        "/api/settings",
+        json={"notifications": {"subscriptions": {"telegram": {"types": ["risk"]}}}},
+    )
+
+    assert response.status_code == 200, response.text
+    subscriptions = response.json()["notifications"]["subscriptions"]
+    assert subscriptions["browser"] == {"types": ["data"], "min_severity": "warning"}
+    assert subscriptions["webhook"] == {"types": ["strategy"], "min_severity": "critical"}
+    # 没提交 min_severity 时沿用已存值；从未存过则回落到该通道的默认门槛，不是 info。
+    assert subscriptions["telegram"] == {"types": ["risk"], "min_severity": "warning"}
+
+
+def test_submitting_only_min_severity_keeps_the_types(client: TestClient) -> None:
+    """只改最低严重度时，该通道已保存的类型清单不能被清空。"""
+
+    client.patch(
+        "/api/settings",
+        json={"notifications": {"subscriptions": {"telegram": {"types": ["risk", "data"]}}}},
+    )
+
+    response = client.patch(
+        "/api/settings",
+        json={"notifications": {"subscriptions": {"telegram": {"min_severity": "critical"}}}},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["notifications"]["subscriptions"]["telegram"] == {
+        "types": ["risk", "data"],
+        "min_severity": "critical",
+    }
+
+
+def test_empty_subscription_update_is_rejected(client: TestClient) -> None:
+    """空对象没有可写字段：当场 400，而不是静默地把整块订阅写成默认值。"""
+
+    assert (
+        client.patch("/api/settings", json={"notifications": {"subscriptions": {}}}).status_code
+        == 422
+    )
+    assert (
+        client.patch(
+            "/api/settings", json={"notifications": {"subscriptions": {"telegram": {}}}}
+        ).status_code
+        == 422
+    )

@@ -44,6 +44,29 @@
     "channels": [
       "browser"
     ],
+    "subscriptions": {
+      "browser": {
+        "min_severity": "info",
+        "types": [
+          "indicator",
+          "price",
+          "risk",
+          "strategy",
+          "data"
+        ]
+      },
+      "telegram": {
+        "min_severity": "warning",
+        "types": [
+          "risk",
+          "strategy"
+        ]
+      },
+      "webhook": {
+        "min_severity": "warning",
+        "types": []
+      }
+    },
     "telegram": {
       "chat_id": "",
       "token_configured": false

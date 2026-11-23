@@ -19,7 +19,14 @@ import pytest
 from app.config import OKX_WS_PRIVATE_URL_DEMO, OKX_WS_PRIVATE_URL_PROD, Settings
 from app.core import ValidationError
 from app.exchange import ExchangeError
-from app.exchange.okx.ws import DEFAULT_CHANNELS, Deduper, OkxWebSocket, message_key
+from app.exchange.okx.sign import SIMULATED_TRADING_HEADER
+from app.exchange.okx.ws import (
+    DEFAULT_CHANNELS,
+    Deduper,
+    OkxWebSocket,
+    handshake_headers,
+    message_key,
+)
 from tests.fakes.okx.trade import FakeCredentials
 
 CREDENTIALS = FakeCredentials()
@@ -75,12 +82,17 @@ def _settings() -> Settings:
     )
 
 
-def _connect_script(*connections: FakeSocket | Exception) -> Callable[[str], FakeConnection]:
-    """按顺序返回「成功连接」或抛出异常，用来驱动连续断线。"""
+def _connect_script(
+    *connections: FakeSocket | Exception,
+    calls: list[dict[str, Any]] | None = None,
+) -> Callable[..., FakeConnection]:
+    """按顺序返回「成功连接」或抛出异常，用来驱动连续断线；`calls` 记录额外连接参数。"""
 
     script: Iterator[FakeSocket | Exception] = iter(connections)
 
-    def connect(_url: str) -> FakeConnection:
+    def connect(_url: str, **kwargs: Any) -> FakeConnection:
+        if calls is not None:
+            calls.append(kwargs)
         step = next(script)
         if isinstance(step, Exception):
             raise step
@@ -89,10 +101,10 @@ def _connect_script(*connections: FakeSocket | Exception) -> Callable[[str], Fak
     return connect
 
 
-def _recording_connect(urls: list[str], socket: FakeSocket) -> Callable[[str], FakeConnection]:
+def _recording_connect(urls: list[str], socket: FakeSocket) -> Callable[..., FakeConnection]:
     """记录 `connect()` 收到的地址，用来断言模拟盘/实盘各连了哪个域名。"""
 
-    def connect(url: str) -> FakeConnection:
+    def connect(url: str, **_kwargs: Any) -> FakeConnection:
         urls.append(url)
         return FakeConnection(socket)
 
@@ -225,6 +237,72 @@ def test_the_constructor_url_has_the_highest_priority() -> None:
     asyncio.run(_take(client, 1))
 
     assert urls == ["wss://constructor.example/ws/v5/private"]
+
+
+def test_the_default_endpoints_use_the_migrated_port() -> None:
+    """上游公告 8443 将退役（推送 64010）：私有地址默认走 443。"""
+
+    assert OKX_WS_PRIVATE_URL_DEMO == "wss://wspap.okx.com:443/ws/v5/private"
+    assert OKX_WS_PRIVATE_URL_PROD == "wss://ws.okx.com:443/ws/v5/private"
+
+
+# ------------------------------------------------------------------ 模拟盘握手头
+
+
+def test_handshake_headers_follow_the_demo_flag() -> None:
+    """规则只有一个出口：`okx_demo` 为真带头，为假一个头都不带。"""
+
+    assert handshake_headers(True) == {SIMULATED_TRADING_HEADER: "1"}
+    assert handshake_headers(False) == {}
+
+
+def test_the_demo_handshake_carries_the_simulated_trading_header() -> None:
+    """模拟盘握手按约定声明账户环境，头名与 REST 侧共用同一个常量。"""
+
+    calls: list[dict[str, Any]] = []
+    socket = FakeSocket([_login_ack(), _push({"ts": "1", "fillPx": "100"})])
+    client = OkxWebSocket(
+        settings=_settings(),
+        connect=_connect_script(socket, calls=calls),
+        sleep=_no_sleep(),
+    )
+
+    asyncio.run(_take(client, 1))
+
+    assert calls == [{"additional_headers": {SIMULATED_TRADING_HEADER: "1"}}]
+
+
+def test_the_production_handshake_sends_no_simulated_trading_header() -> None:
+    """实盘不带该头：上游对账户环境的判定不能靠发一个 `0` 来猜。"""
+
+    calls: list[dict[str, Any]] = []
+    socket = FakeSocket([_login_ack(), _push({"ts": "1", "fillPx": "100"})])
+    client = OkxWebSocket(
+        settings=_settings().model_copy(update={"okx_demo": False}),
+        connect=_connect_script(socket, calls=calls),
+        sleep=_no_sleep(),
+    )
+
+    asyncio.run(_take(client, 1))
+
+    assert calls == [{}]
+
+
+def test_every_reconnect_carries_the_same_handshake_header() -> None:
+    """重连走同一个连接调用：第 2 条连接的握手头与第 1 条一致。"""
+
+    calls: list[dict[str, Any]] = []
+    first = FakeSocket([_login_ack()])
+    second = FakeSocket([_login_ack(), _push({"ts": "1", "fillPx": "100"})])
+    client = OkxWebSocket(
+        settings=_settings(),
+        connect=_connect_script(first, second, calls=calls),
+        sleep=_no_sleep(),
+    )
+
+    asyncio.run(_take(client, 1))
+
+    assert calls == [{"additional_headers": {SIMULATED_TRADING_HEADER: "1"}}] * 2
 
 
 def test_three_disconnects_then_a_successful_reconnect_without_duplicates() -> None:

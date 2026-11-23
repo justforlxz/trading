@@ -18,7 +18,7 @@ from app.exchange import CandleShape, MarketPush
 from app.instrument import sync_instruments
 from app.positions import ExchangePositionView
 from app.stream import StreamHub
-from app.stream.hub import CANDLE_DATASET, PRIVATE_CHANNELS
+from app.stream.hub import CANDLE_DATASET, PRIVATE_CHANNELS, PRIVATE_DATASET
 from app.watchlist import WatchRegistry
 from tests.factories.instruments import make_swap_ref
 
@@ -803,6 +803,34 @@ def test_status_snapshot_reports_how_many_instruments_each_connection_subscribed
 
     assert (snapshot["subscriptions"], snapshot["skipped"]) == (2, 1)
     assert (snapshot["candle"]["subscriptions"], snapshot["candle"]["skipped"]) == (1, 0)
+
+
+def test_status_snapshot_reports_the_private_connection_state() -> None:
+    """私有推送是否真的连上必须读得到：它按需启动，不能用公共连接的状态代替。"""
+
+    hub = _hub()
+    hub._set_status(PRIVATE_DATASET, True, "")
+
+    snapshot = hub.status_snapshot()
+
+    assert snapshot["private"]["dataset"] == "private_ws"
+    assert snapshot["private"]["connected"] is True
+    assert snapshot["private"]["ever_connected"] is True
+    assert snapshot["private"]["last_error"] is None
+
+
+def test_status_snapshot_keeps_a_private_login_failure_visible() -> None:
+    """启动后登录失败：`connected` 与 `last_success_at` 都为空，只能靠 `last_error` 分辨。"""
+
+    hub = _hub()
+    hub._set_status(PRIVATE_DATASET, False, "WebSocket 连续断开 5 次后放弃重连:4001 Login failed.")
+
+    snapshot = hub.status_snapshot()
+
+    assert snapshot["private"]["connected"] is False
+    assert snapshot["private"]["ever_connected"] is False
+    assert snapshot["private"]["last_success_at"] is None
+    assert "4001" in snapshot["private"]["last_error"]
 
 
 def test_a_candle_reconnect_does_not_trigger_a_private_reconcile(client: Any) -> None:

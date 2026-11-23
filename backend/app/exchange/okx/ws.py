@@ -8,6 +8,15 @@
 重连只重做两件事：登录、重新订阅。它**不下单**——`OkxWebSocket` 手上没有交易端口，
 「重连不产生重复订单」因此是结构上的事实，而不是靠调用方记得别下单。
 
+模拟盘与实盘共用同一套私有协议，但模拟盘在握手时按约定声明账户环境
+（`x-simulated-trading: 1`，与 REST 侧 `sign_headers` 同一口径），实盘不发送这个头。
+`handshake_headers` 是这条规则的唯一出口，首次连接与每次重连走同一个 `connect` 调用。
+
+这个头**不是登录成败的判据**：2026-11-23 用同一份模拟盘凭据实测，`wspap` 的 `443` 与
+`8443` 两个端口上，带与不带都返回 `login code=0`。当天那串 `4001 Login failed` 的真实
+成因是设置文档里的占位 API Key 覆盖了环境变量里的 Key，而 secret 与口令仍取环境变量，
+三件凭据不成组；排这类问题时先核对凭据是否来自同一组，再怀疑握手。
+
 `connect` / `sleep` / `clock` 都可注入：测试用假连接驱动「连续断线 3 次再成功」，
 不连真实网络，也不真的等退避时间。
 """
@@ -26,12 +35,17 @@ from websockets.asyncio.client import connect as ws_connect
 from app.config import Settings, get_settings
 from app.core import Clock, SystemClock
 from app.exchange.errors import ExchangeError
-from app.exchange.okx.sign import require_credentials, ws_login_signature
+from app.exchange.okx.sign import (
+    SIMULATED_TRADING_HEADER,
+    require_credentials,
+    ws_login_signature,
+)
 
 __all__ = [
     "DEFAULT_CHANNELS",
     "Deduper",
     "OkxWebSocket",
+    "handshake_headers",
     "message_key",
 ]
 
@@ -57,6 +71,20 @@ RECONNECT_ON: tuple[type[BaseException], ...] = (
     websockets.exceptions.WebSocketException,
     OSError,
 )
+
+
+def handshake_headers(demo: bool) -> dict[str, str]:
+    """私有连接握手时要带的额外请求头。
+
+    模拟盘按约定声明账户环境（`x-simulated-trading: 1`，与 REST 侧 `sign_headers` 同一
+    口径），实盘**不发**这个头，而不是发一个 `"0"`——取值不在本层能替上游决定的范围内。
+
+    注意它不是登录成败的判据：2026-11-23 用同一份模拟盘凭据实测，`wspap` 的 443 与 8443
+    两个端口上带与不带都返回 `login code=0`；当天那串 `4001 Login failed` 的成因是凭据
+    不成组（设置文档里的占位 API Key 覆盖了环境变量里的 Key），见模块说明。
+    """
+
+    return {SIMULATED_TRADING_HEADER: "1"} if demo else {}
 
 
 def message_key(row: dict[str, Any]) -> tuple[str, str]:
@@ -125,6 +153,8 @@ class OkxWebSocket:
         # 未显式给地址时按 `okx_demo` 推导：模拟盘连 `wspap`，实盘连 `ws`。
         self._url = url or self._settings.ws_private_url
         self._connect = connect
+        # 握手头只取决于 `okx_demo`：连哪个地址不改变上游对账户环境的判定。
+        self._headers = handshake_headers(self._settings.okx_demo)
         self._clock = clock or SystemClock()
         self._sleep = sleep
         self._max_attempts = max_attempts
@@ -153,7 +183,7 @@ class OkxWebSocket:
         while True:
             reason = ""
             try:
-                async with self._connect(self._url) as socket:
+                async with self._connect(self._url, **self._connect_options()) as socket:
                     await self._handshake(socket)
                     self._notify(True, "")
                     async for raw in socket:
@@ -176,6 +206,16 @@ class OkxWebSocket:
     def _notify(self, connected: bool, error: str) -> None:
         if self._on_status is not None:
             self._on_status(connected, error)
+
+    def _connect_options(self) -> dict[str, Any]:
+        """传给 `websockets` 的连接参数。
+
+        头为空时不传这个键，实盘请求与改动前完全一致。参数名是 `additional_headers`：
+        `websockets.asyncio.client.connect` 从 13.0 起就用这个名字（`extra_headers` 属于
+        旧的 `websockets.legacy` 客户端），而 pyproject 锁定 `websockets>=13,<19`。
+        """
+
+        return {"additional_headers": dict(self._headers)} if self._headers else {}
 
     async def _handshake(self, socket: Any) -> None:
         """登录并等到回执，然后订阅；登录失败立刻报错，不进入收流阶段。"""

@@ -138,6 +138,100 @@ def test_health_detail_reports_subscription_counts_and_skipped(client: TestClien
     assert ws.detail == "okx / public_ws；订阅 40 个标的，跳过 2 个（超限）；K 线订阅 40 个标的"
 
 
+def test_health_detail_reports_the_private_connection_state() -> None:
+    """AC1：`/api/system/health` 必须能看到私有数据集是否连上，否则「连没连上」无从验证。"""
+
+    private = {
+        "provider": "okx",
+        "dataset": "private_ws",
+        "connected": True,
+        "last_success_at": "2026-11-23T01:31:00Z",
+    }
+    health = system_health(
+        ws_status={
+            "provider": "okx",
+            "dataset": "public_ws",
+            "connected": True,
+            "private": private,
+        }
+    )
+
+    ws = {item.name: item for item in health.components}["okx_ws"]
+    assert ws.status == "ok"
+    assert ws.detail == "okx / public_ws；private_ws 已连接"
+
+
+def test_health_detail_stays_quiet_when_the_private_connection_never_started() -> None:
+    """私有连接按需启动：从未启用不能被写成「已断开」，否则每次看健康都像出了故障。"""
+
+    health = system_health(
+        ws_status={
+            "provider": "okx",
+            "dataset": "public_ws",
+            "connected": True,
+            "private": {"dataset": "private_ws", "connected": False, "last_success_at": None},
+        }
+    )
+
+    ws = {item.name: item for item in health.components}["okx_ws"]
+    assert "private_ws" not in ws.detail
+
+
+def test_health_surfaces_a_private_connection_that_never_logged_in() -> None:
+    """私有连接启用后登录失败也必须是可见的失败，而不是「从未启用」。
+
+    这种状态下 `connected` 与 `last_success_at` 都为空，只有 `last_error`；
+    只看前两个字段会把本单要消灭的失败模式重新藏起来（AC1 要的就是这个信号）。
+    """
+
+    reason = "WebSocket 连续断开 5 次后放弃重连:received 4001 (private use) Login failed."
+    health = system_health(
+        ws_status={
+            "provider": "okx",
+            "dataset": "public_ws",
+            "connected": True,
+            "private": {
+                "dataset": "private_ws",
+                "connected": False,
+                "ever_connected": False,
+                "last_success_at": None,
+                "last_error": reason,
+            },
+        }
+    )
+
+    ws = {item.name: item for item in health.components}["okx_ws"]
+    assert ws.status == "error"
+    assert ws.detail == "okx / public_ws；private_ws 已断开"
+    assert ws.error is not None
+    assert "4001" in ws.error
+
+
+def test_health_marks_a_private_connection_that_worked_before_as_stale() -> None:
+    """连上过再断开是 `stale`：曾经正常，现在不是实时数据。"""
+
+    health = system_health(
+        ws_status={
+            "provider": "okx",
+            "dataset": "public_ws",
+            "connected": True,
+            "private": {
+                "dataset": "private_ws",
+                "connected": False,
+                "ever_connected": True,
+                "last_success_at": "2026-11-23T02:00:00Z",
+                "last_error": "上游正常关闭连接",
+            },
+        }
+    )
+
+    ws = {item.name: item for item in health.components}["okx_ws"]
+    assert ws.status == "stale"
+    assert ws.detail == "okx / public_ws；private_ws 已断开"
+    assert ws.error is not None
+    assert "上游正常关闭连接" in ws.error
+
+
 def _equity_component(status: dict | None) -> ComponentHealth:
     health = system_health(
         macro_status=None,

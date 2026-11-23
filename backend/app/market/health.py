@@ -182,18 +182,26 @@ def _okx_ws(ws_status: Mapping[str, Any] | None) -> ComponentHealth:
         )
     connected = bool(ws_status.get("connected"))
     last_success = _parse_iso(ws_status.get("last_success_at"))
-    error = ws_status.get("last_error")
+    public_error = ws_status.get("last_error")
+    error: str | None = None if public_error is None else "推送连接异常"
     if connected:
         status = "ok"
     elif last_success is not None:
         status = "stale"
     else:
         status = "unconfigured"
+    # 私有连接按需启动，与公共连接各自独立：它启用后挂掉时公共连接仍然是 ok，
+    # 只读顶层字段会让私有失败在健康接口上没有任何痕迹。
+    private = ws_status.get("private")
+    private_error = _private_error(private)
+    if private_error is not None:
+        error = private_error
+        status = _private_status(status, private)
     return ComponentHealth(
         name="okx_ws",
         status=status,
         last_success_at=last_success,
-        error=None if error is None else "推送连接异常",
+        error=error,
         detail=_ws_detail(ws_status),
     )
 
@@ -207,6 +215,7 @@ def _ws_detail(ws_status: Mapping[str, Any]) -> str:
 
     detail = f"{ws_status.get('provider', 'okx')} / {ws_status.get('dataset', 'public_ws')}"
     detail += _subscriptions_text("", ws_status)
+    detail += _private_text(ws_status.get("private"))
     candle = ws_status.get("candle")
     if isinstance(candle, Mapping):
         detail += _subscriptions_text("K 线", candle)
@@ -224,6 +233,66 @@ def _subscriptions_text(label: str, block: Mapping[str, Any]) -> str:
     if isinstance(skipped, int) and skipped > 0:
         text += f"，跳过 {skipped} 个（超限）"
     return text
+
+
+def _private_text(block: Any) -> str:
+    """私有推送的可见状态：启用过就写，从未启用则不写。
+
+    私有连接按需启动，没有账户/持仓订阅时它从未连过；把「从未启用」写成「断开」会
+    让人以为出了故障。启用过的判定必须包含「启动即失败」——那种状态下 `connected` 与
+    `last_success_at` 都为空、只有 `last_error`，漏掉它就把失败重新藏起来了。
+    """
+
+    if not _private_enabled(block):
+        return ""
+    return "；private_ws " + ("已连接" if block.get("connected") else "已断开")
+
+
+#: 组件 `error` 只放摘要，太长的上游原文会挤掉其他信息。
+_PRIVATE_ERROR_LIMIT = 160
+
+
+def _private_enabled(block: Any) -> bool:
+    """私有连接是否被启用过：连上过，或启动后失败（`last_error` 非空）。"""
+
+    if not isinstance(block, Mapping):
+        return False
+    return bool(
+        block.get("connected")
+        or block.get("ever_connected")
+        or block.get("last_success_at")
+        or block.get("last_error")
+    )
+
+
+def _private_ever_connected(block: Any) -> bool:
+    """私有连接是否成功连上过；`last_success_at` 兼容还未带 `ever_connected` 的调用方。"""
+
+    return isinstance(block, Mapping) and bool(
+        block.get("ever_connected") or block.get("last_success_at")
+    )
+
+
+def _private_error(block: Any) -> str | None:
+    """私有连接的失败摘要；只在启用过且当前断开时给出。"""
+
+    if not isinstance(block, Mapping) or block.get("connected") or not _private_enabled(block):
+        return None
+    reason = str(block.get("last_error") or "").strip()
+    if not reason:
+        return "私有推送已断开"
+    return f"私有推送已断开：{reason[:_PRIVATE_ERROR_LIMIT]}"
+
+
+def _private_status(component_status: str, block: Any) -> str:
+    """私有连接断开时给整项定级：连上过是 `stale`，一次都没成是 `error`。
+
+    不因为公共连接是 `ok` 就吞掉私有失败，也不把已经更差的公共状态改好。
+    """
+
+    if component_status == "error":
+        return "error"
+    return "stale" if _private_ever_connected(block) else "error"
 
 
 def _macro(now: datetime, status: Mapping[str, Any] | None) -> ComponentHealth:

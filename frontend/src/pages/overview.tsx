@@ -10,12 +10,16 @@ import {
   fetchAiSummary,
   fetchMacroOverview,
   fetchMarketOverview,
+  fetchSettings,
+  fetchWatchlist,
   updateAlertStatus,
+  updateSettings,
   type AiSummaryResponse,
   type AlertStatusUpdate,
   type MacroOverviewResponse,
   type MarketSnapshotResponse,
 } from "../lib/api";
+import { pinnedCandidates, type PinnedCandidate } from "../lib/home-pinned";
 import { streamLiveness } from "../lib/stream";
 import { usePositionStream, useQuoteStream, useStreamState } from "../lib/stream-hooks";
 import { OverviewView } from "./overview/view";
@@ -52,6 +56,10 @@ export default function OverviewPage() {
   const [aiSummary, setAiSummary] = useState<AiSummaryResponse | null>(null);
   const [aiSummaryError, setAiSummaryError] = useState<string | null>(null);
   const [aiSummaryLoading, setAiSummaryLoading] = useState(true);
+  // 置顶清单存在服务端显示偏好里：首页读它，与当前自选求交集后决定卡片显示哪几行。
+  const [pinnedWatchlist, setPinnedWatchlist] = useState<string[]>([]);
+  // 弹窗候选来自整份自选：首页汇总只带五行，不够用来选第 6 个标的。
+  const [watchlistCandidates, setWatchlistCandidates] = useState<PinnedCandidate[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -129,6 +137,31 @@ export default function OverviewPage() {
     };
   }, [reloadToken]);
 
+  useEffect(() => {
+    let active = true;
+    // 自选与设置都读不到时各自降级：置顶只是卡片的一个显示偏好，空清单/空候选都
+    // 不会让首页整体不可用，用户点「选择标的」重新保存一次即可恢复。
+    fetchWatchlist()
+      .then((payload) => {
+        if (active) setWatchlistCandidates(pinnedCandidates(payload.items));
+      })
+      .catch(() => undefined);
+    fetchSettings()
+      .then((settings) => {
+        if (!active) return;
+        setPinnedWatchlist(settings.display.homepage_pinned ?? []);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [reloadToken]);
+
+  const savePinned = async (next: string[]): Promise<void> => {
+    const saved = await updateSettings({ display: { homepage_pinned: next } });
+    setPinnedWatchlist(saved.display.homepage_pinned ?? []);
+  };
+
   const instIds = useMemo(
     () => (summary?.watchlist.data?.items ?? []).map((item) => item.inst_id),
     [summary],
@@ -186,6 +219,9 @@ export default function OverviewPage() {
         void resolveAlert(alertId, status);
       }}
       resolvingAlertId={resolvingAlertId}
+      pinnedWatchlist={pinnedWatchlist}
+      watchlistCandidates={watchlistCandidates}
+      onSavePinned={savePinned}
     />
   );
 }

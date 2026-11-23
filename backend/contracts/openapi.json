@@ -5616,6 +5616,13 @@
             "title": "Home Layout",
             "type": "string"
           },
+          "homepage_pinned": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Homepage Pinned",
+            "type": "array"
+          },
           "price_precision": {
             "default": 2,
             "maximum": 8.0,
@@ -5625,6 +5632,89 @@
           }
         },
         "title": "DisplaySettings",
+        "type": "object"
+      },
+      "DisplaySettingsUpdate": {
+        "additionalProperties": false,
+        "description": "显示偏好的可写字段：不提交的字段保持库中原值。\n\n置顶清单的取值规则（形状、长度、重复、是否在自选里）由路由层校验，因此这里\n只声明形状、不加约束；`None` 表示本次不改这一项。",
+        "properties": {
+          "color_scheme": {
+            "anyOf": [
+              {
+                "enum": [
+                  "system",
+                  "light",
+                  "dark"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color Scheme"
+          },
+          "default_bar": {
+            "anyOf": [
+              {
+                "enum": [
+                  "1m",
+                  "5m",
+                  "15m",
+                  "1h",
+                  "4h",
+                  "1d"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Bar"
+          },
+          "home_layout": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Home Layout"
+          },
+          "homepage_pinned": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Homepage Pinned"
+          },
+          "price_precision": {
+            "anyOf": [
+              {
+                "maximum": 8.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Precision"
+          }
+        },
+        "title": "DisplaySettingsUpdate",
         "type": "object"
       },
       "EquityPoint": {
@@ -11309,6 +11399,7 @@
               "color_scheme": "system",
               "default_bar": "1d",
               "home_layout": "cockpit",
+              "homepage_pinned": [],
               "price_precision": 2
             },
             "execution": {
@@ -11415,7 +11506,7 @@
           "display": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DisplaySettings"
+                "$ref": "#/components/schemas/DisplaySettingsUpdate"
               },
               {
                 "type": "null"

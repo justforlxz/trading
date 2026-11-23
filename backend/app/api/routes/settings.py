@@ -46,6 +46,7 @@ from app.api.schemas import (
     WebhookSettings,
 )
 from app.config import get_settings as runtime_settings
+from app.core import ValidationError
 from app.equity import validate_equity_override
 from app.events import (
     ChannelConfig,
@@ -63,7 +64,14 @@ from app.events import (
 from app.jobs import OKX_PROVIDER
 from app.macro import validate_series_override
 from app.market import sync_summary
-from app.settings import SettingsRecord, load_settings, save_settings
+from app.settings import (
+    HOMEPAGE_PINNED_LIMIT,
+    SettingsRecord,
+    load_settings,
+    normalize_homepage_pinned,
+    save_settings,
+)
+from app.watchlist import tracked_instruments
 
 __all__ = ["settings_router"]
 
@@ -86,7 +94,7 @@ def patch_settings_document(payload: SettingsUpdateRequest) -> SettingsResponse:
     _validate_macro(payload)
     _validate_equity(payload)
     record = save_settings(
-        display=None if payload.display is None else payload.display.model_dump(mode="json"),
+        display=_display(payload),
         risk_defaults=None
         if payload.risk_defaults is None
         else payload.risk_defaults.model_dump(mode="json"),
@@ -140,6 +148,63 @@ def get_notification_deliveries(
     """最近若干条投递记录，新的在前。"""
 
     return DeliveryListResponse(items=[_delivery(row) for row in list_deliveries(limit)])
+
+
+def _display(payload: SettingsUpdateRequest) -> dict[str, Any] | None:
+    """显示分组的部分更新：先校验置顶清单，再合并到库中的整组显示偏好。
+
+    置顶清单是唯一需要跨域校验的显示项——元素必须在自选里，所以校验读一次自选。
+    其余显示项按提交值覆盖、未提交的保持原值：部分更新不应把颜色方案、默认周期
+    之类的已存值重置成默认值。
+    """
+
+    group = payload.display
+    if group is None:
+        return None
+    values = group.model_dump(exclude_none=True, mode="json")
+    if "homepage_pinned" in values:
+        values["homepage_pinned"] = _pinned_for_save(values["homepage_pinned"])
+    return {**load_settings().display, **values}
+
+
+def _pinned_for_save(value: object) -> list[str]:
+    """校验提交的置顶清单，再把库里「已不在自选」的项按原位置补回去。
+
+    请求里的数组只能表达**看得见的选择**：元素必须在自选里（否则 400），所以客户端提交
+    的只会是弹窗里列出来的那些。而库里可能还留着已从自选删掉的置顶项——读取时它们不显示，
+    但绝不能被一次保存顺手删掉（任务要求：加回自选后要能恢复显示）。
+
+    合并按位置进行：已看不见的项留在它原来的位置，其余位置按提交顺序填充，多出来的追加到
+    末尾。这样「什么都不改直接保存」写回的数组与库中逐字节相同，用户重新排过顺序时以提交
+    的顺序为准。
+    """
+
+    available = {instrument.symbol for instrument in tracked_instruments()}
+    submitted = normalize_homepage_pinned(value, available=available)
+    stored = load_settings().display.get("homepage_pinned")
+    stored_items = [
+        item
+        for item in (stored if isinstance(stored, list) else [])
+        if isinstance(item, str) and item
+    ]
+    hidden = {item for item in stored_items if item not in available}
+
+    remaining = HOMEPAGE_PINNED_LIMIT - len(hidden)
+    if len(submitted) > remaining:
+        raise ValidationError(
+            f"首页置顶最多 {HOMEPAGE_PINNED_LIMIT} 个标的：另有 {len(hidden)} 个已不在自选的"
+            f"置顶项会保留，本次最多再选 {remaining} 个"
+        )
+
+    queue = list(submitted)
+    merged: list[str] = []
+    for item in stored_items:
+        if item in hidden:
+            merged.append(item)  # 看不见的项留在原位
+        elif queue:
+            merged.append(queue.pop(0))  # 可见的位按提交顺序填充
+    merged.extend(queue)  # 新增的置顶项追加到末尾
+    return merged
 
 
 def _notifications(payload: SettingsUpdateRequest) -> dict[str, Any] | None:

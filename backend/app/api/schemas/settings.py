@@ -12,7 +12,7 @@ Secret 与 Passphrase 仍只经环境变量注入，不在本契约的可写范�
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
-from typing import Literal
+from typing import Annotated, Any, Literal
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
@@ -29,6 +29,7 @@ __all__ = [
     "DeliveryItem",
     "DeliveryListResponse",
     "DisplaySettings",
+    "DisplaySettingsUpdate",
     "EquitySchedulerSettings",
     "EquitySchedulerSettingsUpdate",
     "EquitySettings",
@@ -55,6 +56,17 @@ ColorScheme = Literal["system", "light", "dark"]
 OkxPermission = Literal["read_only", "unknown"]
 
 
+#: 首页「关注列表」卡片置顶清单的可写形状。
+#:
+#: 对外仍是 `array<string>`（`json_schema_extra` 保证导出的契约与前端类型不变），
+#: 但运行时的形状校验交给路由层，好让「不是数组」「元素不是字符串」与「超过 5 个」
+#: 「有重复」「不在自选里」一样返回 400。若这里声明成 `list[str]`，非数组会在到达
+#: 路由前被 FastAPI 判成 422，数字元素还会被宽松模式悄悄转成字符串。
+HomepagePinned = Annotated[
+    Any, Field(json_schema_extra={"type": "array", "items": {"type": "string"}})
+]
+
+
 class DisplaySettings(BaseModel):
     """显示偏好；前端可缓存，后端持久化。"""
 
@@ -64,6 +76,24 @@ class DisplaySettings(BaseModel):
     default_bar: Bar = "1d"
     price_precision: int = Field(default=2, ge=0, le=8)
     home_layout: str = Field(default="cockpit", min_length=1, max_length=32)
+    #: 首页「关注列表」卡片置顶的标的，按选择顺序，最多 5 个；空表示卡片显示空状态。
+    homepage_pinned: list[str] = Field(default_factory=list)
+
+
+class DisplaySettingsUpdate(BaseModel):
+    """显示偏好的可写字段：不提交的字段保持库中原值。
+
+    置顶清单的取值规则（形状、长度、重复、是否在自选里）由路由层校验，因此这里
+    只声明形状、不加约束；`None` 表示本次不改这一项。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    color_scheme: ColorScheme | None = None
+    default_bar: Bar | None = None
+    price_precision: int | None = Field(default=None, ge=0, le=8)
+    home_layout: str | None = Field(default=None, min_length=1, max_length=32)
+    homepage_pinned: HomepagePinned | None = None
 
 
 class RiskDefaults(BaseModel):
@@ -470,6 +500,7 @@ class SettingsResponse(BaseModel):
                         "default_bar": "1d",
                         "price_precision": 2,
                         "home_layout": "cockpit",
+                        "homepage_pinned": [],
                     },
                     "risk_defaults": {
                         "default_leverage": "3",
@@ -526,7 +557,7 @@ class SettingsUpdateRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    display: DisplaySettings | None = None
+    display: DisplaySettingsUpdate | None = None
     risk_defaults: RiskDefaults | None = None
     execution: ExecutionSettings | None = None
     data_sources: DataSourceSettingsUpdate | None = None

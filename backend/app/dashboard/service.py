@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -162,7 +163,11 @@ class PositionsData:
 
 @dataclass(frozen=True, slots=True)
 class WatchlistData:
-    """自选摘要：计数、覆盖率与最多五行条目。"""
+    """自选摘要：计数、覆盖率与最多五行条目。
+
+    行序把首页置顶的标的排在前面（见 `_watchlist`）：卡片只显示置顶项，置顶项若
+    落在五行之外就会凭空消失，所以截断必须发生在按置顶排序之后。
+    """
 
     summary: WatchlistSummary
     entries: tuple[WatchlistEntry, ...]
@@ -224,8 +229,12 @@ class DashboardSummary:
         return tuple((name, getattr(self, name)) for name in MODULE_NAMES)
 
 
-def load_summary(*, clock: Clock | None = None) -> DashboardSummary:
-    """读取八个模块；任何模块失败都在自己的边界内降级。"""
+def load_summary(*, clock: Clock | None = None, pinned: Sequence[str] = ()) -> DashboardSummary:
+    """读取八个模块；任何模块失败都在自己的边界内降级。
+
+    `pinned` 是首页「关注列表」的置顶清单（按选择顺序）。首页聚合只把它当输入用，
+    不自己去读设置文档：`dashboard` 不依赖 `settings`。
+    """
 
     moment = (clock or SystemClock()).now().astimezone(UTC).replace(microsecond=0)
     # 风险与持仓都要用敞口结果：一次请求只读一次，避免同一份数据被读两遍。
@@ -237,7 +246,7 @@ def load_summary(*, clock: Clock | None = None) -> DashboardSummary:
         account=_isolate(_account),
         risk=_isolate(lambda: _risk(exposure)),
         positions=_isolate(lambda: _positions(exposure)),
-        watchlist=_isolate(_watchlist),
+        watchlist=_isolate(lambda: _watchlist(pinned)),
         alerts=_isolate(_alerts),
         strategies=_isolate(lambda: _strategies(moment)),
         activity=_isolate(lambda: _activity(moment)),
@@ -388,7 +397,7 @@ def _optional_exposure(exposure_once: _ExposureOnce) -> RiskExposure | None:
         return None
 
 
-def _watchlist() -> Module:
+def _watchlist(pinned: Sequence[str]) -> Module:
     entries = list_entries()
     summary = summarize_entries(entries)
     last_updated = max(
@@ -399,8 +408,19 @@ def _watchlist() -> Module:
         status=STATUS_OK,
         as_of=last_updated,
         error=None,
-        data=WatchlistData(summary=summary, entries=tuple(entries[:TOP_ROWS])),
+        data=WatchlistData(summary=summary, entries=_leading_pinned(entries, pinned)[:TOP_ROWS]),
     )
+
+
+def _leading_pinned(
+    entries: Sequence[WatchlistEntry], pinned: Sequence[str]
+) -> list[WatchlistEntry]:
+    """置顶项按选择顺序排在前面，其余按自选原顺序跟上；已删除的置顶项直接跳过。"""
+
+    by_inst_id = {entry.instrument.symbol: entry for entry in entries}
+    leading = [by_inst_id[inst_id] for inst_id in pinned if inst_id in by_inst_id]
+    picked = {entry.instrument.symbol for entry in leading}
+    return leading + [entry for entry in entries if entry.instrument.symbol not in picked]
 
 
 def _alerts() -> Module:

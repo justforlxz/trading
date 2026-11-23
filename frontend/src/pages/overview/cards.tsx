@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 
 import { ActivityTimeline } from "../../components/ui/activity-timeline";
 import { AlertList } from "../../components/ui/alert-list";
+import { Button } from "../../components/ui/button";
 import type { AlertStatusUpdate } from "../../lib/alerts";
 import {
   amountText,
@@ -22,6 +23,7 @@ import {
   type DashboardSummary,
 } from "../../lib/dashboard";
 import { signedTone, signedValue } from "../../lib/display";
+import type { PinnedCandidate } from "../../lib/home-pinned";
 import { accountSourceLabel, positionSideLabel } from "../../lib/positions";
 import { marginUsageBasisLabel, riskLevelView } from "../../lib/risk";
 import { cn } from "../../lib/utils";
@@ -286,79 +288,102 @@ export function PositionsBody({
 export function WatchlistBody({
   summary,
   pushed,
+  rows,
+  onEdit,
 }: {
   summary: DashboardSummary;
+  /** 卡片要显示的置顶行：由页面按「置顶清单 ∩ 当前自选」算好，不取汇总里的五行。 */
+  rows: readonly PinnedCandidate[];
   pushed: Record<string, string>;
+  onEdit: () => void;
 }) {
   const data = summary.watchlist.data;
   if (data == null) return null;
-  const pushedAtList = [...new Set(Object.values(pushed).map((moment) => asOfText(moment)))];
+  const items = rows;
+  // 只统计**显示出来的行**收到的推送时刻：卡片只显示置顶项，而推送按整份订阅标的到达，
+  // 用全部推送时刻会写出「价格来自推送」，可那些价格其实来自自选接口的快照。
+  const pushedAtList = [
+    ...new Set(
+      items
+        .map((item) => pushed[item.inst_id])
+        .filter((moment): moment is string => moment !== undefined)
+        .map((moment) => asOfText(moment)),
+    ),
+  ];
+  if (items.length === 0) {
+    return (
+      <div className="rounded-md border p-6 text-center" style={{ borderStyle: "dashed" }}>
+        <p className="text-sm font-medium">首页还没有关注标的</p>
+        <p className="mt-1 text-xs text-muted-foreground">从关注列表里挑最多 5 个显示在这里</p>
+        <Button type="button" size="sm" className="mt-3" onClick={onEdit}>
+          选择标的
+        </Button>
+      </div>
+    );
+  }
+  const bullish = items.filter((item) => item.trend === "bullish").length;
+  const bearish = items.filter((item) => item.trend === "bearish").length;
   return (
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">
-        共 {countText(data.summary.total)} 个 · 偏多 {countText(data.summary.bullish)} · 偏空{" "}
-        {countText(data.summary.bearish)} · 日线覆盖率 {percentOrMissingText(data.summary.coverage_pct)}
+        共 {countText(items.length)} 个 · 偏多 {countText(bullish)} · 偏空 {countText(bearish)}
       </p>
-      {data.items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">自选列表为空。</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-xs text-muted-foreground">
-                <th className="py-2 pr-3 text-left font-medium">标的</th>
-                <th className="px-2 py-2 text-right font-medium">价格</th>
-                <th className="px-2 py-2 text-right font-medium">日涨跌</th>
-                <th className="hidden px-2 py-2 text-right font-medium sm:table-cell">RSI</th>
-                <th className="py-2 pl-2 text-left font-medium">趋势</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.items.map((item) => (
-                <tr key={item.inst_id} className="border-b last:border-0">
-                  <td className="py-3 pr-3">
-                    <Link
-                      to={`/watchlist/${encodeURIComponent(item.inst_id)}`}
-                      className="font-mono text-xs underline-offset-4 hover:underline"
-                    >
-                      {item.display_symbol}
-                    </Link>
-                    <span className="block text-[11px] text-muted-foreground">{item.name}</span>
-                  </td>
-                  <td className="px-2 py-3 text-right font-mono text-xs tabular-nums">
-                    {item.last_price ?? "未提供"}
-                  </td>
-                  <td
-                    className={cn(
-                      "px-2 py-3 text-right font-mono text-xs tabular-nums",
-                      item.change_pct_24h === null || item.change_pct_24h === undefined
-                        ? ""
-                        : signedTone(item.change_pct_24h),
-                    )}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b text-xs text-muted-foreground">
+              <th className="py-2 pr-3 text-left font-medium">标的</th>
+              <th className="px-2 py-2 text-right font-medium">价格</th>
+              <th className="px-2 py-2 text-right font-medium">日涨跌</th>
+              <th className="hidden px-2 py-2 text-right font-medium sm:table-cell">RSI</th>
+              <th className="py-2 pl-2 text-left font-medium">趋势</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item) => (
+              <tr key={item.inst_id} className="border-b last:border-0">
+                <td className="py-3 pr-3">
+                  <Link
+                    to={`/watchlist/${encodeURIComponent(item.inst_id)}`}
+                    className="font-mono text-xs underline-offset-4 hover:underline"
                   >
-                    {item.change_pct_24h === null || item.change_pct_24h === undefined
-                      ? "未提供"
-                      : `${signedValue(item.change_pct_24h)}%`}
-                  </td>
-                  <td className="hidden px-2 py-3 text-right font-mono text-xs tabular-nums sm:table-cell">
-                    {item.rsi_14 ?? "未提供"}
-                  </td>
-                  <td className="py-3 pl-2 text-xs">
-                    {item.trend === "bullish"
-                      ? "偏多"
-                      : item.trend === "bearish"
-                        ? "偏空"
-                        : item.trend === "neutral"
-                          ? "中性"
-                          : "未生成"}
-                  </td>
+                    {item.display_symbol}
+                  </Link>
+                  <span className="block text-[11px] text-muted-foreground">{item.name}</span>
+                </td>
+                <td className="px-2 py-3 text-right font-mono text-xs tabular-nums">
+                  {item.last_price ?? "未提供"}
+                </td>
+                <td
+                  className={cn(
+                    "px-2 py-3 text-right font-mono text-xs tabular-nums",
+                    item.change_pct_24h === null || item.change_pct_24h === undefined
+                      ? ""
+                      : signedTone(item.change_pct_24h),
+                  )}
+                >
+                  {item.change_pct_24h === null || item.change_pct_24h === undefined
+                    ? "未提供"
+                    : `${signedValue(item.change_pct_24h)}%`}
+                </td>
+                <td className="hidden px-2 py-3 text-right font-mono text-xs tabular-nums sm:table-cell">
+                  {item.rsi_14 ?? "未提供"}
+                </td>
+                <td className="py-3 pl-2 text-xs">
+                  {item.trend === "bullish"
+                    ? "偏多"
+                    : item.trend === "bearish"
+                      ? "偏空"
+                      : item.trend === "neutral"
+                        ? "中性"
+                        : "未生成"}
+                </td>
 
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <p className="text-[11px] leading-5 text-muted-foreground">
         {pushedAtList.length === 0
           ? `价格、日涨跌、RSI 与趋势均为 HTTP 快照 ${asOfText(summary.watchlist.as_of)}。`

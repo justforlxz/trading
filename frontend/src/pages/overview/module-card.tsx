@@ -29,7 +29,12 @@ export function StatusBadge({ status }: { status: string }) {
   );
 }
 
-/** 八个模块共用的卡片外壳：标题、状态、数据时间、跳转入口与降级文案。 */
+/**
+ * 八个模块共用的卡片外壳：标题、状态、数据时间、跳转入口与降级文案。
+ *
+ * `actions` 是标题行里状态徽标与跳转箭头之间的操作位（例如关注列表的「编辑」）；
+ * `meta` 是元信息行最前面的一项（例如「已选 3/5」）。
+ */
 export function ModuleCard({
   name,
   title,
@@ -37,6 +42,8 @@ export function ModuleCard({
   module,
   pushedFields,
   to,
+  actions,
+  meta,
   className,
   children,
 }: {
@@ -47,6 +54,8 @@ export function ModuleCard({
   /** 本模块有多少条记录被推送字段覆盖；0 表示整卡都是 HTTP 快照。 */
   pushedFields: number;
   to?: string;
+  actions?: ReactNode;
+  meta?: ReactNode;
   className?: string;
   children: ReactNode;
 }) {
@@ -62,6 +71,7 @@ export function ModuleCard({
           <CardTitle>{title}</CardTitle>
           <div className="flex shrink-0 items-center gap-2">
             <StatusBadge status={module.status} />
+            {actions}
             {to ? (
               <Link
                 to={to}
@@ -74,6 +84,12 @@ export function ModuleCard({
           </div>
         </div>
         <CardDescription className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          {meta ? (
+            <>
+              <span>{meta}</span>
+              <span aria-hidden="true">·</span>
+            </>
+          ) : null}
           <span>数据时间：{asOfText(module.as_of)}</span>
           <span aria-hidden="true">·</span>
           <span>

@@ -66,10 +66,11 @@ __all__ = [
     "load_quote_snapshot",
 ]
 
-#: OKX 公共行情地址：`tickers` / `mark-price` / `index-tickers`。
-DEFAULT_PUBLIC_WS_URL = "wss://ws.okx.com:8443/ws/v5/public"
+#: OKX 公共行情地址：`tickers` / `mark-price` / `index-tickers`。上游已公告 `8443`
+#: 将退役，默认改走 `443`。
+DEFAULT_PUBLIC_WS_URL = "wss://ws.okx.com:443/ws/v5/public"
 #: OKX 业务地址：K 线（`candle{周期}`）只在这里推送，公共地址会以 60018 拒绝。
-DEFAULT_BUSINESS_WS_URL = "wss://ws.okx.com:8443/ws/v5/business"
+DEFAULT_BUSINESS_WS_URL = "wss://ws.okx.com:443/ws/v5/business"
 #: 行情需要的三个频道；同一个 inst_id 在每个频道各订阅一次。
 DEFAULT_PUBLIC_CHANNELS: tuple[str, ...] = ("tickers", "mark-price", "index-tickers")
 #: 上游对单次订阅请求的长度上限：多个频道的 `args` 总长度不超过 64 KB。

@@ -10,9 +10,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # 后端包所在目录：`.env` 与 `alembic.ini` 按包路径定位，不依赖进程 cwd。
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 
-#: OKX 私有 WebSocket 地址：模拟盘与实盘不是同一个域名。
-OKX_WS_PRIVATE_URL_DEMO = "wss://wspap.okx.com:8443/ws/v5/private"
-OKX_WS_PRIVATE_URL_PROD = "wss://ws.okx.com:8443/ws/v5/private"
+#: OKX 私有 WebSocket 地址：模拟盘与实盘不是同一个域名。上游已公告 `8443` 将退役
+#: （推送 `{"code":"64010","msg":"WebSocket port 8443 will be retired soon. Please
+#: migrate to port 443."}`），因此默认走 `443`。
+OKX_WS_PRIVATE_URL_DEMO = "wss://wspap.okx.com:443/ws/v5/private"
+OKX_WS_PRIVATE_URL_PROD = "wss://ws.okx.com:443/ws/v5/private"
 
 
 class Settings(BaseSettings):

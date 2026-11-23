@@ -948,6 +948,10 @@ class StreamHub:
             "subscriptions": candle_subscriptions,
             "skipped": candle_skipped,
         }
+        # 私有连接按需启动：没有任何账户/持仓订阅时它从未连过，健康里不需要把它当成
+        # 故障；但只要启用过（连上过，或启动后登录失败），状态就必须读得到，否则
+        # 「私有推送是否真的连上」在健康接口上没有任何痕迹。
+        payload["private"] = self._status_payload(PRIVATE_DATASET)
         return payload
 
     def _status_payload(self, dataset: str) -> dict[str, Any]:
@@ -959,6 +963,9 @@ class StreamHub:
             "connected": status.connected,
             "last_message_at": _iso(status.last_message_at),
             "last_success_at": _iso(status.last_success_at),
+            # `connected` 与 `last_success_at` 在「启动后登录失败」时都为空，只有
+            # `ever_connected` 能区分「启用过但一次都没成」和「从未启用」。
+            "ever_connected": status.ever_connected,
             "reconnect_count": status.reconnect_count,
             "error": status.last_error,
             "last_error": status.last_error,

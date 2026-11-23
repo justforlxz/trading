@@ -17,6 +17,8 @@ import pytest
 
 from app.exchange import ExchangeError, MarketPush, OkxPublicWebSocket, candle_channel
 from app.exchange.okx.market_ws import (
+    DEFAULT_BUSINESS_WS_URL,
+    DEFAULT_PUBLIC_WS_URL,
     MAX_SUBSCRIBE_FRAME_BYTES,
     SUBSCRIBE_FRAME_SAFETY_MARGIN,
     _frame,
@@ -302,3 +304,10 @@ def test_an_upstream_subscription_error_is_logged_and_yields_no_push(caplog) -> 
 
     assert [row.row["last"] for row in rows] == ["100"]
     assert "60018" in caplog.text
+
+
+def test_the_default_public_endpoints_use_the_migrated_port() -> None:
+    """上游公告 8443 将退役（推送 64010）：行情与 K 线两条连接默认走 443。"""
+
+    assert DEFAULT_PUBLIC_WS_URL == "wss://ws.okx.com:443/ws/v5/public"
+    assert DEFAULT_BUSINESS_WS_URL == "wss://ws.okx.com:443/ws/v5/business"

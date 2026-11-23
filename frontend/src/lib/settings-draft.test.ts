@@ -12,10 +12,17 @@ import {
   toEquityDraft,
   toNotificationDraft,
   withChannel,
+  withMinSeverity,
+  withSubscriptionType,
 } from "./settings-draft";
 
 const NOTIFICATIONS: NotificationSettings = {
   channels: ["browser", "telegram"],
+  subscriptions: {
+    browser: { types: ["risk", "strategy"], min_severity: "warning" },
+    telegram: { types: [], min_severity: "warning" },
+    webhook: { types: [], min_severity: "info" },
+  },
   telegram: { chat_id: "-1001234567890", token_configured: true },
   webhook: { url: "https://example.invalid/hooks/trading", secret_configured: false },
 };
@@ -64,17 +71,41 @@ describe("订阅标的输入", () => {
 });
 
 describe("通知设置草稿", () => {
-  it("接口的嵌套分组拍平成三条输入，缺项按未配置处理", () => {
+  it("接口的嵌套分组拍平成草稿，缺项按未配置处理", () => {
     expect(toNotificationDraft(NOTIFICATIONS)).toEqual({
       channels: ["browser", "telegram"],
+      subscriptions: {
+        browser: { types: ["risk", "strategy"], minSeverity: "warning" },
+        telegram: { types: [], minSeverity: "warning" },
+        webhook: { types: [], minSeverity: "info" },
+      },
       telegramChatId: "-1001234567890",
       webhookUrl: "https://example.invalid/hooks/trading",
     });
     expect(toNotificationDraft({})).toEqual({
       channels: [],
+      subscriptions: {
+        browser: { types: [], minSeverity: "info" },
+        telegram: { types: [], minSeverity: "info" },
+        webhook: { types: [], minSeverity: "info" },
+      },
       telegramChatId: "",
       webhookUrl: "",
     });
+  });
+
+  it("勾选与取消一个类型只改该通道，最低严重度单独可改", () => {
+    const draft = toNotificationDraft(NOTIFICATIONS).subscriptions;
+    const added = withSubscriptionType(draft, "telegram", "risk", true);
+    expect(added.telegram.types).toEqual(["risk"]);
+    expect(added.telegram.minSeverity).toBe("warning");
+    expect(added.browser).toEqual(draft.browser);
+
+    const removed = withSubscriptionType(added, "telegram", "risk", false);
+    expect(removed.telegram.types).toEqual([]);
+
+    const stricter = withMinSeverity(draft, "browser", "critical");
+    expect(stricter.browser).toEqual({ types: ["risk", "strategy"], minSeverity: "critical" });
   });
 
   it("切换一个通道不丢失其它通道的开关", () => {
@@ -84,15 +115,25 @@ describe("通知设置草稿", () => {
     expect(withChannel(["browser"], "telegram", false)).toEqual(["browser"]);
   });
 
-  it("保存载荷带全三个子项，接收方去空白", () => {
+  it("保存载荷带全四个子项，接收方去空白", () => {
     expect(
       notificationsPatch({
         channels: ["telegram"],
+        subscriptions: {
+          browser: { types: ["risk"], minSeverity: "warning" },
+          telegram: { types: [], minSeverity: "critical" },
+          webhook: { types: ["data"], minSeverity: "info" },
+        },
         telegramChatId: "  -100999  ",
         webhookUrl: "",
       }),
     ).toEqual({
       channels: ["telegram"],
+      subscriptions: {
+        browser: { types: ["risk"], min_severity: "warning" },
+        telegram: { types: [], min_severity: "critical" },
+        webhook: { types: ["data"], min_severity: "info" },
+      },
       telegram: { chat_id: "-100999" },
       webhook: { url: "" },
     });

@@ -4,7 +4,12 @@
 """
 
 from app.alerts.model import AlertEventRow
-from app.alerts.rules import AlertCandidate, technical_candidates
+from app.alerts.rules import (
+    ALERT_SEVERITIES,
+    ALERT_TYPES,
+    AlertCandidate,
+    technical_candidates,
+)
 from app.alerts.service import (
     AlertRecord,
     list_alerts,
@@ -14,6 +19,8 @@ from app.alerts.service import (
 )
 
 __all__ = [
+    "ALERT_SEVERITIES",
+    "ALERT_TYPES",
     "AlertCandidate",
     "AlertEventRow",
     "AlertRecord",

@@ -47,8 +47,10 @@ export function alertNotificationTitle(alert: AlertCreatedData): string {
   return alert.title.trim() === "" ? "新提醒" : alert.title;
 }
 
+/** 通知正文：用服务端渲染好的那段文字；老数据没有 `message` 时回落到详情。 */
 export function alertNotificationBody(alert: AlertCreatedData): string {
-  return alert.detail;
+  const message = alert.message?.trim() ?? "";
+  return message === "" ? alert.detail : message;
 }
 
 type StorageLike = Pick<Storage, "getItem" | "setItem">;

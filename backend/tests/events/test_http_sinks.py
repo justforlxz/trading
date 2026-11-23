@@ -15,13 +15,13 @@ import json
 import logging
 import time
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
 import pytest
 
-from app.events import DomainEvent
+from app.events import DeliveryDigest, DomainEvent, digest_of
 from app.events.sinks.base import DeliveryResult
 from app.events.sinks.config import ChannelConfig
 from app.events.sinks.http import RETRY_DELAYS
@@ -70,17 +70,31 @@ class MemoryRecorder:
 class BrokenTelegram(TelegramSink):
     """投递时直接抛错的 Telegram 通道：用来验证通道之间互不影响。"""
 
-    async def deliver(self, event: DomainEvent) -> DeliveryResult:
+    async def deliver(self, digest: DeliveryDigest) -> DeliveryResult:
         raise RuntimeError("Telegram 上游不可用")
 
 
-def _event() -> DomainEvent:
+def _event_at(offset_minutes: int = 0) -> DomainEvent:
+    """一条告警事件，时刻从 `MOMENT` 起按分钟偏移。"""
+
     return DomainEvent(
         kind="alert",
         inst_id="XAAPL-USDT",
         payload={"rule_id": "price_deviation", "alert": dict(ALERT)},
-        occurred_at=MOMENT,
+        occurred_at=MOMENT + timedelta(minutes=offset_minutes),
     )
+
+
+def _digest_at(offset_minutes: int = 0) -> DeliveryDigest:
+    """一次投递的内容：单条告警，时刻与 `_event_at` 一致。"""
+
+    digest = digest_of(_event_at(offset_minutes))
+    assert digest is not None
+    return digest
+
+
+def _digest() -> DeliveryDigest:
+    return _digest_at()
 
 
 def _source(**overrides: str):
@@ -104,6 +118,16 @@ def _config(**overrides: str) -> ChannelConfig:
     }
     values.update(overrides)
     return ChannelConfig(**values)
+
+
+def _allow_everything() -> dict[str, Any]:
+    """这几个用例只关心通道隔离与台账，订阅就不在这里验证了：全开。"""
+
+    return {
+        "browser": {"types": ["price"], "min_severity": "info"},
+        "telegram": {"types": ["price"], "min_severity": "info"},
+        "webhook": {"types": ["price"], "min_severity": "info"},
+    }
 
 
 def _responding(status: int, *, payload: Any = None, headers: Any = None) -> Any:
@@ -138,12 +162,12 @@ def _sequence(responses: list[httpx.Response | Exception]) -> Any:
 
 
 def test_telegram_sends_the_documented_request() -> None:
-    """AC1（MockTransport，未做真实投递）：地址、chat_id、纯文本四行与关闭预览。"""
+    """AC1（MockTransport，未做真实投递）：地址、chat_id、模板正文与关闭预览。"""
 
     handler, requests = _responding(200, payload={"ok": True})
     sink = TelegramSink(_source(), transport=httpx.MockTransport(handler))
 
-    result = asyncio.run(sink.deliver(_event()))
+    result = asyncio.run(sink.deliver(_digest()))
 
     assert result == DeliveryResult("telegram", "delivered")
     assert len(requests) == 1
@@ -153,10 +177,9 @@ def test_telegram_sends_the_documented_request() -> None:
     assert body == {
         "chat_id": CHAT_ID,
         "text": (
-            "[warning] 价格偏离参考价\n"
+            "⚠️ 价格区间 · 警告\n"
             "XAAPL-USDT 最新成交价 101.5 高于 指数价 100，偏离 1.5%\n"
-            "标的：XAAPL-USDT\n"
-            "时间：2026-11-20T12:00:00Z"
+            "2026-11-20T12:00:00Z"
         ),
         "disable_web_page_preview": True,
     }
@@ -169,7 +192,7 @@ def test_telegram_401_is_permanent_and_never_leaks_the_token() -> None:
     sleeps = Sleeps()
     sink = TelegramSink(_source(), transport=httpx.MockTransport(handler), sleep=sleeps)
 
-    result = asyncio.run(sink.deliver(_event()))
+    result = asyncio.run(sink.deliver(_digest()))
 
     assert result.status == "failed"
     assert len(requests) == 1
@@ -190,7 +213,7 @@ def test_a_delivery_writes_no_log_line_with_the_token(caplog: pytest.LogCaptureF
     handler, _ = _responding(200, payload={"ok": True})
     sink = TelegramSink(_source(), transport=httpx.MockTransport(handler))
 
-    result = asyncio.run(sink.deliver(_event()))
+    result = asyncio.run(sink.deliver(_digest()))
 
     assert result.status == "delivered"
     assert "HTTP Request" not in caplog.text
@@ -206,7 +229,7 @@ def test_a_failing_delivery_writes_no_log_line_with_the_token(
     handler, _ = _responding(503)
     sink = TelegramSink(_source(), transport=httpx.MockTransport(handler), sleep=Sleeps())
 
-    asyncio.run(sink.deliver(_event()))
+    asyncio.run(sink.deliver(_digest()))
 
     assert "HTTP Request" not in caplog.text
     assert TOKEN not in caplog.text
@@ -224,7 +247,7 @@ def test_telegram_429_waits_for_the_upstream_retry_after() -> None:
     sleeps = Sleeps()
     sink = TelegramSink(_source(), transport=httpx.MockTransport(handler), sleep=sleeps)
 
-    result = asyncio.run(sink.deliver(_event()))
+    result = asyncio.run(sink.deliver(_digest()))
 
     assert result.status == "delivered"
     assert len(requests) == 2
@@ -238,7 +261,7 @@ def test_telegram_5xx_retries_the_whole_ladder_and_stops() -> None:
     sleeps = Sleeps()
     sink = TelegramSink(_source(), transport=httpx.MockTransport(handler), sleep=sleeps)
 
-    result = asyncio.run(sink.deliver(_event()))
+    result = asyncio.run(sink.deliver(_digest()))
 
     assert result.status == "failed"
     assert len(requests) == len(RETRY_DELAYS) + 1 == 4
@@ -254,7 +277,7 @@ def test_telegram_timeout_is_retried_and_reported_readably() -> None:
     sleeps = Sleeps()
     sink = TelegramSink(_source(), transport=httpx.MockTransport(handler), sleep=sleeps)
 
-    result = asyncio.run(sink.deliver(_event()))
+    result = asyncio.run(sink.deliver(_digest()))
 
     assert result.status == "failed"
     assert len(requests) == 4
@@ -284,7 +307,7 @@ def test_a_response_body_that_never_ends_hits_the_same_timeout(
 
     async def scenario() -> DeliveryResult:
         # 外层再套一层上限：万一 body 读取没有被超时窗口包住，用例是失败而不是挂住。
-        return await asyncio.wait_for(sink.deliver(_event()), timeout=10.0)
+        return await asyncio.wait_for(sink.deliver(_digest()), timeout=10.0)
 
     started = time.monotonic()
     result = asyncio.run(scenario())
@@ -309,8 +332,8 @@ def test_telegram_without_credentials_reports_unconfigured_without_a_request() -
         transport=httpx.MockTransport(handler),
     )
 
-    tokenless = asyncio.run(no_token.deliver(_event()))
-    chatless = asyncio.run(no_chat.deliver(_event()))
+    tokenless = asyncio.run(no_token.deliver(_digest()))
+    chatless = asyncio.run(no_chat.deliver(_digest()))
 
     assert requests == []
     assert tokenless.status == "failed"
@@ -336,7 +359,7 @@ def test_webhook_signs_the_exact_body_it_sends() -> None:
 
     sink = WebhookSink(_source(), transport=httpx.MockTransport(handler))
 
-    result = asyncio.run(sink.deliver(_event()))
+    result = asyncio.run(sink.deliver(_digest()))
 
     assert result == DeliveryResult("webhook", "delivered")
     body = json.loads(received[0].content)
@@ -348,6 +371,11 @@ def test_webhook_signs_the_exact_body_it_sends() -> None:
         "title": ALERT["title"],
         "detail": ALERT["detail"],
         "instrument_id": "XAAPL-USDT",
+        "message": (
+            "⚠️ 价格区间 · 警告\n"
+            "XAAPL-USDT 最新成交价 101.5 高于 指数价 100，偏离 1.5%\n"
+            "2026-11-20T12:00:00Z"
+        ),
         "occurred_at": "2026-11-20T12:00:00Z",
     }
     assert set(("id", "type", "severity", "title", "detail", "instrument_id")) <= set(body)
@@ -360,7 +388,7 @@ def test_webhook_without_a_secret_sends_the_body_unsigned() -> None:
         transport=httpx.MockTransport(handler),
     )
 
-    result = asyncio.run(sink.deliver(_event()))
+    result = asyncio.run(sink.deliver(_digest()))
 
     assert result.status == "delivered"
     assert SIGNATURE_HEADER not in requests[0].headers
@@ -373,7 +401,7 @@ def test_webhook_client_error_is_not_retried() -> None:
     sleeps = Sleeps()
     sink = WebhookSink(_source(), transport=httpx.MockTransport(handler), sleep=sleeps)
 
-    result = asyncio.run(sink.deliver(_event()))
+    result = asyncio.run(sink.deliver(_digest()))
 
     assert result.status == "failed"
     assert len(requests) == 1
@@ -385,7 +413,7 @@ def test_webhook_without_a_url_reports_unconfigured_without_a_request() -> None:
     handler, requests = _responding(200)
     sink = WebhookSink(_source(webhook_url=""), transport=httpx.MockTransport(handler))
 
-    result = asyncio.run(sink.deliver(_event()))
+    result = asyncio.run(sink.deliver(_digest()))
 
     assert result.status == "failed"
     assert requests == []
@@ -406,9 +434,10 @@ def test_one_channel_failing_does_not_stop_the_other() -> None:
             WebhookSink(_source(), transport=httpx.MockTransport(handler)),
         ],
         recorder=recorder,
+        subscriptions=_allow_everything,
     )
 
-    results = asyncio.run(registry.deliver(_event()))
+    results = asyncio.run(registry.deliver(_event_at()))
 
     assert [(item.channel, item.status) for item in results] == [
         ("telegram", "failed"),
@@ -430,9 +459,10 @@ def test_telegram_delivery_is_recorded_as_delivered() -> None:
         [TelegramSink(_source(), transport=httpx.MockTransport(handler))],
         enabled=["telegram"],
         recorder=recorder,
+        subscriptions=_allow_everything,
     )
 
-    asyncio.run(registry.deliver(_event()))
+    asyncio.run(registry.deliver(_event_at()))
 
     assert len(requests) == 1
     assert recorder.rows == [("telegram", "delivered", None)]
@@ -447,9 +477,10 @@ def test_each_enabled_channel_writes_its_own_delivery_row() -> None:
         [WebhookSink(_source(), transport=httpx.MockTransport(handler))],
         enabled=["browser", "webhook"],
         recorder=recorder,
+        subscriptions=_allow_everything,
     )
 
-    asyncio.run(registry.deliver(_event()))
+    asyncio.run(registry.deliver(_event_at()))
 
     assert len(requests) == 1
     assert recorder.rows == [("webhook", "delivered", None)]
@@ -464,13 +495,14 @@ def test_turning_a_channel_off_at_runtime_stops_new_ledger_rows() -> None:
         [WebhookSink(_source(), transport=httpx.MockTransport(handler))],
         enabled=["webhook"],
         recorder=recorder,
+        subscriptions=_allow_everything,
     )
 
-    asyncio.run(registry.deliver(_event()))
+    asyncio.run(registry.deliver(_event_at()))
     registry.set_channels([])
-    asyncio.run(registry.deliver(_event()))
+    asyncio.run(registry.deliver(_event_at(11)))
     registry.set_channels(["webhook"])
-    asyncio.run(registry.deliver(_event()))
+    asyncio.run(registry.deliver(_event_at(22)))
 
     assert len(requests) == 2
     assert recorder.rows == [

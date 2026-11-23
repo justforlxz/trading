@@ -10,11 +10,12 @@ import {
 
 describe("提醒展示辅助", () => {
   it("级别、类型与状态只做中文标签，未知值原样返回", () => {
-    expect(severityLabel("critical")).toBe("严重");
+    expect(severityLabel("critical")).toBe("紧急");
     expect(severityLabel("warning")).toBe("警告");
     expect(severityLabel(null)).toBe("未标注级别");
     expect(severityLabel("unknown-level")).toBe("unknown-level");
-    expect(alertTypeLabel("risk")).toBe("风险");
+    expect(alertTypeLabel("risk")).toBe("持仓风险");
+    expect(alertTypeLabel("indicator")).toBe("技术形态");
     expect(alertTypeLabel("other")).toBe("other");
     expect(alertStatusLabel("acknowledged")).toBe("已确认");
     expect(alertStatusLabel("other")).toBe("other");

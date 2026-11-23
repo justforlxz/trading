@@ -7,12 +7,11 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from app.events import DomainEvent, build_pipeline, build_sinks
+from app.events import DeliveryDigest, DomainEvent, build_pipeline, build_sinks
 from app.events.sinks.base import DeliveryResult
-from app.events.sinks.browser import BrowserSink
 from app.events.sinks.registry import SinkRegistry
 
 MOMENT = datetime(2026, 11, 20, 12, 0, tzinfo=UTC)
@@ -32,20 +31,17 @@ class FakeSink:
     name = "fake"
 
     def __init__(self) -> None:
-        self.events: list[DomainEvent] = []
+        self.digests: list[DeliveryDigest] = []
 
-    def accepts(self, event: DomainEvent) -> bool:
-        return event.kind == "alert"
-
-    async def deliver(self, event: DomainEvent) -> DeliveryResult:
-        self.events.append(event)
+    async def deliver(self, digest: DeliveryDigest) -> DeliveryResult:
+        self.digests.append(digest)
         return DeliveryResult(channel=self.name, status="delivered")
 
 
 class BrokenSink(FakeSink):
     name = "broken"
 
-    async def deliver(self, event: DomainEvent) -> DeliveryResult:
+    async def deliver(self, digest: DeliveryDigest) -> DeliveryResult:
         raise RuntimeError("通道不可用")
 
 
@@ -57,12 +53,23 @@ class MemoryRecorder:
         self.rows.append((result.channel, result.status, result.error))
 
 
-def _alert() -> DomainEvent:
+def _alert(*, minutes: int = 0) -> DomainEvent:
     return DomainEvent(
         kind="alert",
         inst_id="XAAPL-USDT",
-        payload={"rule_id": "test_rule", "state": "triggered", "alert": {"id": "al_1"}},
-        occurred_at=MOMENT,
+        payload={
+            "rule_id": "test_rule",
+            "state": "triggered",
+            "alert": {
+                "id": "al_1",
+                "type": "price",
+                "severity": "warning",
+                "title": "价格偏离参考价",
+                "detail": "XAAPL-USDT 最新成交价 101.5 高于 指数价 100",
+                "instrument_id": "XAAPL-USDT",
+            },
+        },
+        occurred_at=MOMENT + timedelta(minutes=minutes),
     )
 
 
@@ -72,8 +79,10 @@ def test_disabled_browser_channel_does_not_broadcast() -> None:
     broadcast = RecordingBroadcast()
     registry = build_sinks(channels=[], broadcast=broadcast)
 
+    asyncio.run(registry.deliver(_alert()))
+
     assert registry.channels == ()
-    assert registry.accepts(_alert()) is False
+    assert broadcast.calls == []
 
 
 def test_other_channels_keep_delivering_when_browser_is_off() -> None:
@@ -88,7 +97,7 @@ def test_other_channels_keep_delivering_when_browser_is_off() -> None:
 
     asyncio.run(scenario())
 
-    assert [event.kind for event in fake.events] == ["alert"]
+    assert [digest.items[0].alert["id"] for digest in fake.digests] == ["al_1"]
     assert recorder.rows == [("fake", "delivered", None)]
     assert broadcast.calls == []
 
@@ -104,6 +113,7 @@ def test_enabling_browser_broadcasts_only_the_alerts_subscribers() -> None:
 
     assert [call[0] for call in broadcast.calls] == ["alert.created"]
     assert broadcast.calls[0][1]["id"] == "al_1"
+    assert broadcast.calls[0][1]["message"].startswith("⚠️ 价格区间 · 警告")
 
 
 def test_turning_a_channel_off_at_runtime_stops_broadcasting() -> None:
@@ -115,9 +125,9 @@ def test_turning_a_channel_off_at_runtime_stops_broadcasting() -> None:
     async def scenario() -> None:
         await registry.deliver(_alert())
         registry.set_channels([])
-        await registry.deliver(_alert())
+        await registry.deliver(_alert(minutes=11))
         registry.set_channels(["browser"])
-        await registry.deliver(_alert())
+        await registry.deliver(_alert(minutes=22))
 
     asyncio.run(scenario())
 
@@ -131,13 +141,19 @@ def test_unknown_channel_names_are_ignored_not_faked() -> None:
     assert registry.channels == ("browser",)
 
 
-def test_browser_sink_ignores_everything_but_alert_events() -> None:
-    sink = BrowserSink(RecordingBroadcast())
+def test_non_alert_events_never_reach_a_channel() -> None:
+    """行情、账户这类事实没有可投递的正文：不投递，也不写台账。"""
 
-    assert sink.accepts(_alert()) is True
-    assert (
-        sink.accepts(DomainEvent(kind="quote", inst_id="XAAPL-USDT", occurred_at=MOMENT)) is False
+    sink = FakeSink()
+    recorder = MemoryRecorder()
+    registry = SinkRegistry([sink], recorder=recorder)
+
+    asyncio.run(
+        registry.deliver(DomainEvent(kind="quote", inst_id="XAAPL-USDT", occurred_at=MOMENT))
     )
+
+    assert sink.digests == []
+    assert recorder.rows == []
 
 
 def test_a_failing_channel_is_recorded_as_failed() -> None:

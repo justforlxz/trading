@@ -1,7 +1,8 @@
 """Telegram 通道：把告警发到一个聊天里。
 
 只用纯文本，不用 Markdown：转义规则随版本变化，一条报警不该因为标题里有个下划线就发
-不出去。正文四行——级别与标题、详情、标的、发生时刻——与浏览器通道展示的是同一份事实。
+不出去。正文由 `render.render_message` 统一渲染，与浏览器通道、Webhook 推送的是同一段
+文字；超过 Telegram 的上限时由渲染侧截断明细，标的时间保留。
 
 bot token 只从环境变量 `TELEGRAM_BOT_TOKEN` 读，接口地址只从配置读
 （`TELEGRAM_API_BASE`），两者都只出现在请求地址里；失败原因由
@@ -16,10 +17,11 @@ from collections.abc import Callable
 
 import httpx
 
-from app.events.event import DomainEvent
-from app.events.sinks.base import DeliveryResult, alert_payload, utc_moment
+from app.events.sinks.base import DeliveryResult
 from app.events.sinks.config import ChannelConfig
+from app.events.sinks.digest import DeliveryDigest
 from app.events.sinks.http import Sleep, post_json
+from app.events.sinks.render import render_message
 
 __all__ = ["TelegramSink"]
 
@@ -40,13 +42,7 @@ class TelegramSink:
         self._transport = transport
         self._sleep = sleep
 
-    def accepts(self, event: DomainEvent) -> bool:
-        return alert_payload(event) is not None
-
-    async def deliver(self, event: DomainEvent) -> DeliveryResult:
-        alert = alert_payload(event)
-        if alert is None:
-            return DeliveryResult(self.name, "failed", "不是告警事件，没有可投递的正文")
+    async def deliver(self, digest: DeliveryDigest) -> DeliveryResult:
         # 配置来自设置表的同步查询：挪到线程里，别占住事件循环。
         config = await asyncio.to_thread(self._config)
         missing = _missing(config)
@@ -55,7 +51,7 @@ class TelegramSink:
         body = json.dumps(
             {
                 "chat_id": config.telegram_chat_id,
-                "text": _text(event, alert),
+                "text": render_message(digest),
                 "disable_web_page_preview": True,
             },
             ensure_ascii=False,
@@ -84,25 +80,3 @@ def _missing(config: ChannelConfig) -> list[str]:
     if not config.telegram_api_base:
         missing.append("需要配置 TELEGRAM_API_BASE")
     return missing
-
-
-def _text(event: DomainEvent, alert: dict[str, object]) -> str:
-    """四行纯文本：`[{severity}] {title}` / 详情 / 标的 / 时间。"""
-
-    severity = _field(alert, "severity") or "unknown"
-    title = _field(alert, "title") or "告警"
-    detail = _field(alert, "detail") or "无详情"
-    instrument = _field(alert, "instrument_id") or event.inst_id or "未指定"
-    return "\n".join(
-        (
-            f"[{severity}] {title}",
-            detail,
-            f"标的：{instrument}",
-            f"时间：{utc_moment(event.occurred_at)}",
-        )
-    )
-
-
-def _field(alert: dict[str, object], key: str) -> str:
-    value = alert.get(key)
-    return str(value).strip() if isinstance(value, str | int | float) else ""

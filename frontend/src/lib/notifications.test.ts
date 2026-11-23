@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   NOTIFIED_ALERTS_KEY,
+  alertNotificationBody,
   NotifiedAlerts,
   alertNavigationPath,
   notificationPermissionLabel,
@@ -18,6 +19,7 @@ const ALERT: AlertCreatedData = {
   instrument_id: "XAAPL-USDT",
   title: "价格偏离参考价",
   detail: "XAAPL-USDT 最新成交价 110 高于 指数价 100，偏离 10%",
+  message: null,
   triggered_at: "2026-11-20T12:00:00Z",
 };
 
@@ -175,5 +177,18 @@ describe("去重", () => {
     seen.add("al_1");
 
     expect(seen.has("al_1")).toBe(true);
+  });
+});
+
+describe("通知正文", () => {
+  it("服务端渲染的 message 优先，缺失时回落到 detail", () => {
+    const rendered = {
+      ...ALERT,
+      message: "⚠️ 价格区间 · 警告\nXAAPL-USDT  110  10%\n2026-11-20T12:00:00Z",
+    };
+    expect(alertNotificationBody(rendered)).toContain("价格区间 · 警告");
+
+    expect(alertNotificationBody({ ...ALERT, message: "  " })).toBe(ALERT.detail);
+    expect(alertNotificationBody(ALERT)).toBe(ALERT.detail);
   });
 });

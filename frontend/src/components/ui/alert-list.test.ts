@@ -32,7 +32,7 @@ describe("提醒列表", () => {
   it("按接口字段展示，严重提醒排在最前", () => {
     const html = renderToStaticMarkup(createElement(AlertList, { items: ITEMS }));
     expect(html.indexOf("保证金使用率过高")).toBeLessThan(html.indexOf("持仓缺少止损"));
-    expect(html).toContain("严重");
+    expect(html).toContain("紧急");
     expect(html).toContain("警告");
     expect(html).toContain("AAPL-USDT-SWAP 没有有效止损记录");
     expect(html).toContain("规则 stop_missing");

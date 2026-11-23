@@ -1,8 +1,8 @@
 """投递通道的协议与投递结果。
 
-一个通道只做一件事：把已经判定过的告警送到用户能看见的地方。它不判断规则、不改
+一个通道只做一件事：把一次投递的内容送到用户能看见的地方。它不判断规则、不改
 告警内容，也不吞掉失败——失败原样返回，由注册表写一行投递记录，便于排查「为什么
-浏览器没弹」。
+浏览器没弹」。正文一律由 `render` 渲染，通道只负责运输。
 
 `notification_deliveries` 是投递台账：每次投递一行，`status` 只有 `delivered` 与
 `failed` 两种，`error` 只放失败原因，不放告警正文。
@@ -12,13 +12,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Literal, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 from sqlalchemy import Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, UtcDateTime
 from app.events.event import DomainEvent
+
+if TYPE_CHECKING:
+    from app.events.sinks.digest import DeliveryDigest
 
 __all__ = [
     "DeliveryResult",
@@ -42,13 +45,11 @@ class DeliveryResult:
 
 
 class Sink(Protocol):
-    """投递通道：只声明接收哪类事件，并把它送出去。"""
+    """投递通道：把一次投递的内容送出去，正文用同一个渲染入口。"""
 
     name: str
 
-    def accepts(self, event: DomainEvent) -> bool: ...
-
-    async def deliver(self, event: DomainEvent) -> DeliveryResult: ...
+    async def deliver(self, digest: DeliveryDigest) -> DeliveryResult: ...
 
 
 class NotificationDeliveryRow(Base):

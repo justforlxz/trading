@@ -261,6 +261,32 @@ describe("设置页", () => {
     expect(html).toContain("Webhook 通道");
   });
 
+  it("每个通道一组类型复选框与最低严重度下拉", () => {
+    const html = render({
+      draft: {
+        ...toSettingsDraft(SETTINGS),
+        notifications: {
+          ...toSettingsDraft(SETTINGS).notifications,
+          subscriptions: {
+            browser: { types: ["risk", "indicator"], minSeverity: "info" },
+            telegram: { types: ["risk"], minSeverity: "warning" },
+            webhook: { types: [], minSeverity: "critical" },
+          },
+        },
+      },
+    });
+    for (const label of ["持仓风险", "策略信号", "技术形态", "价格区间", "数据缺口"]) {
+      expect(html).toContain(label);
+    }
+    expect(html).toContain("最低严重度");
+    // 三个通道各一个下拉：值来自草稿，未配置时是「提示」。
+    expect(html).toContain('<option value="info" selected="">提示</option>');
+    expect(html).toContain('<option value="warning" selected="">警告</option>');
+    expect(html).toContain('<option value="critical" selected="">紧急</option>');
+    // 勾选状态来自草稿：browser 两个、telegram 一个，webhook 没有。
+    expect((html.match(/checked=""/g) ?? []).length).toBe(2 + 3 + 0);
+  });
+
   it("最近投递逐条展示时间、通道、状态与失败原因", () => {
     const html = render();
     expect(html).toContain("最近投递");

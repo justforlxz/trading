@@ -744,7 +744,9 @@
               "price",
               "risk",
               "strategy",
-              "data"
+              "data",
+              "market",
+              "watchlist"
             ],
             "title": "Type",
             "type": "string"
@@ -4254,7 +4256,9 @@
               "price",
               "risk",
               "strategy",
-              "data"
+              "data",
+              "market",
+              "watchlist"
             ],
             "title": "Type",
             "type": "string"
@@ -11417,7 +11421,9 @@
                     "price",
                     "risk",
                     "strategy",
-                    "data"
+                    "data",
+                    "market",
+                    "watchlist"
                   ]
                 },
                 "telegram": {

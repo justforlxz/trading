@@ -19,7 +19,7 @@ __all__ = [
     "AlertType",
 ]
 
-AlertType = Literal["indicator", "price", "risk", "strategy", "data"]
+AlertType = Literal["indicator", "price", "risk", "strategy", "data", "market", "watchlist"]
 AlertSeverity = Literal["info", "warning", "critical"]
 AlertStatus = Literal["pending", "acknowledged", "ignored", "expired"]
 

@@ -68,10 +68,13 @@ def _day(value: str | None) -> date | None:
 
 
 class StooqSource:
-    """Stooq 日线 CSV：`delayed=True`（收盘后才发布的日结数据，不是实时）。"""
+    """Stooq 日线 CSV：`delayed=True`（收盘后才发布的日结数据，不是实时）。
+
+    只服务日线：`bars` 只有一个周期。
+    """
 
     name = "stooq"
-    bar = "1d"
+    bars = ("1d",)
     #: 日结数据在收盘后才发布，任何时刻都不能当作实时报价。
     delayed = True
 

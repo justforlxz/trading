@@ -24,7 +24,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 from app.core import Clock, DataUnavailable, SystemClock, UpstreamError, ValidationError
-from app.equity.config import EquityConfig, resolve_config
+from app.equity.config import DAILY_BAR, EquityConfig, resolve_config
 from app.equity.pipeline import PendingBatch, build_pipeline
 from app.equity.providers import build_provider, provider_delayed, provider_url
 from app.equity.runtime import EquityRuntime
@@ -54,15 +54,17 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-#: 抓取窗口的回看长度：分钟级取 7 天、日线取 30 天。
+#: 抓取窗口的回看长度：分钟级取 7 天、日线取 120 天。
 #:
 #: 分钟级不能只回看 1 天：Yahoo 的 `range=1d` 给的是**最近一个交易日**的分钟线，周末与
 #: 周一一早运行时，「最近 24 小时」整个落在休市区间里，会把上一个交易日的行情全部过滤掉
 #: （实测：周日 15:48 UTC 跑一次，窗口变成周六 15:48 → 周日 15:48，结果 0 根）。
 #: 回看一周既能跨过周末与休市日，也不会把整段历史算进一次 tick——上游本来就只给有限窗口。
+#: 日线要覆盖 20 周期 ATR 的基线再加停牌与假日余量，120 个自然日足够（Yahoo 的上游窗口
+#: 是 3 个月，这里只是本地过滤器，不能比上游窗口更短）。
 LOOKBACK_BY_BAR: dict[str, timedelta] = {
     "1m": timedelta(days=7),
-    "1d": timedelta(days=30),
+    "1d": timedelta(days=120),
 }
 DEFAULT_LOOKBACK = timedelta(days=1)
 
@@ -158,7 +160,7 @@ def _reading(
     is_delayed: bool,
     channel_failing: bool,
 ) -> EquityReading:
-    source_url = provider_url(config.provider, symbol)
+    source_url = provider_url(config.provider, symbol, config.bar)
     name = SYMBOL_NAMES.get(symbol, symbol)
     if stored is None:
         # 没有 K 线时这一行是「缺失」，但市场开没开仍然是事实：给当前时段，不给
@@ -279,35 +281,80 @@ def sync(
         return (_result(config, "skipped", 0, 0, None),)
 
     started = time.monotonic()
+    failures: list[str] = []
     try:
-        outcome = _sync_once(config, now)
-    except (UpstreamError, DataUnavailable, ValidationError) as exc:
-        _RUNTIME.record_failure(now, interval_seconds=config.interval_seconds, message=str(exc))
-        logger.warning("美股同步失败: provider=%s: %s", config.provider, exc)
-        return (_result(config, "failed", 0, 0, str(exc)),)
+        results = tuple(_sync_batches(config, now, failures))
     finally:
         _RUNTIME.release()
 
-    _RUNTIME.record_success(now)
+    if failures:
+        _RUNTIME.record_failure(now, interval_seconds=config.interval_seconds, message=failures[0])
+        logger.warning("美股同步失败: provider=%s: %s", config.provider, failures[0])
+    else:
+        _RUNTIME.record_success(now)
     logger.info(
-        "美股同步完成: provider=%s bar=%s rows=%d published=%d 耗时=%dms",
+        "美股同步完成: provider=%s 耗时=%dms 结果=%s",
         config.provider,
-        config.bar,
-        outcome.written,
-        outcome.published,
         int((time.monotonic() - started) * 1000),
+        ", ".join(f"{item.bar}={item.status}/{item.rows}" for item in results),
     )
-    return (_result(config, "synced", outcome.written, outcome.published, None),)
+    return results
 
 
-def _sync_once(config: EquityConfig, now: datetime):
-    """抓一个窗口并交给管道；返回管道结果，落库没成立时抛 `DataUnavailable`。"""
+def _batches(config: EquityConfig) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """这一轮要抓的（周期, 标的）批次。
 
-    provider = build_provider(config.provider, options=config.options())
-    if not provider.supports(config.symbols):
-        raise ValidationError(f"provider {config.provider} 不支持标的 {list(config.symbols)}")
-    start = now - LOOKBACK_BY_BAR.get(config.bar, DEFAULT_LOOKBACK)
-    bars = provider.fetch(list(config.symbols), start, now)
+    每个周期一批；日线那一批还要带上三个大盘指数——它们不在 `equity.symbols` 里（界面
+    上不显示），但指数日线是 ATR 的唯一来源，由渠道固定维护。放在同一批是因为它们走
+    同一条管道、同一个来源，「一个标的失败即整批记失败」对它们同样适用。
+    """
+
+    return tuple(
+        (bar, config.daily_symbols if bar == DAILY_BAR else config.symbols) for bar in config.bars
+    )
+
+
+def _sync_batches(config: EquityConfig, now: datetime, failures: list[str]) -> list[SyncResult]:
+    """逐个批次抓取；一批失败只记这批的失败，另一批仍然落库。"""
+
+    results: list[SyncResult] = []
+    for bar, symbols in _batches(config):
+        try:
+            outcome = _sync_once(config, bar, symbols, now)
+        except (UpstreamError, DataUnavailable, ValidationError) as exc:
+            failures.append(str(exc))
+            results.append(
+                SyncResult(
+                    provider=config.provider,
+                    bar=bar,
+                    status="failed",
+                    rows=0,
+                    published=0,
+                    error=str(exc),
+                )
+            )
+            continue
+        results.append(
+            SyncResult(
+                provider=config.provider,
+                bar=bar,
+                status="synced",
+                rows=outcome.written,
+                published=outcome.published,
+                error=None,
+            )
+        )
+    return results
+
+
+def _sync_once(config: EquityConfig, bar: str, symbols: tuple[str, ...], now: datetime):
+    """抓一个周期的窗口并交给管道；落库没成立时抛 `DataUnavailable`。"""
+
+    provider = build_provider(config.provider, bar=bar, options=config.options(bar))
+    if not provider.supports(symbols):
+        raise ValidationError(f"provider {config.provider} 不支持标的 {list(symbols)}")
+    start = now - LOOKBACK_BY_BAR.get(bar, DEFAULT_LOOKBACK)
+    bars = provider.fetch(list(symbols), start, now)
     foreign = sorted({item.source for item in bars if item.source != config.provider})
     if foreign:
         raise ValidationError(f"provider {config.provider} 返回了别的来源的行: {foreign}")

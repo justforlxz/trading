@@ -40,6 +40,7 @@ from app.market.funding import (
     upsert_funding,
 )
 from app.market.health import system_health
+from app.market.indexes import INDEX_SYMBOLS, MARKET_INDEXES, MarketIndex
 from app.market.matrix import Matrix, build_matrix, correlation_matrix
 from app.market.model import (
     Candle,
@@ -107,6 +108,8 @@ __all__ = [
     "DEFAULT_THRESHOLD_PCT",
     "EXCHANGE_CLOSED",
     "EXCHANGE_OPEN",
+    "INDEX_SYMBOLS",
+    "MARKET_INDEXES",
     "MIN_RESONANCE_PARTICIPANTS",
     "MIN_SAMPLES",
     "SESSION_CLOSED",
@@ -123,6 +126,7 @@ __all__ = [
     "DivergenceAlert",
     "FundingPoint",
     "IntegrityReport",
+    "MarketIndex",
     "MarketOverviewItem",
     "MarketOverviewSnapshot",
     "Matrix",

@@ -7,12 +7,14 @@
 - `resolve_config`：`settings.data_sources.macro` 的解析结果；
 - `runtime`：进程内同步状态，健康组件与调度器共用。
 
-序列清单、粒度常量与分级纯函数是包内实现细节，跨包用不到；测试按需要从子模块导入。
+序列清单与分级纯函数是包内实现细节，跨包用不到；只有「日线」这个粒度常量要跨包
+用（提醒扫描据它挑结算值），因此单独发布。
 
 定时只在 `app/jobs/market_data.py`，本包内没有任何定时原语。
 """
 
 from app.macro.config import resolve_config, validate_series_override
+from app.macro.series import GRANULARITY_DAILY
 from app.macro.service import (
     MacroOverview,
     MacroSource,
@@ -25,6 +27,7 @@ from app.macro.service import (
 )
 
 __all__ = [
+    "GRANULARITY_DAILY",
     "MacroOverview",
     "MacroSource",
     "SeriesReading",

@@ -53,7 +53,9 @@
           "price",
           "risk",
           "strategy",
-          "data"
+          "data",
+          "market",
+          "watchlist"
         ]
       },
       "telegram": {

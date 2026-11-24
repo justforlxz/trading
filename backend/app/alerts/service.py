@@ -3,11 +3,17 @@
 扫描只使用已落库、已收盘的日线：`candles` 表本身只收 `confirm=true` 的 K 线。
 去重键由「标的 + 规则 + bar + 方向或阈值」组成，数据库唯一约束是最终保证。
 条件恢复或同一规则出现新 bar 时，旧提醒标记为 `expired` 并写一条活动，不删除行。
+
+大盘异动（`market`）与组合异动（`watchlist`）不是单标的规则：它们读指数日线、自选整体
+与宏观收益率读数，去重键带「方向 + 级别」而不带 bar（详见 `app.alerts.rules`）。这两类
+规则的触发时机是行情调度收到新数据之后（`scan_market_alerts`），接口的默认扫描
+（`scan_alerts`）也会带上它们，用户打开页面时看到的就是同一份结果。
 """
 
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -24,16 +30,22 @@ from app.alerts.rules import (
     ALERT_SEVERITIES,
     ALERT_STATUSES,
     ALERT_TYPES,
+    MARKET_SCAN_RULES,
     SCAN_MANAGED_RULES,
     AlertCandidate,
     data_gap_candidates,
+    market_index_candidates,
     price_range_candidates,
+    spread_candidates,
     technical_candidates,
+    us10y_candidates,
+    watchlist_candidates,
 )
-from app.core import Clock, Conflict, SystemClock, ValidationError
+from app.core import Bar, Clock, Conflict, SystemClock, ValidationError
 from app.db import session_scope
 from app.instrument import Instrument
-from app.market import integrity, load_candles
+from app.macro import GRANULARITY_DAILY, macro_overview
+from app.market import MARKET_INDEXES, integrity, load_candles
 from app.positions import exchange_positions, list_manual_positions
 from app.risk import (
     RULE_HIGH_LEVERAGE,
@@ -53,14 +65,20 @@ __all__ = [
     "list_alerts",
     "record_candidate",
     "scan_alerts",
+    "scan_market_alerts",
     "update_alert_status",
 ]
+
+logger = logging.getLogger(__name__)
 
 MAX_LIMIT = 200
 RISK_RULE_VERSION = "b3-exposure-v1"
 RISK_BAR = "1d"
+_HUNDRED = Decimal(100)
 # 技术指标最多回看 60 根日线，180 个自然日足够覆盖并留出停牌与周末的余量。
 TECHNICAL_LOOKBACK_DAYS = 180
+# 大盘与组合规则要 20 个交易日的 ATR 基线，120 个自然日足够覆盖并留出假日的余量。
+MARKET_LOOKBACK_DAYS = 120
 _RISK_TITLES = {
     RULE_STOP_MISSING: "持仓缺少止损",
     RULE_STOP_DISTANCE: "止损距离过近",
@@ -183,12 +201,56 @@ def update_alert_status(
 
 
 def scan_alerts(*, clock: Clock | None = None) -> ScanResult:
-    """扫描风险、技术、价格与数据规则，写入新提醒并标记已恢复的旧提醒。"""
+    """扫描全部规则（含大盘与组合），写入新提醒并标记已恢复的旧提醒。"""
 
-    moment = (clock or SystemClock()).now().astimezone(UTC).replace(microsecond=0)
-    candidates = _drop_unknown_instruments(
-        _risk_candidates(moment) + _instrument_candidates(moment)
+    moment = _moment(clock)
+    return _record_candidates(
+        _all_candidates(moment), moment, clock=clock, scope=SCAN_MANAGED_RULES
     )
+
+
+def scan_market_alerts(*, clock: Clock | None = None) -> ScanResult:
+    """只扫大盘异动与组合异动；行情调度收到新的日线后调用它。
+
+    单独一条入口只是为了不把风险、技术这些与行情 tick 无关的规则带进每分钟的调度轮次，
+    判定与落库仍走同一个 `_record_candidates`。**判过期的范围必须跟着缩小**：这一轮没有
+    评估技术、价格、数据与风险规则，就不能把它们仍在待处理的提醒当成「条件已恢复」。
+    """
+
+    moment = _moment(clock)
+    return _record_candidates(
+        _market_and_watchlist_candidates(moment),
+        moment,
+        clock=clock,
+        scope=MARKET_SCAN_RULES,
+    )
+
+
+def _moment(clock: Clock | None) -> datetime:
+    return (clock or SystemClock()).now().astimezone(UTC).replace(microsecond=0)
+
+
+def _all_candidates(moment: datetime) -> list[AlertCandidate]:
+    """一次完整扫描的全部候选；单标的规则先按标的表过滤，指数与组合规则没有标的。"""
+
+    return _drop_unknown_instruments(
+        _risk_candidates(moment)
+        + _instrument_candidates(moment)
+        + _market_and_watchlist_candidates(moment)
+    )
+
+
+def _market_and_watchlist_candidates(moment: datetime) -> list[AlertCandidate]:
+    return _market_candidates(moment) + _watchlist_candidates(moment)
+
+
+def _record_candidates(
+    candidates: list[AlertCandidate],
+    moment: datetime,
+    *,
+    clock: Clock | None,
+    scope: Collection[str],
+) -> ScanResult:
     unique = {candidate.dedup_key: candidate for candidate in candidates}
 
     created = 0
@@ -259,7 +321,9 @@ def scan_alerts(*, clock: Clock | None = None) -> ScanResult:
             created += 1
             new_groups.add((candidate.type, candidate.rule_id, candidate.instrument_id))
 
-        expired = _expire_stale(session, unique.values(), new_groups, moment, clock=clock)
+        expired = _expire_stale(
+            session, unique.values(), new_groups, moment, clock=clock, scope=scope
+        )
     return ScanResult(created=created, expired=expired)
 
 
@@ -337,6 +401,79 @@ def _risk_candidates(moment: datetime) -> list[AlertCandidate]:
     return found
 
 
+def _market_candidates(moment: datetime) -> list[AlertCandidate]:
+    """三个指数的单日涨跌，加上 10Y 收益率与 2Y→10Y 利差的变化。"""
+
+    start = moment - timedelta(days=MARKET_LOOKBACK_DAYS)
+    found: list[AlertCandidate] = []
+    for index in MARKET_INDEXES:
+        bars = _daily_series(index.symbol, start)
+        found.extend(market_index_candidates(index, bars, moment=moment))
+    found.extend(_rate_candidates(moment))
+    return found
+
+
+def _rate_candidates(moment: datetime) -> list[AlertCandidate]:
+    """收益率读数来自宏观域的日线结算值；读失败时跳过，不让它拖垮其他规则。"""
+
+    try:
+        overview = macro_overview()
+    except Exception:  # 宏观读数读不出来只影响这两条规则
+        logger.exception("宏观读数读取失败, 本轮跳过收益率提醒")
+        return []
+    daily = {
+        reading.series_id: reading
+        for reading in overview.readings
+        if reading.granularity == GRANULARITY_DAILY
+    }
+    ten = daily.get("us10y")
+    if ten is None or ten.value is None or ten.change is None or ten.as_of is None:
+        return []
+    trading_day = ten.as_of.date()
+    found = us10y_candidates(
+        change_pp=ten.change, value=ten.value, trading_day=trading_day, moment=moment
+    )
+    two = daily.get("us2y")
+    if two is None or two.value is None or two.change is None or two.as_of is None:
+        return found
+    if two.as_of.date() != trading_day:
+        # 两腿不在同一个结算日：凑出来的差值不是期限利差，宁可这一轮不报。
+        return found
+    found.extend(
+        spread_candidates(
+            current_bp=(ten.value - two.value) * _HUNDRED,
+            previous_bp=((ten.value - ten.change) - (two.value - two.change)) * _HUNDRED,
+            trading_day=trading_day,
+            moment=moment,
+        )
+    )
+    return found
+
+
+def _watchlist_candidates(moment: datetime) -> list[AlertCandidate]:
+    """自选整体走弱：只吃有日线的自选标的，没有日线的标的无法判断涨跌。"""
+
+    start = moment - timedelta(days=MARKET_LOOKBACK_DAYS)
+    series = {item.symbol: _daily_series(item.symbol, start) for item in tracked_instruments()}
+    return watchlist_candidates(
+        {symbol: bars for symbol, bars in series.items() if bars}, moment=moment
+    )
+
+
+def _daily_series(symbol: str, start: datetime) -> list[Bar]:
+    """某标的的日线序列，只取最新一根所在来源的行。
+
+    换过数据源后旧来源的行还留在 `candles` 里；把两个来源的日线接成一条序列会算出
+    根本不存在的跳空，ATR 也跟着失真。因此以最新一根的来源为准。
+    """
+
+    bars = load_candles(symbol, RISK_BAR, start=start)
+    if not bars:
+        return []
+    newest = max(bars, key=lambda bar: bar.open_time)
+    return [bar for bar in bars if bar.source == newest.source]
+
+
 def _instrument_candidates(moment: datetime) -> list[AlertCandidate]:
     found: list[AlertCandidate] = []
     start = moment - timedelta(days=TECHNICAL_LOOKBACK_DAYS)
@@ -368,20 +505,30 @@ def _expire_stale(
     moment: datetime,
     *,
     clock: Clock | None,
+    scope: Collection[str],
 ) -> int:
+    """把这一轮**评估过**、且条件已不再成立的提醒标为过期。
+
+    `scope` 是这一轮负责的规则集合：没在里面的规则一个都不能碰——一次只扫大盘的轮次
+    没有看技术形态与持仓风险，把它们的待处理提醒判成「已恢复」等于凭空清空用户的提醒。
+    """
+
     current_keys = {candidate.dedup_key for candidate in candidates}
     active_groups = {
         (candidate.type, candidate.rule_id, candidate.instrument_id) for candidate in candidates
     }
-    statement = select(AlertEventRow).where(AlertEventRow.status.in_(("pending", "acknowledged")))
+    statement = select(AlertEventRow).where(
+        AlertEventRow.status.in_(("pending", "acknowledged")),
+        AlertEventRow.rule_id.in_(sorted(scope)),
+    )
     if current_keys:
         statement = statement.where(AlertEventRow.dedup_key.notin_(current_keys))
     # 行锁让并发扫描串行处理同一批旧提醒，避免同一条恢复记录写两次活动。
     rows = list(session.scalars(statement.order_by(AlertEventRow.id).with_for_update()))
     expired = 0
     for row in rows:
-        if row.rule_id not in SCAN_MANAGED_RULES:
-            # 不归扫描维护的提醒（例如事件管道写入的）：状态由产出方负责，这里不碰。
+        if row.rule_id not in scope:
+            # 防御性兜底：不归这一轮维护的提醒，状态由产出方负责，这里不碰。
             continue
         group = (row.type, row.rule_id, row.instrument_id)
         if group not in new_groups and group in active_groups:

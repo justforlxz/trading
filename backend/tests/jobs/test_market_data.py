@@ -7,7 +7,10 @@ from datetime import UTC, date, datetime, timedelta
 import pytest
 
 from app.core import UpstreamError
+from app.equity import SyncResult as EquitySyncResult
 from app.jobs import MarketDataScheduler
+from app.jobs import market_data as jobs_module
+from app.macro import SyncResult
 from app.macro import service as service_module
 from app.market import settlement_epoch
 from tests.macro.conftest import FakeProvider, observation, provider_builder
@@ -246,3 +249,102 @@ def test_equity_tick_failure_does_not_block_the_macro_tick() -> None:
     scheduler._tick()
 
     assert calls == ["macro", "equity"]
+
+
+def _equity_result(*, bar: str, published: int) -> EquitySyncResult:
+    return EquitySyncResult(
+        provider="yahoo", bar=bar, status="synced", rows=1, published=published, error=None
+    )
+
+
+def test_a_new_daily_bar_triggers_the_market_alert_scan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """AC7：大盘/组合异动挂在行情调度轮次上，不新增定时器。
+
+    触发条件是「这一轮真的收到了新的收盘数据」：分钟级每分钟都在写，不能每分钟都评估
+    一遍日线规则。
+    """
+
+    scheduler = MarketDataScheduler()
+    scans: list[str] = []
+    monkeypatch.setattr(scheduler, "run_once", lambda **_: ())
+    monkeypatch.setattr(
+        scheduler,
+        "run_equity_once",
+        lambda **_: (
+            _equity_result(bar="1m", published=1),
+            _equity_result(bar="1d", published=1),
+        ),
+    )
+    monkeypatch.setattr(scheduler, "run_market_alert_scan", lambda: scans.append("scan"))
+
+    scheduler._tick()
+
+    assert scans == ["scan"]
+
+
+def test_a_tick_without_new_daily_data_does_not_scan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """只有分钟级新行时不评估：日线一天只变一次。"""
+
+    scheduler = MarketDataScheduler()
+    scans: list[str] = []
+    monkeypatch.setattr(scheduler, "run_once", lambda **_: ())
+    monkeypatch.setattr(
+        scheduler,
+        "run_equity_once",
+        lambda **_: (
+            _equity_result(bar="1m", published=5),
+            _equity_result(bar="1d", published=0),
+        ),
+    )
+    monkeypatch.setattr(scheduler, "run_market_alert_scan", lambda: scans.append("scan"))
+
+    scheduler._tick()
+
+    assert scans == []
+
+
+def test_a_new_macro_settlement_also_triggers_the_scan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """宏观日结值落地同样触发：10Y 与利差规则的数据来自宏观域。"""
+
+    scheduler = MarketDataScheduler()
+    scans: list[str] = []
+    monkeypatch.setattr(
+        scheduler,
+        "run_once",
+        lambda **_: (
+            SyncResult(
+                series_id="us10y",
+                granularity="daily",
+                provider="treasury",
+                status="synced",
+                rows=1,
+                error=None,
+            ),
+        ),
+    )
+    monkeypatch.setattr(scheduler, "run_equity_once", lambda **_: ())
+    monkeypatch.setattr(scheduler, "run_market_alert_scan", lambda: scans.append("scan"))
+
+    scheduler._tick()
+
+    assert scans == ["scan"]
+
+
+def test_a_failing_scan_does_not_kill_the_scheduler_tick(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """扫描失败只记日志：调度线程不能因为一条提醒挂掉。"""
+
+    def broken(**_: object) -> None:
+        raise RuntimeError("数据库不可用")
+
+    monkeypatch.setattr(jobs_module, "scan_market_alerts", broken)
+
+    # 不抛异常即通过：失败在 `run_market_alert_scan` 里被兜住并记日志。
+    MarketDataScheduler().run_market_alert_scan()

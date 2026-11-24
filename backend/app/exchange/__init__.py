@@ -37,7 +37,7 @@ from app.exchange.okx.snapshots import (
 from app.exchange.okx.ws import OkxWebSocket
 from app.exchange.providers import (
     build_source,
-    source_bar,
+    source_bars,
     source_delayed,
     source_names,
     source_template,
@@ -64,7 +64,7 @@ __all__ = [
     "load_quote_snapshot",
     "parse_account_snapshot_row",
     "parse_exchange_position_row",
-    "source_bar",
+    "source_bars",
     "source_delayed",
     "source_names",
     "source_template",

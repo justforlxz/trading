@@ -28,6 +28,7 @@ from datetime import datetime, timedelta
 from threading import Event, Thread
 from typing import Any
 
+from app.alerts import scan_market_alerts
 from app.core import Clock, SystemClock
 from app.equity import (
     EquityConfig,
@@ -38,13 +39,15 @@ from app.equity import (
 from app.equity import resolve_config as resolve_equity_config
 from app.equity import runtime as equity_runtime
 from app.equity import sync as equity_sync
-from app.macro import SyncResult, resolve_config, runtime, sync
+from app.macro import GRANULARITY_DAILY, SyncResult, resolve_config, runtime, sync
 from app.settings import load_settings
 
 __all__ = ["MarketDataScheduler", "start_market_data_scheduler"]
 
 logger = logging.getLogger(__name__)
 
+#: 只有日线才能当 ATR 的来源：大盘与组合异动都由它驱动。
+DAILY_BAR = "1d"
 #: 停止时给正在跑的那一次 tick 的收尾时间。
 STOP_TIMEOUT_SECONDS = 5.0
 #: 配置读不出来时的等待秒数：一分钟，与默认周期一致。
@@ -156,6 +159,20 @@ class MarketDataScheduler:
         )
         return results
 
+    def run_market_alert_scan(self) -> None:
+        """收盘数据落地后评估大盘与组合异动；失败只记日志，不拖累调度线程。
+
+        不新增定时器：调用点就在已经存在的调度轮次里，且只在**这一轮真的收到新的收盘
+        数据**时才调用，所以一天最多评估一次，不按分钟空转。
+        """
+
+        try:
+            result = scan_market_alerts()
+        except Exception:
+            logger.exception("大盘/组合提醒扫描失败")
+            return
+        logger.info("大盘/组合提醒扫描完成: created=%d expired=%d", result.created, result.expired)
+
     def _loop(self) -> None:
         """等一个周期再跑一次；周期每轮重读，改配置后下一轮生效。"""
 
@@ -167,14 +184,33 @@ class MarketDataScheduler:
     def _tick(self) -> None:
         """跑一个完整周期；两个域各自兜住异常，一个挂掉不拖累另一个。"""
 
+        macro_results: tuple[SyncResult, ...] = ()
+        equity_results: tuple[EquitySyncResult, ...] = ()
         try:
-            self.run_once()
+            macro_results = self.run_once()
         except Exception:
             logger.exception("宏观调度 tick 失败")
         try:
-            self.run_equity_once()
+            equity_results = self.run_equity_once()
         except Exception:
             logger.exception("美股调度 tick 失败")
+        if _settled(macro_results, equity_results):
+            self.run_market_alert_scan()
+
+
+def _settled(
+    macro_results: tuple[SyncResult, ...],
+    equity_results: tuple[EquitySyncResult, ...],
+) -> bool:
+    """这一轮是否收到了新的收盘数据：宏观的新日结值，或美股的新日线。
+
+    调度周期是分钟级，但日线与日结值一天只变一次。没有新数据就不评估，避免每分钟
+    读一遍指数与自选日线；有的数据源一轮里只更新一边，两边都看才不漏。
+    """
+
+    if any(item.rows > 0 and item.granularity == GRANULARITY_DAILY for item in macro_results):
+        return True
+    return any(item.bar == DAILY_BAR and item.published > 0 for item in equity_results)
 
 
 def _interval_seconds(fallback: int) -> int:

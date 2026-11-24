@@ -61,7 +61,7 @@ class FakeProvider:
                 source=self.name,
             )
             for bar in self.bars
-            if bar.inst_id in wanted
+            if bar.inst_id in wanted and bar.timeframe.value == self.bar
         ]
 
 

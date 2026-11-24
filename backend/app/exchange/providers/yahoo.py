@@ -1,11 +1,14 @@
-"""Yahoo chart API：分钟级 K 线，免费源是延迟行情。
+"""Yahoo chart API：分钟级与日线 K 线，免费源是延迟行情。
 
-`GET {url}` 的 `{symbol}` 由标的名替换；查询串固定为「1 分钟级、最近一个交易日」。
-返回体是 `chart.result[0]` 里的并列数组：`timestamp[]` 与
-`indicators.quote[0].{open,high,low,close,volume}[]`，按索引一一对应。
+`GET {url}` 的 `{symbol}` 由标的名替换；查询串由配置里的地址模板决定（分钟级
+`interval=1m&range=1d`、日线 `interval=1d&range=3mo`）。返回体是 `chart.result[0]` 里的
+并列数组：`timestamp[]` 与 `indicators.quote[0].{open,high,low,close,volume}[]`，
+按索引一一对应。
 
-只交出**已收盘**的 K 线：最后一根正在形成的分钟也在上游的返回里，它的收盘价还会变，
-写进 `candles`（该表只收已收盘 K 线）就是伪造历史。
+**上游正在形成的那一根也会被交出去**：是否定稿取决于交易时段（分钟级看这一分钟是否走完，
+日线看当天收盘），那是行情域的知识，取数层不认识交易时段因此不在这里过滤。定稿判断在
+`app.equity.providers` 的适配层做，写进 `candles`（该表只收已收盘 K 线）的仍然是已定稿
+的那些。
 
 **本模块没有任何定时原语**：什么时候抓由 `app/jobs/market_data.py` 的调度器决定。
 """
@@ -23,7 +26,6 @@ import httpx
 from app.core import UpstreamError
 from app.exchange.providers.http import get_text
 from app.exchange.providers.raw import RawBar
-from app.shared import bar_seconds
 
 __all__ = ["YahooSource", "parse_yahoo"]
 
@@ -68,10 +70,14 @@ def _load_json(text: str) -> Any:
 
 
 class YahooSource:
-    """Yahoo chart API：1 分钟 K 线。免费源延迟 15 分钟级，`delayed=True`。"""
+    """Yahoo chart API：分钟级与日线。免费源延迟 15 分钟级，`delayed=True`。
+
+    `bars` 声明这个实现能服务哪几个周期；实例上的 `bar` 是**这一次**代表哪个周期，
+    因为「最后一根是否已收盘」按周期不同而不同。
+    """
 
     name = "yahoo"
-    bar = "1m"
+    bars = ("1m", "1d")
     #: 免费源是延迟行情，不是实时报价。
     delayed = True
 
@@ -123,12 +129,8 @@ def parse_yahoo(payload: Any, symbol: str, *, start: datetime, end: datetime) ->
     closes = columns.get("close") or []
     volumes = columns.get("volume") or []
 
-    # 一根 K 线在它的 open_time + 周期之后才算收盘。
-    closed_before = end.timestamp() - bar_seconds(YahooSource.bar)
     bars: list[RawBar] = []
     for index, stamp in enumerate(stamps):
-        if int(stamp) > closed_before:
-            continue  # 还在形成中的那一根
         open_time = datetime.fromtimestamp(int(stamp), tz=UTC)
         if open_time < start or open_time >= end:
             continue

@@ -16,6 +16,8 @@ describe("提醒展示辅助", () => {
     expect(severityLabel("unknown-level")).toBe("unknown-level");
     expect(alertTypeLabel("risk")).toBe("持仓风险");
     expect(alertTypeLabel("indicator")).toBe("技术形态");
+    expect(alertTypeLabel("market")).toBe("大盘异动");
+    expect(alertTypeLabel("watchlist")).toBe("组合异动");
     expect(alertTypeLabel("other")).toBe("other");
     expect(alertStatusLabel("acknowledged")).toBe("已确认");
     expect(alertStatusLabel("other")).toBe("other");

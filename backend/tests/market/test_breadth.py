@@ -7,19 +7,27 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import Engine, event, select
 
 from app.core import Bar, Timeframe, ValidationError
+from app.db import session_scope
 from app.instrument import list_tradable, sync_instruments
 from app.market import (
     MIN_RESONANCE_PARTICIPANTS,
+    Candle,
     advance_decline,
+    asset_session,
     market_overview,
+    primary_source,
     resonance_strength,
+    to_epoch,
     upsert_candles,
 )
 from tests.factories.instruments import make_ref, make_swap_ref
@@ -349,6 +357,135 @@ def test_overview_of_an_empty_class_is_all_zero() -> None:
     assert overview.breadth.participants == 0
     assert overview.breadth.ratio is None
     assert overview.resonance.strength is None
+
+
+# ---------------------------------------------------------------- 批量取数
+
+
+def _per_symbol_bars(inst_type: str, bar: str, as_of: datetime, count: int) -> dict[str, list[Bar]]:
+    """改前的取数口径：每个标的各发一条 SQL。批量取数的结果必须与它逐项相等。"""
+
+    moment = to_epoch(as_of)
+    loaded: dict[str, list[Bar]] = {}
+    with session_scope() as session:
+        for instrument in list_tradable(inst_type):
+            session_state = asset_session(
+                instrument.asset_type, as_of, inst_type=instrument.inst_type
+            )
+            source = primary_source(session_state, instrument.asset_type, instrument.inst_type)
+            statement = (
+                select(Candle)
+                .where(
+                    Candle.symbol == instrument.symbol,
+                    Candle.bar == bar,
+                    Candle.source == source,
+                    Candle.open_time <= moment,
+                )
+                .order_by(Candle.open_time.desc())
+                .limit(count)
+            )
+            rows = list(session.scalars(statement))
+            if rows:
+                loaded[instrument.symbol] = [row.to_bar() for row in reversed(rows)]
+    return loaded
+
+
+@contextmanager
+def _count_statements() -> Iterator[list[str]]:
+    """数一次编排发到库里的 SQL 条数；逐标的取数会留下「标的数」条，批量取数留下落组数条。"""
+
+    issued: list[str] = []
+
+    def _record(
+        _conn: object,
+        _cursor: object,
+        statement: str,
+        _parameters: object,
+        _context: object,
+        _executemany: bool,
+    ) -> None:
+        issued.append(statement)
+
+    event.listen(Engine, "before_cursor_execute", _record)
+    try:
+        yield issued
+    finally:
+        event.remove(Engine, "before_cursor_execute", _record)
+
+
+def _mixed_cross_section() -> None:
+    """每种边界各占一个标的：窗口外的旧值、只有 1 根、一根都没有、两种来源、`as_of` 之后。"""
+
+    # 30 根：前 9 根从 100 一路往下掉，最近 21 根上涨。窗口内首尾定方向是上涨；
+    # 若把窗口外的旧值也读进来，方向会变成下跌——这条把「只取尾巴」钉住。
+    _crypto_spot(
+        ["LONG"],
+        [100.0 - index for index in range(9)] + [10.0 + index for index in range(WINDOW_BARS)],
+    )
+    # 只有 1 根：定不了方向，不进参与标的，但取数时不能丢。
+    _crypto_spot(["ONE"], [7.0])
+    # 一根 K 线都没有：不进结果，也不报错。
+    sync_instruments([make_ref(inst_id="NONE-USDT", base_ccy="NONE", inst_category="1")])
+    # 同一标的两种来源都有数据：只算此刻有效的 `okx_spot`，另一来源的下跌不参与。
+    sync_instruments([make_ref(inst_id="XMULTI-USDT", base_ccy="XMULTI", inst_category="1")])
+    upsert_candles(
+        _bars(
+            _falling(WINDOW_BARS), symbol="XMULTI-USDT", source="yahoo", bar="1d", start=DAY_START
+        )
+    )
+    upsert_candles(
+        _bars([9.0, 9.5], symbol="XMULTI-USDT", source="okx_spot", bar="1d", start=DAY_START)
+    )
+    # 只在 `as_of` 之后才有 K 线：一根都不算。
+    sync_instruments([make_ref(inst_id="FUTURE-USDT", base_ccy="FUTURE", inst_category="1")])
+    upsert_candles(
+        _bars([10.0, 5.0], symbol="FUTURE-USDT", source="okx_spot", bar="1d", start=_last_open())
+    )
+
+
+def test_batch_read_matches_the_per_symbol_read() -> None:
+    """同一份数据：批量取数与逐标的取数给出完全相同的广度与共振（含各种边界）。"""
+
+    _mixed_cross_section()
+    as_of = _last_open()
+
+    overview = market_overview(as_of, "1d", "SPOT")
+    per_symbol = _per_symbol_bars("SPOT", "1d", as_of, WINDOW_BARS)
+
+    assert overview.breadth == advance_decline(per_symbol)
+    assert overview.resonance == resonance_strength(per_symbol, 20)
+
+
+def test_batch_read_keeps_every_edge_case() -> None:
+    """逐项钉住边界：参与标的只有 2 个，窗口外的旧值、另一来源与 `as_of` 之后都不算。"""
+
+    _mixed_cross_section()
+
+    breadth = market_overview(_last_open(), "1d", "SPOT").breadth
+
+    # LONG 在窗口内上涨、XMULTI 的 `okx_spot` 序列 9.0 → 9.5 上涨；ONE 只有 1 根、
+    # NONE 没有 K 线、FUTURE 的 K 线在 `as_of` 之后、XMULTI 的 `yahoo` 序列都不算。
+    assert (breadth.advancers, breadth.decliners, breadth.unchanged) == (2, 0, 0)
+    assert breadth.participants == 2
+    assert breadth.ratio is None
+
+
+def test_batch_read_statement_count_does_not_grow_with_the_cross_section() -> None:
+    """标的从 10 个加到 50 个，SQL 条数不变：横截面取数只有一条 SQL。"""
+
+    _crypto_spot(_names("CA", 10), _rising(WINDOW_BARS))
+    with _count_statements() as few:
+        market_overview(_last_open(), "1d", "SPOT")
+
+    _crypto_spot(_names("CB", 40), _rising(WINDOW_BARS))
+    with _count_statements() as many:
+        market_overview(_last_open(), "1d", "SPOT")
+
+    assert len(list_tradable("SPOT")) == 50
+    assert len(many) == len(few)
+    # 其余语句是标的名录与测试装配自己的 savepoint，不随标的数增长；
+    # 横截面取数只有一条含 `candles` 的 SQL。
+    assert len([statement for statement in many if "FROM candles" in statement]) == 1
 
 
 # ---------------------------------------------------------------- 端点

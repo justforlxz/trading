@@ -15,8 +15,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import Select, String, any_, bindparam, func, select, true
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
+from sqlalchemy.orm import aliased
 
 from app.core import Bar, ValidationError
 from app.db import session_scope
@@ -478,28 +480,81 @@ def _recent_bars(
     按 `(symbol, bar, open_time, source)` 主键倒序取固定条数，不整段读历史：横截面要
     的是窗口内的尾巴，读全量历史再把尾巴切掉只是把成本推到数据库。一个标的没有
     K 线就不进结果，广度与共振都按「至少有 2 根」筛参与标的，缺数据不会被算成不变。
+
+    取数按来源分组成批：一个横截面里同一来源的标的一次取完，不再每个标的发一条 SQL。
     """
 
     moment = to_epoch(as_of)
+    # 同一个横截面里不同标的可能走不同来源：加密资产走 OKX，代币化股票在美股时段走代理。
+    # 因此先按来源分组，一组一条批量查询——组内一条 SQL 就取回每个标的各自的尾巴。
+    symbols_by_source: dict[str, list[str]] = {}
+    for instrument in instruments:
+        session_state = asset_session(instrument.asset_type, as_of, inst_type=instrument.inst_type)
+        source = primary_source(session_state, instrument.asset_type, instrument.inst_type)
+        symbols_by_source.setdefault(source, []).append(instrument.symbol)
+
     loaded: dict[str, list[Bar]] = {}
     with session_scope() as session:
-        for instrument in instruments:
-            session_state = asset_session(
-                instrument.asset_type, as_of, inst_type=instrument.inst_type
-            )
-            source = primary_source(session_state, instrument.asset_type, instrument.inst_type)
-            statement = (
-                select(Candle)
-                .where(
-                    Candle.symbol == instrument.symbol,
-                    Candle.bar == bar,
-                    Candle.source == source,
-                    Candle.open_time <= moment,
-                )
-                .order_by(Candle.open_time.desc())
-                .limit(count)
-            )
-            rows = list(session.scalars(statement))
-            if rows:
-                loaded[instrument.symbol] = [row.to_bar() for row in reversed(rows)]
+        for source, symbols in symbols_by_source.items():
+            statement = _latest_bars_statement(bar, source, moment, count)
+            for row in session.scalars(statement, {"symbols": list(symbols)}):
+                loaded.setdefault(row.symbol, []).append(row.to_bar())
+    # 批量查询按标的交错返回，方向判断要求按 `open_time` 升序，这里统一排一次。
+    for bars in loaded.values():
+        bars.sort(key=lambda candle: candle.open_time)
     return loaded
+
+
+def _latest_bars_statement(
+    bar: str,
+    source: str,
+    moment: int,
+    count: int,
+) -> Select[tuple[Candle]]:
+    """一条 SQL 取回一组标的各自在 `source` 下、`moment`（含）之前最近 `count` 根 K 线。
+
+    标的清单由绑定的 `symbols`（`text[]`）参数给：一次请求里标的可能上千个，写进
+    `IN (...)` 或 `VALUES` 都会让语句文本随标的数膨胀，传数组只多一个参数。
+
+    每个标的的尾巴用 `LATERAL` + 各自 `LIMIT` 取：`(symbol, bar, open_time, source)`
+    主键倒序扫，取够 `count` 根就停，读到的行数与「有数据的标的数 × count」同阶。
+    不用 `row_number() over (partition by symbol ...)`：窗口函数拿不到 `LIMIT` 下推，
+    数据库必须先把这些标的的历史整段读出来、排一次序再切尾巴，实测同一份数据上从
+    80ms 变成 925ms，计划里还多出一次 Seq Scan 与 12MB 外部排序。
+
+    先用一条物化的 `have` 收窄到「窗口内真的有 K 线」的标的：主键上的等值前缀取不到
+    匹配时，PostgreSQL 不会在标的边界停下，而是把整条索引扫完——实测 1230 个没有 K 线
+    的标的让这一条 SQL 从 37ms 涨到 300ms。`MATERIALIZED` 不能省：被内联回主查询后
+    又会退回逐标的扫描。
+    """
+
+    table = Candle.__table__
+    symbols = bindparam("symbols", type_=ARRAY(String(64)))
+    have = (
+        select(table.c.symbol)
+        .where(
+            table.c.symbol == any_(symbols),
+            table.c.bar == bar,
+            table.c.source == source,
+            table.c.open_time <= moment,
+        )
+        .distinct()
+        .cte("have")
+        .prefix_with("MATERIALIZED")
+    )
+    latest = (
+        select(table)
+        .where(
+            table.c.symbol == have.c.symbol,
+            table.c.bar == bar,
+            table.c.source == source,
+            table.c.open_time <= moment,
+        )
+        .order_by(table.c.open_time.desc())
+        .limit(count)
+        .correlate(have)
+        .lateral()
+    )
+    # 把 `LATERAL` 的结果挂回实体，`to_bar()` 仍是「表行 → 值对象」的唯一换算点。
+    entity = aliased(Candle, latest)
+    return select(entity).select_from(have.join(latest, true()))

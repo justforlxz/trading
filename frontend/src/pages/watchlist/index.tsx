@@ -38,6 +38,8 @@ import {
   matchesGroup,
   ratioPercent,
   shortUtc,
+  watchlistListState,
+  watchlistPanelState,
   watchlistGroups,
   type WatchlistGroupFilter,
 } from "../../lib/watchlist";
@@ -63,8 +65,8 @@ function messageOf(reason: unknown, fallback: string): string {
 /**
  * 分组筛选行：选中后同时筛列表与关注汇总。
  *
- * 「全部」用 `null` 表示，计数等于全部条目数；分组名与计数来自 `GET /api/watchlist`
- * 的 `groups` 与当前条目，不再按资产类别切分。
+ * 「全部」用 `null` 表示；分组名来自 `GET /api/watchlist` 的 `groups`，不再按资产类别切分。
+ * 计数来自当前条目：数据还没到手时传 `null`，按钮只写分组名，不写没有依据的 0。
  */
 export function GroupFilter({
   value,
@@ -75,13 +77,17 @@ export function GroupFilter({
 }: {
   value: WatchlistGroupFilter;
   groups: readonly string[];
-  counts: Record<string, number>;
-  total: number;
+  counts: Record<string, number> | null;
+  total: number | null;
   onChange: (value: WatchlistGroupFilter) => void;
 }) {
-  const options: Array<{ value: WatchlistGroupFilter; label: string; count: number }> = [
+  const options: Array<{ value: WatchlistGroupFilter; label: string; count: number | null }> = [
     { value: null, label: "全部", count: total },
-    ...groups.map((name) => ({ value: name, label: name, count: counts[name] ?? 0 })),
+    ...groups.map((name) => ({
+      value: name,
+      label: name,
+      count: counts === null ? null : (counts[name] ?? 0),
+    })),
   ];
 
   return (
@@ -96,7 +102,7 @@ export function GroupFilter({
           onClick={() => onChange(option.value)}
           className="h-7 px-2 text-[11px]"
         >
-          {option.label} {option.count}
+          {option.count === null ? option.label : `${option.label} ${option.count}`}
         </Button>
       ))}
     </div>
@@ -256,6 +262,8 @@ function SearchResults({
 
 export default function WatchlistPage() {
   const [data, setData] = useState<WatchlistResponse | null>(null);
+  /** 列表请求在途：首次加载摆占位行，已有数据时只盖遮罩，都不清空已渲染的内容。 */
+  const [listLoading, setListLoading] = useState(true);
   const [reloadToken, setReloadToken] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -293,12 +301,16 @@ export default function WatchlistPage() {
 
   useEffect(() => {
     let active = true;
+    setListLoading(true);
     fetchWatchlist()
       .then((value) => {
         if (active) setData(value);
       })
       .catch((reason: unknown) => {
         if (active) setError(messageOf(reason, "自选列表加载失败"));
+      })
+      .finally(() => {
+        if (active) setListLoading(false);
       });
     return () => {
       active = false;
@@ -370,6 +382,26 @@ export default function WatchlistPage() {
     () => items.filter((item) => matchesGroup(item, groupFilter)),
     [items, groupFilter],
   );
+
+  /**
+   * 列表区画占位行、真实行还是空状态，以及汇总面板要不要出现。
+   * 汇总的数值全部由标的列表算出来，数据没到手就不画，避免出现没有支撑的 0。
+   */
+  const panel = watchlistPanelState({
+    loading: listLoading,
+    loaded: data !== null,
+    total: items.length,
+    visible: visibleItems.length,
+  });
+  /** 表格只在 `skeleton` / `rows` 两种状态下渲染，其余状态由下面的分支各自处理。 */
+  const listState = watchlistListState(panel.body);
+  /** 汇总缺席时（首屏、空自选）整块不画。 */
+  const showList = panel.body !== "hidden" && panel.body !== "empty-watchlist";
+  /**
+   * 窄视口同一时间只显示一块，规则写在 `index.css` 的 `.wl-grid[data-view]`：
+   * 汇总面板还没出现时必须落在「关注列表」，否则列表被 CSS 藏掉、首屏只剩一块空白。
+   */
+  const activeView: MobileView = panel.hasData ? view : "list";
 
   /** 分组筛选是联动的：列表与三块汇总都按当前分组的标的统计；切回「全部」恢复全量。 */
   const aggregate = useMemo(() => aggregateWatchlist(visibleItems), [visibleItems]);
@@ -583,9 +615,8 @@ export default function WatchlistPage() {
         </p>
       ) : null}
 
-      {!error && !data ? <p className="text-sm text-muted-foreground">加载中…</p> : null}
-
-      {data && items.length === 0 ? (
+      {/* 加载中不显示空状态：否则会先看到「还没有自选标的」再看到列表出现。 */}
+      {panel.body === "empty-watchlist" ? (
         <Card>
           <CardHeader>
             <CardTitle>还没有自选标的</CardTitle>
@@ -601,13 +632,15 @@ export default function WatchlistPage() {
         </Card>
       ) : null}
 
-      {data && items.length > 0 ? (
+      {/* 首次加载也要先摆出列表结构：表头与占位行立即出现，数据到了原地替换。 */}
+      {showList ? (
         <>
           <div className="wl-tabs" role="tablist" aria-label="切换视图">
             <button
               type="button"
               role="tab"
-              aria-selected={view === "summary"}
+              aria-selected={activeView === "summary"}
+              disabled={!panel.hasData}
               onClick={() => setView("summary")}
             >
               汇总
@@ -615,20 +648,20 @@ export default function WatchlistPage() {
             <button
               type="button"
               role="tab"
-              aria-selected={view === "list"}
+              aria-selected={activeView === "list"}
               onClick={() => setView("list")}
             >
               关注列表
             </button>
           </div>
 
-          <div className="wl-grid" data-view={view}>
+          <div className="wl-grid" data-view={activeView}>
             <section className="wl-list rounded-lg border bg-card text-card-foreground shadow-sm">
               <header className="flex flex-wrap items-baseline justify-between gap-2 border-b px-4 py-3">
                 <h2 className="text-sm font-semibold tracking-tight">关注列表</h2>
                 <span className="flex items-center gap-2 text-[11px] text-muted-foreground">
                   <StreamTag liveness={liveness} />
-                  {visibleItems.length} 个
+                  {panel.hasData ? `${visibleItems.length} 个` : null}
                 </span>
               </header>
 
@@ -636,8 +669,8 @@ export default function WatchlistPage() {
                 <GroupFilter
                   value={groupFilter}
                   groups={groups}
-                  counts={counts}
-                  total={items.length}
+                  counts={panel.hasData ? counts : null}
+                  total={panel.hasData ? items.length : null}
                   onChange={setGroupFilter}
                 />
               </div>
@@ -648,7 +681,7 @@ export default function WatchlistPage() {
                 </div>
               )}
 
-              {visibleItems.length === 0 ? (
+              {panel.body === "empty-group" ? (
                 <p className="px-4 py-6 text-center text-sm text-muted-foreground">
                   当前分组下没有标的。
                   <Button
@@ -660,7 +693,7 @@ export default function WatchlistPage() {
                     查看全部
                   </Button>
                 </p>
-              ) : (
+              ) : listState ? (
                 <WatchlistList
                   items={visibleItems}
                   quotes={quotes}
@@ -669,17 +702,21 @@ export default function WatchlistPage() {
                   groups={groupChoices}
                   onRemove={(instId) => void handleRemove(instId)}
                   onMove={(instId, group) => void handleMove(instId, group)}
+                  state={listState}
+                  loading={listLoading}
                 />
-              )}
+              ) : null}
             </section>
 
-            <WatchlistSummary
-              aggregate={aggregate}
-              pending={pending}
-              marketRisk={vixReading(macro)}
-              marketRiskLoading={macroLoading}
-              marketRiskError={macroError}
-            />
+            {panel.hasData ? (
+              <WatchlistSummary
+                aggregate={aggregate}
+                pending={pending}
+                marketRisk={vixReading(macro)}
+                marketRiskLoading={macroLoading}
+                marketRiskError={macroError}
+              />
+            ) : null}
           </div>
         </>
       ) : null}

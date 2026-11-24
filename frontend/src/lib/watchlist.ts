@@ -64,6 +64,68 @@ export function groupCounts(
   return counts;
 }
 
+/** 列表区该画哪一块：加载态先摆结构，空状态只在加载结束后出现。 */
+export type WatchlistBodyState =
+  | "hidden"
+  | "skeleton"
+  | "rows"
+  | "empty-group"
+  | "empty-watchlist";
+
+export type WatchlistPanelState = {
+  body: WatchlistBodyState;
+  /**
+   * 数据已经到手且非空：汇总面板、「N 个」计数、分组筛选的计数都靠它。
+   * 加载中与空自选时一律不给数量，避免出现没有数据支撑的 0。
+   */
+  hasData: boolean;
+};
+
+/**
+ * 列表区与汇总面板的渲染状态。
+ *
+ * - 首次加载（`loaded` 为假）只摆占位行；加载失败且没有数据时整块不画，错误写在页面上方，
+ *   不能让一张只有表头的空表格冒充列表。
+ * - 所有由标的列表算出来的数字（汇总面板、条数、分组计数）只在已经有标的时出现：
+ *   一条标的都没有时画出来的「有信号 0」「全部 0」是没有支撑的业务数值，
+ *   汇总面板还会把自己的高度算进页面。
+ * - 请求进行中不返回两种空状态，避免先闪一句「没有标的」再出现数据。
+ */
+export function watchlistPanelState(input: {
+  loading: boolean;
+  loaded: boolean;
+  total: number;
+  visible: number;
+}): WatchlistPanelState {
+  // 跨到「有标的」才给数量：没有任何标的时算出来只能是 0，这是没有数据支撑的数值。
+  const hasData = input.loaded && input.total > 0;
+
+  if (!input.loaded) {
+    return { body: input.loading ? "skeleton" : "hidden", hasData };
+  }
+  if (input.total === 0) {
+    return { body: input.loading ? "skeleton" : "empty-watchlist", hasData };
+  }
+  if (input.visible === 0) {
+    return { body: input.loading ? "skeleton" : "empty-group", hasData };
+  }
+  return { body: "rows", hasData };
+}
+
+/**
+ * 列表表格只有「占位行」和「真实行」两种画法。
+ *
+ * 其余状态返回 `null`：调用方据此不要渲染表格，而不是拿一个兜底值画出一张
+ * 看起来像真实数据的表格。
+ */
+export function watchlistListState(
+  body: WatchlistBodyState,
+): "skeleton" | "rows" | null {
+  if (body === "skeleton") return "skeleton";
+  if (body === "rows") return "rows";
+  return null;
+}
+
 export function assetTypeLabel(assetType: InstrumentRef["asset_type"]): string {
   return ASSET_TYPE_LABELS[assetType];
 }

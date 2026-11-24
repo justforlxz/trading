@@ -32,6 +32,7 @@ function renderList(
         groups,
         onRemove: () => {},
         onMove: () => {},
+        state: "rows",
       }),
     ),
   );

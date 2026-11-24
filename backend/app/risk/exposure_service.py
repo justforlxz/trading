@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
@@ -18,15 +18,17 @@ from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from app.core import Bar, Clock, SystemClock, UnprocessableEntity
 from app.db import session_scope
 from app.indicators import compute
-from app.instrument import Instrument, list_instruments, okx_source
-from app.market import candle_sources, latest_candle, load_candles
+from app.instrument import Instrument, get_instruments, okx_source
+from app.market import latest_candles_by_source, load_candles_by_source
 from app.positions import (
+    AccountView,
+    ExchangePositionsView,
     ExchangePositionView,
     ManualPositionView,
     PositionRiskConfigRow,
     account_summary,
     exchange_positions,
-    list_manual_positions,
+    list_open_manual_positions,
 )
 from app.risk.exposure import (
     ATR_PERIOD,
@@ -39,6 +41,7 @@ from app.settings import load_settings
 
 __all__ = [
     "SavedRiskConfig",
+    "exposure_from_positions",
     "exposure_report",
     "save_position_risk_config",
 ]
@@ -46,6 +49,7 @@ __all__ = [
 ZERO = Decimal(0)
 HUNDRED = Decimal(100)
 CONFIG_SOURCE = "local"
+DAILY_BAR = "1d"
 
 _UNSET = object()
 
@@ -72,11 +76,28 @@ class _InstrumentRiskData:
 
 
 def exposure_report(*, clock: Clock | None = None) -> RiskExposure:
-    """当前组合的风险与敞口；没有持仓时返回空视图，不编造数值。"""
+    """当前组合的风险与敞口；没有持仓时返回空视图，不编造数值。
 
-    account = account_summary(include_position_notional=False)
-    exchange = exchange_positions()
-    manual = [item for item in list_manual_positions() if item.status == "open"]
+    自己读一次账户、交易所持仓与手动持仓。首页一次请求里这三份事实由调用方读完
+    后经 `exposure_from_positions` 传进来，风险和持仓两个模块共用同一份。
+    """
+
+    return exposure_from_positions(
+        account_summary(include_position_notional=False),
+        exchange_positions(),
+        list_open_manual_positions(),
+        clock=clock,
+    )
+
+
+def exposure_from_positions(
+    account: AccountView,
+    exchange: ExchangePositionsView,
+    manual: Sequence[ManualPositionView],
+    *,
+    clock: Clock | None = None,
+) -> RiskExposure:
+    """用已读到的持仓事实算敞口：读什么由 `exposure_report` 决定，本函数只算。"""
 
     exchange_refs = {
         f"exchange:{account.account_id}:{item.pos_id}": item for item in exchange.items
@@ -161,7 +182,7 @@ def _known_position_refs() -> set[str]:
     account = account_summary(include_position_notional=False)
     exchange = exchange_positions()
     refs = {f"exchange:{account.account_id}:{item.pos_id}" for item in exchange.items}
-    refs.update(f"manual:{item.id}" for item in list_manual_positions() if item.status == "open")
+    refs.update(f"manual:{item.id}" for item in list_open_manual_positions())
     return refs
 
 
@@ -229,37 +250,59 @@ def _load_configs(refs: tuple[str, ...]) -> dict[str, PositionRiskConfigRow]:
 
 
 def _instrument_data(symbols: set[str]) -> dict[str, _InstrumentRiskData]:
+    """一批标的的持仓风险输入：标的一次、日线一次、最新价一次，都与标的数无关。
+
+    批量读的前提是「来源按标的选」这条规则不变：日线与最新价只按
+    `_approved_sources` 认可的来源读，同一标的混存多种来源时仍按顺序挑第一个有数据的，
+    不在批量结果里合并。
+    """
+
     if not symbols:
         return {}
-    known = {row.symbol: row for row in list_instruments() if row.symbol in symbols}
-    return {symbol: _read_instrument(known.get(symbol), symbol) for symbol in symbols}
+    ordered = sorted(symbols)
+    known = get_instruments(ordered)
+    sources = sorted({source for row in known.values() for source in _approved_sources(row)})
+    if not sources:
+        return {symbol: _read_instrument(None, symbol, {}, {}) for symbol in ordered}
+    series = load_candles_by_source(ordered, DAILY_BAR, sources=sources)
+    latest = latest_candles_by_source(ordered, sources=sources)
+    return {
+        symbol: _read_instrument(known.get(symbol), symbol, series, latest) for symbol in ordered
+    }
 
 
-def _read_instrument(row: Instrument | None, symbol: str) -> _InstrumentRiskData:
+def _read_instrument(
+    row: Instrument | None,
+    symbol: str,
+    series: Mapping[tuple[str, str], Sequence[Bar]],
+    latest: Mapping[tuple[str, str], Bar],
+) -> _InstrumentRiskData:
     if row is None:
         return _InstrumentRiskData(None, symbol, None, None, None, None, None)
-    bars = _daily_bars(row)
+    approved = _approved_sources(row)
     return _InstrumentRiskData(
         inst_type=row.inst_type,
         display_symbol=f"{row.product_key}-{row.quote_currency}",
         sector=row.sector,
         ct_val=row.ct_val,
         ct_mult=row.ct_mult,
-        latest_price=_latest_price(row),
-        atr=_last_atr(bars),
+        latest_price=_latest_price(latest, symbol, approved),
+        atr=_last_atr(_daily_bars(series, symbol, approved)),
     )
 
 
-def _daily_bars(row: Instrument) -> tuple[Bar, ...]:
-    available = candle_sources([row.symbol], "1d").get(row.symbol, set())
-    source = next(
-        (candidate for candidate in _approved_sources(row) if candidate in available), None
-    )
-    if source is None:
-        return ()
-    return tuple(
-        candle for candle in load_candles(row.symbol, "1d", source=source) if candle.confirm
-    )
+def _daily_bars(
+    series: Mapping[tuple[str, str], Sequence[Bar]],
+    symbol: str,
+    approved: Sequence[str],
+) -> tuple[Bar, ...]:
+    """按来源顺序取第一个有日线的来源，整段序列原样返回（ATR 需要完整历史）。"""
+
+    for source in approved:
+        bars = series.get((symbol, source))
+        if bars:
+            return tuple(candle for candle in bars if candle.confirm)
+    return ()
 
 
 def _last_atr(bars: tuple[Bar, ...]) -> Decimal | None:
@@ -271,9 +314,15 @@ def _last_atr(bars: tuple[Bar, ...]) -> Decimal | None:
     return series.points[-1].values.get("atr")
 
 
-def _latest_price(row: Instrument) -> Decimal | None:
-    for source in _approved_sources(row):
-        candle = latest_candle(row.symbol, source=source)
+def _latest_price(
+    latest: Mapping[tuple[str, str], Bar],
+    symbol: str,
+    approved: Sequence[str],
+) -> Decimal | None:
+    """按来源顺序取第一个有行情的最新收盘价；不限定周期，与 `latest_candle` 同口径。"""
+
+    for source in approved:
+        candle = latest.get((symbol, source))
         if candle is not None:
             return candle.close
     return None

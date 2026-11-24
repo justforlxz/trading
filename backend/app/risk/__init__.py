@@ -27,6 +27,7 @@ from app.risk.exposure import (
 )
 from app.risk.exposure_service import (
     SavedRiskConfig,
+    exposure_from_positions,
     exposure_report,
     save_position_risk_config,
 )
@@ -72,6 +73,7 @@ __all__ = [
     "build_exposure",
     "dispose",
     "evaluate",
+    "exposure_from_positions",
     "exposure_report",
     "list_risk_events",
     "notional_value",

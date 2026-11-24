@@ -19,7 +19,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -31,13 +31,20 @@ from app.backtest import BacktestRunHeader, latest_run
 from app.core import Clock, DataUnavailable, SystemClock, UpstreamError, ValidationError
 from app.dashboard.positions import merge_positions
 from app.market import asset_session, market_overview, primary_source
-from app.positions import account_summary
+from app.positions import (
+    AccountView,
+    ExchangePositionsView,
+    ManualPositionView,
+    account_summary,
+    exchange_positions,
+    list_open_manual_positions,
+)
 from app.risk import (
     RULE_HIGH_LEVERAGE,
     RULE_STOP_DISTANCE,
     RULE_STOP_MISSING,
     RiskExposure,
-    exposure_report,
+    exposure_from_positions,
 )
 from app.strategy import UserStrategySummary, summarize_user_strategies
 from app.watchlist import (
@@ -237,15 +244,18 @@ def load_summary(*, clock: Clock | None = None, pinned: Sequence[str] = ()) -> D
     """
 
     moment = (clock or SystemClock()).now().astimezone(UTC).replace(microsecond=0)
-    # 风险与持仓都要用敞口结果：一次请求只读一次，避免同一份数据被读两遍。
-    # 敞口读取失败时把同一个异常交给两个模块，各自按自己的规则降级。
-    exposure = _ExposureOnce()
+    # 账户、交易所持仓、手动持仓各只读一次：风险与持仓两个模块用的是同一份事实，
+    # 逐模块各读一遍只是把同一条查询重复两次。读到异常也缓存，各模块按自己的规则降级。
+    account = _Once(lambda: account_summary(include_position_notional=False))
+    exchange = _Once(exchange_positions)
+    manual = _Once(list_open_manual_positions)
+    exposure = _Once(lambda: exposure_from_positions(account.get(), exchange.get(), manual.get()))
     return DashboardSummary(
         as_of=moment,
         market=_isolate(lambda: _market(moment)),
-        account=_isolate(_account),
+        account=_isolate(lambda: _account(account)),
         risk=_isolate(lambda: _risk(exposure)),
-        positions=_isolate(lambda: _positions(exposure)),
+        positions=_isolate(lambda: _positions(exposure, exchange, manual)),
         watchlist=_isolate(lambda: _watchlist(pinned)),
         alerts=_isolate(_alerts),
         strategies=_isolate(lambda: _strategies(moment)),
@@ -290,8 +300,8 @@ def _market(moment: datetime) -> Module:
     )
 
 
-def _account() -> Module:
-    view = account_summary(include_position_notional=False)
+def _account(account: _Once[AccountView]) -> Module:
+    view = account.get()
     if view.status == STATUS_UNCONFIGURED:
         return Module(
             status=STATUS_UNCONFIGURED,
@@ -302,28 +312,29 @@ def _account() -> Module:
     return Module(status=view.status, as_of=view.captured_at, error=None, data=view)
 
 
-class _ExposureOnce:
-    """一次请求内只读一次敞口；读到异常也缓存，供后续模块按自己的规则降级。"""
+class _Once[T]:
+    """一次请求内只读一次；读到异常也缓存，供各模块按自己的规则降级。"""
 
-    def __init__(self) -> None:
+    def __init__(self, loader: Callable[[], T]) -> None:
+        self._loader = loader
         self._loaded = False
-        self._value: RiskExposure | None = None
+        self._value: T | None = None
         self._error: Exception | None = None
 
-    def get(self) -> RiskExposure:
+    def get(self) -> T:
         if not self._loaded:
             self._loaded = True
             try:
-                self._value = exposure_report()
+                self._value = self._loader()
             except Exception as exc:  # 缓存后原样抛给每个调用方
                 self._error = exc
         if self._error is not None:
             raise self._error
         # 读取成功时 `_value` 一定已赋值；读取失败的分支已在上方抛出。
-        return cast("RiskExposure", self._value)
+        return cast("T", self._value)
 
 
-def _risk(exposure_once: _ExposureOnce) -> Module:
+def _risk(exposure_once: _Once[RiskExposure]) -> Module:
     exposure = exposure_once.get()
     near_stop = {
         rule.position_ref
@@ -355,10 +366,18 @@ def _risk(exposure_once: _ExposureOnce) -> Module:
     )
 
 
-def _positions(exposure_once: _ExposureOnce) -> Module:
+def _positions(
+    exposure_once: _Once[RiskExposure],
+    exchange: _Once[ExchangePositionsView],
+    manual: _Once[tuple[ManualPositionView, ...]],
+) -> Module:
     # 止损距离与名义价值只在 B3 的敞口结果里，本模块只借用它的输出；敞口读取失败
     # 时这两列留空，持仓本身仍然返回，不能因为风险模块失败而把持仓一并判成不可用。
-    snapshot = merge_positions(_optional_exposure(exposure_once))
+    snapshot = merge_positions(
+        _optional_exposure(exposure_once),
+        exchange=exchange.get(),
+        manual=manual.get(),
+    )
     items = tuple(
         PositionItem(
             position_ref=item.position_ref,
@@ -388,7 +407,7 @@ def _positions(exposure_once: _ExposureOnce) -> Module:
     )
 
 
-def _optional_exposure(exposure_once: _ExposureOnce) -> RiskExposure | None:
+def _optional_exposure(exposure_once: _Once[RiskExposure]) -> RiskExposure | None:
     """敞口只是持仓摘要的可选补充；读取失败时不影响持仓本身。"""
 
     try:

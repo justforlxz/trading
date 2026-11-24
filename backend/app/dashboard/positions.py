@@ -7,15 +7,17 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
 from app.positions import (
     DEFAULT_ACCOUNT_ID,
+    ExchangePositionsView,
     ManualPositionView,
     exchange_positions,
-    list_manual_positions,
+    list_open_manual_positions,
 )
 from app.risk import RiskExposure, exposure_report
 
@@ -70,11 +72,22 @@ def load_merged_positions() -> MergedPositions:
     return merge_positions(exposure)
 
 
-def merge_positions(exposure: RiskExposure | None) -> MergedPositions:
-    """用给定的敞口结果合并两种来源；`exposure=None` 时可选列留空。"""
+def merge_positions(
+    exposure: RiskExposure | None,
+    *,
+    exchange: ExchangePositionsView | None = None,
+    manual: Sequence[ManualPositionView] | None = None,
+) -> MergedPositions:
+    """用给定的敞口结果合并两种来源；`exposure=None` 时可选列留空。
 
-    exchange = exchange_positions()
-    manual = [item for item in list_manual_positions() if item.status == "open"]
+    `exchange` / `manual` 是调用方已经读到的持仓事实：首页一次请求里敞口与合并视图
+    用的是同一份，再读一遍只是重复同一条查询。不传就自己读。
+    """
+
+    if exchange is None:
+        exchange = exchange_positions()
+    if manual is None:
+        manual = list_open_manual_positions()
     stops = _stop_prices(exposure)
     distances = _stop_distances(exposure)
     notionals = _notionals(exposure)

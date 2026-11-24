@@ -22,7 +22,7 @@ import {
 import { pinnedCandidates, type PinnedCandidate } from "../lib/home-pinned";
 import { streamLiveness } from "../lib/stream";
 import { usePositionStream, useQuoteStream, useStreamState } from "../lib/stream-hooks";
-import { OverviewView } from "./overview/view";
+import { HomeView } from "./overview/home";
 
 function messageOf(reason: unknown): string {
   return reason instanceof Error ? reason.message : "读取首页汇总失败";
@@ -198,7 +198,7 @@ export default function OverviewPage() {
   };
 
   return (
-    <OverviewView
+    <HomeView
       summary={merged?.summary ?? null}
       error={error}
       loading={loading}

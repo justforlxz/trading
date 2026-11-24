@@ -6,41 +6,54 @@ import { describe, expect, it } from "vitest";
 
 import type { MacroOverviewResponse } from "../../lib/api";
 import type { DashboardSummary } from "../../lib/dashboard";
+import type { PinnedCandidate } from "../../lib/home-pinned";
 import type { AiSummary, MarketSnapshot } from "../../lib/market";
-import type { OverviewViewProps } from "../overview/view";
-import { OverviewView } from "../overview/view";
+import type { HomeViewProps } from "../overview/home";
+import { HomeView } from "../overview/home";
+
+/** 六区块 + 结论条顺序，与布局契约一致。 */
+const BLOCKS = [
+  "conclusion",
+  "account",
+  "watchlist",
+  "positions",
+  "market",
+  "alerts",
+  "system",
+] as const;
+
+const SUMMARY_ITEMS = [
+  {
+    inst_id: "AAPL-USDT-SWAP",
+    display_symbol: "AAPL",
+    name: "Apple",
+    last_price: "231.42",
+    change_pct_24h: "1.86",
+    trend: "bullish" as const,
+    rsi_14: "61.4",
+    data_status: "ok" as const,
+  },
+];
+
+const SUMMARY_POSITIONS = [
+  {
+    position_ref: "exchange:okx-main:123456",
+    source: "exchange" as const,
+    inst_id: "AAPL-USDT-SWAP",
+    display_symbol: "AAPL-USDT",
+    side: "long" as const,
+    leverage: "3",
+    mark_price: "231.42",
+    notional: "1851.36",
+    stop_distance_pct: null,
+    unrealized_pnl: "36.96",
+  },
+];
 
 function summary(): DashboardSummary {
   return {
+    market: { status: "ok", as_of: null, error: null, data: null },
     as_of: "2026-11-13T09:00:00Z",
-    market: {
-      status: "ok",
-      as_of: "2026-11-13T09:00:00Z",
-      error: null,
-      data: {
-        session: "pre",
-        items: [
-          {
-            inst_type: "SPOT",
-            session: "regular",
-            primary_source: "okx_spot",
-            bar: "1d",
-            as_of: "2026-11-13T09:00:00Z",
-            breadth: { advancers: 8, decliners: 2, unchanged: 1, ratio: "4", participants: 11 },
-            resonance: { strength: "0.62", participants: 11, window: 20 },
-          },
-          {
-            inst_type: "SWAP",
-            session: "pre",
-            primary_source: "okx_swap",
-            bar: "1d",
-            as_of: "2026-11-13T09:00:00Z",
-            breadth: { advancers: 5, decliners: 5, unchanged: 0, ratio: "1", participants: 10 },
-            resonance: { strength: "0", participants: 10, window: 20 },
-          },
-        ],
-      },
-    },
     account: {
       status: "ok",
       as_of: "2026-11-13T09:00:00Z",
@@ -90,20 +103,7 @@ function summary(): DashboardSummary {
         exchange_count: 1,
         manual_count: 0,
         exchange_status: "ok",
-        items: [
-          {
-            position_ref: "exchange:okx-main:123456",
-            source: "exchange",
-            inst_id: "AAPL-USDT-SWAP",
-            display_symbol: "AAPL-USDT",
-            side: "long",
-            leverage: "3",
-            mark_price: "231.42",
-            notional: "1851.36",
-            stop_distance_pct: null,
-            unrealized_pnl: "36.96",
-          },
-        ],
+        items: SUMMARY_POSITIONS,
       },
     },
     watchlist: {
@@ -112,18 +112,7 @@ function summary(): DashboardSummary {
       error: null,
       data: {
         summary: { total: 1, bullish: 1, bearish: 0, coverage_pct: "100" },
-        items: [
-          {
-            inst_id: "AAPL-USDT-SWAP",
-            display_symbol: "AAPL",
-            name: "Apple",
-            last_price: "231.42",
-            change_pct_24h: "1.86",
-            trend: "bullish",
-            rsi_14: "61.4",
-            data_status: "ok",
-          },
-        ],
+        items: SUMMARY_ITEMS,
       },
     },
     alerts: { status: "ok", as_of: null, error: null, data: [] },
@@ -136,20 +125,27 @@ function summary(): DashboardSummary {
         enabled: 1,
         running: 0,
         pending_signals: null,
-        recent_backtest: {
-          run_id: "bt_0001",
-          data_source: "okx_swap",
-          window_days: 30,
-          total_return: "0.124",
-          max_drawdown: "0.061",
-          trade_count: 18,
-          as_of: "2026-11-12T10:00:00Z",
-        },
+        recent_backtest: null,
       },
     },
-    activity: { status: "ok", as_of: "2026-11-13T09:00:00Z", error: null, data: [] },
+    activity: { status: "ok", as_of: null, error: null, data: [] },
     degraded: [],
-  };
+  } as DashboardSummary;
+}
+
+function candidates(): PinnedCandidate[] {
+  return [
+    {
+      inst_id: "AAPL-USDT-SWAP",
+      display_symbol: "AAPL",
+      name: "AAPL",
+      detail: "默认",
+      last_price: "231.42",
+      change_pct_24h: "1.86",
+      rsi_14: "61.4",
+      trend: "bullish",
+    },
+  ];
 }
 
 function marketOverview(): MarketSnapshot {
@@ -185,22 +181,6 @@ function macroOverview(): MacroOverviewResponse {
         series_id: "us10y",
         name: "美国 10 年期国债",
         unit: "%",
-        granularity: "minute",
-        provider: "yahoo",
-        source_url: null,
-        value: "4.92",
-        change: "-0.13",
-        as_of: "2026-11-15T05:59:00Z",
-        is_delayed: true,
-        market_session: "open",
-        quality_status: "normal",
-        regime: null,
-        error: null,
-      },
-      {
-        series_id: "us10y",
-        name: "美国 10 年期国债",
-        unit: "%",
         granularity: "daily",
         provider: "treasury",
         source_url: null,
@@ -213,38 +193,6 @@ function macroOverview(): MacroOverviewResponse {
         regime: null,
         error: null,
       },
-      {
-        series_id: "us2y",
-        name: "美国 2 年期国债",
-        unit: "%",
-        granularity: "daily",
-        provider: "treasury",
-        source_url: null,
-        value: "4.63",
-        change: "-0.13",
-        as_of: "2026-11-14T21:00:00Z",
-        is_delayed: false,
-        market_session: "closed",
-        quality_status: "normal",
-        regime: null,
-        error: null,
-      },
-      {
-        series_id: "vix",
-        name: "恐慌指数 VIX",
-        unit: "点",
-        granularity: "minute",
-        provider: "yahoo",
-        source_url: null,
-        value: "35.89",
-        change: "7.45",
-        as_of: "2026-11-15T05:59:00Z",
-        is_delayed: true,
-        market_session: "open",
-        quality_status: "normal",
-        regime: "panic",
-        error: null,
-      },
     ],
     spread: {
       available: true,
@@ -255,37 +203,27 @@ function macroOverview(): MacroOverviewResponse {
       reason: null,
       sources: [{ provider: "treasury", source_url: null }],
     },
-  };
+  } as MacroOverviewResponse;
 }
 
 function aiSummary(): AiSummary {
   return {
     generated_at: "2026-11-15T06:10:00Z",
     overall: "偏强，波动率抬升",
-    points: [
-      {
-        text: "BTC 最新 100000，较前值 +1.01%。",
-        sources: [{ type: "market_overview", id: "BTC", url: null }],
-      },
-    ],
-    risks: [
-      {
-        text: "持仓缺少止损：AAPL-USDT-SWAP",
-        sources: [{ type: "alert", id: "alert_1", url: null }],
-      },
-    ],
+    points: [],
+    risks: [],
     disclaimer: "仅作信息归纳，不构成交易建议",
     stale: false,
     stale_notice: null,
   };
 }
 
-function render(overrides: Partial<OverviewViewProps> = {}): string {
+function render(overrides: Partial<HomeViewProps> = {}): string {
   return renderToStaticMarkup(
     createElement(
       MemoryRouter,
       null,
-      createElement(OverviewView, {
+      createElement(HomeView, {
         summary: summary(),
         error: null,
         loading: false,
@@ -302,20 +240,8 @@ function render(overrides: Partial<OverviewViewProps> = {}): string {
         aiSummaryError: null,
         aiSummaryLoading: false,
         onRefresh: () => undefined,
-        // 关注列表卡片只显示置顶项：默认把夹具里唯一的自选标的置顶，其余用例保持原样。
         pinnedWatchlist: ["AAPL-USDT-SWAP"],
-        watchlistCandidates: [
-          {
-            inst_id: "AAPL-USDT-SWAP",
-            display_symbol: "AAPL",
-            name: "AAPL",
-            detail: "默认",
-            last_price: "231.42",
-            change_pct_24h: "1.86",
-            rsi_14: "61.4",
-            trend: "bullish" as const,
-          },
-        ],
+        watchlistCandidates: candidates(),
         onSavePinned: async () => undefined,
         ...overrides,
       }),
@@ -323,344 +249,435 @@ function render(overrides: Partial<OverviewViewProps> = {}): string {
   );
 }
 
-describe("首页 v6", () => {
-  it("八个模块都在页面上，重要模块在前", () => {
+/** 结论条的事实段（不含右侧的持仓/同步状态）。 */
+function factsOf(html: string): string {
+  const matched = html.match(/data-conclusion-facts[^>]*>([\s\S]*?)<\/span>/);
+  return matched?.[1] ?? "";
+}
+
+/** 取某个区块 `<section>` 上的 class 列表。 */
+function blockClass(html: string, block: string): string {
+  const matched = html.match(new RegExp(`id="${block}"[^>]*class="([^"]*)"`));
+  return matched?.[1] ?? "";
+}
+
+/** 表格行里的标识顺序，用来断言排序结果。 */
+function rowIds(html: string, attribute: "inst-id" | "position-ref"): string[] {
+  return [...html.matchAll(new RegExp(`data-${attribute}="([^"]+)"`, "g"))].map(
+    (matched) => matched[1],
+  );
+}
+
+function sectionOf(html: string, block: string): string {
+  const start = html.indexOf(`data-block="${block}"`);
+  const next = html.indexOf("data-block=", start + 10);
+  return html.slice(start, next === -1 ? html.length : next);
+}
+
+describe("首页决策优先布局：区块与分栏", () => {
+  it("区块顺序为 结论条 → 资金与风险 → 关注列表 → 当前持仓 → 市场环境 → 提醒 → 系统状态", () => {
     const html = render();
-    const order = [
-      "market",
-      "account",
-      "risk",
-      "positions",
-      "market_summary",
-      "watchlist",
-      "alerts",
-      "strategies",
-      "activity",
-    ];
     let cursor = -1;
-    for (const name of order) {
-      const index = html.indexOf(`data-module="${name}"`);
-      expect(index, `缺少模块：${name}`).toBeGreaterThan(-1);
-      expect(index, `模块顺序不符：${name}`).toBeGreaterThan(cursor);
+    for (const block of BLOCKS) {
+      const index = html.indexOf(`data-block="${block}"`);
+      expect(index, `缺少区块：${block}`).toBeGreaterThan(-1);
+      expect(index, `区块顺序不符：${block}`).toBeGreaterThan(cursor);
       cursor = index;
     }
   });
 
-  it("数值全部来自后端，不在页面里重算", () => {
+  it("lg 断点按 12 栏 5/7、7/5、7/5 分栏，结论条通栏", () => {
     const html = render();
-    expect(html).toContain("100000");
-    expect(html).toContain("偏强，波动率抬升");
-    expect(html).toContain("1248.60 USDT");
-    expect(html).toContain("45.36%");
-    expect(html).toContain("231.42");
-    expect(html).toContain("+1.86%");
-    expect(html).toContain("+12.4%");
-    expect(html).toContain("6.1%");
-    expect(html).toContain("名义价值合计");
-    expect(html).toContain("1851.36 USDT");
+    expect(html).toContain("grid gap-4 lg:grid-cols-12");
+    expect(blockClass(html, "conclusion")).toContain("lg:col-span-12");
+    expect(blockClass(html, "account")).toContain("lg:col-span-5");
+    expect(blockClass(html, "watchlist")).toContain("lg:col-span-7");
+    expect(blockClass(html, "positions")).toContain("lg:col-span-7");
+    expect(blockClass(html, "market")).toContain("lg:col-span-5");
+    expect(blockClass(html, "alerts")).toContain("lg:col-span-7");
+    expect(blockClass(html, "system")).toContain("lg:col-span-5");
   });
 
-  it("风险卡把最大实际占比写成敞口，不写成上限", () => {
+  it("窄屏单列：所有 col-span 类都带 lg: 前缀，基础栅格不分栏", () => {
     const html = render();
-    expect(html).toContain("最大单标的敞口");
-    expect(html).not.toContain("单标的权重上限");
-    expect(html).toContain("100%");
+    const gridClass = html.match(/class="([^"]*lg:grid-cols-12[^"]*)"/)?.[1] ?? "";
+    expect(gridClass).toContain("grid");
+    expect(gridClass).not.toMatch(/(?:^| )grid-cols-\d/);
+
+    for (const block of BLOCKS.slice(1)) {
+      const spans = blockClass(html, block)
+        .split(" ")
+        .filter((name) => name.includes("col-span"));
+      expect(spans.length, `${block} 没有分栏类`).toBeGreaterThan(0);
+      for (const span of spans) {
+        expect(span.startsWith("lg:"), `${block} 的分栏 ${span} 必须在 lg 断点下生效`).toBe(true);
+      }
+    }
   });
+});
 
-  it("止损距离为空时写后端未返回，不写未设置止损", () => {
-    const html = render();
-    const positionsStart = html.indexOf('data-module="positions"');
-    const positionsEnd = html.indexOf('data-module="watchlist"', positionsStart);
-    const section = html.slice(positionsStart, positionsEnd);
-    expect(section).toContain("后端未返回止损距离");
-    expect(section).not.toContain("未设置止损");
-
-    const base = summary();
-    const withStop = render({
-      summary: {
-        ...base,
-        positions: {
-          ...base.positions,
-          data: {
-            ...base.positions.data!,
-            items: [{ ...base.positions.data!.items[0], stop_distance_pct: "3.2" }],
-          },
-        },
-      },
-    });
-    expect(withStop).toContain("距止损 3.2%");
-  });
-
-  it("日盈亏基准读契约字段，不写死口径", () => {
+describe("首页结论条只用后端字段", () => {
+  it("四项齐全时拼成一句话，并给出建议动作", () => {
     const base = summary();
     const html = render({
       summary: {
         ...base,
         account: {
           ...base.account,
-          data: { ...base.account.data!, day_pnl_basis: "equity_only" },
+          data: { ...base.account.data!, margin_usage_pct: "32" },
+        },
+        risk: {
+          ...base.risk,
+          data: {
+            ...base.risk.data!,
+            missing_stop_count: 4,
+            high_leverage_count: 1,
+          },
+        },
+        watchlist: {
+          ...base.watchlist,
+          data: {
+            ...base.watchlist.data!,
+            summary: { total: 7, bullish: 2, bearish: 5, coverage_pct: "100" },
+          },
         },
       },
     });
-    expect(html).toContain("日盈亏基准：仅账户权益");
-    expect(html).not.toContain("现金流水调整");
+
+    expect(factsOf(html)).toBe("保证金 32% · 缺止损 4 个 · 高杠杆 1 个 · 自选 5/7 走弱");
+    expect(html).toContain("先处理止损");
   });
 
-  it("市场概况卡没有对应页面时不渲染跳转入口", () => {
-    const html = render();
-    expect(html).not.toContain("打开市场概况所在页面");
+  it("高杠杆为 0 时整项省略，不做页面侧判断", () => {
+    expect(factsOf(render())).toBe("保证金 45% · 缺止损 1 个 · 自选 0/1 走弱");
   });
 
-  it("摘要来源锚点在首页存在", () => {
-    const html = render();
-    expect(html).toContain('id="market-overview"');
-    expect(html).toContain('id="alerts"');
-    expect(html).toContain('id="risk"');
-    expect(html).toContain('href="#market-overview"');
-    expect(html).toContain('href="#alerts"');
+  it("account 置空时保证金一项消失，且不出现 NaN / undefined", () => {
+    const base = summary();
+    const html = render({
+      summary: {
+        ...base,
+        account: { status: "unavailable", as_of: null, error: null, data: null },
+      },
+    });
+
+    expect(factsOf(html)).not.toContain("保证金");
+    expect(factsOf(html)).toContain("缺止损 1 个");
+    expect(html).not.toContain("NaN");
+    expect(html).not.toContain("undefined");
   });
 
-  it("单个模块失效只降级自己，其余模块照常渲染", () => {
+  it("保证金比例缺失时同样整项省略，不写 0%", () => {
+    const base = summary();
+    const html = render({
+      summary: {
+        ...base,
+        account: { ...base.account, data: { ...base.account.data!, margin_usage_pct: null } },
+      },
+    });
+
+    expect(factsOf(html)).not.toContain("保证金");
+    expect(html).not.toContain("NaN");
+    expect(html).toContain("未提供");
+  });
+
+  it("风险模块不可用时不给建议动作，避免凭空写「结构正常」", () => {
+    const base = summary();
+    const html = render({
+      summary: {
+        ...base,
+        risk: { status: "unavailable", as_of: null, error: null, data: null },
+      },
+    });
+
+    expect(factsOf(html)).not.toContain("缺止损");
+    expect(html).not.toContain("结构正常");
+    expect(html).not.toContain("先处理止损");
+  });
+});
+
+describe("首页排序", () => {
+  it("自选按涨跌幅绝对值降序，第一行是绝对值最大的标的", () => {
+    const base = summary();
+    const rows = [
+      { instId: "AAA", change: "1.00" },
+      { instId: "BBB", change: "-9.00" },
+      { instId: "CCC", change: "3.00" },
+    ];
+    const html = render({
+      summary: {
+        ...base,
+        watchlist: {
+          ...base.watchlist,
+          data: {
+            summary: { total: 3, bullish: 1, bearish: 2, coverage_pct: "100" },
+            items: rows.map((row) => ({
+              inst_id: row.instId,
+              display_symbol: row.instId,
+              name: row.instId,
+              last_price: "100",
+              change_pct_24h: row.change,
+              trend: "neutral" as const,
+              rsi_14: "50",
+              data_status: "ok" as const,
+            })),
+          },
+        },
+      },
+      pinnedWatchlist: rows.map((row) => row.instId),
+      watchlistCandidates: rows.map((row) => ({
+        inst_id: row.instId,
+        display_symbol: row.instId,
+        name: row.instId,
+        detail: "默认",
+        last_price: "100",
+        change_pct_24h: row.change,
+        rsi_14: "50",
+        trend: "neutral" as const,
+      })),
+    });
+
+    expect(rowIds(sectionOf(html, "watchlist"), "inst-id")).toEqual(["BBB", "CCC", "AAA"]);
+  });
+
+  it("持仓按盈亏绝对值降序，第一行是绝对值最大的持仓", () => {
+    const base = summary();
+    const rows = [
+      { ref: "pos:small", pnl: "10.00" },
+      { ref: "pos:biggest", pnl: "-500.00" },
+      { ref: "pos:middle", pnl: "200.00" },
+    ];
+    const html = render({
+      summary: {
+        ...base,
+        positions: {
+          ...base.positions,
+          data: {
+            ...base.positions.data!,
+            total: rows.length,
+            items: rows.map((row) => ({
+              position_ref: row.ref,
+              source: "exchange" as const,
+              inst_id: `${row.ref}-USDT-SWAP`,
+              display_symbol: row.ref,
+              side: "long" as const,
+              leverage: "2",
+              mark_price: "100",
+              notional: "1000",
+              stop_distance_pct: null,
+              unrealized_pnl: row.pnl,
+            })),
+          },
+        },
+      },
+    });
+
+    expect(rowIds(sectionOf(html, "positions"), "position-ref")).toEqual([
+      "pos:biggest",
+      "pos:middle",
+      "pos:small",
+    ]);
+  });
+});
+
+describe("首页空状态与降级", () => {
+  it("没有置顶标的时给出选择入口，不把整份自选铺开", () => {
+    const section = sectionOf(render({ pinnedWatchlist: [] }), "watchlist");
+    expect(section).toContain("已选 0/5");
+    expect(section).toContain("还没有置顶标的");
+    expect(section).toContain("编辑");
+    expect(rowIds(section, "inst-id")).toEqual([]);
+  });
+
+  it("没有持仓、提醒、活动时各自给出空状态", () => {
+    const base = summary();
+    const html = render({
+      summary: {
+        ...base,
+        positions: {
+          ...base.positions,
+          data: { ...base.positions.data!, total: 0, items: [] },
+        },
+      },
+    });
+
+    expect(sectionOf(html, "positions")).toContain("没有持仓");
+    expect(sectionOf(html, "alerts")).toContain("没有待处理的提醒");
+  });
+
+  it("单模块降级时整页给出降级提示，其余区块照常渲染", () => {
     const base = summary();
     const html = render({
       summary: {
         ...base,
         account: { status: "unavailable", as_of: null, error: "OKX 读取失败", data: null },
-        risk: { status: "stale", as_of: "2026-11-12T09:00:00Z", error: "风险快照过期", data: null },
         degraded: [
           { module: "account", status: "unavailable", reason: "OKX 读取失败" },
-          { module: "risk", status: "stale", reason: "风险快照过期" },
-        ],
+        ] as DashboardSummary["degraded"],
       },
     });
 
-    expect(html).toContain("不可用（OKX 读取失败）");
-    expect(html).toContain("不可用（风险快照过期）");
     expect(html).toContain("以下模块降级");
-    expect(html).toContain("账户概览");
-    expect(html).toContain("风险监控");
-
-    // 其余模块仍然给出真实数值。
-    expect(html).toContain("+1.86%");
-    expect(html).toContain("+12.4%");
+    expect(html).toContain("账户概览（OKX 读取失败）");
+    expect(sectionOf(html, "account")).toContain("账户数据不可用");
     expect(html).toContain("231.42");
   });
 
-  it("模块状态与数据时间逐块标注，降级模块写明确状态", () => {
+  it("行情读取失败时只在市场环境里报错，不显示旧值", () => {
+    const html = render({
+      marketOverview: null,
+      marketOverviewError: "OKX BTC 行情读取失败（HTTP 502）",
+    });
+
+    const section = sectionOf(html, "market");
+    expect(section).toContain("OKX BTC 行情读取失败（HTTP 502）");
+    expect(section).not.toContain("100000");
+  });
+
+  it("推送断开时给出提示，不把最后已知值当成实时值", () => {
+    const html = render({ priceLiveness: "stale" as const });
+    expect(html).toContain("实时推送已断开：关注列表价格为最后已知值");
+  });
+});
+describe("缺失数据不写成确定结论", () => {
+  it("风险模块不可用时两个计数徽标写「未提供」并用中性配色，不写 0", () => {
     const base = summary();
     const html = render({
       summary: {
         ...base,
-        watchlist: { status: "stale", as_of: "2026-11-10T16:00:00Z", error: null, data: null },
-        degraded: [{ module: "watchlist", status: "stale", reason: "自选快照过期" }],
+        risk: { status: "unavailable", as_of: null, error: null, data: null },
       },
     });
+    const section = sectionOf(html, "account");
 
-    expect(html).toContain("陈旧");
-    expect(html).toContain("不可用（自选快照过期）");
-    expect(html).toContain("数据时间：");
-    expect(html).toContain("2026-11-13 17:00");
-  });
+    expect(section).not.toContain("缺止损 0");
+    expect(section).not.toContain("高杠杆 0");
+    expect(section).toContain("缺止损 未提供");
+    expect(section).toContain("高杠杆 未提供");
 
-  it("推送到达后只标注被覆盖的字段，其余字段仍写快照时间", () => {
-    const plain = render();
-    expect(plain).toContain("HTTP 快照");
-
-    const pushed = render({
-      pushed: {
-        account: "2026-11-13T09:10:00Z",
-        positions: { "exchange:okx-main:123456": "2026-11-13T09:10:00Z" },
-        watchlist: { "AAPL-USDT-SWAP": "2026-11-13T09:10:00Z" },
-      },
-    });
-    expect(pushed.match(/1 条记录含推送字段/g)?.length).toBe(3);
-    expect(pushed).toContain("价格来自推送 2026-11-13 17:10");
-    expect(pushed).toContain("日涨跌、RSI 与趋势仍是 HTTP 快照 2026-11-13 00:00");
-    expect(pushed).toContain("标记价与未实现盈亏来自推送 2026-11-13 17:10");
-    expect(pushed).toContain("名义价值与止损距离仍是 HTTP 快照 2026-11-13 17:00");
-    expect(pushed).toContain("今日盈亏仍为快照");
-  });
-
-  it("首页汇总失败时仍展示独立的市场模块，不展示汇总业务数值", () => {
-    const html = render({ summary: null, error: "请求失败（HTTP 502）" });
-    expect(html).toContain("请求失败（HTTP 502）");
-    expect(html).toContain('data-module="market"');
-    expect(html).toContain('data-module="market_summary"');
-    expect(html).toContain("100000");
-    expect(html).not.toContain("1248.60");
-    expect(html).not.toContain("231.42");
-  });
-
-  it("市场摘要没有后端数据时不拼摘要文案", () => {
-    const html = render({ aiSummary: null, aiSummaryLoading: false });
-    const start = html.indexOf("市场摘要");
-    const end = html.indexOf("关注列表", start);
-    const section = html.slice(start, end);
-    expect(section).toContain("市场摘要不可用");
-    expect(section).not.toContain("市场整体偏强");
-    expect(section).not.toContain("偏强，波动率抬升");
-  });
-
-  it("市场概况的指数项只有 BTC，不出现已删除的外部指数占位项", () => {
-    const html = render();
-    expect(html).toContain('data-market-symbol="BTC"');
-    // VIX 现在有真实来源，单独走宏观行（见下一条用例），不再是占位项。
-    for (const symbol of ["NASDAQ", "SP500", "DOW"]) {
-      expect(html).not.toContain(`data-market-symbol="${symbol}"`);
+    // 还能用告警色的话，读者仍会把它当成「有风险的 0 个」，所以要退回中性配色。
+    for (const label of ["缺止损 未提供", "高杠杆 未提供"]) {
+      const badge = section.match(
+        new RegExp(`<span class="([^"]*)"[^>]*>\\s*${label}\\s*</span>`),
+      );
+      expect(badge, `找不到「${label}」徽标`).not.toBeNull();
+      expect(badge![1]).not.toContain("rose");
+      expect(badge![1]).not.toContain("amber");
     }
-    const start = html.indexOf('data-module="market"');
-    const end = html.indexOf('data-module="account"', start);
-    const section = html.slice(start, end);
-    expect(section).toContain("来源：逐行标注");
-    expect(section).toContain("okx_spot");
-    expect(section).toContain("2026-11-15 14:00");
-    expect(section).toContain("实时");
-    expect(section).toContain("https://www.okx.com/trade-spot/btc-usdt");
   });
 
-  it("市场概况卡的宏观三行：10Y、利差与 VIX 分级都来自接口", () => {
-    const html = render();
-    const start = html.indexOf('data-module="market"');
-    const end = html.indexOf('data-module="account"', start);
-    const section = html.slice(start, end);
-
-    expect(section).toContain('data-macro-series="us10y"');
-    expect(section).toContain('data-macro-series="spread"');
-    expect(section).toContain('data-macro-series="vix"');
-    expect(section).toContain("4.92%");
-    expect(section).toContain("+29bp");
-    expect(section).toContain('data-regime="panic"');
-    expect(section).toContain("恐慌");
-    expect(section).toContain("延迟");
-    // AC3：三行都要有来源。利差行的来源由后端给出（配对用的日结 provider）。
-    const macroStart = html.indexOf('aria-label="宏观数据"');
-    const macroSection = html.slice(macroStart, end);
-    expect(macroSection.match(/来源：/g)?.length).toBe(3);
-    expect(macroSection).toContain("结算日：2026-11-14");
-    expect(macroSection).toContain("treasury");
-  });
-
-  it("利差为负时标红并写「倒挂」", () => {
-    const macro = macroOverview();
+  it("持仓模块不可用时结论条不写同步状态，系统状态省掉这一行", () => {
+    const base = summary();
     const html = render({
-      macroOverview: {
-        ...macro,
-        spread: {
-          available: true,
-          value_bp: "-53",
-          inverted: true,
-          trading_day: "2026-11-14",
-          quality_status: "normal",
-          reason: null,
-          sources: [{ provider: "treasury", source_url: null }],
-        },
-      },
-    });
-
-    expect(html).toContain("倒挂");
-    expect(html).toContain("-53bp");
-    expect(html).toContain("text-rose-600");
-  });
-
-  it("宏观数据过期时给出提示，数值保持后端给的原值", () => {
-    const macro = macroOverview();
-    const html = render({
-      macroOverview: { ...macro, stale: true, stale_reason: "上游 503" },
-    });
-
-    expect(html).toContain("宏观数据已过期");
-    expect(html).toContain("上游 503");
-    expect(html).toContain("4.92%");
-  });
-
-  it("利差不可用时显示原因，不用分钟级顶替", () => {
-    const macro = macroOverview();
-    const html = render({
-      macroOverview: {
-        ...macro,
-        spread: {
-          available: false,
-          value_bp: null,
-          inverted: false,
-          trading_day: null,
-          quality_status: "missing",
-          reason: "2Y 结算日 2026-11-14 与 10Y 结算日 2026-11-13 不同, 无法配对",
-          sources: [{ provider: "treasury", source_url: null }],
-        },
-      },
-    });
-
-    expect(html).toContain("无法配对");
-    expect(html).toContain("不可用");
-  });
-
-  it("市场概况读取失败时显示原因，不显示旧值", () => {
-    const html = render({
-      marketOverview: null,
-      marketOverviewError: "OKX BTC 行情读取失败（HTTP 502）",
-      marketOverviewLoading: false,
-    });
-    expect(html).toContain("OKX BTC 行情读取失败（HTTP 502）");
-    const start = html.indexOf('data-module="market"');
-    const end = html.indexOf('data-module="account"', start);
-    const section = html.slice(start, end);
-    expect(section).not.toContain("100000");
-    expect(section).not.toContain("实时");
-    // 其它模块不受影响。
-    expect(html).toContain("1248.60 USDT");
-  });
-
-  it("摘要的每个事实点都写出来源，没有来源的句子不展示", () => {
-    const base = aiSummary();
-    const html = render({
-      aiSummary: {
+      summary: {
         ...base,
-        points: [
-          ...base.points,
-          { text: "这条没有来源，不应出现", sources: [] },
-          { text: "来源标识为空，也不应出现", sources: [{ type: "alert", id: " ", url: null }] },
-        ],
+        positions: { status: "unavailable", as_of: null, error: null, data: null },
       },
     });
-    expect(html).toContain("BTC 最新 100000");
-    expect(html).toContain("市场概况 · BTC");
-    expect(html).toContain('href="#alerts"');
-    expect(html).not.toContain("这条没有来源，不应出现");
-    expect(html).not.toContain("来源标识为空，也不应出现");
+
+    expect(html).not.toContain("同步异常");
+    expect(html).not.toContain("同步正常");
+    expect(sectionOf(html, "system")).not.toContain("持仓同步");
   });
 
-  it("免责声明为空时不渲染空段落", () => {
-    const base = aiSummary();
-    const html = render({ aiSummary: { ...base, disclaimer: "" } });
-    expect(html).not.toContain("data-summary-disclaimer");
+  it("持仓同步状态三档都写成中文，不打印后端枚举", () => {
+    const cases = [
+      ["ok", "正常"],
+      ["stale", "陈旧"],
+      ["unconfigured", "未配置"],
+    ] as const;
+
+    for (const [status, label] of cases) {
+      const base = summary();
+      const html = render({
+        summary: {
+          ...base,
+          positions: {
+            ...base.positions,
+            data: { ...base.positions.data!, exchange_status: status },
+          },
+        },
+      });
+      const system = sectionOf(html, "system");
+
+      expect(system, `同步状态 ${status} 应写成「${label}」`).toContain(label);
+      expect(system, `系统状态栏不应出现原始枚举 ${status}`).not.toMatch(
+        /\bok\b|\bstale\b|\bunconfigured\b/,
+      );
+    }
+  });
+});
+describe("模块不可用时不写空状态", () => {
+  /** 把某个模块换成 `data: null` 的不可用信封。 */
+  function unavailable(module: "positions" | "alerts" | "watchlist", reason: string) {
+    const base = summary();
+    return {
+      ...base,
+      [module]: { status: "unavailable", as_of: null, error: reason, data: null },
+      degraded: [
+        ...base.degraded,
+        { module, status: "unavailable", reason },
+      ] as DashboardSummary["degraded"],
+    } as DashboardSummary;
+  }
+
+  it("持仓模块不可用时不写「没有持仓」，改为写数据不可用", () => {
+    const html = render({ summary: unavailable("positions", "持仓快照缺失") });
+    const section = sectionOf(html, "positions");
+
+    expect(section).not.toContain("没有持仓");
+    expect(section).toContain("持仓数据不可用");
+    // 同屏的降级提示要说清是哪一块出了问题。
+    expect(html).toContain("当前持仓（持仓快照缺失）");
   });
 
-  it("市场概况与摘要过期时都给出显式提示", () => {
-    const overview = marketOverview();
-    const summary = aiSummary();
+  it("提醒模块不可用时不写「没有待处理的提醒」，改为写数据不可用", () => {
+    const html = render({ summary: unavailable("alerts", "提醒服务未响应") });
+    const section = sectionOf(html, "alerts");
+
+    expect(section).not.toContain("没有待处理的提醒");
+    expect(section).toContain("提醒数据不可用");
+    expect(html).toContain("提醒（提醒服务未响应）");
+  });
+
+  it("关注列表模块不可用且没有置顶行时不写「还没有置顶标的」", () => {
     const html = render({
-      marketOverview: {
-        ...overview,
-        stale: true,
-        stale_reason: "OKX BTC 行情已过期",
-        items: overview.items.map((item) => ({
-          ...item,
-          quality_status: "stale" as const,
-        })),
-      },
-      aiSummary: {
-        ...summary,
-        stale: true,
-        stale_notice: "OKX BTC 行情已过期",
-        overall: "数据不完整；偏强",
-      },
+      summary: unavailable("watchlist", "自选快照缺失"),
+      pinnedWatchlist: [],
     });
-    expect(html).toContain("数据已过期：OKX BTC 行情已过期");
-    expect(html).toContain("数据不完整；偏强");
-    expect(html).toContain("过期");
+    const section = sectionOf(html, "watchlist");
+
+    expect(section).not.toContain("还没有置顶标的");
+    expect(section).toContain("关注列表数据不可用");
   });
 
-  it("提醒卡展示接口字段并提供确认与忽略入口", () => {
+  it("模块可用但没有记录时仍然照旧写空状态", () => {
+    const base = summary();
+    const html = render({
+      summary: {
+        ...base,
+        positions: { ...base.positions, data: { ...base.positions.data!, total: 0, items: [] } },
+        alerts: { status: "ok", as_of: null, error: null, data: [] },
+      },
+      pinnedWatchlist: [],
+    });
+
+    expect(sectionOf(html, "positions")).toContain("没有持仓");
+    expect(sectionOf(html, "alerts")).toContain("没有待处理的提醒");
+    expect(sectionOf(html, "watchlist")).toContain("还没有置顶标的");
+  });
+});
+
+
+
+describe("首页保留既有能力", () => {
+  it("关注列表可打开置顶编辑弹窗（最多 5 个）", () => {
+    const html = render();
+    expect(sectionOf(html, "watchlist")).toContain("编辑");
+    expect(html).toContain("已选 1/5");
+  });
+
+  it("提醒行有「处理」按钮，携带 acknowledged 状态", () => {
     const base = summary();
     const html = render({
       summary: {
@@ -682,13 +699,37 @@ describe("首页 v6", () => {
               triggered_at: "2026-11-13T09:00:00Z",
             },
           ],
-        },
+        } as DashboardSummary["alerts"],
       },
       onResolveAlert: () => undefined,
     });
-    expect(html).toContain("止损距离过近");
-    expect(html).toContain("AAPL-USDT-SWAP 的止损距离 -9.29，阈值 1");
-    expect(html).toContain("确认");
-    expect(html).toContain("忽略");
+
+    const section = sectionOf(html, "alerts");
+    expect(section).toContain("止损距离过近");
+    expect(section).toContain("处理");
+    expect(section).toContain('data-alert-id="al_1"');
+  });
+
+  it("推送覆盖只算显示出来的自选行", () => {
+    const at = "2026-11-13T09:10:00Z";
+    const covered = render({
+      pinnedWatchlist: ["AAPL-USDT-SWAP"],
+      pushed: { account: null, positions: {}, watchlist: { "AAPL-USDT-SWAP": at } },
+    });
+    expect(sectionOf(covered, "system")).toContain("1 条自选推送");
+
+    const notCovered = render({
+      pinnedWatchlist: ["AAPL-USDT-SWAP"],
+      pushed: { account: null, positions: {}, watchlist: { "TSLA-USDT-SWAP": at } },
+    });
+    expect(sectionOf(notCovered, "system")).toContain("0 条自选推送");
+  });
+
+  it("汇总不可用时只写不可用，不展示任何业务数值", () => {
+    const html = render({ summary: null, error: "请求失败（HTTP 502）" });
+    expect(html).toContain("请求失败（HTTP 502）");
+    expect(html).toContain("首页汇总不可用，请重试。");
+    expect(html).not.toContain("1248.60");
+    expect(html).not.toContain("NaN");
   });
 });

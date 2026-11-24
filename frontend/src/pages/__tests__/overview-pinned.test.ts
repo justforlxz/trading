@@ -6,8 +6,8 @@ import { describe, expect, it } from "vitest";
 
 import type { DashboardSummary } from "../../lib/dashboard";
 import type { PinnedCandidate } from "../../lib/home-pinned";
-import type { OverviewViewProps } from "../overview/view";
-import { OverviewView } from "../overview/view";
+import type { HomeViewProps } from "../overview/home";
+import { HomeView } from "../overview/home";
 import { WatchlistPicker } from "../overview/watchlist-picker";
 
 const IDS = [
@@ -68,7 +68,7 @@ function summary(): DashboardSummary {
       error: null,
       data: {
         items,
-        summary: { total: items.length, bullish: 3, bearish: 3, coverage_pct: "100" },
+        summary: { total: items.length, bullish: 3, bearish: 2, coverage_pct: "100" },
       },
     } as DashboardSummary["watchlist"],
     alerts: { status: "ok", as_of: null, error: null, data: [] },
@@ -77,12 +77,12 @@ function summary(): DashboardSummary {
   };
 }
 
-function renderView(overrides: Partial<OverviewViewProps> = {}): string {
+function renderView(overrides: Partial<HomeViewProps> = {}): string {
   return renderToStaticMarkup(
     createElement(
       MemoryRouter,
       null,
-      createElement(OverviewView, {
+      createElement(HomeView, {
         summary: summary(),
         error: null,
         loading: false,
@@ -108,54 +108,58 @@ function renderView(overrides: Partial<OverviewViewProps> = {}): string {
   );
 }
 
-/** 只截关注列表卡片：相邻模块的文案不应混进断言。 */
+/** 只截关注列表区块：相邻区块的文案不应混进断言。 */
 function watchlistSection(html: string): string {
-  const start = html.indexOf('data-module="watchlist"');
-  const end = html.indexOf('data-module="alerts"', start);
+  const start = html.indexOf('data-block="watchlist"');
+  const end = html.indexOf('data-block="positions"', start);
   return html.slice(start, end);
 }
 
+function systemSection(html: string): string {
+  const start = html.indexOf('data-block="system"');
+  return html.slice(start);
+}
+
+/** 卡片里真的渲染出来的标的，顺序即页面顺序。 */
+function cardRows(html: string): string[] {
+  return [...watchlistSection(html).matchAll(/data-inst-id="([^"]+)"/g)].map(
+    (matched) => matched[1],
+  );
+}
+
 describe("首页关注列表置顶（卡片）", () => {
-  it("只渲染置顶的标的，顺序与选择顺序一致，头部给出已选数量", () => {
+  it("只渲染置顶的标的，头部给出已选数量", () => {
     const html = renderView({
       pinnedWatchlist: ["SOL-USDT-SWAP", "BTC-USDT-SWAP", "AAPL-USDT-SWAP"],
     });
     const section = watchlistSection(html);
 
     expect(section).toContain("已选 3/5");
-    const rows = [...section.matchAll(/href="\/watchlist\/([^"]+)"/g)].map((match) =>
-      decodeURIComponent(match[1]),
-    );
-    expect(rows).toEqual(["SOL-USDT-SWAP", "BTC-USDT-SWAP", "AAPL-USDT-SWAP"]);
+    expect(cardRows(html).sort()).toEqual(["AAPL-USDT-SWAP", "BTC-USDT-SWAP", "SOL-USDT-SWAP"]);
 
     // 未置顶的自选标的不出现在卡片里（它们仍在自选页，只是不占首页这一块）。
     for (const instId of ["ETH-USDT-SWAP", "GOOGL-USDT-SWAP", "ASTS-USDT-SWAP"]) {
-      expect(section).not.toContain(instId.replace(/-USDT-SWAP$/, '"'));
       expect(section).not.toContain(instId);
     }
   });
 
   it("没有置顶项时显示空状态与选择入口，不把整份自选铺开", () => {
-    const section = watchlistSection(renderView({ pinnedWatchlist: [] }));
+    const html = renderView({ pinnedWatchlist: [] });
+    const section = watchlistSection(html);
 
     expect(section).toContain("已选 0/5");
-    expect(section).toContain("首页还没有关注标的");
-    expect(section).toContain("选择标的");
-    for (const instId of IDS) {
-      expect(section).not.toContain(instId);
-    }
+    expect(section).toContain("还没有置顶标的");
+    expect(section).toContain("编辑");
+    expect(cardRows(html)).toEqual([]);
   });
 
   it("置顶项已从自选删掉时只减这一行，其它置顶项照旧", () => {
-    const section = watchlistSection(
-      renderView({ pinnedWatchlist: ["SOL-USDT-SWAP", "GONE-USDT-SWAP", "BTC-USDT-SWAP"] }),
-    );
+    const html = renderView({
+      pinnedWatchlist: ["SOL-USDT-SWAP", "GONE-USDT-SWAP", "BTC-USDT-SWAP"],
+    });
 
-    expect(section).toContain("已选 2/5");
-    const rows = [...section.matchAll(/href="\/watchlist\/([^"]+)"/g)].map((match) =>
-      decodeURIComponent(match[1]),
-    );
-    expect(rows).toEqual(["SOL-USDT-SWAP", "BTC-USDT-SWAP"]);
+    expect(watchlistSection(html)).toContain("已选 2/5");
+    expect(cardRows(html).sort()).toEqual(["BTC-USDT-SWAP", "SOL-USDT-SWAP"]);
   });
 });
 
@@ -240,14 +244,11 @@ describe("保存后立刻渲染（置顶项落在汇总五行之外）", () => {
     const summaryIds = fixture.watchlist.data?.items.map((item) => item.inst_id) ?? [];
     expect(summaryIds).not.toContain("ASTS-USDT-SWAP");
 
-    const section = watchlistSection(renderView({ pinnedWatchlist: ["ASTS-USDT-SWAP"] }));
+    const html = renderView({ pinnedWatchlist: ["ASTS-USDT-SWAP"] });
 
-    expect(section).toContain("已选 1/5");
-    expect(section).not.toContain("首页还没有关注标的");
-    const rows = [...section.matchAll(/href="\/watchlist\/([^"]+)"/g)].map((match) =>
-      decodeURIComponent(match[1]),
-    );
-    expect(rows).toEqual(["ASTS-USDT-SWAP"]);
+    expect(watchlistSection(html)).toContain("已选 1/5");
+    expect(watchlistSection(html)).not.toContain("还没有置顶标的");
+    expect(cardRows(html)).toEqual(["ASTS-USDT-SWAP"]);
   });
 
   it("置顶项与汇总有交集时，数值取自汇总（推送写回的那一份）", () => {
@@ -255,41 +256,35 @@ describe("保存后立刻渲染（置顶项落在汇总五行之外）", () => {
 
     // 汇总夹具：价格 100 + 序号（BTC 是 100）、RSI 50、日涨跌 +1.5%、趋势偏多；
     // 候选夹具一律是 7777 / -77.7% / RSI 88 / 偏空。只认前者才说明覆盖生效。
-    expect(section).toContain("BTC-USDT-SWAP");
-    expect(section).toContain("100");
-    expect(section).toContain("+1.5%");
+    expect(section).toContain("BTC");
+    expect(section).toContain("100.00");
+    expect(section).toContain("+1.50%");
     expect(section).toContain("50");
     expect(section).not.toContain("7777");
-    expect(section).not.toContain("-77.7%");
+    expect(section).not.toContain("-77.70%");
     expect(section).not.toContain("88");
   });
 });
 
-describe("卡片的推送标注只认显示出来的行", () => {
+describe("推送覆盖只认显示出来的行", () => {
   const at = "2026-11-23T12:05:00Z";
 
-  it("推送只覆盖未置顶的行时，脚注不写「价格来自推送」", () => {
-    const section = watchlistSection(
-      renderView({
-        pinnedWatchlist: ["BTC-USDT-SWAP"],
-        pushed: { account: null, positions: {}, watchlist: { "TSLA-USDT-SWAP": at } },
-      }),
-    );
+  it("推送只覆盖未置顶的行时，自选推送计数为 0", () => {
+    const html = renderView({
+      pinnedWatchlist: ["BTC-USDT-SWAP"],
+      pushed: { account: null, positions: {}, watchlist: { "TSLA-USDT-SWAP": at } },
+    });
 
-    expect(section).not.toContain("价格来自推送");
-    expect(section).toContain("HTTP 快照");
+    expect(systemSection(html)).toContain("0 条自选推送");
   });
 
-  it("推送覆盖了显示的行时，脚注写推送时间", () => {
-    const section = watchlistSection(
-      renderView({
-        pinnedWatchlist: ["BTC-USDT-SWAP"],
-        pushed: { account: null, positions: {}, watchlist: { "BTC-USDT-SWAP": at } },
-      }),
-    );
+  it("推送覆盖了显示的行时，自选推送计数为 1", () => {
+    const html = renderView({
+      pinnedWatchlist: ["BTC-USDT-SWAP"],
+      pushed: { account: null, positions: {}, watchlist: { "BTC-USDT-SWAP": at } },
+    });
 
-    expect(section).toContain("价格来自推送 2026-11-23 20:05");
-    expect(section).toContain("1 条记录含推送字段");
+    expect(systemSection(html)).toContain("1 条自选推送");
   });
 });
 

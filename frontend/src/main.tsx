@@ -11,7 +11,8 @@ import "./index.css";
  * 生产构建走同一份契约的真实 FastAPI 进程，`DEV` 为假时完全跳过。
  */
 async function bootstrap(): Promise<void> {
-  if (import.meta.env.DEV) {
+  // 预览用：VITE_REAL_API=1 时跳过假后端，直接打真实接口。
+  if (import.meta.env.DEV && import.meta.env.VITE_REAL_API !== "1") {
     const { enableDevBackend } = await import("../dev/dev-backend");
     await enableDevBackend();
   }

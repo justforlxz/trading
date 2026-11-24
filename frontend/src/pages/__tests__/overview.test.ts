@@ -302,6 +302,21 @@ function render(overrides: Partial<OverviewViewProps> = {}): string {
         aiSummaryError: null,
         aiSummaryLoading: false,
         onRefresh: () => undefined,
+        // 关注列表卡片只显示置顶项：默认把夹具里唯一的自选标的置顶，其余用例保持原样。
+        pinnedWatchlist: ["AAPL-USDT-SWAP"],
+        watchlistCandidates: [
+          {
+            inst_id: "AAPL-USDT-SWAP",
+            display_symbol: "AAPL",
+            name: "AAPL",
+            detail: "默认",
+            last_price: "231.42",
+            change_pct_24h: "1.86",
+            rsi_14: "61.4",
+            trend: "bullish" as const,
+          },
+        ],
+        onSavePinned: async () => undefined,
         ...overrides,
       }),
     ),

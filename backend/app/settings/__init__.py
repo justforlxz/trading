@@ -6,17 +6,21 @@
 from app.settings.model import SettingsRow
 from app.settings.service import (
     DEFAULT_DATA_SOURCES,
+    HOMEPAGE_PINNED_LIMIT,
     SettingsRecord,
     apply_saved_settings,
     load_settings,
+    normalize_homepage_pinned,
     save_settings,
 )
 
 __all__ = [
     "DEFAULT_DATA_SOURCES",
+    "HOMEPAGE_PINNED_LIMIT",
     "SettingsRecord",
     "SettingsRow",
     "apply_saved_settings",
     "load_settings",
+    "normalize_homepage_pinned",
     "save_settings",
 ]

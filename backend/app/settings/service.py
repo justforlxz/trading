@@ -23,7 +23,7 @@ v6 只经 HTTP 暴露五类：显示偏好、风险默认值、自动执行开�
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from types import MappingProxyType
@@ -32,7 +32,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.core import Clock, InvariantViolation, SystemClock
+from app.core import Clock, InvariantViolation, SystemClock, ValidationError
 from app.db import session_scope
 from app.settings.model import SettingsRow
 
@@ -45,10 +45,12 @@ __all__ = [
     "DEFAULT_NOTIFICATIONS",
     "DEFAULT_RISK",
     "DEFAULT_RISK_DEFAULTS",
+    "HOMEPAGE_PINNED_LIMIT",
     "MASKED_API_KEY",
     "SettingsRecord",
     "apply_saved_settings",
     "load_settings",
+    "normalize_homepage_pinned",
     "save_settings",
 ]
 
@@ -80,11 +82,19 @@ DEFAULT_BACKTEST: dict[str, Any] = {
     "default_initial_capital": "10000",
     "default_bar": "1h",
 }
+#: 首页「关注列表」卡片置顶的标的个数上限；契约固定为 5，不做成用户可配。
+HOMEPAGE_PINNED_LIMIT = 5
+#: 单个标的标识的长度上限，只用来挡住明显坏掉的值，与交易所的标识规则无关。
+_HOMEPAGE_PINNED_MAX_LENGTH = 64
+
+# `homepage_pinned` 是 v7 新增的显示偏好：加一个键不需要数据库迁移——`_merged()`
+# 以默认值为底、只保留默认值里出现的键，读旧行时自然补成空清单。
 DEFAULT_DISPLAY: dict[str, Any] = {
     "color_scheme": "system",
     "default_bar": "1d",
     "price_precision": 2,
     "home_layout": "cockpit",
+    "homepage_pinned": [],
 }
 DEFAULT_RISK_DEFAULTS: dict[str, Any] = {
     "default_leverage": "3",
@@ -158,6 +168,38 @@ class SettingsRecord:
             object.__setattr__(self, name, MappingProxyType(dict(getattr(self, name))))
         if self.updated_at.tzinfo is None:
             raise InvariantViolation("设置文档的 updated_at 必须带时区")
+
+
+def normalize_homepage_pinned(value: object, *, available: Collection[str]) -> list[str]:
+    """校验首页置顶清单并去掉首尾空白；违规抛 `ValidationError`（HTTP 400）。
+
+    规则按契约固定：必须是数组、元素必须是非空字符串、最多 5 个、不许重复、
+    每个标的都要在自选里。校验放在写入路径上：非法清单存进设置文档后，首页会
+    渲染出不存在的标的，用户无从看出是数据坏了还是行情没同步。
+    """
+
+    if not isinstance(value, list):
+        raise ValidationError("首页置顶清单必须是字符串数组")
+
+    pinned: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise ValidationError("首页置顶清单的元素必须是字符串")
+        inst_id = item.strip()
+        if not inst_id:
+            raise ValidationError("首页置顶清单里不能有空标的")
+        if len(inst_id) > _HOMEPAGE_PINNED_MAX_LENGTH:
+            raise ValidationError(f"首页置顶标的名过长: {inst_id!r}")
+        if inst_id in pinned:
+            raise ValidationError(f"首页置顶清单里有重复标的: {inst_id}")
+        pinned.append(inst_id)
+
+    if len(pinned) > HOMEPAGE_PINNED_LIMIT:
+        raise ValidationError(f"首页置顶最多 {HOMEPAGE_PINNED_LIMIT} 个标的，收到 {len(pinned)} 个")
+    missing = [inst_id for inst_id in pinned if inst_id not in available]
+    if missing:
+        raise ValidationError(f"首页置顶标的必须在自选里: {', '.join(missing)}")
+    return pinned
 
 
 def _parse(name: str, value: str) -> dict[str, Any]:

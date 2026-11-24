@@ -3852,11 +3852,32 @@ export interface components {
              * @default cockpit
              */
             home_layout: string;
+            /** Homepage Pinned */
+            homepage_pinned?: string[];
             /**
              * Price Precision
              * @default 2
              */
             price_precision: number;
+        };
+        /**
+         * DisplaySettingsUpdate
+         * @description 显示偏好的可写字段：不提交的字段保持库中原值。
+         *
+         *     置顶清单的取值规则（形状、长度、重复、是否在自选里）由路由层校验，因此这里
+         *     只声明形状、不加约束；`None` 表示本次不改这一项。
+         */
+        DisplaySettingsUpdate: {
+            /** Color Scheme */
+            color_scheme?: ("system" | "light" | "dark") | null;
+            /** Default Bar */
+            default_bar?: ("1m" | "5m" | "15m" | "1h" | "4h" | "1d") | null;
+            /** Home Layout */
+            home_layout?: string | null;
+            /** Homepage Pinned */
+            homepage_pinned?: string[] | null;
+            /** Price Precision */
+            price_precision?: number | null;
         };
         /** EquityPoint */
         EquityPoint: {
@@ -6444,6 +6465,7 @@ export interface components {
          *         "color_scheme": "system",
          *         "default_bar": "1d",
          *         "home_layout": "cockpit",
+         *         "homepage_pinned": [],
          *         "price_precision": 2
          *       },
          *       "execution": {
@@ -6513,7 +6535,7 @@ export interface components {
          */
         SettingsUpdateRequest: {
             data_sources?: components["schemas"]["DataSourceSettingsUpdate"] | null;
-            display?: components["schemas"]["DisplaySettings"] | null;
+            display?: components["schemas"]["DisplaySettingsUpdate"] | null;
             exchange?: components["schemas"]["ExchangeSettingsUpdate"] | null;
             execution?: components["schemas"]["ExecutionSettings"] | null;
             notifications?: components["schemas"]["NotificationSettingsUpdate"] | null;

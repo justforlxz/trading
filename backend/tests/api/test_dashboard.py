@@ -25,7 +25,7 @@ from app.db import session_scope
 from app.instrument import sync_instruments
 from app.market import upsert_candles
 from app.strategy import create_instance, update_strategy
-from tests.api.conftest import latest_opens, seed_daily
+from tests.api.conftest import latest_opens, seed_daily, seed_instruments
 from tests.factories.instruments import make_ref, make_swap_ref
 from tests.factories.strategies import make_strategy
 
@@ -495,3 +495,47 @@ def test_exposure_report_is_read_once_per_request(
     assert body["risk"]["status"] == "ok"
     assert body["positions"]["status"] == "ok"
     assert len(calls) == 1
+
+
+def test_watchlist_module_puts_pinned_entries_first(client: TestClient) -> None:
+    """置顶项排在前五行之内：卡片只显示置顶项，落在五行之外就会从卡片上消失。"""
+
+    seed_instruments(
+        *[make_ref(inst_id=f"XPIN{index}-USDT", base_ccy=f"XPIN{index}") for index in range(6)]
+    )
+    for index in range(6):
+        assert (
+            client.post("/api/watchlist", json={"inst_id": f"XPIN{index}-USDT"}).status_code == 201
+        )
+
+    # 置顶最后两个：按加入顺序它们本来落在五行之外。
+    pinned = ["XPIN5-USDT", "XPIN4-USDT"]
+    assert (
+        client.patch("/api/settings", json={"display": {"homepage_pinned": pinned}}).status_code
+        == 200
+    )
+
+    body = client.get("/api/dashboard/summary").json()
+    items = body["watchlist"]["data"]["items"]
+
+    assert [item["inst_id"] for item in items[:2]] == pinned
+    assert len(items) == 5
+    # 摘要仍是整份自选的统计，不因为置顶而改变。
+    assert body["watchlist"]["data"]["summary"]["total"] == 6
+
+
+def test_watchlist_module_without_pins_keeps_join_order(client: TestClient) -> None:
+    """没有置顶项时保持自选原顺序（按加入时间），截断仍取前五行。"""
+
+    seed_instruments(
+        *[make_ref(inst_id=f"XORDER{index}-USDT", base_ccy=f"XORDER{index}") for index in range(6)]
+    )
+    for index in range(6):
+        assert (
+            client.post("/api/watchlist", json={"inst_id": f"XORDER{index}-USDT"}).status_code
+            == 201
+        )
+
+    items = client.get("/api/dashboard/summary").json()["watchlist"]["data"]["items"]
+
+    assert [item["inst_id"] for item in items] == [f"XORDER{index}-USDT" for index in range(5)]

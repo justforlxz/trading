@@ -29,6 +29,8 @@ frontend/           React + TS + Vite + Tailwind
 ```
 
 - 不在仓库根新建第二个后端/前端目录；一个 Monorepo，一个后端包。
+- `.agents/spec/design/` 放界面设计规范（`design.md`）与用户确认过的原型；它不是生产代码
+  目录，构建、类型检查与测试都不读它。
 - 不建与当前阶段无关的目录或空接口；骨架目录只放 `__init__.py` 的一行说明。
 
 ## 2. 分层与依赖方向
@@ -131,3 +133,18 @@ make verify-live            # 起真实 uvicorn 进程并请求 /api/health
 - 接口、依赖或计划变更时，先改文档并合并，再修改或创建 issue；PR 中写明受影响的 issue。
 - 文档与 issue 冲突时以文档为准；文档与 `docs/prd/v6-data-spec.md` 冲突时以规格为准。
 - 每次执行 issue 完成时，在同一个 PR 更新 `docs/prd/v6.md` 中自己负责的行。
+
+## 9. 界面设计规范
+
+界面任务以 [`.agents/spec/design/design.md`](.agents/spec/design/design.md) 为令牌与组件基线：
+
+- 颜色只来自 `frontend/src/index.css` 的 CSS 变量，组件里只用语义类（`bg-card` / `border` /
+  `text-muted-foreground` 等）；状态色必须成对写 `dark:` 变体。
+- 卡片、按钮、弹窗（`components/ui/dialog.tsx`）的类组合与无障碍契约以该文件为准，不另起一套。
+- 构建产物里不存在的 Tailwind 类写了会静默失效；用它之前先查 `frontend/dist/assets/*.css`，
+  清单与查法见该文件第 3 节。
+- 正文与 11px 以下小字的对比度一律 ≥ 4.5:1；检查方法见该文件第 4 节。
+
+视觉基线是 [`.agents/spec/design/prototypes/home.html`](.agents/spec/design/prototypes/home.html)
+（单文件、CSS 内联、可直接打开）。原型与 `design.md` 冲突时以 `design.md` 为准；需要改规范时，
+在同一个 PR 里一并修改。

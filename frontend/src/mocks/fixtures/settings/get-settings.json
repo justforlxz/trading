@@ -35,6 +35,7 @@
     "color_scheme": "system",
     "default_bar": "1d",
     "home_layout": "cockpit",
+    "homepage_pinned": [],
     "price_precision": 2
   },
   "execution": {

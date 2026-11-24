@@ -10,13 +10,17 @@ from datetime import UTC, datetime, timedelta
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
 from app.alerts import ALERT_TYPES
 from app.config import get_settings
+from app.db import session_scope
 from app.events import DeliveryDigest, DeliveryResult, DomainEvent, record_delivery
 from app.events.sinks.registry import SinkRegistry
 from app.jobs import OKX_PROVIDER
 from app.market import finish_sync_job, start_sync_job
+from tests.api.conftest import seed_instruments
+from tests.factories.instruments import make_ref
 
 UTC_ZULU = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 
@@ -25,6 +29,7 @@ DEFAULT_DISPLAY = {
     "default_bar": "1d",
     "price_precision": 2,
     "home_layout": "cockpit",
+    "homepage_pinned": [],
 }
 DEFAULT_RISK_DEFAULTS = {
     "default_leverage": "3",
@@ -903,3 +908,171 @@ def test_empty_subscription_update_is_rejected(client: TestClient) -> None:
         ).status_code
         == 422
     )
+
+
+# ---------------------------------------------------------------- 首页置顶（MKACG-965）
+
+
+def _seed_watchlist(client: TestClient, count: int) -> list[str]:
+    """同步 `count` 个标的并逐个加入自选；返回加入顺序的 inst_id。"""
+
+    refs = [
+        make_ref(inst_id=f"XPIN{index}-USDT", base_ccy=f"XPIN{index}") for index in range(count)
+    ]
+    seed_instruments(*refs)
+    ids: list[str] = []
+    for ref in refs:
+        added = client.post("/api/watchlist", json={"inst_id": ref.inst_id})
+        assert added.status_code == 201, added.text
+        ids.append(ref.inst_id)
+    return ids
+
+
+def _display_in_db() -> dict[str, object]:
+    """直接读 `settings.display` 列：验证失败时库里必须保持原值。"""
+
+    with session_scope() as session:
+        raw = session.execute(text("select display from settings where id = 1")).scalar_one()
+    return json.loads(raw)
+
+
+def test_homepage_pinned_is_empty_by_default_and_writable(client: TestClient) -> None:
+    """默认没有置顶项；提交后按选择顺序落库，并能读回。"""
+
+    pinned = _seed_watchlist(client, 3)
+    assert client.get("/api/settings").json()["display"]["homepage_pinned"] == []
+
+    selection = [pinned[2], pinned[0]]
+    response = client.patch("/api/settings", json={"display": {"homepage_pinned": selection}})
+
+    assert response.status_code == 200, response.text
+    assert response.json()["display"]["homepage_pinned"] == selection
+    assert client.get("/api/settings").json()["display"]["homepage_pinned"] == selection
+    assert _display_in_db()["homepage_pinned"] == selection
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        pytest.param(["A", "B", "C", "D", "E", "F"], id="超过五个"),
+        pytest.param(["A", "A"], id="重复元素"),
+        pytest.param(["NOT-IN-WATCHLIST"], id="不在自选里"),
+        pytest.param("XAAPL-USDT", id="非数组"),
+        pytest.param(3, id="非数组整数"),
+        pytest.param([1, 2], id="元素非字符串"),
+        pytest.param([""], id="空字符串"),
+    ],
+)
+def test_homepage_pinned_rejects_illegal_values_without_writing(
+    client: TestClient, value: object
+) -> None:
+    """非法提交一律 400，且库里 `display` 一个字节都不变。"""
+
+    ids = _seed_watchlist(client, 6)
+    saved = [ids[0], ids[1]]
+    assert (
+        client.patch("/api/settings", json={"display": {"homepage_pinned": saved}}).status_code
+        == 200
+    )
+    before = _display_in_db()
+
+    # 用真实的自选标的顶替占位名，确保输在规则上而不是「不知道这个标的」。
+    placeholders = dict(zip("ABCDEF", ids, strict=False))
+    payload = (
+        value if not isinstance(value, list) else [placeholders.get(item, item) for item in value]
+    )
+    response = client.patch("/api/settings", json={"display": {"homepage_pinned": payload}})
+
+    assert response.status_code == 400, response.text
+    assert _display_in_db() == before
+    assert client.get("/api/settings").json()["display"]["homepage_pinned"] == saved
+
+
+def test_patching_only_pinned_keeps_the_rest_of_the_display_group(client: TestClient) -> None:
+    """只提交置顶项时，显示偏好的其它字段保持原值，不被默认值冲掉。"""
+
+    ids = _seed_watchlist(client, 2)
+    client.patch(
+        "/api/settings",
+        json={"display": {"color_scheme": "dark", "default_bar": "4h", "price_precision": 4}},
+    )
+
+    response = client.patch("/api/settings", json={"display": {"homepage_pinned": [ids[1]]}})
+
+    assert response.status_code == 200, response.text
+    display = response.json()["display"]
+    assert display["homepage_pinned"] == [ids[1]]
+    assert display["color_scheme"] == "dark"
+    assert display["default_bar"] == "4h"
+    assert display["price_precision"] == 4
+
+
+def test_pinned_item_removed_from_watchlist_stays_in_settings(client: TestClient) -> None:
+    """读取侧只求交集，不改写库：从自选删掉的置顶项仍留在设置文档里。"""
+
+    ids = _seed_watchlist(client, 3)
+    assert (
+        client.patch("/api/settings", json={"display": {"homepage_pinned": ids}}).status_code == 200
+    )
+
+    removed = client.delete(f"/api/watchlist/{ids[1]}")
+    assert removed.status_code in (200, 204), removed.text
+
+    assert client.get("/api/settings").json()["display"]["homepage_pinned"] == ids
+    assert _display_in_db()["homepage_pinned"] == ids
+
+
+def test_pinned_items_removed_from_watchlist_survive_a_save(client: TestClient) -> None:
+    """弹窗只提交看得见的选择：已不在自选的置顶项由服务端补回，不能被一次保存删掉。"""
+
+    ids = _seed_watchlist(client, 3)
+    saved = client.patch("/api/settings", json={"display": {"homepage_pinned": ids}})
+    assert saved.status_code == 200, saved.text
+    assert client.delete(f"/api/watchlist/{ids[2]}").status_code == 204
+
+    # 弹窗里只剩两个候选，保存时提交的也只有这两个。
+    again = client.patch("/api/settings", json={"display": {"homepage_pinned": ids[:2]}})
+
+    assert again.status_code == 200, again.text
+    assert again.json()["display"]["homepage_pinned"] == ids
+    assert client.get("/api/settings").json()["display"]["homepage_pinned"] == ids
+    assert _display_in_db()["homepage_pinned"] == ids
+
+    # 换顺序再存一次：看不见的那项留在原来的位置，看得见的按提交顺序。
+    reordered = client.patch(
+        "/api/settings", json={"display": {"homepage_pinned": [ids[1], ids[0]]}}
+    )
+
+    assert reordered.status_code == 200, reordered.text
+    assert reordered.json()["display"]["homepage_pinned"] == [ids[1], ids[0], ids[2]]
+
+    # 加回自选后恢复显示：数组原样还在，顺序就是数组里的顺序。
+    assert client.post("/api/watchlist", json={"inst_id": ids[2]}).status_code == 201
+    assert client.get("/api/settings").json()["display"]["homepage_pinned"] == [
+        ids[1],
+        ids[0],
+        ids[2],
+    ]
+
+
+def test_pinned_save_counts_hidden_items_against_the_limit(client: TestClient) -> None:
+    """已不在自选的置顶项仍占名额：再加到超过 5 个要当场 400，且不落库。"""
+
+    ids = _seed_watchlist(client, 6)
+    assert (
+        client.patch("/api/settings", json={"display": {"homepage_pinned": ids[:3]}}).status_code
+        == 200
+    )
+    assert client.delete(f"/api/watchlist/{ids[0]}").status_code == 204
+    before = _display_in_db()
+
+    too_many = client.patch("/api/settings", json={"display": {"homepage_pinned": ids[1:]}})
+
+    assert too_many.status_code == 400, too_many.text
+    assert "另有 1 个已不在自选的置顶项会保留" in too_many.json()["detail"]
+    assert _display_in_db() == before
+
+    fits = client.patch("/api/settings", json={"display": {"homepage_pinned": ids[1:5]}})
+
+    assert fits.status_code == 200, fits.text
+    assert fits.json()["display"]["homepage_pinned"] == [ids[0], *ids[1:5]]

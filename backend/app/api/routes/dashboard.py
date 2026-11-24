@@ -52,6 +52,7 @@ from app.dashboard import (
     load_summary,
 )
 from app.instrument import display_symbol
+from app.settings import load_settings
 
 __all__ = ["dashboard_router"]
 
@@ -66,7 +67,7 @@ _VALUE_QUANTUM = Decimal("1e-12")
 def get_dashboard_summary() -> DashboardSummaryResponse:
     """首页一次请求返回八个模块；单个模块失败只把它自己标成不可用。"""
 
-    summary = load_summary()
+    summary = load_summary(pinned=_homepage_pinned())
     return DashboardSummaryResponse(
         as_of=summary.as_of,
         market=_market(summary.market),
@@ -214,6 +215,20 @@ def _position(item: PositionItem) -> DashboardPositionItem:
         stop_distance_pct=_optional(item.stop_distance_pct),
         unrealized_pnl=_optional(item.unrealized_pnl),
     )
+
+
+def _homepage_pinned() -> list[str]:
+    """首页「关注列表」的置顶清单：设置文档里的显示偏好，读不到就按空清单处理。
+
+    聚合层不依赖设置域，置顶清单由这一层读出来当输入传进去——它决定自选模块的行序，
+    因为卡片只显示置顶项，置顶项落在五行之外就会从卡片上消失。
+    """
+
+    try:
+        pinned = load_settings().display.get("homepage_pinned")
+    except Exception:  # 设置读不到不该让首页整体失败：按未置顶处理，卡片显示空状态
+        return []
+    return [item for item in pinned if isinstance(item, str)] if isinstance(pinned, list) else []
 
 
 def _watchlist(module: Module) -> DashboardWatchlistModule:

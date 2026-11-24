@@ -1,4 +1,5 @@
-import { RefreshCw } from "lucide-react";
+import { Pencil, RefreshCw } from "lucide-react";
+import { useState } from "react";
 
 import { PageHeading } from "../../components/layout/page-parts";
 import { Button } from "../../components/ui/button";
@@ -14,6 +15,7 @@ import type { MacroOverviewResponse } from "../../lib/api";
 import type { AiSummary, MarketSnapshot } from "../../lib/market";
 import type { StreamLiveness } from "../../lib/stream";
 import type { AlertStatusUpdate } from "../../lib/alerts";
+import { pinnedCardRows, pinnedCountText, type PinnedCandidate } from "../../lib/home-pinned";
 import {
   AccountBody,
   ActivityBody,
@@ -25,6 +27,7 @@ import {
 } from "./cards";
 import { MarketOverviewCard, MarketSummaryCard } from "./market-cards";
 import { ModuleCard } from "./module-card";
+import { WatchlistPicker } from "./watchlist-picker";
 
 export type OverviewViewProps = {
   summary: DashboardSummary | null;
@@ -45,6 +48,12 @@ export type OverviewViewProps = {
   onRefresh: () => void;
   onResolveAlert?: (alertId: string, status: AlertStatusUpdate) => void;
   resolvingAlertId?: string | null;
+  /** 首页关注列表置顶的标的（服务端 `display.homepage_pinned`），按选择顺序。 */
+  pinnedWatchlist: string[];
+  /** 整份自选（`GET /api/watchlist`）：弹窗的候选，不受首页汇总五行上限的影响。 */
+  watchlistCandidates: PinnedCandidate[];
+  /** 保存置顶清单；失败时抛错，由弹窗自己显示原因并保持打开。 */
+  onSavePinned: (next: string[]) => Promise<void>;
 };
 
 /** 纯展示组件：测试直接渲染它，不依赖网络、推送连接与浏览器。 */
@@ -67,7 +76,24 @@ export function OverviewView({
   onRefresh,
   onResolveAlert,
   resolvingAlertId = null,
+  pinnedWatchlist,
+  watchlistCandidates,
+  onSavePinned,
 }: OverviewViewProps) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  // 卡片行 = 置顶清单 ∩ 当前自选，价格用首页汇总里更实时的那一份覆盖。
+  // 不能直接拿汇总里的行：汇总只带五行，置顶到第 6 个标的上会保存成功却渲染不出来。
+  const pinnedRows = pinnedCardRows(
+    watchlistCandidates,
+    summary?.watchlist.data?.items ?? [],
+    pinnedWatchlist,
+  );
+  // 推送覆盖数只算卡片上真的显示出来的行：没置顶时卡片是空的，写「5 条记录含推送
+  // 字段」会让人以为卡里还有 5 行。
+  const pinnedRowIds = new Set(pinnedRows.map((item) => item.inst_id));
+  const pushedPinnedRows = Object.keys(pushed.watchlist).filter((instId) =>
+    pinnedRowIds.has(instId),
+  ).length;
   const degraded = summary?.degraded.filter((item) => item.module !== "market") ?? [];
   const marketOverviewCard = (
     <MarketOverviewCard
@@ -197,10 +223,29 @@ export function OverviewView({
               title="关注列表"
               summary={summary}
               module={summary.watchlist}
-              pushedFields={Object.keys(pushed.watchlist).length}
+              pushedFields={pushedPinnedRows}
               to="/watchlist"
+              meta={pinnedCountText(pinnedRows.length)}
+              actions={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground"
+                  onClick={() => setPickerOpen(true)}
+                  disabled={summary.watchlist.data == null}
+                >
+                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                  编辑
+                </Button>
+              }
             >
-              <WatchlistBody summary={summary} pushed={pushed.watchlist} />
+              <WatchlistBody
+                summary={summary}
+                pushed={pushed.watchlist}
+                rows={pinnedRows}
+                onEdit={() => setPickerOpen(true)}
+              />
             </ModuleCard>
             <ModuleCard
               name="alerts"
@@ -242,6 +287,14 @@ export function OverviewView({
           </div>
         </div>
       )}
+
+      <WatchlistPicker
+        open={pickerOpen}
+        items={watchlistCandidates}
+        pinned={pinnedWatchlist}
+        onClose={() => setPickerOpen(false)}
+        onSave={onSavePinned}
+      />
     </>
   );
 }

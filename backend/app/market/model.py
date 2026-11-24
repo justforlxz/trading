@@ -110,19 +110,45 @@ class Candle(Base):
     def to_bar(self) -> Bar:
         """历史行 → `Bar`；表里只有已收盘 K 线，因此 `confirm` 恒为 True。"""
 
-        return Bar(
-            inst_id=self.symbol,
-            timeframe=Timeframe.parse(self.bar),
-            open_time=from_epoch(self.open_time),
-            open=self.open,
-            high=self.high,
-            low=self.low,
-            close=self.close,
-            volume=self.volume,
-            confirm=True,
-            source=self.source,
-            market_session=self.market_session,
-        )
+        return bar_from_columns(self)
+
+
+#: 换算一个 `Bar` 需要的列。批量读取按这一组列发查询，拿到行后直接交给
+#: `bar_from_columns`：先造 ORM 实例再换算会多花一倍时间，而 `Bar` 的值完全相同。
+BAR_COLUMNS: tuple[Any, ...] = (
+    Candle.symbol,
+    Candle.bar,
+    Candle.open_time,
+    Candle.open,
+    Candle.high,
+    Candle.low,
+    Candle.close,
+    Candle.volume,
+    Candle.source,
+    Candle.market_session,
+)
+
+
+def bar_from_columns(row: Any) -> Bar:
+    """一行列值 → `Bar`；ORM 实例与批量读取取回的列行都走这一处换算。
+
+    入参只要有 `symbol` / `bar` / `open_time` / 四个价格 / `volume` / `source` /
+    `market_session` 这些同名属性即可，`Candle` 实例本身就是其中一种。
+    """
+
+    return Bar(
+        inst_id=row.symbol,
+        timeframe=Timeframe.parse(row.bar),
+        open_time=from_epoch(row.open_time),
+        open=row.open,
+        high=row.high,
+        low=row.low,
+        close=row.close,
+        volume=row.volume,
+        confirm=True,
+        source=row.source,
+        market_session=row.market_session,
+    )
 
 
 class Funding(Base):

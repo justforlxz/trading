@@ -199,3 +199,41 @@ def test_related_instruments_skips_candidates_without_enough_data() -> None:
     _daily("AAPL-USDT-SWAP", ["20", "40"])
 
     assert related_instruments("XAAPL-USDT", 180) == []
+
+
+def test_list_entries_batches_reads_and_merges_sources() -> None:
+    """批量读：同一标的的多来源按 `open_time` 合在一起，缺 K 线的条目仍然保留。
+
+    代理来源的两根日线比 OKX 的更早，合并后最新两根仍是 100 与 110，涨跌幅 10%；
+    条目总数 4 根说明两个来源都进了同一条序列，没有被悄悄挑成一条。
+    """
+
+    _seed_instruments(make_ref(), make_ref(inst_id="XMSFT-USDT", base_ccy="XMSFT"))
+    _daily("XAAPL-USDT", ["100", "110"])
+    upsert_candles(
+        [
+            Bar(
+                inst_id="XAAPL-USDT",
+                timeframe=Timeframe.parse("1d"),
+                open_time=START - DAY * (2 - index),
+                open=Decimal(close),
+                high=Decimal(close),
+                low=Decimal(close),
+                close=Decimal(close),
+                volume=Decimal("10"),
+                confirm=True,
+                source="yahoo",
+            )
+            for index, close in enumerate(["80", "90"])
+        ]
+    )
+    add_item("XAAPL-USDT")
+    add_item("XMSFT-USDT")
+
+    entries = {entry.instrument.symbol: entry for entry in list_entries()}
+
+    assert entries["XAAPL-USDT"].quote.last_price == Decimal("110")
+    assert entries["XAAPL-USDT"].quote.change_pct_24h == Decimal("10.000000")
+    assert entries["XAAPL-USDT"].quote.candle_count == 4
+    assert entries["XMSFT-USDT"].quote.last_price is None
+    assert entries["XMSFT-USDT"].quote.data_status == "missing"

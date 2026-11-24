@@ -472,29 +472,39 @@ def test_market_breadth_and_resonance_render_numbers(client: TestClient) -> None
     assert spot["resonance"] == {"strength": "0.6", "participants": 10, "window": 20}
 
 
-def test_exposure_report_is_read_once_per_request(
+def test_positions_are_read_once_per_request(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """风险与持仓共用同一份敞口结果，一次请求只读一次。"""
+    """风险与持仓共用同一份持仓事实：账户、交易所持仓、手动持仓、敞口各读一次。"""
 
     from app.dashboard import service as dashboard_service
 
-    calls: list[int] = []
-    original = dashboard_service.exposure_report
+    counts = {"account": 0, "exchange": 0, "manual": 0, "exposure": 0}
+    entries = {
+        "account": "account_summary",
+        "exchange": "exchange_positions",
+        "manual": "list_open_manual_positions",
+        "exposure": "exposure_from_positions",
+    }
 
-    def counting() -> object:
-        calls.append(1)
-        return original()
+    def counting(name: str, function):  # type: ignore[no-untyped-def]
+        def wrapper(*args: object, **kwargs: object) -> object:
+            counts[name] += 1
+            return function(*args, **kwargs)
 
-    monkeypatch.setattr(dashboard_service, "exposure_report", counting)
+        return wrapper
+
+    for name, entry in entries.items():
+        original = getattr(dashboard_service, entry)
+        monkeypatch.setattr(dashboard_service, entry, counting(name, original))
     _swap_market()
 
     body = client.get("/api/dashboard/summary").json()
 
     assert body["risk"]["status"] == "ok"
     assert body["positions"]["status"] == "ok"
-    assert len(calls) == 1
+    assert counts == {"account": 1, "exchange": 1, "manual": 1, "exposure": 1}
 
 
 def test_watchlist_module_puts_pinned_entries_first(client: TestClient) -> None:

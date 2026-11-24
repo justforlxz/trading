@@ -11,13 +11,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import String, any_, bindparam, func, select
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 
 from app.core import Bar, MarketDataPort, Timeframe, ValidationError
 from app.db import session_scope
 from app.market.candles import dedupe_sorted, floor_open_time, next_open_time
-from app.market.model import Candle, from_epoch, to_epoch
+from app.market.model import BAR_COLUMNS, Candle, bar_from_columns, from_epoch, to_epoch
 from app.market.session import day_asset_type
 from app.shared import normalize_bar
 
@@ -241,6 +242,91 @@ def latest_candle(symbol: str, *, source: str | None = None) -> Bar | None:
     with session_scope() as session:
         row = session.scalar(statement)
     return None if row is None else row.to_bar()
+
+
+def load_candles_by_source(
+    symbols: Sequence[str],
+    bar: str,
+    *,
+    sources: Sequence[str] | None = None,
+) -> dict[tuple[str, str], list[Bar]]:
+    """一条 SQL 取回一批标的在 `bar` 上的完整序列，键是 `(标的, 来源)`。
+
+    与 `load_candles` 同一读法：按 `open_time` 升序，不补齐也不裁剪。`sources` 为
+    `None` 表示不筛来源；同一标的的不同来源各自成组，绝不合并成一条时间轴——来源是
+    行情的一部分，合在一起就无法按来源规则挑序列（见 `candle_sources`）。
+
+    标的清单走绑定参数 `text[]`：写进 `IN (...)` 会让语句文本随标的数膨胀，传数组
+    只多一个参数（与 `app.market.service` 的横截面取数同一写法）。
+    """
+
+    canonical = normalize_bar_or_raise(bar)
+    wanted_symbols = _unique(symbols)
+    if not wanted_symbols:
+        return {}
+    required_sources = None if sources is None else _unique(sources)
+    if required_sources is not None and not required_sources:
+        return {}
+    statement = select(*BAR_COLUMNS).where(
+        Candle.symbol == _symbols_bindparam(),
+        Candle.bar == canonical,
+    )
+    if required_sources is not None:
+        statement = statement.where(Candle.source.in_(required_sources))
+    grouped: dict[tuple[str, str], list[Bar]] = {}
+    with session_scope() as session:
+        # 先把行取完再换算：结果要按 `(标的, 来源)` 分组，取完再算能让事务尽早结束，
+        # 分组本身在事务外做。
+        rows = session.execute(
+            statement.order_by(Candle.open_time), {"symbols": wanted_symbols}
+        ).all()
+    for row in rows:
+        grouped.setdefault((row.symbol, row.source), []).append(bar_from_columns(row))
+    return grouped
+
+
+def latest_candles_by_source(
+    symbols: Sequence[str],
+    *,
+    sources: Sequence[str] | None = None,
+) -> dict[tuple[str, str], Bar]:
+    """一条 SQL 取回每个 `(标的, 来源)` 最近一根已收盘 K 线；不限定周期。
+
+    与 `latest_candle` 同一口径：先按 `open_time` 取最新，同一 `open_time` 再按
+    `updated_at`。`DISTINCT ON (symbol, source)` 让数据库对每个键只留一行，读到的
+    行数与「有数据的键数」同阶。
+    """
+
+    wanted_symbols = _unique(symbols)
+    if not wanted_symbols:
+        return {}
+    required_sources = None if sources is None else _unique(sources)
+    if required_sources is not None and not required_sources:
+        return {}
+    statement = select(*BAR_COLUMNS).where(Candle.symbol == _symbols_bindparam())
+    if required_sources is not None:
+        statement = statement.where(Candle.source.in_(required_sources))
+    statement = statement.order_by(
+        Candle.symbol,
+        Candle.source,
+        Candle.open_time.desc(),
+        Candle.updated_at.desc(),
+    ).distinct(Candle.symbol, Candle.source)
+    with session_scope() as session:
+        rows = session.execute(statement, {"symbols": wanted_symbols}).all()
+    return {(row.symbol, row.source): bar_from_columns(row) for row in rows}
+
+
+def _unique(values: Iterable[str]) -> list[str]:
+    """去重并保持顺序：上层重复列出同一标的时不重复取数。"""
+
+    return list(dict.fromkeys(value for value in values if value))
+
+
+def _symbols_bindparam() -> Any:
+    """`text[]` 绑定参数：语句文本不随标的数变化。"""
+
+    return any_(bindparam("symbols", type_=ARRAY(String(64))))
 
 
 def candle_sources(symbols: Sequence[str], bar: str) -> dict[str, set[str]]:

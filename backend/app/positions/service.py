@@ -44,10 +44,11 @@ from app.instrument import (
     Instrument,
     display_symbol,
     get_instrument,
+    get_instruments,
     notional_value,
     trading_rules,
 )
-from app.market import latest_candle
+from app.market import latest_candles_by_source
 from app.positions.manual import LONG, SHORT, LedgerTrade, apply_trade, replay_trades
 from app.positions.model import (
     DEFAULT_ACCOUNT_ID,
@@ -75,6 +76,7 @@ __all__ = [
     "exchange_positions",
     "list_manual_positions",
     "list_manual_trades",
+    "list_open_manual_positions",
     "record_exchange_snapshot",
     "sync_account",
     "update_manual_position",
@@ -436,7 +438,9 @@ def exchange_positions(*, require_mapped: bool = False) -> ExchangePositionsView
         )
         if require_mapped:
             _ensure_instruments_synced(session, {row.inst_id for row in rows})
-    items = tuple(_exchange_position_view(row) for row in rows)
+    # 标的元数据一次取完：持仓行数再多也不按行发语句。
+    instruments = get_instruments(row.inst_id for row in rows)
+    items = tuple(_exchange_position_view(row, instruments.get(row.inst_id)) for row in rows)
     return ExchangePositionsView(latest.captured_at, _configured_status(), items)
 
 
@@ -621,8 +625,10 @@ def _payload_digest(snapshot: object) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
 
-def _exchange_position_view(row: ExchangePositionSnapshotRow) -> ExchangePositionView:
-    instrument = get_instrument(row.inst_id)
+def _exchange_position_view(
+    row: ExchangePositionSnapshotRow,
+    instrument: Instrument | None,
+) -> ExchangePositionView:
     return ExchangePositionView(
         pos_id=row.pos_id,
         inst_id=row.inst_id,
@@ -654,7 +660,13 @@ def list_manual_positions() -> list[ManualPositionView]:
                 )
             )
         )
-    return [_manual_position_view(row) for row in rows]
+    return _manual_position_views(rows)
+
+
+def list_open_manual_positions() -> tuple[ManualPositionView, ...]:
+    """仍在持仓状态的手动持仓；与 `list_manual_positions` 同一次读法，只是先筛状态。"""
+
+    return tuple(item for item in list_manual_positions() if item.status == STATUS_OPEN)
 
 
 def create_manual_position(
@@ -973,17 +985,39 @@ def _replay_one(
     raise Conflict("幂等键对应的流水不在该持仓的账本里")
 
 
+def _manual_position_views(rows: Sequence[ManualPositionRow]) -> list[ManualPositionView]:
+    """一批手动持仓共用两次读取：标的元数据一次、各来源的最新价一次。"""
+
+    if not rows:
+        return []
+    symbols = [row.inst_id for row in rows]
+    instruments = get_instruments(symbols)
+    prices = _latest_prices(symbols)
+    return [
+        _manual_position_row(row, instruments.get(row.inst_id), prices[row.inst_id]) for row in rows
+    ]
+
+
 def _manual_position_view(row: ManualPositionRow) -> ManualPositionView:
-    instrument = get_instrument(row.inst_id)
-    price, source = _latest_price(row.inst_id)
+    """单条手动持仓的视图；批量路径走 `_manual_position_views` 共用取数。"""
+
+    return _manual_position_views([row])[0]
+
+
+def _manual_position_row(
+    row: ManualPositionRow,
+    instrument: Instrument | None,
+    price: tuple[Decimal | None, str | None],
+) -> ManualPositionView:
+    last_price, source = price
     market_value: Decimal | None = None
     unrealized: Decimal | None = None
-    if price is not None:
-        market_value = price * row.quantity
+    if last_price is not None:
+        market_value = last_price * row.quantity
         if row.side == LONG:
-            unrealized = (price - row.avg_cost) * row.quantity
+            unrealized = (last_price - row.avg_cost) * row.quantity
         else:
-            unrealized = (row.avg_cost - price) * row.quantity
+            unrealized = (row.avg_cost - last_price) * row.quantity
     return ManualPositionView(
         id=row.id,
         inst_id=row.inst_id,
@@ -997,8 +1031,8 @@ def _manual_position_view(row: ManualPositionRow) -> ManualPositionView:
         leverage=row.leverage,
         status=row.status,
         note=row.note,
-        price=price,
-        price_status="ok" if price is not None else "unavailable",
+        price=last_price,
+        price_status="ok" if last_price is not None else "unavailable",
         price_source=source,
         market_value=market_value,
         unrealized_pnl=unrealized,
@@ -1045,11 +1079,26 @@ def _ledger_trade(row: ManualTradeRow) -> LedgerTrade:
 
 
 def _latest_price(inst_id: str) -> tuple[Decimal | None, str | None]:
-    for source in PRICE_SOURCES:
-        candle = latest_candle(inst_id, source=source)
-        if candle is not None:
-            return candle.close, candle.source
-    return None, None
+    """单条标的最新可信价；按批读的路径走 `_latest_prices`。"""
+
+    return _latest_prices([inst_id])[inst_id]
+
+
+def _latest_prices(
+    inst_ids: Sequence[str],
+) -> dict[str, tuple[Decimal | None, str | None]]:
+    """一批标的最新可信价：按 `PRICE_SOURCES` 顺序取第一个有数据的来源。"""
+
+    latest = latest_candles_by_source(inst_ids, sources=PRICE_SOURCES)
+    prices: dict[str, tuple[Decimal | None, str | None]] = {}
+    for inst_id in inst_ids:
+        prices[inst_id] = (None, None)
+        for source in PRICE_SOURCES:
+            candle = latest.get((inst_id, source))
+            if candle is not None:
+                prices[inst_id] = (candle.close, candle.source)
+                break
+    return prices
 
 
 def _display_symbol(instrument: Instrument | None, inst_id: str) -> str:

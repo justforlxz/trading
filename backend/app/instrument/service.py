@@ -6,10 +6,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import String, any_, bindparam, select
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Session
 
 from app.core import InstrumentRef, ValidationError
@@ -31,6 +32,7 @@ __all__ = [
     "display_symbol",
     "get_instrument",
     "get_instrument_pair",
+    "get_instruments",
     "list_instruments",
     "list_tradable",
     "resolve_instrument",
@@ -101,11 +103,40 @@ def list_instruments() -> list[Instrument]:
 def get_instrument(symbol: str) -> Instrument | None:
     """按交易所 `instId` 取一行标的；没有时返回 `None`，由调用方决定错误措辞。"""
 
-    raw = symbol.strip().upper()
+    raw = _clean(symbol)
     if not raw:
         return None
     with session_scope() as session:
         return session.scalar(select(Instrument).where(Instrument.symbol == raw))
+
+
+def get_instruments(symbols: Iterable[str]) -> dict[str, Instrument]:
+    """按一批 `instId` 取标的；表里没有的标的不出现在结果里。
+
+    与逐个调用 `get_instrument` 同一读法（去空白、转大写），只是把一次一条改成一条
+    取完：持仓、自选按批读标的元数据时不再按行发语句。结果按调用方传进来的那个写法
+    作键，`row.inst_id` 这类原始值可以直接回查，不用再自己规范化一遍。
+    """
+
+    cleaned = {symbol: _clean(symbol) for symbol in dict.fromkeys(symbols)}
+    wanted = sorted({value for value in cleaned.values() if value})
+    if not wanted:
+        return {}
+    # 标的清单走绑定参数 `text[]`：写进 `IN (...)` 会让语句文本随标的数膨胀，传数组
+    # 只多一个参数（与 `app.market.sync` 的批量取数同一写法；那一层依赖本模块，
+    # 反过来引用会造成循环依赖，所以这里各写一行）。
+    statement = select(Instrument).where(
+        Instrument.symbol == any_(bindparam("symbols", type_=ARRAY(String(64))))
+    )
+    with session_scope() as session:
+        found = {row.symbol: row for row in session.scalars(statement, {"symbols": wanted})}
+    return {symbol: found[value] for symbol, value in cleaned.items() if value in found}
+
+
+def _clean(symbol: str) -> str:
+    """`instId` 的读入口径：去首尾空白、转大写。"""
+
+    return symbol.strip().upper()
 
 
 def display_symbol(row: Instrument) -> str:

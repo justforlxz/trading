@@ -23,10 +23,10 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.activity import record_activity
-from app.core import InvariantViolation, ValidationError
+from app.core import Bar, InvariantViolation, ValidationError
 from app.db import session_scope
-from app.instrument import Instrument
-from app.market import correlation, load_candles
+from app.instrument import Instrument, get_instruments
+from app.market import correlation, load_candles, load_candles_by_source
 from app.watchlist.metrics import MIN_QUOTE_BARS, DailySnapshot, summarize_daily
 from app.watchlist.model import WatchlistGroup, WatchlistItemRow
 from app.watchlist.watch_registry import watch_registry
@@ -111,7 +111,12 @@ def summarize_entries(entries: Sequence[WatchlistEntry]) -> WatchlistSummary:
 
 
 def list_entries() -> list[WatchlistEntry]:
-    """按加入顺序列出全部自选条目；某一行缺行情时保留该行并标记数据状态。"""
+    """按加入顺序列出全部自选条目；某一行缺行情时保留该行并标记数据状态。
+
+    标的元数据与日线各一条 SQL 取完：自选多少条都不再按行发语句。行情仍按原来的
+    口径读——同一标的在 `QUOTE_BAR` 上落过的来源全部合在一起交给 `summarize_daily`，
+    由它按 `open_time` 排序后取最新两根。
+    """
 
     with session_scope() as session:
         rows = list(
@@ -121,21 +126,28 @@ def list_entries() -> list[WatchlistEntry]:
                 )
             )
         )
-        instruments = {row.inst_id: session.get(Instrument, row.inst_id) for row in rows}
-        entries: list[WatchlistEntry] = []
-        for row in rows:
-            instrument = instruments[row.inst_id]
-            if instrument is None:
-                raise InvariantViolation(f"自选标的 {row.inst_id} 在标的表里不存在")
-            entries.append(
-                WatchlistEntry(
-                    instrument=instrument,
-                    group=row.group_name,
-                    added_at=row.added_at,
-                    quote=summarize_daily(load_candles(row.inst_id, QUOTE_BAR)),
-                )
+    # 标的元数据放在会话块外读：`get_instruments` 自己开一个会话，留在块内会在已经
+    # 占着一条池连接时再要一条，并发一高就把连接池用满。
+    instruments = get_instruments(row.inst_id for row in rows)
+    quotes: dict[str, list[Bar]] = {}
+    for (symbol, _source), bars in load_candles_by_source(
+        [row.inst_id for row in rows], QUOTE_BAR
+    ).items():
+        quotes.setdefault(symbol, []).extend(bars)
+    entries: list[WatchlistEntry] = []
+    for row in rows:
+        instrument = instruments.get(row.inst_id)
+        if instrument is None:
+            raise InvariantViolation(f"自选标的 {row.inst_id} 在标的表里不存在")
+        entries.append(
+            WatchlistEntry(
+                instrument=instrument,
+                group=row.group_name,
+                added_at=row.added_at,
+                quote=summarize_daily(quotes.get(row.inst_id, [])),
             )
-        return entries
+        )
+    return entries
 
 
 def list_groups() -> list[str]:

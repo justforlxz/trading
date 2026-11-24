@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
@@ -14,7 +14,7 @@ import pytest
 from app.core import ValidationError
 from app.equity.providers import (
     build_provider,
-    provider_bar,
+    provider_bars,
     provider_delayed,
     provider_names,
     provider_template,
@@ -45,11 +45,11 @@ def test_provider_names_come_from_the_registry() -> None:
     assert provider_names() == ["stooq", "yahoo"]
 
 
-def test_bar_is_declared_by_the_implementation() -> None:
-    """周期由实现声明：Yahoo 只给分钟级、Stooq 只给日线，切换即换周期。"""
+def test_bars_are_declared_by_the_implementation() -> None:
+    """周期由实现声明：Yahoo 同时给分钟级与日线，Stooq 只给日线，切换即换周期。"""
 
-    assert provider_bar("yahoo") == "1m"
-    assert provider_bar("stooq") == "1d"
+    assert provider_bars("yahoo") == ("1m", "1d")
+    assert provider_bars("stooq") == ("1d",)
 
 
 def test_both_free_providers_are_delayed() -> None:
@@ -130,3 +130,65 @@ def test_provider_url_substitutes_the_symbol_for_a_usable_link() -> None:
     stooq = provider_url("stooq", "QQQ")
     assert stooq == "https://stooq.com/q/d/l/?s=qqq.us&i=d"
     assert provider_url("polygon", "SPY") is None
+
+
+def _yahoo_provider(payload: dict) -> object:
+    return build_provider(
+        "yahoo",
+        options={"url": "https://yahoo.test/chart/{symbol}"},
+        client=httpx.Client(
+            transport=httpx.MockTransport(lambda _: httpx.Response(200, json=payload))
+        ),
+    )
+
+
+def _minute_payload(stamp: int) -> dict:
+    return {
+        "chart": {
+            "result": [
+                {
+                    "timestamp": [stamp],
+                    "indicators": {
+                        "quote": [
+                            {
+                                "open": [688.0],
+                                "high": [690.0],
+                                "low": [687.5],
+                                "close": [689.81],
+                                "volume": [12],
+                            }
+                        ]
+                    },
+                }
+            ]
+        }
+    }
+
+
+def test_a_forming_minute_is_not_handed_to_the_pipeline() -> None:
+    """这一分钟还没走完时它的收盘价还会变：适配层把它挡在管道之外。"""
+
+    stamp = int(datetime(2026, 11, 20, 21, 29, tzinfo=UTC).timestamp())
+    provider = _yahoo_provider(_minute_payload(stamp))
+
+    assert provider.fetch(["SPY"], START, datetime(2026, 11, 20, 21, 29, 30, tzinfo=UTC)) == []
+    # 这一分钟走完之后同一根才算定稿。
+    assert len(provider.fetch(["SPY"], START, datetime(2026, 11, 20, 21, 30, tzinfo=UTC))) == 1
+
+
+def test_a_daily_bar_is_final_at_the_us_close() -> None:
+    """日线在该交易日收盘（美东 16:00 = 21:00 UTC）后即可入库，不必等到次日同一时刻。
+
+    用「开盘 + 24 小时」判定会把每天的日线晚一天才写进 `candles`，ATR 与大盘异动跟着
+    晚一天；收盘后那一个 tick 就应该能拿到它。
+    """
+
+    provider = _stooq_provider()
+    closes_at = datetime(2026, 11, 20, 21, 0, tzinfo=UTC)
+
+    before = provider.fetch(["SPY"], START, closes_at - timedelta(minutes=1))
+    after = provider.fetch(["SPY"], START, closes_at)
+
+    trading_day = daily_open_time(US_EQUITY, datetime(2026, 11, 20, 16, 0, tzinfo=UTC))
+    assert trading_day not in [bar.open_time for bar in before]
+    assert trading_day in [bar.open_time for bar in after]

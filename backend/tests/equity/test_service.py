@@ -11,8 +11,10 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import select
 
 from app.core import UpstreamError
+from app.db import session_scope
 from app.equity import (
     equity_overview,
     reset_runtime,
@@ -20,7 +22,7 @@ from app.equity import (
     sync,
 )
 from app.equity import service as service_module
-from app.market import US_EQUITY, daily_open_time, from_epoch, settlement_epoch
+from app.market import US_EQUITY, Candle, daily_open_time, from_epoch, settlement_epoch
 from app.settings import load_settings, save_settings
 from tests.equity.conftest import (
     CLOSE_ET,
@@ -56,13 +58,18 @@ def _provider(**kwargs) -> FakeProvider:
 
 
 def _install(monkeypatch: pytest.MonkeyPatch, provider: FakeProvider) -> list[tuple[str, str]]:
-    """把 `build_provider` 换成替身；返回「被构造过的 (provider, bar)」记录。"""
+    """把 `build_provider` 换成替身；返回「被构造过的 (provider, bar)」记录。
+
+    一个实现现在要按周期构造多次（Yahoo 同时维护分钟级与日线），替身因此也按周期
+    过滤自己返回的 K 线，否则「日线那一批」会拿到分钟级的行。
+    """
 
     built: list[tuple[str, str]] = []
 
-    def build(name: str, **_: object) -> FakeProvider:
-        built.append((name, provider.bar))
+    def build(name: str, *, bar: str = "", **_: object) -> FakeProvider:
+        built.append((name, bar))
         provider.name = name
+        provider.bar = bar
         return provider
 
     monkeypatch.setattr(service_module, "build_provider", build)
@@ -75,8 +82,11 @@ def test_sync_writes_bars_and_records_success(monkeypatch: pytest.MonkeyPatch) -
 
     results = sync(clock=_FixedClock(NOW))
 
-    assert [item.status for item in results] == ["synced"]
-    assert results[0].rows == 1
+    # 两个周期各一批：分钟级写入 1 行，日线这一轮没有数据。
+    assert [(item.bar, item.status, item.rows) for item in results] == [
+        ("1m", "synced", 1),
+        ("1d", "synced", 0),
+    ]
     assert results[0].published == 1
     assert results[0].provider == "yahoo"
     assert candle_count(symbol="SPY") == 1
@@ -115,7 +125,7 @@ def test_a_weekend_run_still_ingests_the_previous_session(
 
     results = sync(clock=_FixedClock(sunday_noon))
 
-    assert [item.status for item in results] == ["synced"]
+    assert [item.status for item in results] == ["synced", "synced"]
     assert results[0].rows == 1
     assert candle_count(symbol="SPY") == 1
 
@@ -137,21 +147,34 @@ def test_switching_the_provider_uses_the_new_implementation(
 ) -> None:
     """AC1：`equity.provider` 从 yahoo 切到 stooq 后走新实现，数据仍入库。"""
 
-    provider = _provider(bars=[equity_bar(open_time=LAST_MINUTE_ET)], bar="1m")
-    built = _install(monkeypatch, provider)
+    minute = _provider(bars=[equity_bar(open_time=LAST_MINUTE_ET)], bar="1m")
+    daily = FakeProvider(
+        "stooq",
+        bar="1d",
+        bars=[equity_bar(open_time=CLOSE_ET, bar="1d", source="stooq")],
+    )
+    built: list[tuple[str, str]] = []
+
+    def build(name: str, *, bar: str = "", **_: object) -> FakeProvider:
+        built.append((name, bar))
+        chosen = minute if name == "yahoo" else daily
+        chosen.bar = bar
+        return chosen
+
+    monkeypatch.setattr(service_module, "build_provider", build)
 
     sync(clock=_FixedClock(NOW))
-    assert built == [("yahoo", "1m")]
+    # Yahoo 声明两个周期，两个都要抓；分钟级那一批有数据，日线这一轮为空。
+    assert built == [("yahoo", "1m"), ("yahoo", "1d")]
 
     # 只改配置：调用方代码不动。
     save_settings(data_sources={"equity": {"provider": "stooq"}})
-    provider.bar = "1d"
-    provider.bars = [equity_bar(open_time=CLOSE_ET, bar="1d", source="stooq")]
     results = sync(clock=_FixedClock(NOW))
 
-    assert built == [("yahoo", "1m"), ("stooq", "1d")]
+    # Stooq 只给日线，因此只抓一批。
+    assert built[-1] == ("stooq", "1d")
+    assert [item.bar for item in results] == ["1d"]
     assert results[0].provider == "stooq"
-    assert results[0].bar == "1d"
     assert candle_count(symbol="SPY") == 2  # 两个来源各一行，互不覆盖
     assert load_settings().data_sources["equity"]["provider"] == "stooq"
 
@@ -161,7 +184,7 @@ def test_sync_records_a_failure_and_backs_off(monkeypatch: pytest.MonkeyPatch) -
     _install(monkeypatch, provider)
 
     failed = sync(clock=_FixedClock(NOW))
-    assert [item.status for item in failed] == ["failed"]
+    assert [item.status for item in failed] == ["failed", "failed"]
     assert "连接被拒绝" in (failed[0].error or "")
     status = runtime().status()
     assert status["failures"] == 1
@@ -191,7 +214,7 @@ def test_a_foreign_source_in_the_batch_is_rejected(monkeypatch: pytest.MonkeyPat
 
     results = sync(clock=_FixedClock(NOW))
 
-    assert [item.status for item in results] == ["failed"]
+    assert [item.status for item in results] == ["failed", "failed"]
     assert "别的来源" in (results[0].error or "")
     assert candle_count(symbol="SPY") == 0
     provider.fetch = original  # type: ignore[method-assign]
@@ -368,3 +391,74 @@ def test_a_repeated_sync_publishes_nothing_new(monkeypatch: pytest.MonkeyPatch) 
 
     assert (first.rows, first.published) == (1, 1)
     assert (second.rows, second.published) == (1, 0)
+
+
+def test_daily_batch_also_maintains_the_market_indexes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """日线那一批要带上三个大盘指数，分钟级不带。
+
+    指数日线是 ATR 的唯一来源；它们不是用户配置的显示标的，但必须由渠道维护，否则
+    大盘异动只能吃种子数据。
+    """
+
+    provider = _provider(bars=[equity_bar(open_time=LAST_MINUTE_ET)])
+    _install(monkeypatch, provider)
+
+    sync(clock=_FixedClock(NOW))
+
+    assert [symbols for symbols, _start, _end in provider.calls] == [
+        ("SPY", "QQQ"),
+        ("SPY", "QQQ", "^NDX", "^GSPC", "^SOX"),
+    ]
+    # 日线回看 120 天：20 周期 ATR 的基线要跨过停牌与假日，比分钟级窗口长得多。
+    assert provider.calls[1][1] == NOW - timedelta(days=120)
+
+
+def test_a_new_trading_days_daily_bar_is_written_by_the_channel(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """新的一天收盘后，指数日线由通道写进 `candles`（不是只靠种子数据）。"""
+
+    provider = _provider(
+        bars=[equity_bar(symbol="^SOX", open_time=CLOSE_ET, bar="1d", close="10201.99")]
+    )
+    _install(monkeypatch, provider)
+
+    results = sync(clock=_FixedClock(NOW))
+
+    assert [(item.bar, item.status, item.rows) for item in results] == [
+        ("1m", "synced", 0),
+        ("1d", "synced", 1),
+    ]
+    with session_scope() as session:
+        row = session.scalar(select(Candle).where(Candle.symbol == "^SOX", Candle.bar == "1d"))
+    assert row is not None
+    assert row.close == Decimal("10201.99")
+    assert row.source == "yahoo"
+
+
+def test_a_failing_daily_batch_keeps_the_minute_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """日线那一批失败只记这批失败，分钟级已经落库的行不受影响。"""
+
+    class _DailyFails(FakeProvider):
+        def fetch(self, symbols, start, end):  # type: ignore[no-untyped-def]
+            if self.bar == "1d":
+                raise UpstreamError("日线不可用")
+            return super().fetch(symbols, start, end)
+
+    provider = _DailyFails("yahoo", bar="1m", bars=[equity_bar(open_time=LAST_MINUTE_ET)])
+    _install(monkeypatch, provider)
+
+    results = sync(clock=_FixedClock(NOW))
+
+    assert [(item.bar, item.status) for item in results] == [
+        ("1m", "synced"),
+        ("1d", "failed"),
+    ]
+    assert "日线不可用" in (results[1].error or "")
+    assert candle_count(symbol="SPY") == 1
+    # 一批失败仍算通道失败：健康组件要看得见。
+    assert runtime().status()["failures"] == 1

@@ -1687,7 +1687,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "indicator" | "price" | "risk" | "strategy" | "data";
+            type: "indicator" | "price" | "risk" | "strategy" | "data" | "market" | "watchlist";
         };
         /**
          * AlertListResponse
@@ -3287,7 +3287,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "indicator" | "price" | "risk" | "strategy" | "data";
+            type: "indicator" | "price" | "risk" | "strategy" | "data" | "market" | "watchlist";
         };
         /** DashboardAlertsModule */
         DashboardAlertsModule: {
@@ -6483,7 +6483,9 @@ export interface components {
          *               "price",
          *               "risk",
          *               "strategy",
-         *               "data"
+         *               "data",
+         *               "market",
+         *               "watchlist"
          *             ]
          *           },
          *           "telegram": {

@@ -76,6 +76,11 @@ class Settings(BaseSettings):
     equity_yahoo_url: str = (
         "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1m&range=1d"
     )
+    # 同一实现的日线地址：`range=3mo` 给约 63 个交易日，够算 20 周期 ATR 并留出余量。
+    # 分钟级与日线是两份上游摘要，模板必须分别写：一份模板给不出两个粒度。
+    equity_yahoo_daily_url: str = (
+        "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=3mo"
+    )
     # Stooq 的代码是小写 + 市场后缀（`SPY` → `spy.us`），后缀写在这份模板里。
     equity_stooq_url: str = "https://stooq.com/q/d/l/?s={symbol}.us&i=d"
 

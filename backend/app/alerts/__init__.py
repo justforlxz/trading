@@ -15,6 +15,7 @@ from app.alerts.service import (
     list_alerts,
     record_candidate,
     scan_alerts,
+    scan_market_alerts,
     update_alert_status,
 )
 
@@ -27,6 +28,7 @@ __all__ = [
     "list_alerts",
     "record_candidate",
     "scan_alerts",
+    "scan_market_alerts",
     "technical_candidates",
     "update_alert_status",
 ]

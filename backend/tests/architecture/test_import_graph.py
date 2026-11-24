@@ -72,13 +72,15 @@ INFRA: frozenset[str] = frozenset({"config", "core"})
 ALLOWED_DEPS: dict[str, frozenset[str]] = {
     # 活动只追加事件行，不反过来依赖写活动的业务模块。
     "activity": frozenset({"db"}),
-    # 提醒扫描读取自选、持仓、指标与风险结果，只写提醒与活动表。
+    # 提醒扫描读取自选、持仓、指标与风险结果，只写提醒与活动表。大盘异动要看 10Y 与
+    # 2Y→10Y 利差的日结值，因此还要读宏观域的只读读数（只读，不触发抓取）。
     "alerts": frozenset(
         {
             "shared",
             "db",
             "activity",
             "instrument",
+            "macro",
             "market",
             "indicators",
             "positions",

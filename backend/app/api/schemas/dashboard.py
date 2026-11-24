@@ -190,7 +190,7 @@ class DashboardAlertItem(BaseModel):
     """待处理提醒；来源是提醒事件表。"""
 
     id: str
-    type: Literal["indicator", "price", "risk", "strategy", "data"]
+    type: Literal["indicator", "price", "risk", "strategy", "data", "market", "watchlist"]
     severity: str | None = None
     instrument_id: str | None = None
     rule_id: str

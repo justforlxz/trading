@@ -52,6 +52,8 @@ TYPE_LABELS: dict[str, str] = {
     "risk": "持仓风险",
     "strategy": "策略信号",
     "data": "数据缺口",
+    "market": "大盘异动",
+    "watchlist": "组合异动",
     "system": "系统",
 }
 

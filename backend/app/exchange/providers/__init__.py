@@ -5,12 +5,13 @@
 
 两个实现：
 
-- `yahoo`：Yahoo chart API，分钟级。**免费源是延迟行情**（15 分钟级），`delayed`
-  如实标 `True`，不当实时；要真实时只能接付费源。
+- `yahoo`：Yahoo chart API，同时提供分钟级与日线。**免费源是延迟行情**（15 分钟级），
+  `delayed` 如实标 `True`，不当实时；要真实时只能接付费源。
 - `stooq`：Stooq 的 CSV 下载，只有日线。免费、无需 key，作为备用。
 
-`bar` / `delayed` 由实现自己声明：Yahoo 只给分钟级、Stooq 只给日线，切换 provider
-就换了落库周期，这一点会在 `candles.bar` 上直接可见，不靠调用方猜。
+`bars` / `delayed` 由实现自己声明：Yahoo 同时给分钟级与日线，Stooq 只给日线，切换
+provider 就换了落库周期，这一点会在 `candles.bar` 上直接可见，不靠调用方猜。一个实现
+可以提供多个周期，每个周期的上游地址是**各自一份**配置（同一份模板给不出两种粒度）。
 
 **本层不认识「交易时段」**：把上游时刻对齐成该市场的开盘定界、算出 `market_session`
 都是行情域的事（`app/equity/providers.py`）。这一层只把上游的字段搬成 `RawBar`，
@@ -35,7 +36,7 @@ from app.exchange.providers.yahoo import YahooSource
 __all__ = [
     "EQUITY_SOURCE_KIND",
     "build_source",
-    "source_bar",
+    "source_bars",
     "source_delayed",
     "source_names",
     "source_template",
@@ -45,11 +46,11 @@ __all__ = [
 #: 注册表里的实现类别；与宏观的 `macro_provider` 分开，同名实现互不干扰。
 EQUITY_SOURCE_KIND = "equity_source"
 
-#: provider 名 → 进程配置里的地址模板。地址是配置，不是实现细节；新增实现时在这里
-#: 加一行，实现本身不写 URL。
-_URL_SETTINGS: dict[str, str] = {
-    "yahoo": "equity_yahoo_url",
-    "stooq": "equity_stooq_url",
+#: provider 名 → 周期 → 进程配置里的地址模板。地址是配置，不是实现细节；新增实现或
+#: 新增周期时在这里加一行，实现本身不写 URL。
+_URL_SETTINGS: dict[str, dict[str, str]] = {
+    "yahoo": {"1m": "equity_yahoo_url", "1d": "equity_yahoo_daily_url"},
+    "stooq": {"1d": "equity_stooq_url"},
 }
 
 
@@ -59,7 +60,11 @@ def build_source(
     options: Mapping[str, Any],
     client: httpx.Client | None = None,
 ) -> Any:
-    """按名字构造取数实现；名字未登记时 `app.core.get` 抛参数不合法。"""
+    """按名字构造取数实现；名字未登记时 `app.core.get` 抛参数不合法。
+
+    实现不需要知道自己这次代表哪个周期：周期由地址模板决定（`interval=1m` / `interval=1d`），
+    「这根 K 线是否已定稿」由行情域按交易时段判断，不在取数层猜。
+    """
 
     factory = get(EQUITY_SOURCE_KIND, name)
     return factory(options=options, client=client)
@@ -72,15 +77,15 @@ def source_names() -> list[str]:
 
 
 def _declared(name: str, attribute: str) -> Any:
-    """读实现声明的类属性（`bar` / `delayed`），不构造实例、不发请求。"""
+    """读实现声明的类属性（`bars` / `delayed`），不构造实例、不发请求。"""
 
     return getattr(get(EQUITY_SOURCE_KIND, name), attribute)
 
 
-def source_bar(name: str) -> str:
-    """该实现实际提供的周期（`1m` / `1d`）。"""
+def source_bars(name: str) -> tuple[str, ...]:
+    """该实现实际提供的周期，按展示优先级排列（第一个是首页读数的周期）。"""
 
-    return str(_declared(name, "bar"))
+    return tuple(str(item) for item in _declared(name, "bars"))
 
 
 def source_delayed(name: str) -> bool:
@@ -92,27 +97,30 @@ def source_delayed(name: str) -> bool:
         return True
 
 
-def source_template(name: str) -> str | None:
-    """该来源的上游地址模板（含 `{symbol}` 占位符）；配置把它交给 provider 拼请求。
+def source_template(name: str, bar: str = "") -> str | None:
+    """该来源在某个周期上的上游地址模板（含 `{symbol}` 占位符）。
 
-    地址是配置事实，与这次有没有抓到数据无关。
+    地址是配置事实，与这次有没有抓到数据无关；实现不提供该周期或没有配置时给 `None`。
     """
 
-    attribute = _URL_SETTINGS.get(name)
+    names = _URL_SETTINGS.get(name)
+    if not names:
+        return None
+    attribute = names.get(bar or next(iter(names)))
     if attribute is None:
         return None
     template = getattr(get_settings(), attribute, "").strip()
     return template or None
 
 
-def source_url(name: str, symbol: str) -> str | None:
+def source_url(name: str, symbol: str, bar: str = "") -> str | None:
     """该来源对该标的的真实请求地址；接口把它作为「来源」链接返回。
 
     直接返回模板会让页面出现一个带花括号、点开 404 的链接，因此这里用实现自己的
     地址构造（与抓取时逐字一致：Stooq 的代码是小写 + 市场后缀）。
     """
 
-    template = source_template(name)
+    template = source_template(name, bar)
     if not template:
         return None
     try:

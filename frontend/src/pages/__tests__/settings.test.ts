@@ -275,7 +275,15 @@ describe("设置页", () => {
         },
       },
     });
-    for (const label of ["持仓风险", "策略信号", "技术形态", "价格区间", "数据缺口"]) {
+    for (const label of [
+      "持仓风险",
+      "策略信号",
+      "大盘异动",
+      "组合异动",
+      "技术形态",
+      "价格区间",
+      "数据缺口",
+    ]) {
       expect(html).toContain(label);
     }
     expect(html).toContain("最低严重度");

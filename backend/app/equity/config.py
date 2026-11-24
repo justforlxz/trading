@@ -1,4 +1,4 @@
-"""`settings.data_sources.equity` 的解析：provider 名、标的清单与调度周期。
+"""`settings.data_sources.equity` 的解析：provider 名、标的清单、周期与调度周期。
 
 配置形状（缺项用默认值补齐，见 `app/settings` 的 `DEFAULT_DATA_SOURCES`）：
 
@@ -13,8 +13,13 @@
 `provider` 决定用哪个实现；上游地址跟 OKX、宏观一样只从 `app/config.py`（环境变量）
 读取，实现里不写 URL。因此「换源」只要改这一个字段，调用方代码不动。
 
-**周期不在这里配置**：它由 provider 实现声明（Yahoo 1 分钟、Stooq 日线），配置切到
-哪个实现就落哪个周期。让用户在设置里选一个源不提供的周期，只会在落库时静默造假。
+**周期不在这里配置**：它由 provider 实现声明（Yahoo 声明分钟级与日线、Stooq 只有日线），
+配置切到哪个实现就落它声明的那些周期。让用户在设置里选一个源不提供的周期，只会在
+落库时静默造假。
+
+**日线还要带上三个大盘指数**：`symbols` 是用户在首页「市场概况」看到的标的，指数不在
+其中；但指数日线是 ATR 的唯一来源，属于渠道自己维护的固定清单（`app.market.indexes`），
+因此 `daily_symbols` 把它们并进日线那一批，界面上不显示。
 
 配置不合法（provider 未登记、标的为空、周期不在允许值内）时抛 `ValidationError`：
 这是用户可以改配置修好的失败，不是上游故障，不能降级成缓存值糊过去。
@@ -27,10 +32,12 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.core import ValidationError
-from app.equity.providers import provider_bar, provider_names, provider_template
+from app.equity.providers import provider_bars, provider_names, provider_template
+from app.market import INDEX_SYMBOLS
 
 __all__ = [
     "ALLOWED_INTERVALS",
+    "DAILY_BAR",
     "DEFAULT_INTERVAL",
     "DEFAULT_PROVIDER",
     "DEFAULT_SYMBOLS",
@@ -49,24 +56,40 @@ DEFAULT_PROVIDER = "yahoo"
 DEFAULT_SYMBOLS: tuple[str, ...] = ("SPY", "QQQ")
 #: 标的名进 `candles.symbol`（`String(64)`），这里按上游代码的常见长度收紧。
 MAX_SYMBOL_LENGTH = 16
+#: 日线周期：ATR 与大盘异动都只认它。
+DAILY_BAR = "1d"
 
 
 @dataclass(frozen=True, slots=True)
 class EquityConfig:
-    """一次调度需要的全部配置：provider 名、标的清单、周期与调度周期。"""
+    """一次调度需要的全部配置：provider 名、标的清单、要维护的周期与调度周期。"""
 
     provider: str
     symbols: tuple[str, ...]
-    bar: str
+    #: 这个实现要维护的周期，按展示优先级排列；第一个是首页读数用的周期。
+    bars: tuple[str, ...]
     interval: str
     interval_seconds: int
-    #: 上游地址模板（含 `{symbol}`）；未配置时为 `None`，抓取时如实报错。
-    url: str | None
+    #: 周期 → 上游地址模板（含 `{symbol}`）；未配置的周期为 `None`，抓取时如实报错。
+    urls: Mapping[str, str | None]
 
-    def options(self) -> Mapping[str, Any]:
+    @property
+    def bar(self) -> str:
+        """首页读数用的周期：实现的第一个周期。"""
+
+        return self.bars[0]
+
+    @property
+    def daily_symbols(self) -> tuple[str, ...]:
+        """日线那一批的标的：用户配置的标的 + 渠道固定维护的大盘指数。"""
+
+        return tuple(dict.fromkeys((*self.symbols, *INDEX_SYMBOLS)))
+
+    def options(self, bar: str | None = None) -> Mapping[str, Any]:
         """交给 provider 的上游配置；实现只认 `url`。"""
 
-        return {"url": self.url} if self.url else {}
+        url = self.urls.get(bar or self.bar)
+        return {"url": url} if url else {}
 
 
 def _group(data_sources: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -139,11 +162,12 @@ def resolve_config(data_sources: Mapping[str, Any]) -> EquityConfig:
             f"美股调度周期 {interval!r} 不支持; 可选: {', '.join(ALLOWED_INTERVALS)}"
         )
 
+    bars = provider_bars(provider)
     return EquityConfig(
         provider=provider,
         symbols=symbols,
-        bar=provider_bar(provider),
+        bars=bars,
         interval=interval,
         interval_seconds=ALLOWED_INTERVALS[interval],
-        url=provider_template(provider),
+        urls={bar: provider_template(provider, bar) for bar in bars},
     )

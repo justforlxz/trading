@@ -23,19 +23,32 @@ def test_defaults_apply_when_the_group_is_missing() -> None:
 
     assert config.provider == "yahoo"
     assert config.symbols == DEFAULT_SYMBOLS
+    # Yahoo 同时提供分钟级与日线：两个周期都要维护，第一个是首页读数用的周期。
+    assert config.bars == ("1m", "1d")
     assert config.bar == "1m"
     assert config.interval == "1m"
     assert config.interval_seconds == ALLOWED_INTERVALS["1m"]
-    assert config.url is not None
+    assert config.urls["1m"] is not None
+    assert config.urls["1d"] is not None
 
 
 def test_switching_provider_switches_the_bar_but_not_the_symbols() -> None:
     config = resolve_config({"equity": {"provider": "stooq"}})
 
     assert config.provider == "stooq"
+    assert config.bars == ("1d",)
     assert config.bar == "1d"
     assert config.symbols == DEFAULT_SYMBOLS
     assert config.options()["url"] is not None
+
+
+def test_daily_batch_also_maintains_the_market_indexes() -> None:
+    """指数日线是 ATR 的唯一来源，由渠道固定维护；它不是用户配置的显示标的。"""
+
+    config = resolve_config({})
+
+    assert config.symbols == ("SPY", "QQQ")
+    assert config.daily_symbols == ("SPY", "QQQ", "^NDX", "^GSPC", "^SOX")
 
 
 def test_symbols_are_cleaned_and_deduplicated() -> None:

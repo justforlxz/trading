@@ -17,7 +17,7 @@ import pytest
 from app.core import UpstreamError
 from app.exchange.providers import (
     build_source,
-    source_bar,
+    source_bars,
     source_delayed,
     source_names,
     source_template,
@@ -78,18 +78,21 @@ def test_yahoo_parse_maps_each_column_by_index() -> None:
     assert first.volume == Decimal("1000")
 
 
-def test_yahoo_parse_drops_the_bar_still_forming() -> None:
-    """最后一根还在形成：它的收盘价会变，写进 `candles` 就是伪造历史。"""
+def test_yahoo_parse_hands_over_every_bar_inside_the_window() -> None:
+    """取数层不认识交易时段：窗口内的每一根都交上去，定稿判断在行情域的适配层。"""
 
-    # 窗口在第二根 K 线收完之前结束：第三根还没收盘。
     end = datetime.fromtimestamp(STAMPS[2], tz=UTC)
 
     bars = parse_yahoo(_yahoo_payload(), "SPY", start=START, end=end)
 
+    # `end` 是半开窗口的右端：第三根的 open_time 等于 `end`，不在窗口内。
     assert [bar.open_time for bar in bars] == [
         datetime.fromtimestamp(STAMPS[0], tz=UTC),
         datetime.fromtimestamp(STAMPS[1], tz=UTC),
     ]
+
+    wider = parse_yahoo(_yahoo_payload(), "SPY", start=START, end=NOW)
+    assert len(wider) == 3
 
 
 def test_yahoo_prices_lose_the_binary_float_tail() -> None:
@@ -252,8 +255,8 @@ def test_stooq_fetch_substitutes_a_lowercase_symbol() -> None:
 
 def test_registry_declares_granularity_and_delay_per_provider() -> None:
     assert source_names() == ["stooq", "yahoo"]
-    assert source_bar("yahoo") == "1m"
-    assert source_bar("stooq") == "1d"
+    assert source_bars("yahoo") == ("1m", "1d")
+    assert source_bars("stooq") == ("1d",)
     # 两个免费源都是延迟行情：不能把它们的价格当实时。
     assert source_delayed("yahoo") is True
     assert source_delayed("stooq") is True

@@ -39,7 +39,11 @@ class AccountSnapshotRow(Base):
     """
 
     __tablename__ = "account_snapshots"
-    __table_args__ = (UniqueConstraint("account_id", "captured_at", "source"),)
+    __table_args__ = (
+        UniqueConstraint("account_id", "captured_at", "source"),
+        # 权益曲线只按 `captured_at >= 起点` 过滤，唯一约束的 `account_id` 前缀用不上。
+        Index("ix_account_snapshots_captured", "captured_at"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     account_id: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -66,6 +70,8 @@ class ExchangePositionSnapshotRow(Base):
     __table_args__ = (
         UniqueConstraint("account_id", "pos_id", "captured_at"),
         Index("ix_exchange_position_snapshots_account_captured", "account_id", "captured_at"),
+        # 持仓盈亏曲线按时间范围读，同样用不上 `account_id` 打头的索引。
+        Index("ix_exchange_position_snapshots_captured", "captured_at"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
@@ -82,6 +88,13 @@ class ExchangePositionSnapshotRow(Base):
     mgn_mode: Mapped[str | None] = mapped_column(String(16), nullable=True)
     liq_px: Mapped[Decimal | None] = mapped_column(DecimalText, nullable=True)
     margin: Mapped[Decimal | None] = mapped_column(DecimalText, nullable=True)
+    # 止损来自 OKX 策略委托与订单上的 `slTriggerPx`，落库后读侧不再联网。
+    # `stop_status` 必须是三态：`confirmed`（有价位）/ `none`（问过、确认没有）/
+    # `unavailable`（没问成）。把第三种写成 `none` 就是在告诉用户「你没设止损」。
+    stop_px: Mapped[Decimal | None] = mapped_column(DecimalText, nullable=True)
+    stop_status: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="unavailable"
+    )
     captured_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
     source: Mapped[str] = mapped_column(String(16), nullable=False)
 

@@ -10,7 +10,13 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from app.api.schemas.common import DecimalString, PositionSide, UtcDatetime
+from app.api.schemas.common import (
+    DecimalString,
+    MarginUsageBasis,
+    PositionSide,
+    StopStatus,
+    UtcDatetime,
+)
 
 __all__ = [
     "ExposurePositionItem",
@@ -19,13 +25,19 @@ __all__ = [
     "PositionRiskConfigResponse",
     "RiskConfigUpdateRequest",
     "RiskExposureResponse",
+    "RiskNotifyConfigResponse",
+    "RiskNotifyConfigUpdateRequest",
+    "RiskNotifyRuleItem",
+    "RiskNotifyRuleUpdate",
     "SectorExposureItem",
 ]
 
 RiskLevel = Literal["low", "medium", "high"]
 RuleLevel = Literal["warning", "critical"]
 ExposureStatus = Literal["ok", "empty"]
-MarginUsageBasis = Literal["margin_ratio", "used_margin"]
+
+#: 通知渠道；与 `app.risk.notify.CHANNELS` 一致。
+NotifyChannel = Literal["browser", "telegram", "webhook"]
 
 
 class ExposureSummary(BaseModel):
@@ -35,6 +47,7 @@ class ExposureSummary(BaseModel):
     gross_notional: DecimalString
     margin_usage_pct: DecimalString | None = None
     margin_usage_basis: MarginUsageBasis | None = None
+    max_single_instrument_weight_pct: DecimalString | None = None
     risk_level: RiskLevel
     currency: str
 
@@ -49,6 +62,9 @@ class ExposurePositionItem(BaseModel):
     weight_pct: DecimalString | None = None
     mark_px: DecimalString | None = None
     stop_px: DecimalString | None = None
+    #: 止损三态；`None` 表示来源没有这个概念（手动持仓）。`unavailable` 与
+    #: `none` 必须分开：前者是我们没查到，后者才确认没挂。
+    stop_status: StopStatus | None = None
     stop_distance_pct: DecimalString | None = None
     atr_distance: DecimalString | None = None
     lever: DecimalString | None = None
@@ -89,7 +105,8 @@ class RiskExposureResponse(BaseModel):
                         "net_notional": "2432.40",
                         "gross_notional": "4393.20",
                         "margin_usage_pct": "45.36",
-                        "margin_usage_basis": "margin_ratio",
+                        "margin_usage_basis": "notional_over_leverage",
+                        "max_single_instrument_weight_pct": "42.14",
                         "risk_level": "low",
                         "currency": "USDT",
                     },
@@ -104,6 +121,7 @@ class RiskExposureResponse(BaseModel):
                             "weight_pct": "42.14",
                             "mark_px": "231.42",
                             "stop_px": "210.00",
+                            "stop_status": "confirmed",
                             "stop_distance_pct": "9.25",
                             "atr_distance": "3.8",
                             "lever": "3",
@@ -164,3 +182,64 @@ class PositionRiskConfigResponse(BaseModel):
             ]
         }
     )
+
+
+class RiskNotifyRuleItem(BaseModel):
+    """一条风控通知规则：开关、渠道与阈值。
+
+    阈值为 `null` 的规则（未挂止损）没有可调数字；其余规则的阈值就是敞口计算用的
+    那一份，不另存副本。
+    """
+
+    rule_id: str
+    enabled: bool
+    channels: list[NotifyChannel]
+    threshold: DecimalString | None = None
+
+
+class RiskNotifyConfigResponse(BaseModel):
+    """五条风控通知规则的完整配置，顺序固定。"""
+
+    rules: list[RiskNotifyRuleItem]
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "rules": [
+                        {
+                            "rule_id": "stop_missing",
+                            "enabled": True,
+                            "channels": ["browser"],
+                            "threshold": None,
+                        },
+                        {
+                            "rule_id": "high_leverage",
+                            "enabled": True,
+                            "channels": ["browser", "telegram"],
+                            "threshold": "5",
+                        },
+                    ]
+                }
+            ]
+        }
+    )
+
+
+class RiskNotifyRuleUpdate(BaseModel):
+    """单条规则的部分更新；未提交的字段保持原值。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    rule_id: str
+    enabled: bool | None = None
+    channels: list[NotifyChannel] | None = None
+    threshold: DecimalString | None = None
+
+
+class RiskNotifyConfigUpdateRequest(BaseModel):
+    """批量更新通知规则；只提交的规则会被改动。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    rules: list[RiskNotifyRuleUpdate]

@@ -1,0 +1,35 @@
+{
+  "as_of": "2026-11-25T13:51:00Z",
+  "items": [
+    {
+      "asset_class": "equity_perp",
+      "avg_px": "269.34",
+      "display_symbol": "GOOGL-USDT",
+      "inst_id": "GOOGL-USDT-SWAP",
+      "lever": "10",
+      "margin": "57.83",
+      "mark_px": "276.71",
+      "mgn_mode": "isolated",
+      "name": "Alphabet",
+      "notional": "578.32",
+      "pos_id": "GOOGL-USDT-SWAP:long",
+      "pos_side": "long",
+      "size": "2.09",
+      "stop_status": "none",
+      "upl": "15.40",
+      "upl_curve": [
+        {
+          "at": "2026-11-25T12:51:00Z",
+          "value": "12.10"
+        },
+        {
+          "at": "2026-11-25T13:51:00Z",
+          "value": "15.40"
+        }
+      ],
+      "upl_ratio": "0.0274",
+      "weight_pct": "79.12"
+    }
+  ],
+  "status": "ok"
+}

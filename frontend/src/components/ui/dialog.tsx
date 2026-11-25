@@ -26,6 +26,8 @@ export type DialogProps = {
   /** 底部操作区，通常是取消 / 确认两个按钮；左对齐的内容由调用方自己放进 children 之外。 */
   footer?: ReactNode;
   className?: string;
+  /** 面板宽度上限；默认 28rem。宽表（订单历史）需要更宽时传更大的值。 */
+  maxWidth?: string;
   onClose: () => void;
   children: ReactNode;
 };
@@ -38,6 +40,7 @@ export function Dialog({
   description,
   footer,
   className,
+  maxWidth = "28rem",
   onClose,
   children,
 }: DialogProps) {
@@ -98,7 +101,7 @@ export function Dialog({
           "flex w-full flex-col rounded-lg border bg-card text-card-foreground shadow-sm outline-none",
           className,
         )}
-        style={{ maxWidth: "28rem" }}
+        style={{ maxWidth }}
       >
         <div className="flex flex-col gap-1.5 p-6">
           <h3 id={titleId} className="text-base font-semibold tracking-tight">

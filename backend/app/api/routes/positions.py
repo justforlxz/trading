@@ -14,6 +14,8 @@ from app.api.mapping import decimal_str
 from app.api.schemas.positions import (
     AccountSummaryResponse,
     AccountSyncResponse,
+    CurvePointItem,
+    EquityCurveResponse,
     ExchangePositionItem,
     ExchangePositionsResponse,
     ManualPositionCreateRequest,
@@ -25,21 +27,32 @@ from app.api.schemas.positions import (
     ManualTradeRequest,
     MergedPositionItem,
     MergedPositionsResponse,
+    OrderHistoryItem,
+    OrderHistoryResponse,
+    OrderScope,
+    PositionCardItem,
+    PositionCardsResponse,
 )
+from app.core import OrderRecord
 from app.dashboard import MergedPosition, load_merged_positions
 from app.positions import (
     AccountSyncView,
     AccountView,
+    CurvePoint,
     ExchangePositionView,
     ManualPositionView,
     ManualTradeView,
+    PositionCard,
     account_summary,
     add_manual_trade,
     create_manual_position,
     delete_manual_position,
+    equity_curve,
     exchange_positions,
+    instrument_order_history,
     list_manual_positions,
     list_manual_trades,
+    position_cards,
     sync_account,
     update_manual_position,
 )
@@ -61,6 +74,56 @@ def sync_account_snapshot() -> AccountSyncResponse:
     """采集一次 OKX 只读快照；上游故障返回 502，且不写半套数据。"""
 
     return _sync(sync_account())
+
+
+@positions_router.get("/account/equity-curve", response_model=EquityCurveResponse)
+def get_account_equity_curve(
+    range: Literal["1d", "1w", "1m", "6m", "1y"] = "1d",
+) -> EquityCurveResponse:
+    """按区间读权益曲线；覆盖不足时 `available=false` 且不给点，不画假线。"""
+
+    view = equity_curve(range)
+    return EquityCurveResponse(
+        range=view.range,
+        available=view.available,
+        change_pct=_optional_text(view.change_pct),
+        points=[_curve_point(point) for point in view.points],
+        first_snapshot_at=view.first_snapshot_at,
+        last_snapshot_at=view.last_snapshot_at,
+    )
+
+
+@positions_router.get("/positions/cards", response_model=PositionCardsResponse)
+def get_position_cards(
+    range: Literal["1d", "1w", "1m", "6m", "1y"] = "1d",
+) -> PositionCardsResponse:
+    """持仓卡片：已按未实现盈亏绝对值降序，含每条持仓的盈亏曲线与止损三态。"""
+
+    view = position_cards(range)
+    return PositionCardsResponse(
+        as_of=view.as_of,
+        status=view.status,  # type: ignore[arg-type]
+        items=[_position_card(card) for card in view.items],
+    )
+
+
+@positions_router.get("/positions/{inst_id}/orders", response_model=OrderHistoryResponse)
+def get_instrument_orders(
+    inst_id: str,
+    scope: OrderScope = "all",
+) -> OrderHistoryResponse:
+    """单标的订单历史：近 7 天与归档合并，按时间倒序。
+
+    上游不可用时返回 502 —— 空列表代表「确实没有订单」，不能用来表示「没查到」。
+    """
+
+    records = instrument_order_history(inst_id)
+    items = [
+        _order_history_item(record)
+        for record in records
+        if scope == "all" or (scope == "open") == record.is_open
+    ]
+    return OrderHistoryResponse(inst_id=inst_id, scope=scope, window_days=90, items=items)
 
 
 @positions_router.get("/positions/exchange", response_model=ExchangePositionsResponse)
@@ -205,6 +268,11 @@ def _account(view: AccountView) -> AccountSummaryResponse:
         day_pnl=_optional_text(view.day_pnl),
         position_notional=_optional_text(view.position_notional),
         position_notional_at=view.position_notional_at,
+        gross_notional=_optional_text(view.gross_notional),
+        net_notional=_optional_text(view.net_notional),
+        notional_status=view.notional_status,  # type: ignore[arg-type]
+        margin_used=_optional_text(view.margin_used),
+        margin_usage_floor=view.margin_usage_floor,
         captured_at=view.captured_at,
         source=view.source,
     )
@@ -235,6 +303,53 @@ def _exchange_position(view: ExchangePositionView) -> ExchangePositionItem:
         mgn_mode=view.mgn_mode,
         liq_px=_optional_text(view.liq_px),
         margin=_optional_text(view.margin),
+    )
+
+
+def _curve_point(point: CurvePoint) -> CurvePointItem:
+    return CurvePointItem(at=point.at, value=decimal_str(point.value))
+
+
+def _position_card(card: PositionCard) -> PositionCardItem:
+    return PositionCardItem(
+        pos_id=card.pos_id,
+        inst_id=card.inst_id,
+        display_symbol=card.display_symbol,
+        name=card.name,
+        asset_class=card.asset_class,
+        pos_side=card.pos_side,  # type: ignore[arg-type]
+        size=decimal_str(card.size),
+        avg_px=decimal_str(card.avg_px),
+        mark_px=_optional_text(card.mark_px),
+        upl=_optional_text(card.upl),
+        upl_ratio=_optional_text(card.upl_ratio),
+        lever=_optional_text(card.lever),
+        mgn_mode=card.mgn_mode,
+        liq_px=_optional_text(card.liq_px),
+        margin=_optional_text(card.margin),
+        notional=_optional_text(card.notional),
+        weight_pct=_optional_text(card.weight_pct),
+        stop_status=card.stop_status,  # type: ignore[arg-type]
+        stop_px=_optional_text(card.stop_px),
+        stop_distance_pct=_optional_text(card.stop_distance_pct),
+        upl_curve=[_curve_point(point) for point in card.upl_curve],
+    )
+
+
+def _order_history_item(record: OrderRecord) -> OrderHistoryItem:
+    return OrderHistoryItem(
+        order_id=record.order_id,
+        side="sell" if record.side == "sell" else "buy",
+        order_type=record.order_type,
+        price=_optional_text(record.price),
+        avg_px=_optional_text(record.avg_px),
+        qty=decimal_str(record.qty),
+        filled_qty=decimal_str(record.filled_qty),
+        pnl=_optional_text(record.pnl),
+        fee=_optional_text(record.fee),
+        status=record.status,
+        is_open=record.is_open,
+        ts=record.ts,
     )
 
 

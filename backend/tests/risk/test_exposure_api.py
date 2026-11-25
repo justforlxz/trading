@@ -139,8 +139,11 @@ def test_exchange_position_exposure_matches_hand_calculation(
     assert D(body["summary"]["short_notional"]) == D("0")
     assert D(body["summary"]["net_notional"]) == D("1851.36")
     assert D(body["summary"]["gross_notional"]) == D("1851.36")
-    assert D(body["summary"]["margin_usage_pct"]) == _q12(D("566.30") / D("1248.60") * D("100"))
-    assert body["summary"]["margin_usage_basis"] == "margin_ratio"
+    # 保证金占用只有一种口径：`Σ(名义 ÷ 杠杆) ÷ 权益`（不读 OKX 的 `used_margin`）。
+    assert D(body["summary"]["margin_usage_pct"]) == _q12(
+        D("1851.36") / D("3") / D("1248.60") * D("100")
+    )
+    assert body["summary"]["margin_usage_basis"] == "notional_over_leverage"
     assert body["summary"]["risk_level"] == "medium"
 
     position = body["positions"][0]

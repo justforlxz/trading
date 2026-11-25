@@ -246,7 +246,9 @@ def load_summary(*, clock: Clock | None = None, pinned: Sequence[str] = ()) -> D
     moment = (clock or SystemClock()).now().astimezone(UTC).replace(microsecond=0)
     # 账户、交易所持仓、手动持仓各只读一次：风险与持仓两个模块用的是同一份事实，
     # 逐模块各读一遍只是把同一条查询重复两次。读到异常也缓存，各模块按自己的规则降级。
-    account = _Once(lambda: account_summary(include_position_notional=False))
+    # 必须带上名义合计：保证金占用率的口径是 `Σ(名义 ÷ 杠杆) ÷ 权益`，跳过合计就
+    # 只能拿到 `None`，首页风险卡上的占用率会静默消失。
+    account = _Once(account_summary)
     exchange = _Once(exchange_positions)
     manual = _Once(list_open_manual_positions)
     exposure = _Once(lambda: exposure_from_positions(account.get(), exchange.get(), manual.get()))

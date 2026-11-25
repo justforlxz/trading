@@ -10,12 +10,20 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.api.schemas.common import DataSource, DecimalString, PositionSide, UtcDatetime
+from app.api.schemas.common import (
+    DataSource,
+    DecimalString,
+    PositionSide,
+    StopStatus,
+    UtcDatetime,
+)
 
 __all__ = [
     "AccountStatus",
     "AccountSummaryResponse",
     "AccountSyncResponse",
+    "CurvePointItem",
+    "EquityCurveResponse",
     "ExchangePositionItem",
     "ExchangePositionsResponse",
     "ManualPositionCreateRequest",
@@ -28,9 +36,21 @@ __all__ = [
     "ManualTradeRequest",
     "MergedPositionItem",
     "MergedPositionsResponse",
+    "NotionalStatus",
+    "OrderHistoryItem",
+    "OrderHistoryResponse",
+    "OrderScope",
+    "PositionCardItem",
+    "PositionCardsResponse",
+    "StopStatus",
 ]
 
 AccountStatus = Literal["ok", "stale", "unconfigured"]
+#: 名义合计是否完整；`partial` 表示有持仓没行情，界面必须在数字前标 `≥`。
+NotionalStatus = Literal["exact", "partial"]
+
+#: 订单弹窗的筛选：全部 / 挂单 / 历史。
+OrderScope = Literal["all", "open", "history"]
 ManualTradeAction = Literal["add", "reduce", "close", "correct"]
 
 
@@ -51,6 +71,11 @@ class AccountSummaryResponse(BaseModel):
     day_pnl_basis: Literal["equity_only"] = "equity_only"
     position_notional: DecimalString | None = None
     position_notional_at: UtcDatetime | None = None
+    gross_notional: DecimalString | None = None
+    net_notional: DecimalString | None = None
+    notional_status: NotionalStatus = "partial"
+    margin_used: DecimalString | None = None
+    margin_usage_floor: bool = True
     captured_at: UtcDatetime | None = None
     source: str | None = None
 
@@ -72,6 +97,11 @@ class AccountSummaryResponse(BaseModel):
                     "day_pnl_basis": "equity_only",
                     "position_notional": "1851.36",
                     "position_notional_at": "2026-11-13T09:00:00Z",
+                    "gross_notional": "1851.36",
+                    "net_notional": "1851.36",
+                    "notional_status": "exact",
+                    "margin_used": "617.12",
+                    "margin_usage_floor": False,
                     "captured_at": "2026-11-13T09:00:00Z",
                     "source": "okx_rest",
                 }
@@ -103,6 +133,11 @@ class AccountSyncResponse(AccountSummaryResponse):
                     "day_pnl_basis": "equity_only",
                     "position_notional": "1851.36",
                     "position_notional_at": "2026-11-13T09:00:00Z",
+                    "gross_notional": "1851.36",
+                    "net_notional": "1851.36",
+                    "notional_status": "exact",
+                    "margin_used": "617.12",
+                    "margin_usage_floor": False,
                     "captured_at": "2026-11-13T09:00:00Z",
                     "source": "okx_rest",
                     "positions_synced": 1,
@@ -402,5 +437,173 @@ class ManualTradeListResponse(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [{"items": ManualTradeItem.model_config["json_schema_extra"]["examples"]}]
+        }
+    )
+
+
+class CurvePointItem(BaseModel):
+    """曲线上的一个点；`value` 是该时刻的快照值，不做插值。"""
+
+    at: UtcDatetime
+    value: DecimalString
+
+
+class EquityCurveResponse(BaseModel):
+    """一段区间的权益曲线。
+
+    `available=false` 表示这段区间还没有足够的数据（快照只有十天时，一个月窗口
+    只有三分之一），此时 `points` 一定为空，界面显示「这段区间还没有数据」，
+    **不画线**。`first_snapshot_at` 用于说明「快照自 … 起记录」。
+    """
+
+    range: str
+    available: bool
+    change_pct: DecimalString | None = None
+    points: list[CurvePointItem]
+    first_snapshot_at: UtcDatetime | None = None
+    last_snapshot_at: UtcDatetime | None = None
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "range": "1d",
+                    "available": True,
+                    "change_pct": "2.33",
+                    "first_snapshot_at": "2026-11-15T00:00:00Z",
+                    "last_snapshot_at": "2026-11-25T13:51:00Z",
+                    "points": [
+                        {"at": "2026-11-25T12:51:00Z", "value": "412.60"},
+                        {"at": "2026-11-25T13:51:00Z", "value": "413.45"},
+                    ],
+                }
+            ]
+        }
+    )
+
+
+class PositionCardItem(BaseModel):
+    """一张持仓卡片需要的全部事实，盈亏、占比与止损距离都由后端算好。"""
+
+    pos_id: str
+    inst_id: str
+    display_symbol: str
+    name: str
+    asset_class: str
+    pos_side: PositionSide
+    size: DecimalString
+    avg_px: DecimalString
+    mark_px: DecimalString | None = None
+    upl: DecimalString | None = None
+    upl_ratio: DecimalString | None = None
+    lever: DecimalString | None = None
+    mgn_mode: str | None = None
+    liq_px: DecimalString | None = None
+    margin: DecimalString | None = None
+    notional: DecimalString | None = None
+    weight_pct: DecimalString | None = None
+    stop_status: StopStatus
+    stop_px: DecimalString | None = None
+    stop_distance_pct: DecimalString | None = None
+    upl_curve: list[CurvePointItem]
+
+
+class PositionCardsResponse(BaseModel):
+    """持仓卡片列表，已按未实现盈亏绝对值降序。"""
+
+    as_of: UtcDatetime | None = None
+    status: AccountStatus
+    items: list[PositionCardItem]
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "as_of": "2026-11-25T13:51:00Z",
+                    "status": "ok",
+                    "items": [
+                        {
+                            "pos_id": "GOOGL-USDT-SWAP:long",
+                            "inst_id": "GOOGL-USDT-SWAP",
+                            "display_symbol": "GOOGL-USDT",
+                            "name": "Alphabet",
+                            "asset_class": "equity_perp",
+                            "pos_side": "long",
+                            "size": "2.09",
+                            "avg_px": "269.34",
+                            "mark_px": "276.71",
+                            "upl": "15.40",
+                            "upl_ratio": "0.0274",
+                            "lever": "10",
+                            "mgn_mode": "isolated",
+                            "liq_px": None,
+                            "margin": "57.83",
+                            "notional": "578.32",
+                            "weight_pct": "79.12",
+                            "stop_status": "none",
+                            "stop_px": None,
+                            "stop_distance_pct": None,
+                            "upl_curve": [
+                                {"at": "2026-11-25T12:51:00Z", "value": "12.10"},
+                                {"at": "2026-11-25T13:51:00Z", "value": "15.40"},
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+
+
+class OrderHistoryItem(BaseModel):
+    """单标的一笔订单；`is_open` 区分挂单与历史，`pnl` / `fee` 缺失时为 `null`。"""
+
+    order_id: str
+    side: Literal["buy", "sell"]
+    order_type: str
+    price: DecimalString | None = None
+    avg_px: DecimalString | None = None
+    qty: DecimalString
+    filled_qty: DecimalString
+    pnl: DecimalString | None = None
+    fee: DecimalString | None = None
+    status: str
+    is_open: bool
+    ts: UtcDatetime
+
+
+class OrderHistoryResponse(BaseModel):
+    """单标的订单历史；近 7 天来自 `orders-history`，更早来自归档（最多 3 个月）。"""
+
+    inst_id: str
+    scope: OrderScope
+    window_days: int
+    items: list[OrderHistoryItem]
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "inst_id": "BTC-USDT-SWAP",
+                    "scope": "all",
+                    "window_days": 90,
+                    "items": [
+                        {
+                            "order_id": "3123456789",
+                            "side": "sell",
+                            "order_type": "limit",
+                            "price": "60520",
+                            "avg_px": "60520",
+                            "qty": "0.2",
+                            "filled_qty": "0.2",
+                            "pnl": "1.84",
+                            "fee": "-0.03",
+                            "status": "filled",
+                            "is_open": False,
+                            "ts": "2026-11-25T09:09:00Z",
+                        }
+                    ],
+                }
+            ]
         }
     )

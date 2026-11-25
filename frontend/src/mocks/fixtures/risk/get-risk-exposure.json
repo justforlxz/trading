@@ -14,6 +14,7 @@
       "source": "exchange",
       "stop_distance_pct": "9.25",
       "stop_px": "210.00",
+      "stop_status": "confirmed",
       "weight_pct": "42.14"
     }
   ],
@@ -38,8 +39,9 @@
     "currency": "USDT",
     "gross_notional": "4393.20",
     "long_notional": "3412.80",
-    "margin_usage_basis": "margin_ratio",
+    "margin_usage_basis": "notional_over_leverage",
     "margin_usage_pct": "45.36",
+    "max_single_instrument_weight_pct": "42.14",
     "net_notional": "2432.40",
     "risk_level": "low",
     "short_notional": "980.40"

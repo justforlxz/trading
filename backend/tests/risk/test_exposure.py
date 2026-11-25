@@ -25,6 +25,7 @@ THRESHOLDS = RiskThresholds(
     max_leverage=D("3"),
     max_single_instrument_weight_pct=D("80"),
     max_margin_usage_pct=D("70"),
+    stop_distance_atr_multiple=D("1"),
 )
 
 
@@ -81,6 +82,7 @@ NO_CONCENTRATION_RULE = RiskThresholds(
     max_leverage=D("3"),
     max_single_instrument_weight_pct=D("100"),
     max_margin_usage_pct=D("70"),
+    stop_distance_atr_multiple=D("1"),
 )
 
 
@@ -236,6 +238,7 @@ def test_single_instrument_weight_aggregates_spot_and_swap_of_the_same_product()
             max_leverage=D("3"),
             max_single_instrument_weight_pct=D("80"),
             max_margin_usage_pct=D("70"),
+            stop_distance_atr_multiple=D("1"),
         ),
     )
 

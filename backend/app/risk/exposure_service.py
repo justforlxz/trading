@@ -21,6 +21,7 @@ from app.indicators import compute
 from app.instrument import Instrument, get_instruments, okx_source
 from app.market import latest_candles_by_source, load_candles_by_source
 from app.positions import (
+    STOP_CONFIRMED,
     AccountView,
     ExchangePositionsView,
     ExchangePositionView,
@@ -37,6 +38,7 @@ from app.risk.exposure import (
     RiskThresholds,
     build_exposure,
 )
+from app.risk.notify import load_notify_config
 from app.settings import load_settings
 
 __all__ = [
@@ -83,7 +85,8 @@ def exposure_report(*, clock: Clock | None = None) -> RiskExposure:
     """
 
     return exposure_from_positions(
-        account_summary(include_position_notional=False),
+        # 名义合计是保证金占用率的分母来源，这里必须带上，否则占用率恒为 `None`。
+        account_summary(),
         exchange_positions(),
         list_open_manual_positions(),
         clock=clock,
@@ -117,9 +120,7 @@ def exposure_from_positions(
         for ref, item in manual_refs.items()
     )
 
-    usage, basis = _margin_usage(
-        account.used_margin, account.available_margin, account.margin_usage_pct
-    )
+    usage, basis = _margin_usage(account)
     return build_exposure(
         tuple(positions),
         as_of=account.captured_at or (clock or SystemClock()).now(),
@@ -127,6 +128,7 @@ def exposure_from_positions(
         thresholds=_thresholds(),
         margin_usage_pct=usage,
         margin_usage_basis=basis,
+        disabled_rules=load_notify_config().disabled(),
     )
 
 
@@ -193,6 +195,13 @@ def _exchange_input(
     instruments: Mapping[str, _InstrumentRiskData],
 ) -> PositionRiskInput:
     data = instruments[item.inst_id]
+    # 用户在本应用里声明的止损优先（那是他明确表达过的意图）；没配过就用同步来的
+    # OKX 止损，并原样带上三态——「没查到」与「没挂」在风险层必须分开。
+    local_stop = None if config is None else config.stop_px
+    if local_stop is not None:
+        stop_px, stop_status = local_stop, STOP_CONFIRMED
+    else:
+        stop_px, stop_status = item.stop_px, item.stop_status
     return PositionRiskInput(
         position_ref=ref,
         source="exchange",
@@ -202,7 +211,8 @@ def _exchange_input(
         size=item.size,
         inst_type=data.inst_type,
         mark_px=item.mark_px if item.mark_px is not None else data.latest_price,
-        stop_px=None if config is None else config.stop_px,
+        stop_px=stop_px,
+        stop_status=stop_status,
         atr=data.atr,
         lever=item.lever,
         sector=data.sector,
@@ -342,6 +352,7 @@ def _thresholds() -> RiskThresholds:
             risk, "max_single_instrument_weight_pct", "35"
         ),
         max_margin_usage_pct=_positive_setting(risk, "max_margin_usage_pct", "70"),
+        stop_distance_atr_multiple=_positive_setting(risk, "stop_distance_atr_multiple", "1.0"),
     )
 
 
@@ -353,21 +364,17 @@ def _positive_setting(risk: Mapping[str, object], name: str, default: str) -> De
     return value if value > ZERO else Decimal(default)
 
 
-def _margin_usage(
-    used_margin: Decimal | None,
-    available_margin: Decimal | None,
-    ratio_pct: Decimal | None,
-) -> tuple[Decimal | None, str | None]:
-    """优先账户快照的保证金比率；没有时用已用保证金占两者之和的比例。"""
+def _margin_usage(account: AccountView) -> tuple[Decimal | None, str | None]:
+    """保证金占用率只有一种口径：`Σ(名义 ÷ 杠杆) ÷ 权益`。
 
-    if ratio_pct is not None:
-        return ratio_pct, "margin_ratio"
-    if used_margin is None or available_margin is None:
+    不再退回 OKX 的 `used_margin` / `imr`：逐仓模式下它们返回 0 或空，用它会让
+    「占用 0%」和「保证金占用过高」这条规则同时失效。`margin_usage_floor` 为真时
+    这个比例是下限（有持仓缺行情），界面标 `≥`。
+    """
+
+    if account.margin_usage_pct is None:
         return None, None
-    denominator = used_margin + available_margin
-    if denominator <= ZERO:
-        return None, None
-    return used_margin / denominator * HUNDRED, "used_margin"
+    return account.margin_usage_pct, "notional_over_leverage"
 
 
 def _config_view(row: PositionRiskConfigRow) -> SavedRiskConfig:

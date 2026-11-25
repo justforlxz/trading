@@ -13,7 +13,6 @@ export type RiskExposure = components["schemas"]["RiskExposureResponse"];
 export type RiskSummary = RiskExposure["summary"];
 export type RiskPosition = RiskExposure["positions"][number];
 export type RiskRule = RiskExposure["rules"][number];
-export type SectorExposure = RiskExposure["sectors"][number];
 export type RiskConfig = components["schemas"]["PositionRiskConfigResponse"];
 export type RiskConfigUpdate = components["schemas"]["RiskConfigUpdateRequest"];
 
@@ -241,13 +240,6 @@ export function positionSourceLabel(source: string | null | undefined): string {
   return unavailableText("后端返回了未知持仓来源");
 }
 
-export function sectorLabel(sector: string | null | undefined): string {
-  if (sector === null || sector === undefined || sector.trim() === "") {
-    return unavailableText("后端未返回行业名称");
-  }
-  return sector === "unclassified" ? "未分类" : sector;
-}
-
 export function riskSideLabel(side: string | null | undefined): string {
   if (side === "long") return "多";
   if (side === "short") return "空";
@@ -270,7 +262,73 @@ export function riskExposureProblem(value: unknown): string | null {
     return "后端返回缺少 summary";
   }
   if (!Array.isArray(record.positions)) return "后端返回缺少 positions";
-  if (!Array.isArray(record.sectors)) return "后端返回缺少 sectors";
   if (!Array.isArray(record.rules)) return "后端返回缺少 rules";
   return null;
+}
+
+// ---------------------------------------------------------------- 命中汇总
+
+export type HitSummary = {
+  id: string;
+  label: string;
+  tone: string;
+};
+
+const TONE_ALERT = "border-rose-600/40 bg-rose-500/5 text-rose-700 dark:text-rose-400";
+const TONE_WARN = "border-amber-600/40 bg-amber-500/5 text-amber-700 dark:text-amber-400";
+const TONE_NEUTRAL = "border-border text-muted-foreground";
+
+/**
+ * 把规则结果压成风控命中条上的几个徽标。
+ *
+ * 只数规则命中条数、取最大的单标的占比，不重新判定任何一条规则——判定在后端，
+ * 页面只呈现结果。没有命中时返回空数组，由调用方显示「无」。
+ */
+export function summarizeHits(exposure: RiskExposure | null): HitSummary[] {
+  if (exposure === null) return [];
+  const counts = new Map<string, number>();
+  for (const rule of exposure.rules) {
+    counts.set(rule.rule_id, (counts.get(rule.rule_id) ?? 0) + 1);
+  }
+
+  const hits: HitSummary[] = [];
+  const stopMissing = counts.get("stop_missing") ?? 0;
+  if (stopMissing > 0) {
+    hits.push({ id: "stop_missing", label: `未挂止损 ${stopMissing}`, tone: TONE_ALERT });
+  }
+  // 「没查到」不是「没挂」：单列一个中性徽标，既不告警也不隐瞒。
+  const unknownStops = exposure.positions.filter(
+    (position) => position.stop_status === "unavailable",
+  ).length;
+  if (unknownStops > 0) {
+    hits.push({ id: "stop_unavailable", label: `止损未取到 ${unknownStops}`, tone: TONE_NEUTRAL });
+  }
+  const stopNear = counts.get("stop_distance") ?? 0;
+  if (stopNear > 0) {
+    hits.push({ id: "stop_distance", label: `止损距离过近 ${stopNear}`, tone: TONE_WARN });
+  }
+  const leverage = counts.get("high_leverage") ?? 0;
+  if (leverage > 0) {
+    hits.push({ id: "high_leverage", label: `杠杆过高 ${leverage}`, tone: TONE_WARN });
+  }
+  if ((counts.get("single_instrument_weight") ?? 0) > 0) {
+    hits.push({
+      id: "single_instrument_weight",
+      label: `最大单标的占比 ${oneDecimal(exposure.summary.max_single_instrument_weight_pct)}%`,
+      tone: TONE_NEUTRAL,
+    });
+  }
+  if ((counts.get("margin_usage") ?? 0) > 0) {
+    hits.push({
+      id: "margin_usage",
+      label: `保证金占用 ${oneDecimal(exposure.summary.margin_usage_pct)}%`,
+      tone: TONE_WARN,
+    });
+  }
+  return hits;
+}
+
+function oneDecimal(value: string | null | undefined): string {
+  const parsed = Number(value ?? "0");
+  return Number.isFinite(parsed) ? parsed.toFixed(1) : "—";
 }

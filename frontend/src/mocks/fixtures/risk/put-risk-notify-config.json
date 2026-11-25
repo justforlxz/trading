@@ -1,0 +1,20 @@
+{
+  "rules": [
+    {
+      "channels": [
+        "browser"
+      ],
+      "enabled": true,
+      "rule_id": "stop_missing"
+    },
+    {
+      "channels": [
+        "browser",
+        "telegram"
+      ],
+      "enabled": true,
+      "rule_id": "high_leverage",
+      "threshold": "5"
+    }
+  ]
+}

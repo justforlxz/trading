@@ -31,6 +31,11 @@ from app.risk.exposure_service import (
     exposure_report,
     save_position_risk_config,
 )
+from app.risk.notify import (
+    NotifyConfig,
+    load_notify_config,
+    save_notify_config,
+)
 from app.risk.rules import (
     Correlation,
     PositionExposure,
@@ -58,6 +63,7 @@ __all__ = [
     "DisposalAction",
     "DisposalContext",
     "DisposalRequest",
+    "NotifyConfig",
     "PositionExposure",
     "PositionRiskInput",
     "RiskContext",
@@ -76,9 +82,11 @@ __all__ = [
     "exposure_from_positions",
     "exposure_report",
     "list_risk_events",
+    "load_notify_config",
     "notional_value",
     "plan",
     "resolve_risk_event",
     "rule_applicability",
+    "save_notify_config",
     "save_position_risk_config",
 ]

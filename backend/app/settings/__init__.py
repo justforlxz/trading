@@ -6,6 +6,7 @@
 from app.settings.model import SettingsRow
 from app.settings.service import (
     DEFAULT_DATA_SOURCES,
+    DEFAULT_RISK,
     HOMEPAGE_PINNED_LIMIT,
     SettingsRecord,
     apply_saved_settings,
@@ -16,6 +17,7 @@ from app.settings.service import (
 
 __all__ = [
     "DEFAULT_DATA_SOURCES",
+    "DEFAULT_RISK",
     "HOMEPAGE_PINNED_LIMIT",
     "SettingsRecord",
     "SettingsRow",

@@ -21,7 +21,9 @@ __all__ = [
     "ExchangePosition",
     "Fill",
     "Order",
+    "OrderRecord",
     "Position",
+    "StopOrder",
     "TradePort",
 ]
 
@@ -107,6 +109,44 @@ class ExchangePosition:
     margin: Decimal | None
 
 
+@dataclass(frozen=True, slots=True)
+class StopOrder:
+    """一条挂在交易所或订单上的止盈止损。
+
+    `stop_px` 只取止损触发价（`slTriggerPx`）。只带止盈的单子（`tpTriggerPx` 有值、
+    `slTriggerPx` 为空）`stop_px` 仍为空——止盈不是止损，不能当成「已挂止损」。
+    """
+
+    inst_id: str
+    order_id: str
+    order_type: str
+    side: str
+    stop_px: Decimal | None
+    pos_side: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class OrderRecord:
+    """单标的的一笔订单记录：`is_open` 区分挂单与历史，`pnl` / `fee` 可空。
+
+    字段全部保留上游原值；`status` 是上游状态字面量，由展示层做语义映射。
+    """
+
+    order_id: str
+    inst_id: str
+    side: str
+    order_type: str
+    price: Decimal | None
+    avg_px: Decimal | None
+    qty: Decimal
+    filled_qty: Decimal
+    pnl: Decimal | None
+    fee: Decimal | None
+    status: str
+    is_open: bool
+    ts: datetime
+
+
 @runtime_checkable
 class TradePort(Protocol):
     """交易端口：业务模块只依赖这些方法签名。
@@ -142,5 +182,19 @@ class TradePort(Protocol):
 
     def fills(self, inst_id: str, order_id: str | None = None) -> list[Fill]:
         """查询成交记录；`order_id` 为空时返回该标的的全部成交。"""
+
+        raise NotImplementedError
+
+    def stop_orders(self) -> list[StopOrder]:
+        """返回账户上所有止盈止损委托与订单携带的触发价。
+
+        上游整体不可用时抛 `UpstreamError`；「查到了、一条止损都没有」返回空列表。
+        调用方必须区分这两者，不能把失败当成「没设止损」。
+        """
+
+        raise NotImplementedError
+
+    def order_history(self, inst_id: str, *, days: int = 90) -> list[OrderRecord]:
+        """返回单个标的的挂单与历史订单，按时间倒序；`days` 是历史回溯天数上限。"""
 
         raise NotImplementedError

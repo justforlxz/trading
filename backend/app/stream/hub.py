@@ -1138,7 +1138,10 @@ def _account_payload(
         "unrealized_pnl": _decimal_text(snapshot.unrealized_pnl),
         "used_margin": _decimal_text(snapshot.used_margin),
         "available_margin": _decimal_text(snapshot.available_margin),
-        "margin_usage_pct": _decimal_text(snapshot.margin_ratio * 100),
+        # 推送不带保证金占用率：正确口径是 `Σ(名义 ÷ 杠杆) ÷ 权益`，需要持仓明细，
+        # 而这次推送只有账户字段。上游 `margin_ratio` 在逐仓模式下恒为 0，拿它顶上
+        # 会把页面上的占用率从真实值打回 0%。前端合并时保持 HTTP 快照里那一份。
+        "margin_usage_pct": None,
         "captured_at": _iso(captured_at),
         "source": source,
     }

@@ -104,9 +104,12 @@ def test_sync_then_summary_and_exchange_positions_share_captured_at(
     assert Decimal(body["equity"]) == Decimal("1248.60")
     assert Decimal(body["available_equity"]) == Decimal("682.30")
     assert Decimal(body["used_margin"]) == Decimal("566.30")
+    # 保证金占用按 `Σ(名义 ÷ 杠杆) ÷ 权益` 计算，不读快照里的 `used_margin`：
+    # 逐仓模式下上游 `imr` 返回空、`used_margin` 恒为 0，用它只会得到「占用 0%」。
     assert float(Decimal(body["margin_usage_pct"])) == pytest.approx(
-        float(Decimal("566.30") / Decimal("1248.60") * 100)
+        float(Decimal("1851.36") / Decimal("3") / Decimal("1248.60") * 100)
     )
+    assert Decimal(body["margin_used"]) == pytest.approx(Decimal("617.12"))
     assert body["day_pnl"] is None
     assert body["day_pnl_basis"] == "equity_only"
     assert Decimal(body["position_notional"]) == Decimal("1851.36")

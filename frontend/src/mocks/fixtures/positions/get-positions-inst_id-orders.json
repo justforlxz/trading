@@ -1,0 +1,21 @@
+{
+  "inst_id": "BTC-USDT-SWAP",
+  "items": [
+    {
+      "avg_px": "60520",
+      "fee": "-0.03",
+      "filled_qty": "0.2",
+      "is_open": false,
+      "order_id": "3123456789",
+      "order_type": "limit",
+      "pnl": "1.84",
+      "price": "60520",
+      "qty": "0.2",
+      "side": "sell",
+      "status": "filled",
+      "ts": "2026-11-25T09:09:00Z"
+    }
+  ],
+  "scope": "all",
+  "window_days": 90
+}

@@ -1,0 +1,17 @@
+{
+  "available": true,
+  "change_pct": "2.33",
+  "first_snapshot_at": "2026-11-15T00:00:00Z",
+  "last_snapshot_at": "2026-11-25T13:51:00Z",
+  "points": [
+    {
+      "at": "2026-11-25T12:51:00Z",
+      "value": "412.60"
+    },
+    {
+      "at": "2026-11-25T13:51:00Z",
+      "value": "413.45"
+    }
+  ],
+  "range": "1d"
+}

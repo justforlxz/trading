@@ -14,7 +14,9 @@ from app.core.ports.trade import (
     ExchangePosition,
     Fill,
     Order,
+    OrderRecord,
     Position,
+    StopOrder,
     TradePort,
 )
 
@@ -27,7 +29,9 @@ __all__ = [
     "Observation",
     "ObservationProvider",
     "Order",
+    "OrderRecord",
     "Position",
+    "StopOrder",
     "Ticker",
     "TradePort",
 ]

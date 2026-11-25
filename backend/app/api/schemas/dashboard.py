@@ -21,6 +21,7 @@ from app.api.schemas.common import (
     DataSource,
     DecimalString,
     InstType,
+    MarginUsageBasis,
     PositionSide,
     UtcDatetime,
 )
@@ -120,7 +121,7 @@ class DashboardRiskData(BaseModel):
     net_notional: DecimalString
     gross_notional: DecimalString
     margin_usage_pct: DecimalString | None = None
-    margin_usage_basis: Literal["margin_ratio", "used_margin"] | None = None
+    margin_usage_basis: MarginUsageBasis | None = None
     position_count: int
     near_stop_count: int
     high_leverage_count: int

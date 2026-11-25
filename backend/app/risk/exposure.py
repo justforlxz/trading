@@ -27,6 +27,7 @@ from typing import Literal
 
 from app.instrument import notional_value as value_by_unit
 from app.instrument import trading_rules
+from app.positions import STOP_UNAVAILABLE
 
 __all__ = [
     "ATR_PERIOD",
@@ -60,6 +61,8 @@ RULE_MARGIN_USAGE = "margin_usage"
 
 _FLAG_NO_MARKET_DATA = "no_market_data"
 _FLAG_ATR_UNAVAILABLE = "atr_unavailable"
+#: 这次没取到止损数据。它与 `stop_missing` 是两件事：一个是我们不知道，一个是确认没有。
+_FLAG_STOP_UNAVAILABLE = "stop_unavailable"
 
 RiskLevel = Literal["low", "medium", "high"]
 RuleLevel = Literal["warning", "critical"]
@@ -67,11 +70,16 @@ RuleLevel = Literal["warning", "critical"]
 
 @dataclass(frozen=True, slots=True)
 class RiskThresholds:
-    """风险规则阈值；全部来自设置，不在计算里写死。"""
+    """风险规则阈值；全部来自设置，不在计算里写死。
+
+    `stop_distance_atr_multiple` 是「止损距离过近」的判定倍数：标记价到止损价不足
+    这么多倍 ATR 就命中。
+    """
 
     max_leverage: Decimal
     max_single_instrument_weight_pct: Decimal
     max_margin_usage_pct: Decimal
+    stop_distance_atr_multiple: Decimal
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +100,9 @@ class PositionRiskInput:
     sector: str | None
     ct_val: Decimal | None
     ct_mult: Decimal | None
+    #: 止损三态（`confirmed` / `none` / `unavailable`）。`None` 表示来源没有这个概念
+    #: （手动持仓：用户填了就是有，没填就是没有），此时按 `stop_px` 是否为 `None` 判。
+    stop_status: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,6 +116,7 @@ class ExposurePosition:
     weight_pct: Decimal | None
     mark_px: Decimal | None
     stop_px: Decimal | None
+    stop_status: str | None
     stop_distance_pct: Decimal | None
     atr_distance: Decimal | None
     lever: Decimal | None
@@ -135,6 +147,9 @@ class ExposureSummary:
     gross_notional: Decimal
     margin_usage_pct: Decimal | None
     margin_usage_basis: str | None
+    #: 单个标的占组合名义敞口的最大比例；没有可算的持仓时为 `None`。
+    #: 页面上的「最大单标的占比」直接用这个值，不在前端再聚合一次。
+    max_single_instrument_weight_pct: Decimal | None
     risk_level: RiskLevel
     currency: str
 
@@ -204,8 +219,13 @@ def build_exposure(
     thresholds: RiskThresholds,
     margin_usage_pct: Decimal | None = None,
     margin_usage_basis: str | None = None,
+    disabled_rules: frozenset[str] = frozenset(),
 ) -> RiskExposure:
-    """把持仓压成持仓级、行业级、组合级三层风险视图。"""
+    """把持仓压成持仓级、行业级、组合级三层风险视图。
+
+    `disabled_rules` 里的规则**完全不评估**：既不产生命中行，也不打持仓标记。关掉
+    一条规则的意义是「不再关心它」，不是「算完再藏起来」。
+    """
 
     notionals = {position.position_ref: notional_value(position) for position in positions}
     long_notional = sum(
@@ -247,32 +267,47 @@ def build_exposure(
         if value is None:
             flag(position.position_ref, _FLAG_NO_MARKET_DATA)
 
-        if position.stop_px is None:
-            rules.append(
-                ExposureRule(
-                    rule_id=RULE_STOP_MISSING,
-                    level="warning",
-                    position_ref=position.position_ref,
-                    value=None,
-                    threshold=None,
+        # 「没查到」既不能算缺失、也不能算有：缺失只认确认过的 `none`（或来自没有
+        # 三态概念的来源、且确实没填止损）。
+        stop_unavailable = position.stop_status == STOP_UNAVAILABLE
+        if stop_unavailable:
+            flag(position.position_ref, _FLAG_STOP_UNAVAILABLE)
+        elif position.stop_px is None:
+            if RULE_STOP_MISSING not in disabled_rules:
+                rules.append(
+                    ExposureRule(
+                        rule_id=RULE_STOP_MISSING,
+                        level="warning",
+                        position_ref=position.position_ref,
+                        value=None,
+                        threshold=None,
+                    )
                 )
-            )
-            flag(position.position_ref, RULE_STOP_MISSING)
+                flag(position.position_ref, RULE_STOP_MISSING)
         else:
             distance = _price_distance(position)
             atr_distance = _atr_distance(position)
-            if atr_distance is not None and atr_distance < ONE:
+            if (
+                RULE_STOP_DISTANCE not in disabled_rules
+                and atr_distance is not None
+                and atr_distance < thresholds.stop_distance_atr_multiple
+            ):
                 rules.append(
                     ExposureRule(
                         rule_id=RULE_STOP_DISTANCE,
                         level="critical" if distance is not None and distance < ZERO else "warning",
                         position_ref=position.position_ref,
                         value=atr_distance,
-                        threshold=ONE,
+                        threshold=thresholds.stop_distance_atr_multiple,
                     )
                 )
                 flag(position.position_ref, RULE_STOP_DISTANCE)
-            elif atr_distance is None and distance is not None and distance < ZERO:
+            elif (
+                RULE_STOP_DISTANCE not in disabled_rules
+                and atr_distance is None
+                and distance is not None
+                and distance < ZERO
+            ):
                 rules.append(
                     ExposureRule(
                         rule_id=RULE_STOP_DISTANCE,
@@ -286,7 +321,11 @@ def build_exposure(
             if atr_distance is None and position.mark_px is not None:
                 flag(position.position_ref, _FLAG_ATR_UNAVAILABLE)
 
-        if position.lever is not None and position.lever > thresholds.max_leverage:
+        if (
+            RULE_HIGH_LEVERAGE not in disabled_rules
+            and position.lever is not None
+            and position.lever > thresholds.max_leverage
+        ):
             rules.append(
                 ExposureRule(
                     rule_id=RULE_HIGH_LEVERAGE,
@@ -298,24 +337,33 @@ def build_exposure(
             )
             flag(position.position_ref, RULE_HIGH_LEVERAGE)
 
-    for symbol, value in symbol_notional.items():
-        weight = _ratio_pct(value, gross_notional)
-        if weight is None or weight <= thresholds.max_single_instrument_weight_pct:
-            continue
-        refs = sorted(symbol_refs[symbol])
-        rules.append(
-            ExposureRule(
-                rule_id=RULE_SINGLE_INSTRUMENT_WEIGHT,
-                level="warning",
-                position_ref=refs[0],
-                value=weight,
-                threshold=thresholds.max_single_instrument_weight_pct,
+    symbol_weights = {
+        symbol: weight
+        for symbol, value in symbol_notional.items()
+        if (weight := _ratio_pct(value, gross_notional)) is not None
+    }
+    if RULE_SINGLE_INSTRUMENT_WEIGHT not in disabled_rules:
+        for symbol, weight in symbol_weights.items():
+            if weight <= thresholds.max_single_instrument_weight_pct:
+                continue
+            refs = sorted(symbol_refs[symbol])
+            rules.append(
+                ExposureRule(
+                    rule_id=RULE_SINGLE_INSTRUMENT_WEIGHT,
+                    level="warning",
+                    position_ref=refs[0],
+                    value=weight,
+                    threshold=thresholds.max_single_instrument_weight_pct,
+                )
             )
-        )
-        for ref in refs:
-            flag(ref, RULE_SINGLE_INSTRUMENT_WEIGHT)
+            for ref in refs:
+                flag(ref, RULE_SINGLE_INSTRUMENT_WEIGHT)
 
-    if margin_usage_pct is not None and margin_usage_pct > thresholds.max_margin_usage_pct:
+    if (
+        RULE_MARGIN_USAGE not in disabled_rules
+        and margin_usage_pct is not None
+        and margin_usage_pct > thresholds.max_margin_usage_pct
+    ):
         rules.append(
             ExposureRule(
                 rule_id=RULE_MARGIN_USAGE,
@@ -346,6 +394,7 @@ def build_exposure(
             else None,
             mark_px=position.mark_px,
             stop_px=position.stop_px,
+            stop_status=position.stop_status,
             stop_distance_pct=_stop_distance_pct(position),
             atr_distance=_atr_distance(position),
             lever=position.lever,
@@ -378,6 +427,7 @@ def build_exposure(
         gross_notional=gross_notional,
         margin_usage_pct=margin_usage_pct,
         margin_usage_basis=margin_usage_basis,
+        max_single_instrument_weight_pct=max(symbol_weights.values(), default=None),
         risk_level=risk_level,
         currency=currency,
     )

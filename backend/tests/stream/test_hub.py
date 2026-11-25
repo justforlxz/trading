@@ -412,6 +412,9 @@ def _position_view(pos_id: str, size: str, *, mark_px: str = "101") -> ExchangeP
         mgn_mode=None,
         liq_px=None,
         margin=None,
+        stop_px=None,
+        # 推送视图不携带止损：如实标成「未取到」，不是「没挂」。
+        stop_status="unavailable",
     )
 
 

@@ -549,3 +549,57 @@ def test_watchlist_module_without_pins_keeps_join_order(client: TestClient) -> N
     items = client.get("/api/dashboard/summary").json()["watchlist"]["data"]["items"]
 
     assert [item["inst_id"] for item in items] == [f"XORDER{index}-USDT" for index in range(5)]
+
+
+def test_risk_module_survives_an_account_snapshot(client: TestClient) -> None:
+    """账户有快照时风险模块必须照常返回。
+
+    `margin_usage_basis` 的口径在 MKACG-1003 里改成 `notional_over_leverage`。响应模型
+    的 `Literal` 一旦落后于产出口径，构造响应就会失败，风险模块被降级成 `unavailable`
+    —— 首页看不出是「没数据」还是「形状对不上」。
+    """
+
+    from app.core import AccountSnapshot, ExchangePosition
+    from app.positions import record_exchange_snapshot
+
+    _swap_market()
+    moment = datetime(2026, 11, 10, 23, 0, tzinfo=UTC)
+    record_exchange_snapshot(
+        captured_at=moment,
+        source="okx_rest",
+        snapshot=AccountSnapshot(
+            currency="USDT",
+            equity=D("1000"),
+            available_equity=D("800"),
+            cash_balance=D("0"),
+            unrealized_pnl=D("0"),
+            used_margin=D("0"),
+            available_margin=D("800"),
+            margin_ratio=D("0"),
+        ),
+        positions=[
+            ExchangePosition(
+                pos_id="pos-1",
+                inst_id="AAPL-USDT-SWAP",
+                pos_side="long",
+                size=D("2"),
+                avg_px=D("55"),
+                mark_px=D("60.5"),
+                upl=D("11"),
+                upl_ratio=D("0.1"),
+                lever=D("3"),
+                mgn_mode="isolated",
+                liq_px=None,
+                margin=D("0"),
+            )
+        ],
+        stops=[],
+    )
+
+    response = client.get("/api/dashboard/summary")
+
+    assert response.status_code == 200, response.text
+    risk = response.json()["risk"]
+    assert risk["status"] != "unavailable", risk
+    data = risk["data"]
+    assert data["margin_usage_basis"] == "notional_over_leverage", data

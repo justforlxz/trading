@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from typing import Any
 
 from sqlalchemy import String, any_, bindparam, select
 from sqlalchemy.dialects.postgresql import ARRAY
@@ -29,12 +30,14 @@ __all__ = [
     "DEFAULT_QUOTE_CURRENCY",
     "SyncReport",
     "SyncSkip",
+    "TradableRef",
     "display_symbol",
     "get_instrument",
     "get_instrument_pair",
     "get_instruments",
     "list_instruments",
     "list_tradable",
+    "list_tradable_refs",
     "resolve_instrument",
     "sync_instruments",
 ]
@@ -187,6 +190,29 @@ def resolve_instrument(query: str, inst_type: str) -> Instrument:
     return target
 
 
+@dataclass(frozen=True, slots=True)
+class TradableRef:
+    """可交易标的的精简视图：只有横截面按标的选行情来源要用的三列。
+
+    批量横截面读取（`app.market` 的市场总览）只需要「标识、类别、资产」，拿到完整的
+    `Instrument` 实体等于为 1797 行各造一个对象却只用其中三个字段。这里只带三列，
+    筛选规则仍与 `list_tradable` 共用 `_tradable_criteria`，不另立一套。
+    """
+
+    symbol: str
+    inst_type: str
+    asset_type: str
+
+
+def _tradable_criteria(inst_type: str | None) -> tuple[Any, ...]:
+    """可交易标的的筛选规则：唯一出处，`list_tradable` 与 `list_tradable_refs` 共用。"""
+
+    criteria: list[Any] = [Instrument.trading_status == LIVE_STATUS]
+    if inst_type is not None:
+        criteria.append(Instrument.inst_type == _normalize_inst_type(inst_type))
+    return tuple(criteria)
+
+
 def list_tradable(inst_type: str | None = None) -> list[Instrument]:
     """按类别返回可交易标的（`state == live`），不按资产类别过滤。
 
@@ -195,11 +221,26 @@ def list_tradable(inst_type: str | None = None) -> list[Instrument]:
     固定，同一份库两次调用得到同一序列。
     """
 
-    statement = select(Instrument).where(Instrument.trading_status == LIVE_STATUS)
-    if inst_type is not None:
-        statement = statement.where(Instrument.inst_type == _normalize_inst_type(inst_type))
+    statement = select(Instrument).where(*_tradable_criteria(inst_type))
     with session_scope() as session:
         return list(session.scalars(statement.order_by(Instrument.symbol)))
+
+
+def list_tradable_refs(inst_type: str | None = None) -> list[TradableRef]:
+    """与 `list_tradable` 同一批标的、同一顺序，只取三列；供批量横截面读取用。
+
+    返回的标识集合与顺序必须与 `list_tradable` 逐项相同（由测试钉住）：调用方按标的
+    选行情来源，少一个标的就会少算一家涨跌。
+    """
+
+    statement = select(Instrument.symbol, Instrument.inst_type, Instrument.asset_type).where(
+        *_tradable_criteria(inst_type)
+    )
+    with session_scope() as session:
+        return [
+            TradableRef(symbol=symbol, inst_type=kind, asset_type=asset)
+            for symbol, kind, asset in session.execute(statement.order_by(Instrument.symbol))
+        ]
 
 
 def _pick_spot(spots: list[Instrument], swap: Instrument | None) -> Instrument | None:

@@ -92,12 +92,18 @@ def summarize_daily(bars: Sequence[Bar]) -> DailySnapshot:
 
 
 def _trend(bars: Sequence[Bar]) -> Trend | None:
-    """收盘价、MA20、MA60 的排列；历史不足 60 根时不给方向。"""
+    """收盘价、MA20、MA60 的排列；历史不足 60 根时不给方向。
+
+    MA 是定长窗口均值，两个周期的末值只取决于最后 60 根收盘价，因此在整段历史上算
+    与在最后 `TREND_LONG_PERIOD` 根上算完全相等（`test_trend_only_needs_the_trailing_sixty_bars`
+    钉住）。只喂尾巴，避免为上千根历史构造整列序列——这一段是首页自选卡每次请求都要走的。
+    """
 
     if len(bars) < TREND_LONG_PERIOD:
         return None
-    short = _last_value(compute("sma", bars, {"period": TREND_SHORT_PERIOD}), "sma")
-    long = _last_value(compute("sma", bars, {"period": TREND_LONG_PERIOD}), "sma")
+    window = bars[-TREND_LONG_PERIOD:]
+    short = _last_value(compute("sma", window, {"period": TREND_SHORT_PERIOD}), "sma")
+    long = _last_value(compute("sma", window, {"period": TREND_LONG_PERIOD}), "sma")
     if short is None or long is None:
         return None
 

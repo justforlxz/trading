@@ -14,20 +14,31 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import Select, String, any_, bindparam, func, select, true
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
-from sqlalchemy.orm import aliased
 
 from app.core import Bar, ValidationError
 from app.db import session_scope
-from app.instrument import Instrument, list_tradable, resolve_instrument
+from app.instrument import (
+    Instrument,
+    TradableRef,
+    list_tradable_refs,
+    resolve_instrument,
+)
 from app.market.breadth import Breadth, Resonance, advance_decline, resonance_strength
 from app.market.candles import duplicate_open_times, expected_open_times, find_gaps
 from app.market.correlation import METHODS, correlate, p_value
 from app.market.matrix import Matrix
-from app.market.model import Candle, CorrelationSnapshot, from_epoch, to_epoch
+from app.market.model import (
+    Candle,
+    CorrelationSnapshot,
+    bar_from_columns,
+    from_epoch,
+    to_epoch,
+)
 from app.market.session import UNKNOWN_ASSET, asset_session, day_asset_type, primary_source
 from app.market.sync import candle_sources, data_range, load_candles, normalize_bar_or_raise
 from app.shared import bar_seconds
@@ -458,7 +469,7 @@ def market_overview(as_of: datetime | None, bar: str, inst_type: str) -> MarketO
     # K 线的 open_time 精确到秒，微秒在这里没有位置：截掉不改变任何一根是否落在窗口内，
     # 但能让响应里的 `as_of` 与库里的时刻同一精度。
     moment = moment.replace(microsecond=0)
-    instruments = list_tradable(inst_type)
+    instruments = list_tradable_refs(inst_type)
     bars_by_symbol = _recent_bars(instruments, canonical, moment, RESONANCE_WINDOW + 1)
     return MarketOverview(
         inst_type=inst_type,
@@ -470,7 +481,7 @@ def market_overview(as_of: datetime | None, bar: str, inst_type: str) -> MarketO
 
 
 def _recent_bars(
-    instruments: Sequence[Instrument],
+    instruments: Sequence[TradableRef],
     bar: str,
     as_of: datetime,
     count: int,
@@ -497,8 +508,8 @@ def _recent_bars(
     with session_scope() as session:
         for source, symbols in symbols_by_source.items():
             statement = _latest_bars_statement(bar, source, moment, count)
-            for row in session.scalars(statement, {"symbols": list(symbols)}):
-                loaded.setdefault(row.symbol, []).append(row.to_bar())
+            for row in session.execute(statement, {"symbols": list(symbols)}):
+                loaded.setdefault(row.symbol, []).append(bar_from_columns(row))
     # 批量查询按标的交错返回，方向判断要求按 `open_time` 升序，这里统一排一次。
     for bars in loaded.values():
         bars.sort(key=lambda candle: candle.open_time)
@@ -510,8 +521,12 @@ def _latest_bars_statement(
     source: str,
     moment: int,
     count: int,
-) -> Select[tuple[Candle]]:
+) -> Select[Any]:
     """一条 SQL 取回一组标的各自在 `source` 下、`moment`（含）之前最近 `count` 根 K 线。
+
+    只取换算 `Bar` 需要的列（`BAR_COLUMNS` 顺序），不实例化 ORM 实体：一个横截面
+    上千个标的 × 21 根，先造 `Candle` 实例再调 `to_bar()` 实测多花一倍时间，而 `Bar`
+    的值完全相同（`app.market.sync` 的批量读取用同一种写法）。
 
     标的清单由绑定的 `symbols`（`text[]`）参数给：一次请求里标的可能上千个，写进
     `IN (...)` 或 `VALUES` 都会让语句文本随标的数膨胀，传数组只多一个参数。
@@ -555,6 +570,5 @@ def _latest_bars_statement(
         .correlate(have)
         .lateral()
     )
-    # 把 `LATERAL` 的结果挂回实体，`to_bar()` 仍是「表行 → 值对象」的唯一换算点。
-    entity = aliased(Candle, latest)
-    return select(entity).select_from(have.join(latest, true()))
+    # 直接按 `latest` 的列取元组：`bar_from_columns` 仍是「列行 → 值对象」的唯一换算点。
+    return select(*latest.c).select_from(have.join(latest, true()))

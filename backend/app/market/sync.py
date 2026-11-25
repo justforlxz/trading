@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import String, any_, bindparam, func, select
+from sqlalchemy import String, any_, bindparam, func, select, true
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 
@@ -293,8 +293,14 @@ def latest_candles_by_source(
     """一条 SQL 取回每个 `(标的, 来源)` 最近一根已收盘 K 线；不限定周期。
 
     与 `latest_candle` 同一口径：先按 `open_time` 取最新，同一 `open_time` 再按
-    `updated_at`。`DISTINCT ON (symbol, source)` 让数据库对每个键只留一行，读到的
-    行数与「有数据的键数」同阶。
+    `updated_at`。读到的行数与「有数据的键数」同阶，与传入的标的数无关。
+
+    取法用「先物化 `have` 收窄到真有数据的 `(标的, 来源)`，再按组 `LATERAL LIMIT 1`」，
+    与 `app.market.service._latest_bars_statement` 同一写法。`DISTINCT ON` 做不到这一点：
+    首页一次传入整类标的（实测 547 个）时，等值前缀命中整类的全部周期行（5980 行），
+    只能把这些行排序后每组留一行，实测该走法 19.3ms；按组 `LIMIT 1` 走
+    `ix_candles_symbol_source_open_time`，取到第一行就在组边界停下，实测 4.0ms。
+    两者的返回值逐行相同（由测试钉住）。
     """
 
     wanted_symbols = _unique(symbols)
@@ -303,15 +309,29 @@ def latest_candles_by_source(
     required_sources = None if sources is None else _unique(sources)
     if required_sources is not None and not required_sources:
         return {}
-    statement = select(*BAR_COLUMNS).where(Candle.symbol == _symbols_bindparam())
+    table = Candle.__table__
+    narrowed = [table.c.symbol == _symbols_bindparam()]
     if required_sources is not None:
-        statement = statement.where(Candle.source.in_(required_sources))
-    statement = statement.order_by(
-        Candle.symbol,
-        Candle.source,
-        Candle.open_time.desc(),
-        Candle.updated_at.desc(),
-    ).distinct(Candle.symbol, Candle.source)
+        narrowed.append(table.c.source.in_(required_sources))
+    have = (
+        select(table.c.symbol, table.c.source)
+        .where(*narrowed)
+        .distinct()
+        .cte("have")
+        .prefix_with("MATERIALIZED")
+    )
+    latest = (
+        select(table)
+        .where(
+            table.c.symbol == have.c.symbol,
+            table.c.source == have.c.source,
+        )
+        .order_by(table.c.open_time.desc(), table.c.updated_at.desc())
+        .limit(1)
+        .correlate(have)
+        .lateral()
+    )
+    statement = select(*latest.c).select_from(have.join(latest, true()))
     with session_scope() as session:
         rows = session.execute(statement, {"symbols": wanted_symbols}).all()
     return {(row.symbol, row.source): bar_from_columns(row) for row in rows}

@@ -15,7 +15,12 @@ import pytest
 
 from app.core import ValidationError
 from app.exchange.okx.instruments import parse_instruments
-from app.instrument import list_tradable, resolve_instrument, sync_instruments
+from app.instrument import (
+    list_tradable,
+    list_tradable_refs,
+    resolve_instrument,
+    sync_instruments,
+)
 from tests.factories.instruments import load_instruments, make_ref, make_swap_ref
 
 INST_TYPES = ("SPOT", "SWAP")
@@ -197,3 +202,42 @@ def test_tradable_rejects_unsupported_category(inst_type: str) -> None:
 
     with pytest.raises(ValidationError, match="不在支持范围"):
         list_tradable(inst_type)
+
+
+# --------------------------------------------------- 精简只读：与实体读取逐项一致
+
+
+def test_tradable_refs_match_the_entity_read() -> None:
+    """精简三元组与 `list_tradable` 同一批标的、同一顺序、同一组字段值。
+
+    市场总览按「标的 → 资产 → 类别」选行情来源，少一个标的就会少算一家涨跌，因此
+    这两个读取必须逐项对齐；`state != live` 的标的在两边都不出现。
+    """
+
+    sync_instruments(
+        [
+            make_ref(),
+            make_ref(inst_id="XMSFT-USDT", base_ccy="XMSFT"),
+            make_swap_ref(),
+            make_ref(inst_id="XPRE-USDT", base_ccy="XPRE", state="preopen"),
+        ]
+    )
+
+    for inst_type in (None, "SPOT", "SWAP"):
+        entities = list_tradable(inst_type)
+        refs = list_tradable_refs(inst_type)
+        assert [ref.symbol for ref in refs] == [row.symbol for row in entities]
+        assert [(ref.symbol, ref.inst_type, ref.asset_type) for ref in refs] == [
+            (row.symbol, row.inst_type, row.asset_type) for row in entities
+        ]
+
+    # `preopen` 不进可交易集合：两边都不该出现。
+    assert "XPRE-USDT" not in {ref.symbol for ref in list_tradable_refs("SPOT")}
+
+
+@pytest.mark.parametrize("inst_type", ["FUTURES", "   "])
+def test_tradable_refs_reject_unsupported_category(inst_type: str) -> None:
+    """精简读取共用同一筛选规则，未注册的类别同样直接报错而不是返回空列表。"""
+
+    with pytest.raises(ValidationError, match="不在支持范围"):
+        list_tradable_refs(inst_type)

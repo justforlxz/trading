@@ -18,7 +18,7 @@ from sqlalchemy import Engine, event, select
 
 from app.core import Bar, Timeframe, ValidationError
 from app.db import session_scope
-from app.instrument import list_tradable, sync_instruments
+from app.instrument import list_tradable, list_tradable_refs, sync_instruments
 from app.market import (
     MIN_RESONANCE_PARTICIPANTS,
     Candle,
@@ -30,6 +30,7 @@ from app.market import (
     to_epoch,
     upsert_candles,
 )
+from app.market.service import _recent_bars
 from tests.factories.instruments import make_ref, make_swap_ref
 
 HOUR = timedelta(hours=1)
@@ -454,6 +455,24 @@ def test_batch_read_matches_the_per_symbol_read() -> None:
 
     assert overview.breadth == advance_decline(per_symbol)
     assert overview.resonance == resonance_strength(per_symbol, 20)
+
+
+def test_batch_read_returns_the_same_bars_as_reading_the_entity() -> None:
+    """按列取回的元组换算出的 `Bar`，与 ORM 实体换算出的 `Bar` 逐字段相等。
+
+    换算走的是同一个 `bar_from_columns`，但入参一个是列行、一个是 `Candle` 实例；
+    直接比对整批 `Bar` 才能证明绕开 ORM 实例化没有丢掉任何一列（价格、成交量、
+    来源、时段都在 `Bar` 的相等性里）。
+    """
+
+    _mixed_cross_section()
+    as_of = _last_open()
+
+    batch = _recent_bars(list_tradable_refs("SPOT"), "1d", as_of, WINDOW_BARS)
+
+    assert batch == _per_symbol_bars("SPOT", "1d", as_of, WINDOW_BARS)
+    # 有 K 线的四个标的都在、一根 K 线都没有的不在：上面的相等断言不是「两边都空」。
+    assert set(batch) == {"LONG-USDT", "ONE-USDT", "XMULTI-USDT", "FUTURE-USDT"}
 
 
 def test_batch_read_keeps_every_edge_case() -> None:

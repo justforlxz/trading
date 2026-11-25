@@ -110,3 +110,21 @@ def test_previous_close_zero_keeps_change_empty() -> None:
     assert snapshot.change_pct_24h is None
     assert snapshot.volume_24h_quote is None
     assert snapshot.data_status == "partial"
+
+
+def test_trend_only_needs_the_trailing_sixty_bars() -> None:
+    """MA20 与 MA60 的末值由最后 60 根收盘价完全决定。
+
+    `_trend` 只把最后 `TREND_LONG_PERIOD` 根交给指标引擎：定长窗口均值的末值不依赖
+    更早的历史，喂整段与喂尾巴必须给出同一个方向。只喂 20 根时 MA60 会算不出来、方向
+    退化成 `None`，因此下面同时钉住「历史更长时方向已成形」与「只留尾巴时方向不变」。
+    """
+
+    # 前 60 根走平在 100，后 60 根从 101 单调涨到 160。
+    closes = [str(Decimal(100))] * 60
+    closes += [str(Decimal(100) + Decimal(step)) for step in range(1, 61)]
+
+    long_history = summarize_daily(_bars(closes))
+    # MA20 = mean(141..160) = 150.5，MA60 = mean(101..160) = 130.5，收盘 160 高于两者。
+    assert long_history.trend == "bullish"
+    assert summarize_daily(_bars(closes[-60:])).trend == long_history.trend

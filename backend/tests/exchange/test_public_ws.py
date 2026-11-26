@@ -138,6 +138,26 @@ def test_replayed_message_with_the_same_ts_is_delivered_once() -> None:
     asyncio.run(scenario())
 
 
+def test_swap_instruments_skip_the_index_channel() -> None:
+    """`index-tickers` 只接受指数标识（现货形态）；永续标识被上游以 60018 拒绝。
+
+    两种形态以前按同一组频道订阅，日志里持续刷「instId:XXX-USDT-SWAP doesn't
+    exist」。指数价对永续本来也没有对应标识，这里直接不订。
+    """
+
+    socket = FakeSocket([_push("tickers", "XAAPL-USDT", "1", last="100")], block_when_empty=True)
+    client = OkxPublicWebSocket(connect=_connect_script(socket), sleep=_no_sleep())
+    client.set_instruments({"XAAPL-USDT", "AAPL-USDT-SWAP"})
+
+    asyncio.run(_take(client, 1))
+
+    args = socket.sent[0]["args"]
+    assert {"channel": "index-tickers", "instId": "AAPL-USDT-SWAP"} not in args
+    assert {"channel": "index-tickers", "instId": "XAAPL-USDT"} in args
+    assert {"channel": "tickers", "instId": "AAPL-USDT-SWAP"} in args
+    assert {"channel": "mark-price", "instId": "AAPL-USDT-SWAP"} in args
+
+
 def test_unsubscribed_instruments_are_filtered_out() -> None:
     socket = FakeSocket(
         [

@@ -90,11 +90,12 @@ class ExchangePositionSnapshotRow(Base):
     margin: Mapped[Decimal | None] = mapped_column(DecimalText, nullable=True)
     # 止损来自 OKX 策略委托与订单上的 `slTriggerPx`，落库后读侧不再联网。
     # `stop_status` 必须是三态：`confirmed`（有价位）/ `none`（问过、确认没有）/
-    # `unavailable`（没问成）。把第三种写成 `none` 就是在告诉用户「你没设止损」。
+    # `unavailable`（问过、没问成）。把第三种写成 `none` 就是在告诉用户「你没设止损」。
+    # 私有频道推送不携带止损，写的行这一列为空（NULL）：`NULL` 说的是「这一行没带
+    # 止损信息」，`unavailable` 说的是「问过、没问成」。以前用列默认值把两者压成同一个
+    # 值，读侧就分不清「没写」与「没取到」。
     stop_px: Mapped[Decimal | None] = mapped_column(DecimalText, nullable=True)
-    stop_status: Mapped[str] = mapped_column(
-        String(16), nullable=False, server_default="unavailable"
-    )
+    stop_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
     captured_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
     source: Mapped[str] = mapped_column(String(16), nullable=False)
 

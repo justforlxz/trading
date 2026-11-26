@@ -63,6 +63,8 @@ from app.positions.model import (
     ManualTradeRow,
 )
 from app.positions.stops import (
+    STOP_CONFIRMED,
+    STOP_NONE,
     STOP_UNAVAILABLE,
     StopState,
     resolve_stop_states,
@@ -547,11 +549,15 @@ def exchange_positions(*, require_mapped: bool = False) -> ExchangePositionsView
                 .order_by(ExchangePositionSnapshotRow.pos_id)
             )
         )
+        stops = _stop_answers(session, [row.pos_id for row in rows])
         if require_mapped:
             _ensure_instruments_synced(session, {row.inst_id for row in rows})
     # 标的元数据一次取完：持仓行数再多也不按行发语句。
     instruments = get_instruments(row.inst_id for row in rows)
-    items = tuple(_exchange_position_view(row, instruments.get(row.inst_id)) for row in rows)
+    items = tuple(
+        _exchange_position_view(row, instruments.get(row.inst_id), stops.get(row.pos_id, NO_STOP))
+        for row in rows
+    )
     return ExchangePositionsView(latest.captured_at, _configured_status(), items)
 
 
@@ -574,6 +580,7 @@ def position_cards(range_key: str = "1d") -> PositionCardsView:
                 .order_by(ExchangePositionSnapshotRow.pos_id)
             )
         )
+        stops = _stop_answers(session, [row.pos_id for row in rows])
         totals = _position_totals(session, latest)
         status = _configured_status()
 
@@ -583,6 +590,7 @@ def position_cards(range_key: str = "1d") -> PositionCardsView:
     for row in rows:
         instrument = instruments.get(row.inst_id)
         notional = _row_notional(row, instrument)
+        stop = stops.get(row.pos_id, NO_STOP)
         cards.append(
             PositionCard(
                 pos_id=row.pos_id,
@@ -602,9 +610,9 @@ def position_cards(range_key: str = "1d") -> PositionCardsView:
                 margin=row.margin,
                 notional=notional,
                 weight_pct=_weight_pct(notional, totals.gross),
-                stop_status=row.stop_status,
-                stop_px=row.stop_px,
-                stop_distance_pct=_stop_distance_pct(row.mark_px, row.stop_px, row.pos_side),
+                stop_status=stop.status,
+                stop_px=stop.px,
+                stop_distance_pct=_stop_distance_pct(row.mark_px, stop.px, row.pos_side),
                 upl_curve=curves.get(row.pos_id, ()),
             )
         )
@@ -720,6 +728,50 @@ def _latest_account_row(session: Session) -> AccountSnapshotRow | None:
         .order_by(AccountSnapshotRow.captured_at.desc(), AccountSnapshotRow.id.desc())
         .limit(1)
     ).first()
+
+
+@dataclass(frozen=True, slots=True)
+class _StopAnswer:
+    """一条持仓的止损结论：三态之一，外加 `confirmed` 时的触发价。"""
+
+    status: str
+    px: Decimal | None
+
+
+#: 库里没有任何一条带止损结论的行时的回答：问都没问过，不能说成「没有止损」。
+NO_STOP = _StopAnswer(STOP_UNAVAILABLE, None)
+
+
+def _stop_answers(session: Session, pos_ids: Sequence[str]) -> dict[str, _StopAnswer]:
+    """`pos_id` → 最近一条带止损结论的快照行。
+
+    不能读「最新一行」：私有频道推送每 5 秒写一条快照，按设计不携带止损列，最新一条
+    几乎总是它。止损结论只在 REST 同步（每 5 分钟一次）写下的行里，因此按 `pos_id` 取
+    最近一条 `confirmed` / `none` 的行。没有任何结论的 `pos_id` 不出现在结果里，由调用
+    方回落 `NO_STOP`——「从没问过」与「问过、没有」必须分开。
+    """
+
+    if not pos_ids:
+        return {}
+    rows = session.execute(
+        select(
+            ExchangePositionSnapshotRow.pos_id,
+            ExchangePositionSnapshotRow.stop_status,
+            ExchangePositionSnapshotRow.stop_px,
+        )
+        .where(
+            ExchangePositionSnapshotRow.account_id == DEFAULT_ACCOUNT_ID,
+            ExchangePositionSnapshotRow.pos_id.in_(pos_ids),
+            ExchangePositionSnapshotRow.stop_status.in_((STOP_CONFIRMED, STOP_NONE)),
+        )
+        .distinct(ExchangePositionSnapshotRow.pos_id)
+        .order_by(
+            ExchangePositionSnapshotRow.pos_id,
+            ExchangePositionSnapshotRow.captured_at.desc(),
+            ExchangePositionSnapshotRow.id.desc(),
+        )
+    )
+    return {pos_id: _StopAnswer(status, px) for pos_id, status, px in rows}
 
 
 def _day_pnl(
@@ -948,6 +1000,7 @@ def _payload_digest(snapshot: object) -> str:
 def _exchange_position_view(
     row: ExchangePositionSnapshotRow,
     instrument: Instrument | None,
+    stop: _StopAnswer,
 ) -> ExchangePositionView:
     return ExchangePositionView(
         pos_id=row.pos_id,
@@ -965,8 +1018,8 @@ def _exchange_position_view(
         mgn_mode=row.mgn_mode,
         liq_px=row.liq_px,
         margin=row.margin,
-        stop_px=row.stop_px,
-        stop_status=row.stop_status,
+        stop_px=stop.px,
+        stop_status=stop.status,
     )
 
 

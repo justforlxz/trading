@@ -1,5 +1,25 @@
 // 由 `pnpm --dir frontend api:sync` 生成，勿手改。契约源：backend/contracts/openapi.json
 export interface paths {
+    "/api/account/equity-curve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Account Equity Curve
+         * @description 按区间读权益曲线；覆盖不足时 `available=false` 且不给点，不画假线。
+         */
+        get: operations["get_account_equity_curve_api_account_equity_curve_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/account/summary": {
         parameters: {
             query?: never;
@@ -870,6 +890,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/positions/cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Position Cards
+         * @description 持仓卡片：已按未实现盈亏绝对值降序，含每条持仓的盈亏曲线与止损三态。
+         */
+        get: operations["get_position_cards_api_positions_cards_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/positions/exchange": {
         parameters: {
             query?: never;
@@ -882,6 +922,28 @@ export interface paths {
          * @description 最近一次同步的交易所持仓，`as_of` 与该次账户快照相同；标的未同步时返回 503。
          */
         get: operations["get_exchange_positions_api_positions_exchange_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/positions/{inst_id}/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Instrument Orders
+         * @description 单标的订单历史：近 7 天与归档合并，按时间倒序。
+         *
+         *     上游不可用时返回 502 —— 空列表代表「确实没有订单」，不能用来表示「没查到」。
+         */
+        get: operations["get_instrument_orders_api_positions__inst_id__orders_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -997,6 +1059,30 @@ export interface paths {
          */
         get: operations["get_risk_exposure_api_risk_exposure_get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/risk/notify-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Risk Notify Config
+         * @description 五条风控通知规则：开关、渠道与阈值。
+         */
+        get: operations["get_risk_notify_config_api_risk_notify_config_get"];
+        /**
+         * Put Risk Notify Config
+         * @description 保存通知规则；只影响通知与评估开关，不改变持仓页上的数字。
+         */
+        put: operations["put_risk_notify_config_api_risk_notify_config_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1390,7 +1476,12 @@ export interface components {
          *       "currency": "USDT",
          *       "day_pnl_basis": "equity_only",
          *       "equity": "1248.60",
+         *       "gross_notional": "1851.36",
+         *       "margin_usage_floor": false,
          *       "margin_usage_pct": "45.36",
+         *       "margin_used": "617.12",
+         *       "net_notional": "1851.36",
+         *       "notional_status": "exact",
          *       "position_notional": "1851.36",
          *       "position_notional_at": "2026-11-13T09:00:00Z",
          *       "source": "okx_rest",
@@ -1422,8 +1513,25 @@ export interface components {
             day_pnl_basis: "equity_only";
             /** Equity */
             equity?: string | null;
+            /** Gross Notional */
+            gross_notional?: string | null;
+            /**
+             * Margin Usage Floor
+             * @default true
+             */
+            margin_usage_floor: boolean;
             /** Margin Usage Pct */
             margin_usage_pct?: string | null;
+            /** Margin Used */
+            margin_used?: string | null;
+            /** Net Notional */
+            net_notional?: string | null;
+            /**
+             * Notional Status
+             * @default partial
+             * @enum {string}
+             */
+            notional_status: "exact" | "partial";
             /** Position Notional */
             position_notional?: string | null;
             /** Position Notional At */
@@ -1452,7 +1560,12 @@ export interface components {
          *       "currency": "USDT",
          *       "day_pnl_basis": "equity_only",
          *       "equity": "1248.60",
+         *       "gross_notional": "1851.36",
+         *       "margin_usage_floor": false,
          *       "margin_usage_pct": "45.36",
+         *       "margin_used": "617.12",
+         *       "net_notional": "1851.36",
+         *       "notional_status": "exact",
          *       "position_notional": "1851.36",
          *       "position_notional_at": "2026-11-13T09:00:00Z",
          *       "positions_synced": 1,
@@ -1485,8 +1598,25 @@ export interface components {
             day_pnl_basis: "equity_only";
             /** Equity */
             equity?: string | null;
+            /** Gross Notional */
+            gross_notional?: string | null;
+            /**
+             * Margin Usage Floor
+             * @default true
+             */
+            margin_usage_floor: boolean;
             /** Margin Usage Pct */
             margin_usage_pct?: string | null;
+            /** Margin Used */
+            margin_used?: string | null;
+            /** Net Notional */
+            net_notional?: string | null;
+            /**
+             * Notional Status
+             * @default partial
+             * @enum {string}
+             */
+            notional_status: "exact" | "partial";
             /** Position Notional */
             position_notional?: string | null;
             /** Position Notional At */
@@ -3182,6 +3312,16 @@ export interface components {
             window: number;
         };
         /**
+         * CurvePointItem
+         * @description 曲线上的一个点；`value` 是该时刻的快照值，不做插值。
+         */
+        CurvePointItem: {
+            /** At */
+            at: string;
+            /** Value */
+            value: string;
+        };
+        /**
          * DashboardAccountData
          * @description 账户卡内容；派生字段由 `app.positions` 给出，聚合层不重算。
          */
@@ -3468,7 +3608,7 @@ export interface components {
             /** Long Notional */
             long_notional: string;
             /** Margin Usage Basis */
-            margin_usage_basis?: ("margin_ratio" | "used_margin") | null;
+            margin_usage_basis?: ("notional_over_leverage" | "margin_ratio" | "used_margin") | null;
             /** Margin Usage Pct */
             margin_usage_pct?: string | null;
             /** Max Single Instrument Weight Pct */
@@ -3879,6 +4019,45 @@ export interface components {
             /** Price Precision */
             price_precision?: number | null;
         };
+        /**
+         * EquityCurveResponse
+         * @description 一段区间的权益曲线。
+         *
+         *     `available=false` 表示这段区间还没有足够的数据（快照只有十天时，一个月窗口
+         *     只有三分之一），此时 `points` 一定为空，界面显示「这段区间还没有数据」，
+         *     **不画线**。`first_snapshot_at` 用于说明「快照自 … 起记录」。
+         * @example {
+         *       "available": true,
+         *       "change_pct": "2.33",
+         *       "first_snapshot_at": "2026-11-15T00:00:00Z",
+         *       "last_snapshot_at": "2026-11-25T13:51:00Z",
+         *       "points": [
+         *         {
+         *           "at": "2026-11-25T12:51:00Z",
+         *           "value": "412.60"
+         *         },
+         *         {
+         *           "at": "2026-11-25T13:51:00Z",
+         *           "value": "413.45"
+         *         }
+         *       ],
+         *       "range": "1d"
+         *     }
+         */
+        EquityCurveResponse: {
+            /** Available */
+            available: boolean;
+            /** Change Pct */
+            change_pct?: string | null;
+            /** First Snapshot At */
+            first_snapshot_at?: string | null;
+            /** Last Snapshot At */
+            last_snapshot_at?: string | null;
+            /** Points */
+            points: components["schemas"]["CurvePointItem"][];
+            /** Range */
+            range: string;
+        };
         /** EquityPoint */
         EquityPoint: {
             /** Equity */
@@ -4048,6 +4227,8 @@ export interface components {
             stop_distance_pct?: string | null;
             /** Stop Px */
             stop_px?: string | null;
+            /** Stop Status */
+            stop_status?: ("confirmed" | "none" | "unavailable") | null;
             /** Weight Pct */
             weight_pct?: string | null;
         };
@@ -4076,9 +4257,11 @@ export interface components {
             /** Long Notional */
             long_notional: string;
             /** Margin Usage Basis */
-            margin_usage_basis?: ("margin_ratio" | "used_margin") | null;
+            margin_usage_basis?: ("notional_over_leverage" | "margin_ratio" | "used_margin") | null;
             /** Margin Usage Pct */
             margin_usage_pct?: string | null;
+            /** Max Single Instrument Weight Pct */
+            max_single_instrument_weight_pct?: string | null;
             /** Net Notional */
             net_notional: string;
             /**
@@ -5885,6 +6068,77 @@ export interface components {
             side: "buy" | "sell";
         };
         /**
+         * OrderHistoryItem
+         * @description 单标的一笔订单；`is_open` 区分挂单与历史，`pnl` / `fee` 缺失时为 `null`。
+         */
+        OrderHistoryItem: {
+            /** Avg Px */
+            avg_px?: string | null;
+            /** Fee */
+            fee?: string | null;
+            /** Filled Qty */
+            filled_qty: string;
+            /** Is Open */
+            is_open: boolean;
+            /** Order Id */
+            order_id: string;
+            /** Order Type */
+            order_type: string;
+            /** Pnl */
+            pnl?: string | null;
+            /** Price */
+            price?: string | null;
+            /** Qty */
+            qty: string;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "buy" | "sell";
+            /** Status */
+            status: string;
+            /** Ts */
+            ts: string;
+        };
+        /**
+         * OrderHistoryResponse
+         * @description 单标的订单历史；近 7 天来自 `orders-history`，更早来自归档（最多 3 个月）。
+         * @example {
+         *       "inst_id": "BTC-USDT-SWAP",
+         *       "items": [
+         *         {
+         *           "avg_px": "60520",
+         *           "fee": "-0.03",
+         *           "filled_qty": "0.2",
+         *           "is_open": false,
+         *           "order_id": "3123456789",
+         *           "order_type": "limit",
+         *           "pnl": "1.84",
+         *           "price": "60520",
+         *           "qty": "0.2",
+         *           "side": "sell",
+         *           "status": "filled",
+         *           "ts": "2026-11-25T09:09:00Z"
+         *         }
+         *       ],
+         *       "scope": "all",
+         *       "window_days": 90
+         *     }
+         */
+        OrderHistoryResponse: {
+            /** Inst Id */
+            inst_id: string;
+            /** Items */
+            items: components["schemas"]["OrderHistoryItem"][];
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "all" | "open" | "history";
+            /** Window Days */
+            window_days: number;
+        };
+        /**
          * OrderListResponse
          * @example {
          *       "items": [
@@ -5973,6 +6227,110 @@ export interface components {
             side: "long" | "short";
             /** Unrealized Pnl */
             unrealized_pnl: string;
+        };
+        /**
+         * PositionCardItem
+         * @description 一张持仓卡片需要的全部事实，盈亏、占比与止损距离都由后端算好。
+         */
+        PositionCardItem: {
+            /** Asset Class */
+            asset_class: string;
+            /** Avg Px */
+            avg_px: string;
+            /** Display Symbol */
+            display_symbol: string;
+            /** Inst Id */
+            inst_id: string;
+            /** Lever */
+            lever?: string | null;
+            /** Liq Px */
+            liq_px?: string | null;
+            /** Margin */
+            margin?: string | null;
+            /** Mark Px */
+            mark_px?: string | null;
+            /** Mgn Mode */
+            mgn_mode?: string | null;
+            /** Name */
+            name: string;
+            /** Notional */
+            notional?: string | null;
+            /** Pos Id */
+            pos_id: string;
+            /**
+             * Pos Side
+             * @enum {string}
+             */
+            pos_side: "long" | "short";
+            /** Size */
+            size: string;
+            /** Stop Distance Pct */
+            stop_distance_pct?: string | null;
+            /** Stop Px */
+            stop_px?: string | null;
+            /**
+             * Stop Status
+             * @enum {string}
+             */
+            stop_status: "confirmed" | "none" | "unavailable";
+            /** Upl */
+            upl?: string | null;
+            /** Upl Curve */
+            upl_curve: components["schemas"]["CurvePointItem"][];
+            /** Upl Ratio */
+            upl_ratio?: string | null;
+            /** Weight Pct */
+            weight_pct?: string | null;
+        };
+        /**
+         * PositionCardsResponse
+         * @description 持仓卡片列表，已按未实现盈亏绝对值降序。
+         * @example {
+         *       "as_of": "2026-11-25T13:51:00Z",
+         *       "items": [
+         *         {
+         *           "asset_class": "equity_perp",
+         *           "avg_px": "269.34",
+         *           "display_symbol": "GOOGL-USDT",
+         *           "inst_id": "GOOGL-USDT-SWAP",
+         *           "lever": "10",
+         *           "margin": "57.83",
+         *           "mark_px": "276.71",
+         *           "mgn_mode": "isolated",
+         *           "name": "Alphabet",
+         *           "notional": "578.32",
+         *           "pos_id": "GOOGL-USDT-SWAP:long",
+         *           "pos_side": "long",
+         *           "size": "2.09",
+         *           "stop_status": "none",
+         *           "upl": "15.40",
+         *           "upl_curve": [
+         *             {
+         *               "at": "2026-11-25T12:51:00Z",
+         *               "value": "12.10"
+         *             },
+         *             {
+         *               "at": "2026-11-25T13:51:00Z",
+         *               "value": "15.40"
+         *             }
+         *           ],
+         *           "upl_ratio": "0.0274",
+         *           "weight_pct": "79.12"
+         *         }
+         *       ],
+         *       "status": "ok"
+         *     }
+         */
+        PositionCardsResponse: {
+            /** As Of */
+            as_of?: string | null;
+            /** Items */
+            items: components["schemas"]["PositionCardItem"][];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "stale" | "unconfigured";
         };
         /**
          * PositionListResponse
@@ -6357,6 +6715,7 @@ export interface components {
          *           "source": "exchange",
          *           "stop_distance_pct": "9.25",
          *           "stop_px": "210.00",
+         *           "stop_status": "confirmed",
          *           "weight_pct": "42.14"
          *         }
          *       ],
@@ -6381,8 +6740,9 @@ export interface components {
          *         "currency": "USDT",
          *         "gross_notional": "4393.20",
          *         "long_notional": "3412.80",
-         *         "margin_usage_basis": "margin_ratio",
+         *         "margin_usage_basis": "notional_over_leverage",
          *         "margin_usage_pct": "45.36",
+         *         "max_single_instrument_weight_pct": "42.14",
          *         "net_notional": "2432.40",
          *         "risk_level": "low",
          *         "short_notional": "980.40"
@@ -6404,6 +6764,73 @@ export interface components {
              */
             status: "ok" | "empty";
             summary: components["schemas"]["ExposureSummary"];
+        };
+        /**
+         * RiskNotifyConfigResponse
+         * @description 五条风控通知规则的完整配置，顺序固定。
+         * @example {
+         *       "rules": [
+         *         {
+         *           "channels": [
+         *             "browser"
+         *           ],
+         *           "enabled": true,
+         *           "rule_id": "stop_missing"
+         *         },
+         *         {
+         *           "channels": [
+         *             "browser",
+         *             "telegram"
+         *           ],
+         *           "enabled": true,
+         *           "rule_id": "high_leverage",
+         *           "threshold": "5"
+         *         }
+         *       ]
+         *     }
+         */
+        RiskNotifyConfigResponse: {
+            /** Rules */
+            rules: components["schemas"]["RiskNotifyRuleItem"][];
+        };
+        /**
+         * RiskNotifyConfigUpdateRequest
+         * @description 批量更新通知规则；只提交的规则会被改动。
+         */
+        RiskNotifyConfigUpdateRequest: {
+            /** Rules */
+            rules: components["schemas"]["RiskNotifyRuleUpdate"][];
+        };
+        /**
+         * RiskNotifyRuleItem
+         * @description 一条风控通知规则：开关、渠道与阈值。
+         *
+         *     阈值为 `null` 的规则（未挂止损）没有可调数字；其余规则的阈值就是敞口计算用的
+         *     那一份，不另存副本。
+         */
+        RiskNotifyRuleItem: {
+            /** Channels */
+            channels: ("browser" | "telegram" | "webhook")[];
+            /** Enabled */
+            enabled: boolean;
+            /** Rule Id */
+            rule_id: string;
+            /** Threshold */
+            threshold?: string | null;
+        };
+        /**
+         * RiskNotifyRuleUpdate
+         * @description 单条规则的部分更新；未提交的字段保持原值。
+         */
+        RiskNotifyRuleUpdate: {
+            /** Channels */
+            channels?: ("browser" | "telegram" | "webhook")[] | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Rule Id */
+            rule_id: string;
+            /** Threshold */
+            threshold?: string | null;
         };
         /**
          * SecretSettings
@@ -7721,6 +8148,37 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    get_account_equity_curve_api_account_equity_curve_get: {
+        parameters: {
+            query?: {
+                range?: "1d" | "1w" | "1m" | "6m" | "1y";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EquityCurveResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_account_summary_api_account_summary_get: {
         parameters: {
             query?: never;
@@ -9202,6 +9660,37 @@ export interface operations {
             };
         };
     };
+    get_position_cards_api_positions_cards_get: {
+        parameters: {
+            query?: {
+                range?: "1d" | "1w" | "1m" | "6m" | "1y";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PositionCardsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_exchange_positions_api_positions_exchange_get: {
         parameters: {
             query?: never;
@@ -9218,6 +9707,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExchangePositionsResponse"];
+                };
+            };
+        };
+    };
+    get_instrument_orders_api_positions__inst_id__orders_get: {
+        parameters: {
+            query?: {
+                scope?: "all" | "open" | "history";
+            };
+            header?: never;
+            path: {
+                inst_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderHistoryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -9505,6 +10027,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RiskExposureResponse"];
+                };
+            };
+        };
+    };
+    get_risk_notify_config_api_risk_notify_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiskNotifyConfigResponse"];
+                };
+            };
+        };
+    };
+    put_risk_notify_config_api_risk_notify_config_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RiskNotifyConfigUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RiskNotifyConfigResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

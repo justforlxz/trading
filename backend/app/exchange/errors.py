@@ -38,3 +38,6 @@ class RateLimitedError(ExchangeError):
     语义上仍属 `ExchangeError`，调用方可以只捕获基类；需要区分限流
     （例如退避更久后再试）时捕获这个子类。
     """
+
+    #: 限流对用户来说是「等一会再来」，与「上游坏了」不是同一句话。
+    public_message = "请求太频繁，请稍后重试"

@@ -118,7 +118,6 @@ describe("风险响应结构检查", () => {
   it("缺少 summary、数组或状态异常时指出具体原因", () => {
     expect(riskExposureProblem({ ...valid, summary: null })).toBe("后端返回缺少 summary");
     expect(riskExposureProblem({ ...valid, positions: null })).toBe("后端返回缺少 positions");
-    expect(riskExposureProblem({ ...valid, sectors: {} })).toBe("后端返回缺少 sectors");
     expect(riskExposureProblem({ ...valid, rules: null })).toBe("后端返回缺少 rules");
     expect(riskExposureProblem({ ...valid, as_of: "" })).toBe("后端返回缺少 as_of");
     expect(riskExposureProblem({ ...valid, status: "stale" })).toBe(

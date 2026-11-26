@@ -46,7 +46,9 @@ from app.core import (
     Money,
     Order,
     OrderIntent,
+    OrderRecord,
     Position,
+    StopOrder,
     SystemClock,
     TradePort,
     ValidationError,
@@ -79,6 +81,12 @@ _POSITIONS_PATH = "/api/v5/account/positions"
 _ORDER_PATH = "/api/v5/trade/order"
 _CANCEL_ORDER_PATH = "/api/v5/trade/cancel-order"
 _FILLS_PATH = "/api/v5/trade/fills"
+#: 策略委托（条件单 / OCO / 移动止损 / 触发单）：止盈止损可能挂在这里。
+_STOP_ALGO_PATH = "/api/v5/trade/orders-algo-pending"
+#: 普通挂单与历史订单：`slTriggerPx` / `tpTriggerPx` 也可能挂在普通订单上。
+_PENDING_ORDERS_PATH = "/api/v5/trade/orders-pending"
+_HISTORY_ORDERS_PATH = "/api/v5/trade/orders-history"
+_HISTORY_ARCHIVE_PATH = "/api/v5/trade/orders-history-archive"
 
 #: 下单与撤单接口的「逐单失败」封包码：`code` 是 "1"，真实原因在 `data[0].sCode`。
 ORDER_FAILURE_CODES: frozenset[str] = frozenset({"1"})
@@ -100,6 +108,16 @@ DEFAULT_POS_SIDE = "net"
 _CLIENT_ORDER_ID = re.compile(r"[0-9A-Za-z]{1,32}")
 
 _ORDER_QUERY_MAX = 100
+#: 订单列表类接口的单页上限（上游固定 100）。
+_ORDER_PAGE_LIMIT = 100
+#: 止盈止损状态「确认无止损」需要把四类策略委托都问过一遍；漏问一类就会把挂着
+#: 止损的持仓误报成「没有」。
+STOP_ALGO_TYPES: tuple[str, ...] = ("conditional", "oco", "move_order_stop", "trigger")
+#: 本项目只交易 USDT 本位永续与现货；okx 合计的止盈止损查询按永续传 `instType`。
+STOP_INST_TYPE = "SWAP"
+#: `orders-history` 只保留近 7 天，更早的在 archive；两段拼起来覆盖 3 个月。
+HISTORY_WINDOW_DAYS = 90
+_HISTORY_MAX_PAGES = 5
 
 
 class OkxPrivateClient(TradePort):
@@ -248,6 +266,87 @@ class OkxPrivateClient(TradePort):
             params["ordId"] = order_id
         params["limit"] = str(_ORDER_QUERY_MAX)
         return [_parse_fill(row) for row in self._get(_FILLS_PATH, params)]
+
+    def stop_orders(self) -> list[StopOrder]:
+        """四类策略委托 + **还挂着的**普通订单携带的止损触发价。
+
+        只看未终结的委托：已成交 / 已撤销订单上的 `slTriggerPx` 是那一单当时挂过的
+        记录，不是此刻仍生效的止损。把它算进来，一条早就平掉的旧订单会让当前没有
+        止损的持仓被标成「已止损」。
+
+        只要有一类查询失败就整体抛出：部分成功会让「这条持仓到底有没有止损」变成
+        猜的，而「未取到」与「未挂止损」在界面上是两种结论。
+        """
+
+        found: list[StopOrder] = []
+        for order_type in STOP_ALGO_TYPES:
+            rows = self._get(
+                _STOP_ALGO_PATH,
+                {"instType": STOP_INST_TYPE, "ordType": order_type},
+            )
+            found.extend(_parse_stop_rows(rows, order_type=order_type))
+        pending = self._get(_PENDING_ORDERS_PATH, {"instType": STOP_INST_TYPE})
+        found.extend(_parse_stop_rows(pending, order_type=""))
+        return found
+
+    def order_history(self, inst_id: str, *, days: int = HISTORY_WINDOW_DAYS) -> list[OrderRecord]:
+        """单标的的挂单 + 历史订单；按时间倒序，同一 `ordId` 只保留一条。
+
+        `orders-history` 只给近 7 天，更早的落在 `orders-history-archive`（最多 3 个月）；
+        `days` 超过 90 也不再多要，上游没有更早的数据。
+        """
+
+        params = {
+            "instType": STOP_INST_TYPE,
+            "instId": inst_id,
+            "limit": str(_ORDER_PAGE_LIMIT),
+        }
+        rows: list[dict[str, Any]] = list(self._get(_PENDING_ORDERS_PATH, params))
+        cutoff_ms = int(self._clock.now().timestamp() * 1000) - days * 86_400_000
+        rows += self._get_history_pages(_HISTORY_ORDERS_PATH, params, cutoff_ms)
+        if days > 7:
+            rows += self._get_history_pages(_HISTORY_ARCHIVE_PATH, params, cutoff_ms)
+
+        seen: set[str] = set()
+        records: list[OrderRecord] = []
+        for row in rows:
+            record = _parse_order_record(row)
+            if record.order_id in seen:
+                continue
+            seen.add(record.order_id)
+            records.append(record)
+        records.sort(key=lambda item: item.ts, reverse=True)
+        return records
+
+    def _get_history_pages(
+        self,
+        path: str,
+        params: dict[str, str],
+        cutoff_ms: int,
+    ) -> list[dict[str, Any]]:
+        """按 `after=<更早一页最早的 ordId>` 向以前翻页，直到越过时间下界或翻完。
+
+        OKX 的分页语义容易记反：`after` 返回**早于**该 `ordId` 的记录，`before` 返回
+        **晚于**它的记录；两者的取值都是 `ordId`，不是时间戳（K 线接口才是 ts）。
+        用反方向或传时间戳会被上游拒绝，或者反复拿到同一页。
+        """
+
+        rows: list[dict[str, Any]] = []
+        cursor: str | None = None
+        for _ in range(_HISTORY_MAX_PAGES):
+            page = self._get(path, {**params, **({"after": cursor} if cursor else {})})
+            if not page:
+                break
+            rows.extend(page)
+            oldest = min(page, key=lambda row: int(row.get("cTime") or 0))
+            if int(oldest.get("cTime") or 0) <= cutoff_ms:
+                break
+            if len(page) < _ORDER_PAGE_LIMIT:
+                break
+            cursor = str(oldest.get("ordId") or "") or None
+            if cursor is None:
+                break
+        return [row for row in rows if int(row.get("cTime") or 0) >= cutoff_ms]
 
     def close(self) -> None:
         """释放底层连接。"""
@@ -690,6 +789,51 @@ def _parse_fill(row: Any) -> Fill:
         raise ExchangeError(f"成交应答缺少字段:{exc}") from exc
     except (InvalidOperation, TypeError, ValueError) as exc:
         raise ExchangeError(f"成交应答数据非法:{row!r}") from exc
+
+
+def _parse_stop_rows(rows: list[Any], *, order_type: str) -> list[StopOrder]:
+    """把策略委托或普通订单行映射成 `StopOrder`；只取止损触发价。"""
+
+    parsed: list[StopOrder] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        inst_id = str(row.get("instId") or "")
+        if not inst_id:
+            continue
+        parsed.append(
+            StopOrder(
+                inst_id=inst_id,
+                order_id=str(row.get("algoId") or row.get("ordId") or ""),
+                order_type=order_type or str(row.get("ordType") or ""),
+                side=str(row.get("side") or ""),
+                stop_px=_decimal_or_none(row.get("slTriggerPx")),
+                pos_side=str(row.get("posSide") or "") or None,
+            )
+        )
+    return parsed
+
+
+def _parse_order_record(row: Any) -> OrderRecord:
+    """一行订单 → `OrderRecord`；缺失字段留空，不用 0 冒充。"""
+
+    source = row if isinstance(row, dict) else {}
+    state = str(source.get("state") or "")
+    return OrderRecord(
+        order_id=str(source.get("ordId") or ""),
+        inst_id=str(source.get("instId") or ""),
+        side=str(source.get("side") or ""),
+        order_type=str(source.get("ordType") or source.get("type") or ""),
+        price=_decimal_or_none(source.get("px")),
+        avg_px=_decimal_or_none(source.get("avgPx")),
+        qty=_decimal_or_zero(source.get("sz")),
+        filled_qty=_decimal_or_zero(source.get("accFillSz")),
+        pnl=_decimal_or_none(source.get("pnl")),
+        fee=_decimal_or_none(source.get("fee")),
+        status=state,
+        is_open=state in {"live", "partially_filled", "effective"},
+        ts=utc_from_millis(int(source.get("cTime") or 0)),
+    )
 
 
 def _require_order_accepted(rows: list[Any], *, action: str) -> None:

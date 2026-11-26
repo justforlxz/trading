@@ -2,6 +2,7 @@
 // 数据一律来自 backend/contracts/openapi.json 的 example，handler 里不写业务常量。
 import { HttpResponse, http } from "msw";
 
+import getAccountEquityCurve from "./fixtures/positions/get-account-equity-curve.json";
 import getAccountSummary from "./fixtures/positions/get-account-summary.json";
 import postAccountSync from "./fixtures/positions/post-account-sync.json";
 import getActivity from "./fixtures/alerts/get-activity.json";
@@ -48,7 +49,9 @@ import getOpportunities from "./fixtures/opportunity/get-opportunities.json";
 import getOpportunitiesOpportunityId from "./fixtures/opportunity/get-opportunities-opportunity_id.json";
 import patchOpportunitiesOpportunityId from "./fixtures/opportunity/patch-opportunities-opportunity_id.json";
 import getPositions from "./fixtures/positions/get-positions.json";
+import getPositionsCards from "./fixtures/positions/get-positions-cards.json";
 import getPositionsExchange from "./fixtures/positions/get-positions-exchange.json";
+import getPositionsInstIdOrders from "./fixtures/positions/get-positions-inst_id-orders.json";
 import putPositionsPositionRefRiskConfig from "./fixtures/risk/put-positions-position_ref-risk-config.json";
 import getResearchNotes from "./fixtures/research/get-research-notes.json";
 import postResearchNotes from "./fixtures/research/post-research-notes.json";
@@ -57,6 +60,8 @@ import putResearchNotesNoteId from "./fixtures/research/put-research-notes-note_
 import getRiskEvents from "./fixtures/risk/get-risk-events.json";
 import patchRiskEventsEventIdResolve from "./fixtures/risk/patch-risk-events-event_id-resolve.json";
 import getRiskExposure from "./fixtures/risk/get-risk-exposure.json";
+import getRiskNotifyConfig from "./fixtures/risk/get-risk-notify-config.json";
+import putRiskNotifyConfig from "./fixtures/risk/put-risk-notify-config.json";
 import getSettings from "./fixtures/settings/get-settings.json";
 import patchSettings from "./fixtures/settings/patch-settings.json";
 import getSettingsNotificationsDeliveries from "./fixtures/settings/get-settings-notifications-deliveries.json";
@@ -77,6 +82,7 @@ import patchWatchlistInstId from "./fixtures/watchlist/patch-watchlist-inst_id.j
 import getWatchlistInstIdRelated from "./fixtures/watchlist/get-watchlist-inst_id-related.json";
 
 export const handlers = [
+  http.get("*/api/account/equity-curve", () => HttpResponse.json(getAccountEquityCurve)),
   http.get("*/api/account/summary", () => HttpResponse.json(getAccountSummary)),
   http.post("*/api/account/sync", () => HttpResponse.json(postAccountSync)),
   http.get("*/api/activity", () => HttpResponse.json(getActivity)),
@@ -126,7 +132,9 @@ export const handlers = [
   http.get("*/api/opportunities/:opportunity_id", () => HttpResponse.json(getOpportunitiesOpportunityId)),
   http.patch("*/api/opportunities/:opportunity_id", () => HttpResponse.json(patchOpportunitiesOpportunityId)),
   http.get("*/api/positions", () => HttpResponse.json(getPositions)),
+  http.get("*/api/positions/cards", () => HttpResponse.json(getPositionsCards)),
   http.get("*/api/positions/exchange", () => HttpResponse.json(getPositionsExchange)),
+  http.get("*/api/positions/:inst_id/orders", () => HttpResponse.json(getPositionsInstIdOrders)),
   http.put("*/api/positions/:position_ref/risk-config", () => HttpResponse.json(putPositionsPositionRefRiskConfig)),
   http.get("*/api/research-notes", () => HttpResponse.json(getResearchNotes)),
   http.post("*/api/research-notes", () => HttpResponse.json(postResearchNotes, { status: 201 })),
@@ -136,6 +144,8 @@ export const handlers = [
   http.get("*/api/risk/events", () => HttpResponse.json(getRiskEvents)),
   http.patch("*/api/risk/events/:event_id/resolve", () => HttpResponse.json(patchRiskEventsEventIdResolve)),
   http.get("*/api/risk/exposure", () => HttpResponse.json(getRiskExposure)),
+  http.get("*/api/risk/notify-config", () => HttpResponse.json(getRiskNotifyConfig)),
+  http.put("*/api/risk/notify-config", () => HttpResponse.json(putRiskNotifyConfig)),
   http.get("*/api/settings", () => HttpResponse.json(getSettings)),
   http.patch("*/api/settings", () => HttpResponse.json(patchSettings)),
   http.get("*/api/settings/notifications/deliveries", () => HttpResponse.json(getSettingsNotificationsDeliveries)),

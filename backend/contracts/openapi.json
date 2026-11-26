@@ -13,7 +13,12 @@
             "currency": "USDT",
             "day_pnl_basis": "equity_only",
             "equity": "1248.60",
+            "gross_notional": "1851.36",
+            "margin_usage_floor": false,
             "margin_usage_pct": "45.36",
+            "margin_used": "617.12",
+            "net_notional": "1851.36",
+            "notional_status": "exact",
             "position_notional": "1851.36",
             "position_notional_at": "2026-11-13T09:00:00Z",
             "source": "okx_rest",
@@ -108,6 +113,23 @@
             ],
             "title": "Equity"
           },
+          "gross_notional": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gross Notional"
+          },
+          "margin_usage_floor": {
+            "default": true,
+            "title": "Margin Usage Floor",
+            "type": "boolean"
+          },
           "margin_usage_pct": {
             "anyOf": [
               {
@@ -119,6 +141,39 @@
               }
             ],
             "title": "Margin Usage Pct"
+          },
+          "margin_used": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin Used"
+          },
+          "net_notional": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Notional"
+          },
+          "notional_status": {
+            "default": "partial",
+            "enum": [
+              "exact",
+              "partial"
+            ],
+            "title": "Notional Status",
+            "type": "string"
           },
           "position_notional": {
             "anyOf": [
@@ -208,7 +263,12 @@
             "currency": "USDT",
             "day_pnl_basis": "equity_only",
             "equity": "1248.60",
+            "gross_notional": "1851.36",
+            "margin_usage_floor": false,
             "margin_usage_pct": "45.36",
+            "margin_used": "617.12",
+            "net_notional": "1851.36",
+            "notional_status": "exact",
             "position_notional": "1851.36",
             "position_notional_at": "2026-11-13T09:00:00Z",
             "positions_synced": 1,
@@ -304,6 +364,23 @@
             ],
             "title": "Equity"
           },
+          "gross_notional": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gross Notional"
+          },
+          "margin_usage_floor": {
+            "default": true,
+            "title": "Margin Usage Floor",
+            "type": "boolean"
+          },
           "margin_usage_pct": {
             "anyOf": [
               {
@@ -315,6 +392,39 @@
               }
             ],
             "title": "Margin Usage Pct"
+          },
+          "margin_used": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin Used"
+          },
+          "net_notional": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Notional"
+          },
+          "notional_status": {
+            "default": "partial",
+            "enum": [
+              "exact",
+              "partial"
+            ],
+            "title": "Notional Status",
+            "type": "string"
           },
           "position_notional": {
             "anyOf": [
@@ -3913,6 +4023,26 @@
         "title": "CorrelationSeriesResponse",
         "type": "object"
       },
+      "CurvePointItem": {
+        "description": "曲线上的一个点；`value` 是该时刻的快照值，不做插值。",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "value": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "value"
+        ],
+        "title": "CurvePointItem",
+        "type": "object"
+      },
       "DashboardAccountData": {
         "description": "账户卡内容；派生字段由 `app.positions` 给出，聚合层不重算。",
         "properties": {
@@ -4784,6 +4914,7 @@
             "anyOf": [
               {
                 "enum": [
+                  "notional_over_leverage",
                   "margin_ratio",
                   "used_margin"
                 ],
@@ -5721,6 +5852,86 @@
         "title": "DisplaySettingsUpdate",
         "type": "object"
       },
+      "EquityCurveResponse": {
+        "description": "一段区间的权益曲线。\n\n`available=false` 表示这段区间还没有足够的数据（快照只有十天时，一个月窗口\n只有三分之一），此时 `points` 一定为空，界面显示「这段区间还没有数据」，\n**不画线**。`first_snapshot_at` 用于说明「快照自 … 起记录」。",
+        "examples": [
+          {
+            "available": true,
+            "change_pct": "2.33",
+            "first_snapshot_at": "2026-11-15T00:00:00Z",
+            "last_snapshot_at": "2026-11-25T13:51:00Z",
+            "points": [
+              {
+                "at": "2026-11-25T12:51:00Z",
+                "value": "412.60"
+              },
+              {
+                "at": "2026-11-25T13:51:00Z",
+                "value": "413.45"
+              }
+            ],
+            "range": "1d"
+          }
+        ],
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          },
+          "first_snapshot_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Snapshot At"
+          },
+          "last_snapshot_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Snapshot At"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/CurvePointItem"
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "range": {
+            "title": "Range",
+            "type": "string"
+          }
+        },
+        "required": [
+          "range",
+          "available",
+          "points"
+        ],
+        "title": "EquityCurveResponse",
+        "type": "object"
+      },
       "EquityPoint": {
         "properties": {
           "equity": {
@@ -6192,6 +6403,22 @@
             ],
             "title": "Stop Px"
           },
+          "stop_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "confirmed",
+                  "none",
+                  "unavailable"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Status"
+          },
           "weight_pct": {
             "anyOf": [
               {
@@ -6293,6 +6520,7 @@
             "anyOf": [
               {
                 "enum": [
+                  "notional_over_leverage",
                   "margin_ratio",
                   "used_margin"
                 ],
@@ -6315,6 +6543,18 @@
               }
             ],
             "title": "Margin Usage Pct"
+          },
+          "max_single_instrument_weight_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Single Instrument Weight Pct"
           },
           "net_notional": {
             "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
@@ -10094,6 +10334,169 @@
         "title": "OrderCreateRequest",
         "type": "object"
       },
+      "OrderHistoryItem": {
+        "description": "单标的一笔订单；`is_open` 区分挂单与历史，`pnl` / `fee` 缺失时为 `null`。",
+        "properties": {
+          "avg_px": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Px"
+          },
+          "fee": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fee"
+          },
+          "filled_qty": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Filled Qty",
+            "type": "string"
+          },
+          "is_open": {
+            "title": "Is Open",
+            "type": "boolean"
+          },
+          "order_id": {
+            "title": "Order Id",
+            "type": "string"
+          },
+          "order_type": {
+            "title": "Order Type",
+            "type": "string"
+          },
+          "pnl": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pnl"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "qty": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Qty",
+            "type": "string"
+          },
+          "side": {
+            "enum": [
+              "buy",
+              "sell"
+            ],
+            "title": "Side",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "string"
+          }
+        },
+        "required": [
+          "order_id",
+          "side",
+          "order_type",
+          "qty",
+          "filled_qty",
+          "status",
+          "is_open",
+          "ts"
+        ],
+        "title": "OrderHistoryItem",
+        "type": "object"
+      },
+      "OrderHistoryResponse": {
+        "description": "单标的订单历史；近 7 天来自 `orders-history`，更早来自归档（最多 3 个月）。",
+        "examples": [
+          {
+            "inst_id": "BTC-USDT-SWAP",
+            "items": [
+              {
+                "avg_px": "60520",
+                "fee": "-0.03",
+                "filled_qty": "0.2",
+                "is_open": false,
+                "order_id": "3123456789",
+                "order_type": "limit",
+                "pnl": "1.84",
+                "price": "60520",
+                "qty": "0.2",
+                "side": "sell",
+                "status": "filled",
+                "ts": "2026-11-25T09:09:00Z"
+              }
+            ],
+            "scope": "all",
+            "window_days": 90
+          }
+        ],
+        "properties": {
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OrderHistoryItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "scope": {
+            "enum": [
+              "all",
+              "open",
+              "history"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
+          "window_days": {
+            "title": "Window Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "inst_id",
+          "scope",
+          "window_days",
+          "items"
+        ],
+        "title": "OrderHistoryResponse",
+        "type": "object"
+      },
       "OrderListResponse": {
         "examples": [
           {
@@ -10306,6 +10709,285 @@
           "opened_at"
         ],
         "title": "Position",
+        "type": "object"
+      },
+      "PositionCardItem": {
+        "description": "一张持仓卡片需要的全部事实，盈亏、占比与止损距离都由后端算好。",
+        "properties": {
+          "asset_class": {
+            "title": "Asset Class",
+            "type": "string"
+          },
+          "avg_px": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Avg Px",
+            "type": "string"
+          },
+          "display_symbol": {
+            "title": "Display Symbol",
+            "type": "string"
+          },
+          "inst_id": {
+            "title": "Inst Id",
+            "type": "string"
+          },
+          "lever": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lever"
+          },
+          "liq_px": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Liq Px"
+          },
+          "margin": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin"
+          },
+          "mark_px": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mark Px"
+          },
+          "mgn_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mgn Mode"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "notional": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notional"
+          },
+          "pos_id": {
+            "title": "Pos Id",
+            "type": "string"
+          },
+          "pos_side": {
+            "enum": [
+              "long",
+              "short"
+            ],
+            "title": "Pos Side",
+            "type": "string"
+          },
+          "size": {
+            "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+            "title": "Size",
+            "type": "string"
+          },
+          "stop_distance_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Distance Pct"
+          },
+          "stop_px": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Px"
+          },
+          "stop_status": {
+            "enum": [
+              "confirmed",
+              "none",
+              "unavailable"
+            ],
+            "title": "Stop Status",
+            "type": "string"
+          },
+          "upl": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upl"
+          },
+          "upl_curve": {
+            "items": {
+              "$ref": "#/components/schemas/CurvePointItem"
+            },
+            "title": "Upl Curve",
+            "type": "array"
+          },
+          "upl_ratio": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upl Ratio"
+          },
+          "weight_pct": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Pct"
+          }
+        },
+        "required": [
+          "pos_id",
+          "inst_id",
+          "display_symbol",
+          "name",
+          "asset_class",
+          "pos_side",
+          "size",
+          "avg_px",
+          "stop_status",
+          "upl_curve"
+        ],
+        "title": "PositionCardItem",
+        "type": "object"
+      },
+      "PositionCardsResponse": {
+        "description": "持仓卡片列表，已按未实现盈亏绝对值降序。",
+        "examples": [
+          {
+            "as_of": "2026-11-25T13:51:00Z",
+            "items": [
+              {
+                "asset_class": "equity_perp",
+                "avg_px": "269.34",
+                "display_symbol": "GOOGL-USDT",
+                "inst_id": "GOOGL-USDT-SWAP",
+                "lever": "10",
+                "margin": "57.83",
+                "mark_px": "276.71",
+                "mgn_mode": "isolated",
+                "name": "Alphabet",
+                "notional": "578.32",
+                "pos_id": "GOOGL-USDT-SWAP:long",
+                "pos_side": "long",
+                "size": "2.09",
+                "stop_status": "none",
+                "upl": "15.40",
+                "upl_curve": [
+                  {
+                    "at": "2026-11-25T12:51:00Z",
+                    "value": "12.10"
+                  },
+                  {
+                    "at": "2026-11-25T13:51:00Z",
+                    "value": "15.40"
+                  }
+                ],
+                "upl_ratio": "0.0274",
+                "weight_pct": "79.12"
+              }
+            ],
+            "status": "ok"
+          }
+        ],
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PositionCardItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "stale",
+              "unconfigured"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "items"
+        ],
+        "title": "PositionCardsResponse",
         "type": "object"
       },
       "PositionListResponse": {
@@ -11218,6 +11900,7 @@
                 "source": "exchange",
                 "stop_distance_pct": "9.25",
                 "stop_px": "210.00",
+                "stop_status": "confirmed",
                 "weight_pct": "42.14"
               }
             ],
@@ -11242,8 +11925,9 @@
               "currency": "USDT",
               "gross_notional": "4393.20",
               "long_notional": "3412.80",
-              "margin_usage_basis": "margin_ratio",
+              "margin_usage_basis": "notional_over_leverage",
               "margin_usage_pct": "45.36",
+              "max_single_instrument_weight_pct": "42.14",
               "net_notional": "2432.40",
               "risk_level": "low",
               "short_notional": "980.40"
@@ -11297,6 +11981,164 @@
           "rules"
         ],
         "title": "RiskExposureResponse",
+        "type": "object"
+      },
+      "RiskNotifyConfigResponse": {
+        "description": "五条风控通知规则的完整配置，顺序固定。",
+        "examples": [
+          {
+            "rules": [
+              {
+                "channels": [
+                  "browser"
+                ],
+                "enabled": true,
+                "rule_id": "stop_missing"
+              },
+              {
+                "channels": [
+                  "browser",
+                  "telegram"
+                ],
+                "enabled": true,
+                "rule_id": "high_leverage",
+                "threshold": "5"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/RiskNotifyRuleItem"
+            },
+            "title": "Rules",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rules"
+        ],
+        "title": "RiskNotifyConfigResponse",
+        "type": "object"
+      },
+      "RiskNotifyConfigUpdateRequest": {
+        "additionalProperties": false,
+        "description": "批量更新通知规则；只提交的规则会被改动。",
+        "properties": {
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/RiskNotifyRuleUpdate"
+            },
+            "title": "Rules",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rules"
+        ],
+        "title": "RiskNotifyConfigUpdateRequest",
+        "type": "object"
+      },
+      "RiskNotifyRuleItem": {
+        "description": "一条风控通知规则：开关、渠道与阈值。\n\n阈值为 `null` 的规则（未挂止损）没有可调数字；其余规则的阈值就是敞口计算用的\n那一份，不另存副本。",
+        "properties": {
+          "channels": {
+            "items": {
+              "enum": [
+                "browser",
+                "telegram",
+                "webhook"
+              ],
+              "type": "string"
+            },
+            "title": "Channels",
+            "type": "array"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "rule_id": {
+            "title": "Rule Id",
+            "type": "string"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          }
+        },
+        "required": [
+          "rule_id",
+          "enabled",
+          "channels"
+        ],
+        "title": "RiskNotifyRuleItem",
+        "type": "object"
+      },
+      "RiskNotifyRuleUpdate": {
+        "additionalProperties": false,
+        "description": "单条规则的部分更新；未提交的字段保持原值。",
+        "properties": {
+          "channels": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "browser",
+                    "telegram",
+                    "webhook"
+                  ],
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channels"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "rule_id": {
+            "title": "Rule Id",
+            "type": "string"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "pattern": "^-?\\d{1,20}(\\.\\d{1,12})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          }
+        },
+        "required": [
+          "rule_id"
+        ],
+        "title": "RiskNotifyRuleUpdate",
         "type": "object"
       },
       "SecretSettings": {
@@ -14130,6 +14972,57 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/account/equity-curve": {
+      "get": {
+        "description": "按区间读权益曲线；覆盖不足时 `available=false` 且不给点，不画假线。",
+        "operationId": "get_account_equity_curve_api_account_equity_curve_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "range",
+            "required": false,
+            "schema": {
+              "default": "1d",
+              "enum": [
+                "1d",
+                "1w",
+                "1m",
+                "6m",
+                "1y"
+              ],
+              "title": "Range",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquityCurveResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Account Equity Curve",
+        "tags": [
+          "positions"
+        ]
+      }
+    },
     "/api/account/summary": {
       "get": {
         "description": "最近一条账户快照；没有配置或没有快照时返回 200 与明确状态。",
@@ -16735,6 +17628,57 @@
         ]
       }
     },
+    "/api/positions/cards": {
+      "get": {
+        "description": "持仓卡片：已按未实现盈亏绝对值降序，含每条持仓的盈亏曲线与止损三态。",
+        "operationId": "get_position_cards_api_positions_cards_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "range",
+            "required": false,
+            "schema": {
+              "default": "1d",
+              "enum": [
+                "1d",
+                "1w",
+                "1m",
+                "6m",
+                "1y"
+              ],
+              "title": "Range",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PositionCardsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Position Cards",
+        "tags": [
+          "positions"
+        ]
+      }
+    },
     "/api/positions/exchange": {
       "get": {
         "description": "最近一次同步的交易所持仓，`as_of` 与该次账户快照相同；标的未同步时返回 503。",
@@ -16752,6 +17696,64 @@
           }
         },
         "summary": "Get Exchange Positions",
+        "tags": [
+          "positions"
+        ]
+      }
+    },
+    "/api/positions/{inst_id}/orders": {
+      "get": {
+        "description": "单标的订单历史：近 7 天与归档合并，按时间倒序。\n\n上游不可用时返回 502 —— 空列表代表「确实没有订单」，不能用来表示「没查到」。",
+        "operationId": "get_instrument_orders_api_positions__inst_id__orders_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "inst_id",
+            "required": true,
+            "schema": {
+              "title": "Inst Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "enum": [
+                "all",
+                "open",
+                "history"
+              ],
+              "title": "Scope",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderHistoryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Instrument Orders",
         "tags": [
           "positions"
         ]
@@ -17296,6 +18298,68 @@
           }
         },
         "summary": "Get Risk Exposure",
+        "tags": [
+          "risk"
+        ]
+      }
+    },
+    "/api/risk/notify-config": {
+      "get": {
+        "description": "五条风控通知规则：开关、渠道与阈值。",
+        "operationId": "get_risk_notify_config_api_risk_notify_config_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskNotifyConfigResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Risk Notify Config",
+        "tags": [
+          "risk"
+        ]
+      },
+      "put": {
+        "description": "保存通知规则；只影响通知与评估开关，不改变持仓页上的数字。",
+        "operationId": "put_risk_notify_config_api_risk_notify_config_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RiskNotifyConfigUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskNotifyConfigResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Risk Notify Config",
         "tags": [
           "risk"
         ]

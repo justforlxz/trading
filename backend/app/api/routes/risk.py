@@ -14,12 +14,18 @@ from app.api.schemas.risk_exposure import (
     PositionRiskConfigResponse,
     RiskConfigUpdateRequest,
     RiskExposureResponse,
+    RiskNotifyConfigResponse,
+    RiskNotifyConfigUpdateRequest,
+    RiskNotifyRuleItem,
     SectorExposureItem,
 )
 from app.risk import (
+    NotifyConfig,
     RiskExposure,
     SavedRiskConfig,
     exposure_report,
+    load_notify_config,
+    save_notify_config,
     save_position_risk_config,
 )
 
@@ -35,6 +41,23 @@ def get_risk_exposure() -> RiskExposureResponse:
     """组合风险与敞口：多空名义价值、行业分布、止损距离与规则结果。"""
 
     return _exposure(exposure_report())
+
+
+@risk_exposure_router.get("/risk/notify-config", response_model=RiskNotifyConfigResponse)
+def get_risk_notify_config() -> RiskNotifyConfigResponse:
+    """五条风控通知规则：开关、渠道与阈值。"""
+
+    return _notify_config(load_notify_config())
+
+
+@risk_exposure_router.put("/risk/notify-config", response_model=RiskNotifyConfigResponse)
+def put_risk_notify_config(
+    payload: RiskNotifyConfigUpdateRequest,
+) -> RiskNotifyConfigResponse:
+    """保存通知规则；只影响通知与评估开关，不改变持仓页上的数字。"""
+
+    changes = [item.model_dump(exclude_unset=True) for item in payload.rules]
+    return _notify_config(save_notify_config(changes))
 
 
 @risk_exposure_router.put(
@@ -70,6 +93,9 @@ def _exposure(view: RiskExposure) -> RiskExposureResponse:
             gross_notional=decimal_str(summary.gross_notional),
             margin_usage_pct=_optional_text(summary.margin_usage_pct),
             margin_usage_basis=summary.margin_usage_basis,  # type: ignore[arg-type]
+            max_single_instrument_weight_pct=_optional_text(
+                summary.max_single_instrument_weight_pct
+            ),
             risk_level=summary.risk_level,
             currency=summary.currency,
         ),
@@ -84,6 +110,7 @@ def _exposure(view: RiskExposure) -> RiskExposureResponse:
                 weight_pct=_optional_text(item.weight_pct),
                 mark_px=_optional_text(item.mark_px),
                 stop_px=_optional_text(item.stop_px),
+                stop_status=item.stop_status,  # type: ignore[arg-type]
                 stop_distance_pct=_optional_text(item.stop_distance_pct),
                 atr_distance=_optional_text(item.atr_distance),
                 lever=_optional_text(item.lever),
@@ -109,6 +136,20 @@ def _exposure(view: RiskExposure) -> RiskExposureResponse:
             )
             for item in view.rules
         ],
+    )
+
+
+def _notify_config(view: NotifyConfig) -> RiskNotifyConfigResponse:
+    return RiskNotifyConfigResponse(
+        rules=[
+            RiskNotifyRuleItem(
+                rule_id=rule.rule_id,
+                enabled=rule.enabled,
+                channels=list(rule.channels),  # type: ignore[arg-type]
+                threshold=_optional_text(rule.threshold),
+            )
+            for rule in view.rules
+        ]
     )
 
 

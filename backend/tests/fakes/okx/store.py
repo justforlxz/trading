@@ -88,6 +88,9 @@ class OkxStore:
         self._instruments = rows
         self._by_inst_id = {row["instId"]: row for row in rows}
         self._clock = clock
+        #: 只让**指定路径**失败：用来区分「止损查询失败」与「账户查询失败」，
+        #: 全局故障开关做不到这一点（它会把同一次同步里的账户查询一起打掉）。
+        self.fail_paths: set[str] = set()
         #: 交易域状态：私有接口的全部预置数据与鉴权凭据都在这里。
         self.book = book if book is not None else TradeBook(clock=clock)
         #: 固定 K 线：按键与上游一致（`inst_id` → `bar` → 按时间升序的行），只覆盖显式给出的组合。

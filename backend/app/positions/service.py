@@ -34,7 +34,10 @@ from app.core import (
     Conflict,
     DataUnavailable,
     ExchangePosition,
+    OrderRecord,
+    StopOrder,
     SystemClock,
+    TradePort,
     UnprocessableEntity,
     ValidationError,
 )
@@ -49,6 +52,7 @@ from app.instrument import (
     trading_rules,
 )
 from app.market import latest_candles_by_source
+from app.positions.curves import CurvePoint, upl_curves
 from app.positions.manual import LONG, SHORT, LedgerTrade, apply_trade, replay_trades
 from app.positions.model import (
     DEFAULT_ACCOUNT_ID,
@@ -57,6 +61,11 @@ from app.positions.model import (
     ExchangePositionSnapshotRow,
     ManualPositionRow,
     ManualTradeRow,
+)
+from app.positions.stops import (
+    STOP_UNAVAILABLE,
+    StopState,
+    resolve_stop_states,
 )
 
 __all__ = [
@@ -68,15 +77,19 @@ __all__ = [
     "ExchangePositionsView",
     "ManualPositionView",
     "ManualTradeView",
+    "PositionCard",
+    "PositionCardsView",
     "account_summary",
     "add_manual_trade",
     "create_manual_position",
     "delete_manual_position",
     "exchange_position_view_from_snapshot",
     "exchange_positions",
+    "instrument_order_history",
     "list_manual_positions",
     "list_manual_trades",
     "list_open_manual_positions",
+    "position_cards",
     "record_exchange_snapshot",
     "sync_account",
     "update_manual_position",
@@ -92,6 +105,9 @@ STATUS_CLOSED = "closed"
 #: 手动持仓的行情来源优先级；同一标的只用第一个有数据的来源。
 PRICE_SOURCES: tuple[str, ...] = ("okx", "okx_spot", "okx_swap")
 
+_HUNDRED = Decimal(100)
+#: 没算过的持仓按「未取到」处理，绝不退化成「未挂止损」。
+_UNSET_STOP = StopState(STOP_UNAVAILABLE, None)
 BEIJING = ZoneInfo("Asia/Shanghai")
 #: 日初基准快照的识别窗口：每日任务在 00:00 触发，允许几分钟的调度抖动。
 _BASELINE_WINDOW = timedelta(minutes=5)
@@ -114,6 +130,14 @@ class AccountView:
     day_pnl: Decimal | None
     position_notional: Decimal | None
     position_notional_at: datetime | None
+    # 名义敞口与净敞口是**已知持仓**的合计；`notional_status="partial"` 表示还有
+    # 持仓没有行情，界面必须在数字前标 `≥`，不能把已知部分当成全部。
+    gross_notional: Decimal | None
+    net_notional: Decimal | None
+    notional_status: str
+    # 已用保证金按 `Σ(名义 ÷ 杠杆)` 折算，不读 OKX 的 `used_margin`。
+    margin_used: Decimal | None
+    margin_usage_floor: bool
     captured_at: datetime | None
     source: str | None
 
@@ -145,6 +169,9 @@ class ExchangePositionView:
     mgn_mode: str | None
     liq_px: Decimal | None
     margin: Decimal | None
+    #: 止损触发价与三态；`unavailable` 表示这次没取到，不是「没挂」。
+    stop_px: Decimal | None
+    stop_status: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,6 +181,62 @@ class ExchangePositionsView:
     as_of: datetime | None
     status: str
     items: tuple[ExchangePositionView, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class PositionCard:
+    """持仓卡片：一张卡需要的全部事实，盈亏与占比都由后端算好。
+
+    `upl_curve` 是该持仓的未实现盈亏序列（来自 `exchange_position_snapshots.upl`），
+    不是价格 K 线。`stop_status` 三态见 `app.positions.stops`。
+    """
+
+    pos_id: str
+    inst_id: str
+    display_symbol: str
+    name: str
+    asset_class: str
+    pos_side: str
+    size: Decimal
+    avg_px: Decimal
+    mark_px: Decimal | None
+    upl: Decimal | None
+    upl_ratio: Decimal | None
+    lever: Decimal | None
+    mgn_mode: str | None
+    liq_px: Decimal | None
+    margin: Decimal | None
+    notional: Decimal | None
+    weight_pct: Decimal | None
+    stop_status: str
+    stop_px: Decimal | None
+    stop_distance_pct: Decimal | None
+    upl_curve: tuple[CurvePoint, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class PositionCardsView:
+    """持仓卡片列表；`as_of` 与这次用的持仓快照同刻。"""
+
+    as_of: datetime | None
+    status: str
+    items: tuple[PositionCard, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _PositionTotals:
+    """一次遍历算出的名义合计。
+
+    `notional_exact` 与 `margin_exact` 分开：名义只要求有价格与合约规格，保证金还要求
+    知道杠杆。现货持仓没有杠杆，名义算得出来而保证金算不出来，混成一个标志会让
+    `position_notional` 平白变成 `None`。
+    """
+
+    gross: Decimal
+    net: Decimal
+    margin: Decimal
+    notional_exact: bool
+    margin_exact: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -216,13 +299,11 @@ def account_summary(
         if latest is None:
             return _empty_account(_unconfigured_status())
         day_pnl = _day_pnl(session, latest, now)
-        position_notional = (
-            _position_notional(session, latest) if include_position_notional else None
-        )
+        totals = _position_totals(session, latest) if include_position_notional else None
         return _account_view(
             latest,
             day_pnl=day_pnl,
-            position_notional=position_notional,
+            totals=totals,
             status=_configured_status(),
         )
 
@@ -249,6 +330,7 @@ def sync_account(*, clock: Clock | None = None) -> AccountSyncView:
                 clock=clock,
             )
             raise
+        stop_orders, stops_available = _read_stop_orders(port, clock=clock)
     finally:
         port.close()
 
@@ -260,6 +342,8 @@ def sync_account(*, clock: Clock | None = None) -> AccountSyncView:
         source=SOURCE_REST,
         snapshot=snapshot,
         positions=positions,
+        stops=stop_orders,
+        stops_available=stops_available,
     )
     assert summary is not None  # 刚刚写入或同一时刻已存在
     record_activity(
@@ -279,6 +363,8 @@ def record_exchange_snapshot(
     source: str,
     snapshot: AccountSnapshot | None = None,
     positions: Sequence[ExchangePosition] | None = None,
+    stops: Sequence[StopOrder] | None = None,
+    stops_available: bool = True,
 ) -> AccountView | None:
     """把一次账户与持仓快照写进 B2 的表；只写传入的部分，不补造缺失数据。
 
@@ -287,6 +373,9 @@ def record_exchange_snapshot(
     按 `(account_id, pos_id, captured_at)` 更新，并删除该时刻不在集合里的旧行，
     保证同一时刻的账户与持仓是同一批状态。私有频道推送与 REST 同步共用本函数，
     保证两边落库字段一致。返回账户视图，没有账户快照时返回 `None`。
+
+    `stops` 传 `None` 表示这次不涉及止损（私有频道推送就没有止损），已有行的止损
+    列保持原值；传集合时按 `stops_available` 决定是「确认过」还是「没取到」。
     """
 
     with session_scope() as session:
@@ -312,46 +401,62 @@ def record_exchange_snapshot(
                 .on_conflict_do_nothing(index_elements=["account_id", "captured_at", "source"])
             )
         if positions is not None:
+            # `stops is None`：这次调用（私有频道推送）不涉及止损，止损列一律不写。
+            # 不在插入里出现就没有值可覆盖，`ON CONFLICT DO UPDATE` 的 set 里也不包含
+            # 它们，于是同一 `(account_id, pos_id, captured_at)` 上 REST 同步写下的
+            # 「有止损 / 确认无止损」不会被推送抹成「未取到」。
+            stop_states = (
+                resolve_stop_states(positions, stops or (), available=stops_available)
+                if stops is not None
+                else None
+            )
             if positions:
-                insert_positions = postgresql_insert(ExchangePositionSnapshotRow).values(
-                    [
-                        {
-                            "account_id": DEFAULT_ACCOUNT_ID,
-                            "pos_id": item.pos_id,
-                            "inst_id": item.inst_id,
-                            "pos_side": item.pos_side,
-                            "size": item.size,
-                            "avg_px": item.avg_px,
-                            "mark_px": item.mark_px,
-                            "upl": item.upl,
-                            "upl_ratio": item.upl_ratio,
-                            "lever": item.lever,
-                            "mgn_mode": item.mgn_mode,
-                            "liq_px": item.liq_px,
-                            "margin": item.margin,
-                            "captured_at": captured_at,
-                            "source": source,
-                        }
-                        for item in positions
-                    ]
-                )
+                rows = []
+                for item in positions:
+                    row: dict[str, object] = {
+                        "account_id": DEFAULT_ACCOUNT_ID,
+                        "pos_id": item.pos_id,
+                        "inst_id": item.inst_id,
+                        "pos_side": item.pos_side,
+                        "size": item.size,
+                        "avg_px": item.avg_px,
+                        "mark_px": item.mark_px,
+                        "upl": item.upl,
+                        "upl_ratio": item.upl_ratio,
+                        "lever": item.lever,
+                        "mgn_mode": item.mgn_mode,
+                        "liq_px": item.liq_px,
+                        "margin": item.margin,
+                        "captured_at": captured_at,
+                        "source": source,
+                    }
+                    if stop_states is not None:
+                        state = stop_states.get(item.pos_id, _UNSET_STOP)
+                        row["stop_px"] = state.px
+                        row["stop_status"] = state.status
+                    rows.append(row)
+                insert_positions = postgresql_insert(ExchangePositionSnapshotRow).values(rows)
+                updates: dict[str, object] = {
+                    "inst_id": insert_positions.excluded.inst_id,
+                    "pos_side": insert_positions.excluded.pos_side,
+                    "size": insert_positions.excluded.size,
+                    "avg_px": insert_positions.excluded.avg_px,
+                    "mark_px": insert_positions.excluded.mark_px,
+                    "upl": insert_positions.excluded.upl,
+                    "upl_ratio": insert_positions.excluded.upl_ratio,
+                    "lever": insert_positions.excluded.lever,
+                    "mgn_mode": insert_positions.excluded.mgn_mode,
+                    "liq_px": insert_positions.excluded.liq_px,
+                    "margin": insert_positions.excluded.margin,
+                    "source": insert_positions.excluded.source,
+                }
+                if stop_states is not None:
+                    updates["stop_px"] = insert_positions.excluded.stop_px
+                    updates["stop_status"] = insert_positions.excluded.stop_status
                 session.execute(
                     insert_positions.on_conflict_do_update(
                         index_elements=["account_id", "pos_id", "captured_at"],
-                        set_={
-                            "inst_id": insert_positions.excluded.inst_id,
-                            "pos_side": insert_positions.excluded.pos_side,
-                            "size": insert_positions.excluded.size,
-                            "avg_px": insert_positions.excluded.avg_px,
-                            "mark_px": insert_positions.excluded.mark_px,
-                            "upl": insert_positions.excluded.upl,
-                            "upl_ratio": insert_positions.excluded.upl_ratio,
-                            "lever": insert_positions.excluded.lever,
-                            "mgn_mode": insert_positions.excluded.mgn_mode,
-                            "liq_px": insert_positions.excluded.liq_px,
-                            "margin": insert_positions.excluded.margin,
-                            "source": insert_positions.excluded.source,
-                        },
+                        set_=updates,
                     )
                 )
             stale = delete(ExchangePositionSnapshotRow).where(
@@ -379,13 +484,17 @@ def record_exchange_snapshot(
         return _account_view(
             latest,
             day_pnl=_day_pnl(session, latest, captured_at),
-            position_notional=_position_notional(session, latest),
+            totals=_position_totals(session, latest),
             status=_configured_status(),
         )
 
 
 def exchange_position_view_from_snapshot(item: ExchangePosition) -> ExchangePositionView:
-    """推送用的持仓视图：与 `GET /api/positions/exchange` 的条目字段一致。"""
+    """推送用的持仓视图：与 `GET /api/positions/exchange` 的条目字段一致。
+
+    私有频道推送不携带止损信息，因此这里如实标成「未取到」；风险层读的是库里的
+    快照（`exchange_positions()`），不使用本函数，所以推送不会影响止损判定。
+    """
 
     instrument = get_instrument(item.inst_id)
     return ExchangePositionView(
@@ -404,6 +513,8 @@ def exchange_position_view_from_snapshot(item: ExchangePosition) -> ExchangePosi
         mgn_mode=item.mgn_mode,
         liq_px=item.liq_px,
         margin=item.margin,
+        stop_px=None,
+        stop_status=STOP_UNAVAILABLE,
     )
 
 
@@ -444,6 +555,165 @@ def exchange_positions(*, require_mapped: bool = False) -> ExchangePositionsView
     return ExchangePositionsView(latest.captured_at, _configured_status(), items)
 
 
+def position_cards(range_key: str = "1d") -> PositionCardsView:
+    """持仓卡片：按未实现盈亏绝对值降序，带每条持仓的盈亏曲线与止损三态。
+
+    排序放在后端：前端再排一次就会出现「同一份数据两种顺序」，也不符合「前端不重算」
+    的约束。没有行情的持仓照样出卡片——`mark_px` / `upl` 为空，界面用骨架占位补位，
+    整卡消失比空值更难察觉。
+    """
+
+    with session_scope() as session:
+        latest = _latest_account_row(session)
+        if latest is None:
+            return PositionCardsView(None, _unconfigured_status(), ())
+        rows = list(
+            session.scalars(
+                select(ExchangePositionSnapshotRow)
+                .where(ExchangePositionSnapshotRow.captured_at == latest.captured_at)
+                .order_by(ExchangePositionSnapshotRow.pos_id)
+            )
+        )
+        totals = _position_totals(session, latest)
+        status = _configured_status()
+
+    instruments = get_instruments(row.inst_id for row in rows)
+    curves = upl_curves(range_key)
+    cards = []
+    for row in rows:
+        instrument = instruments.get(row.inst_id)
+        notional = _row_notional(row, instrument)
+        cards.append(
+            PositionCard(
+                pos_id=row.pos_id,
+                inst_id=row.inst_id,
+                display_symbol=_display_symbol(instrument, row.inst_id),
+                name=_name(instrument, row.inst_id),
+                asset_class=_asset_class(instrument),
+                pos_side=row.pos_side,
+                size=row.size,
+                avg_px=row.avg_px,
+                mark_px=row.mark_px,
+                upl=row.upl,
+                upl_ratio=row.upl_ratio,
+                lever=row.lever,
+                mgn_mode=row.mgn_mode,
+                liq_px=row.liq_px,
+                margin=row.margin,
+                notional=notional,
+                weight_pct=_weight_pct(notional, totals.gross),
+                stop_status=row.stop_status,
+                stop_px=row.stop_px,
+                stop_distance_pct=_stop_distance_pct(row.mark_px, row.stop_px, row.pos_side),
+                upl_curve=curves.get(row.pos_id, ()),
+            )
+        )
+    cards.sort(
+        key=lambda card: (-abs(card.upl if card.upl is not None else Decimal(0)), card.pos_id)
+    )
+    return PositionCardsView(latest.captured_at, status, tuple(cards))
+
+
+def instrument_order_history(
+    inst_id: str,
+    *,
+    clock: Clock | None = None,
+) -> tuple[OrderRecord, ...]:
+    """单个标的的挂单与历史订单，按时间倒序。
+
+    这是本模块唯一一处读侧联网：订单历史只在 OKX 侧保留（近 7 天在 `orders-history`，
+    更早在 `orders-history-archive`），没有对应的本地表可以读。上游失败抛
+    `ExchangeError`，接口层据此回 502，不返回空列表冒充「没有订单」。
+    """
+
+    if not _credentials_configured():
+        raise DataUnavailable("未配置 OKX 密钥，无法读取订单历史")
+    port = create_trade_port(clock=clock)
+    try:
+        return tuple(port.order_history(inst_id))
+    finally:
+        port.close()
+
+
+def _row_notional(
+    row: ExchangePositionSnapshotRow,
+    instrument: Instrument | None,
+) -> Decimal | None:
+    """一条交易所持仓的名义价值；缺价格或规格时返回 `None`。"""
+
+    if instrument is None:
+        return None
+    price = row.mark_px
+    if price is None:
+        price, _ = _latest_price(row.inst_id)
+    return notional_value(
+        size=row.size,
+        price=price,
+        qty_unit=trading_rules(instrument.inst_type).qty_unit,
+        ct_val=instrument.ct_val,
+        ct_mult=instrument.ct_mult,
+    )
+
+
+def _weight_pct(notional: Decimal | None, gross: Decimal) -> Decimal | None:
+    """占比 = 本条名义 ÷ 已知名义合计；分母为 0 时不给值。"""
+
+    if notional is None or gross <= 0:
+        return None
+    return notional / gross * _HUNDRED
+
+
+def _effective_lever(lever: Decimal | None) -> Decimal:
+    """保证金折算用的杠杆：没有杠杆就按 1 倍算。
+
+    现货是全额买入，占用的资金就是名义本身（`名义 ÷ 1`）。把「没有杠杆」当成「杠杆
+    未知」而跳过，会让现货持仓的保证金贡献恒为 0——实测一条 152.77 名义的现货持仓
+    把账户占用率从 45% 压到 12%，用户会以为账户很轻。
+    """
+
+    if lever is None or lever <= 0:
+        return Decimal(1)
+    return lever
+
+
+def _stop_distance_pct(
+    mark_px: Decimal | None,
+    stop_px: Decimal | None,
+    pos_side: str,
+) -> Decimal | None:
+    """标记价到止损价的距离百分比：多单看下方、空单看上方，正数表示还有缓冲。"""
+
+    if mark_px is None or stop_px is None or mark_px == 0:
+        return None
+    diff = mark_px - stop_px if pos_side != SHORT else stop_px - mark_px
+    return diff / mark_px * _HUNDRED
+
+
+def _read_stop_orders(
+    port: TradePort,
+    *,
+    clock: Clock | None,
+) -> tuple[list[StopOrder], bool]:
+    """取止损委托；失败只降级为「未取到」，不影响账户与持仓的同步。
+
+    止损查询失败时把它记成一条活动事件，然后继续写账户与持仓：一次止损失败不该
+    让整次同步失败，但也不能悄悄变成「没有止损」。
+    """
+
+    try:
+        return list(port.stop_orders()), True
+    except Exception as exc:
+        record_activity(
+            event_type="account.sync.stops_unavailable",
+            object_type="account",
+            object_id=DEFAULT_ACCOUNT_ID,
+            summary="止损委托读取失败，本次按「未取到」处理",
+            payload={"error_type": type(exc).__name__},
+            clock=clock,
+        )
+        return [], False
+
+
 def _latest_account_row(session: Session) -> AccountSnapshotRow | None:
     return session.scalars(
         select(AccountSnapshotRow)
@@ -479,13 +749,18 @@ def _day_pnl(
     return latest.equity - baseline.equity
 
 
-def _position_notional(session: Session, latest: AccountSnapshotRow) -> Decimal | None:
-    """持仓市值：交易所持仓按合约规格与价格折算，手动持仓按最新价折算。
+def _position_totals(session: Session, latest: AccountSnapshotRow) -> _PositionTotals:
+    """一次遍历算出名义敞口、净敞口与已用保证金。
 
-    任一条持仓缺少价格、合约规格或标的信息时返回 `None`，不把不完整的部分相加后
-    当成总额。价格优先用快照里的标记价；缺失时回退到已落库的最新收盘价，与风险
-    敞口使用同一套行情来源。最新账户快照没有携带持仓批次且该时刻没有持仓行时返回
-    `None`，不能把未知当成空持仓的 0。
+    口径（本模块是唯一实现，别处不许另立一套）：
+
+    - 名义 = 合约规格折算的价值，缺失价格/规格/标的时这条持仓无法计入；
+    - 已用保证金 = `Σ(名义 ÷ 杠杆)`，**不读 OKX 的 `used_margin`**：逐仓模式下上游
+      `imr` 返回空、`used_margin` 恒为 0，用它会得出「保证金占用 0%」的假结论；
+    - 任何一条持仓无法计入时 `exact=False`，界面据此在数字前标 `≥`。
+
+    最新账户快照没有携带持仓批次且该时刻没有持仓行时，名义合计退回 0 并标
+    `exact=False`——「不知道有没有持仓」不能当成「没有持仓」。
     """
 
     exchange_rows = list(
@@ -496,7 +771,8 @@ def _position_notional(session: Session, latest: AccountSnapshotRow) -> Decimal 
         )
     )
     if not exchange_rows and not latest.positions_included:
-        return None
+        return _PositionTotals(Decimal(0), Decimal(0), Decimal(0), False, False)
+
     symbols = {row.inst_id for row in exchange_rows}
     instruments = (
         {
@@ -507,11 +783,17 @@ def _position_notional(session: Session, latest: AccountSnapshotRow) -> Decimal 
         else {}
     )
 
-    total = Decimal(0)
+    notional_exact = True
+    margin_exact = True
+    long_notional = Decimal(0)
+    short_notional = Decimal(0)
+    margin = Decimal(0)
     for row in exchange_rows:
         instrument = instruments.get(row.inst_id)
         if instrument is None:
-            return None
+            notional_exact = False
+            margin_exact = False
+            continue
         price = row.mark_px
         if price is None:
             price, _ = _latest_price(row.inst_id)
@@ -523,32 +805,60 @@ def _position_notional(session: Session, latest: AccountSnapshotRow) -> Decimal 
             ct_mult=instrument.ct_mult,
         )
         if value is None:
-            return None
-        total += value
+            notional_exact = False
+            margin_exact = False
+            continue
+        if row.pos_side == "short":
+            short_notional += value
+        else:
+            long_notional += value
+        margin += value / _effective_lever(row.lever)
 
     manual_rows = session.scalars(
         select(ManualPositionRow).where(ManualPositionRow.status == STATUS_OPEN)
     )
     for row in manual_rows:
         price, _ = _latest_price(row.inst_id)
-        value = notional_value(
-            size=row.quantity,
-            price=price,
-            qty_unit="base",
-        )
+        value = notional_value(size=row.quantity, price=price, qty_unit="base")
         if value is None:
-            return None
-        total += value
-    return total
+            notional_exact = False
+            margin_exact = False
+            continue
+        if row.side == SHORT:
+            short_notional += value
+        else:
+            long_notional += value
+        margin += value / _effective_lever(row.leverage)
+
+    return _PositionTotals(
+        gross=long_notional + short_notional,
+        net=long_notional - short_notional,
+        margin=margin,
+        notional_exact=notional_exact,
+        margin_exact=margin_exact,
+    )
 
 
 def _account_view(
     row: AccountSnapshotRow,
     *,
     day_pnl: Decimal | None,
-    position_notional: Decimal | None,
+    totals: _PositionTotals | None,
     status: str,
 ) -> AccountView:
+    """账户卡的只读视图。
+
+    `margin_usage_pct` 用 `Σ(名义 ÷ 杠杆) ÷ 权益` 重算，不使用快照里的 `margin_ratio`
+    （逐仓模式下上游给的是 0）。`margin_used` 同理；`used_margin` 保留上游原值，
+    只作为历史数据被其他页面读取，不参与本页的计算。
+    """
+
+    margin_used = totals.margin if totals is not None else None
+    margin_usage_pct = (
+        margin_used / row.equity * _HUNDRED if margin_used is not None and row.equity != 0 else None
+    )
+    notional_exact = totals is not None and totals.notional_exact
+    margin_exact = totals is not None and totals.margin_exact
     return AccountView(
         status=status,
         account_id=row.account_id,
@@ -559,10 +869,15 @@ def _account_view(
         unrealized_pnl=row.unrealized_pnl,
         used_margin=row.used_margin,
         available_margin=row.available_margin,
-        margin_usage_pct=row.margin_ratio * 100,
+        margin_usage_pct=margin_usage_pct,
         day_pnl=day_pnl,
-        position_notional=position_notional,
-        position_notional_at=row.captured_at if position_notional is not None else None,
+        position_notional=totals.gross if notional_exact else None,
+        position_notional_at=row.captured_at if notional_exact else None,
+        gross_notional=totals.gross if totals is not None else None,
+        net_notional=totals.net if totals is not None else None,
+        notional_status="exact" if notional_exact else "partial",
+        margin_used=margin_used,
+        margin_usage_floor=not margin_exact,
         captured_at=row.captured_at,
         source=row.source,
     )
@@ -583,6 +898,11 @@ def _empty_account(status: str) -> AccountView:
         day_pnl=None,
         position_notional=None,
         position_notional_at=None,
+        gross_notional=None,
+        net_notional=None,
+        notional_status="partial",
+        margin_used=None,
+        margin_usage_floor=True,
         captured_at=None,
         source=None,
     )
@@ -645,6 +965,8 @@ def _exchange_position_view(
         mgn_mode=row.mgn_mode,
         liq_px=row.liq_px,
         margin=row.margin,
+        stop_px=row.stop_px,
+        stop_status=row.stop_status,
     )
 
 

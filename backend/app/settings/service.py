@@ -67,6 +67,17 @@ DEFAULT_RISK: dict[str, Any] = {
     # B3 风险与敞口阈值：单标的占组合总名义价值的上限，以及保证金使用率上限。
     "max_single_instrument_weight_pct": "35",
     "max_margin_usage_pct": "70",
+    # 止损距离过近的判定倍数：标记价到止损价不足这么多倍 ATR 就提醒。
+    "stop_distance_atr_multiple": "1.0",
+    # 风控通知的开关与渠道。阈值不在这里另存一份：它就是上面那几个 `max_*` 键，
+    # 两个真源会让「界面改了阈值、判定还在用旧值」变成常态。
+    "risk_notify": {
+        "stop_missing": {"enabled": True, "channels": ["browser"]},
+        "stop_distance": {"enabled": True, "channels": ["browser"]},
+        "high_leverage": {"enabled": True, "channels": ["browser"]},
+        "single_instrument_weight": {"enabled": True, "channels": ["browser"]},
+        "margin_usage": {"enabled": False, "channels": ["browser"]},
+    },
     "max_daily_loss": "300",
     "liquidation_buffer_pct": "10",
     "stop_loss_mandatory": True,

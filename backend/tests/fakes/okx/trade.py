@@ -43,6 +43,8 @@ INVALID_PASSPHRASE_CODE = "50105"
 #: 逐单失败的封包码：顶层 `code` 是 "1"，具体原因在 `data[0].sCode`。
 ORDER_FAILED_CODE = "1"
 
+#: 上游认为「还没结束」的订单状态；其余算历史。
+OPEN_ORDER_STATES: frozenset[str] = frozenset({"live", "partially_filled", "effective"})
 SUPPORTED_TD_MODES: dict[str, frozenset[str]] = {
     "SPOT": frozenset({"cash"}),
     "SWAP": frozenset({"cross", "isolated"}),
@@ -156,6 +158,8 @@ class TradeBook:
         self._order_ids: dict[tuple[str, str], str] = {}
         self._fills: list[dict[str, str]] = []
         self._marks: dict[str, str] = {}
+        #: 止盈止损委托（策略委托）的预置行；`stop_orders()` 原样吐出去。
+        self._stops: list[dict[str, str]] = []
         self._sequence = 0
         #: 私有接口的调用记录：`(method, path, query, body)`，供用例断言调用形态。
         self.requests: list[tuple[str, str, str, str]] = []
@@ -213,6 +217,32 @@ class TradeBook:
                 "margin": margin,
             }
         )
+
+    def set_stop(
+        self,
+        inst_id: str,
+        *,
+        stop_px: str = "",
+        take_profit_px: str = "",
+        pos_side: str = "net",
+        side: str = "sell",
+        algo_type: str = "conditional",
+    ) -> str:
+        """预置一条策略委托；`stop_px` 为空表示这单只带止盈。"""
+
+        algo_id = self._next_id("algo")
+        self._stops.append(
+            {
+                "algoId": algo_id,
+                "instId": inst_id,
+                "ordType": algo_type,
+                "side": side,
+                "posSide": pos_side,
+                "slTriggerPx": stop_px,
+                "tpTriggerPx": take_profit_px,
+            }
+        )
+        return algo_id
 
     def set_account(
         self,
@@ -362,6 +392,79 @@ class TradeBook:
                 f"Order does not exist: {ord_id or client_order_id}",
             )
         return dict(row)
+
+    def stop_orders(self, *, ord_type: str) -> list[dict[str, str]]:
+        """按 `ordType` 过滤策略委托；`ord_type` 为空时返回全部。"""
+
+        return [dict(row) for row in self._stops if not ord_type or row["ordType"] == ord_type]
+
+    def orders(
+        self,
+        *,
+        inst_id: str = "",
+        only_open: bool,
+        after: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, str]]:
+        """挂单或历史订单，按时间倒序并复刻上游的分页语义。
+
+        `after=<ordId>` 返回**早于**该单的记录（游标之后的那一段）；`limit` 是单页
+        上限，默认 100 与上游一致。假服务端不实现这两条参数，就越不出“翻页写错方向”
+        这类缺陷。
+        """
+
+        rows = sorted(
+            (
+                dict(row)
+                for row in self._orders.values()
+                if (not inst_id or row["instId"] == inst_id)
+                and (row["state"] in OPEN_ORDER_STATES) == only_open
+            ),
+            key=lambda row: int(row.get("cTime") or 0),
+            reverse=True,
+        )
+        if after:
+            ids = [row["ordId"] for row in rows]
+            rows = rows[ids.index(after) + 1 :] if after in ids else []
+        return rows[:limit]
+
+    def add_historical_order(
+        self,
+        inst_id: str,
+        *,
+        side: str = "buy",
+        order_type: str = "limit",
+        qty: str = "1",
+        price: str = "100",
+        avg_px: str = "100",
+        pnl: str = "",
+        fee: str = "-0.01",
+        state: str = "filled",
+        created_at: int = 0,
+        stop_px: str = "",
+    ) -> str:
+        """预置一笔已终结的订单，用来验证「历史」筛选与时间倒序。"""
+
+        ord_id = self._next_id("ord")
+        self._orders[ord_id] = {
+            "ordId": ord_id,
+            "clOrdId": "",
+            "instId": inst_id,
+            "side": side,
+            "ordType": order_type,
+            "sz": qty,
+            "px": price,
+            "accFillSz": qty if state == "filled" else "0",
+            "avgPx": avg_px if state == "filled" else "",
+            "pnl": pnl,
+            "fee": fee,
+            "slTriggerPx": stop_px,
+            "state": state,
+            "cTime": str(created_at),
+            "uTime": str(created_at),
+            "instType": "SWAP",
+        }
+        return ord_id
 
     def fills(self, *, inst_id: str, ord_id: str = "") -> list[dict[str, str]]:
         return [

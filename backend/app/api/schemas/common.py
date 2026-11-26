@@ -72,6 +72,14 @@ AssetType = Literal["tokenized_equity", "crypto", "commodity_token", "unknown"]
 # （见 `app/api/routes/instruments.py` 的 `get_instrument_candles`），因此它也
 # 必须留在契约里；同时它也是早期未区分形态的存量取值。
 DataSource = Literal["okx", "okx_spot", "okx_swap"]
+#: 止损三态，见 `app.positions.stops`：把 `unavailable` 说成 `none` 就是污蔑用户
+#: 没设止损。持仓卡片与持仓风险两处共用这一个定义。
+StopStatus = Literal["confirmed", "none", "unavailable"]
+#: 保证金占用率的口径。**唯一真源**：风控与首页两个响应模型都引用它，避免同一个概念
+#: 出现两个 `Literal`、其中一个落后于产出口径而让响应构造失败。
+#: `margin_ratio` / `used_margin` 是历史口径（来自 OKX `imr`，逐仓模式下恒为 0），
+#: 现在只作为字面量保留，不再产出。
+MarginUsageBasis = Literal["notional_over_leverage", "margin_ratio", "used_margin"]
 # 组件层判断：单个基础组件对某个标的看多、看空还是不动。它不表达仓位，也不表达
 # 组合——「怎么做、做多少、做哪几条腿」由下面的 `TargetPortfolio` 承载。
 SignalAction = Literal["BUY", "SELL", "HOLD"]

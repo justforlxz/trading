@@ -44,6 +44,12 @@ _POSITIONS_PATH = "/api/v5/account/positions"
 _ORDER_PATH = "/api/v5/trade/order"
 _CANCEL_ORDER_PATH = "/api/v5/trade/cancel-order"
 _FILLS_PATH = "/api/v5/trade/fills"
+_STOP_ALGO_PATH = "/api/v5/trade/orders-algo-pending"
+_PENDING_ORDERS_PATH = "/api/v5/trade/orders-pending"
+_HISTORY_ORDERS_PATH = "/api/v5/trade/orders-history"
+_HISTORY_ARCHIVE_PATH = "/api/v5/trade/orders-history-archive"
+#: 订单列表类接口的单页上限，与上游一致。
+_ORDER_PAGE_LIMIT = 100
 
 
 def okx_payload(data: Any, *, code: str = "0", msg: str = "") -> dict[str, Any]:
@@ -267,7 +273,79 @@ def create_app(*, store: OkxStore | None = None, scenarios: Scenarios | None = N
             request.app.state.okx_store.book.fills(inst_id=instId or "", ord_id=ordId or "")
         )
 
+    @app.get(_STOP_ALGO_PATH)
+    def read_stop_algos(
+        request: Request,
+        instType: str | None = None,
+        ordType: str | None = None,
+    ) -> Any:
+        denied = _denied(request)
+        if denied is not None:
+            return denied
+        failed = _path_failed(request)
+        if failed is not None:
+            return failed
+        return okx_payload(request.app.state.okx_store.book.stop_orders(ord_type=ordType or ""))
+
+    @app.get(_PENDING_ORDERS_PATH)
+    def read_pending_orders(
+        request: Request,
+        instId: str | None = None,
+        instType: str | None = None,
+        after: str | None = None,
+        limit: str | None = None,
+    ) -> Any:
+        denied = _denied(request)
+        if denied is not None:
+            return denied
+        failed = _path_failed(request)
+        if failed is not None:
+            return failed
+        return okx_payload(
+            request.app.state.okx_store.book.orders(
+                inst_id=instId or "",
+                only_open=True,
+                after=after,
+                limit=_parse_limit(limit, default=_ORDER_PAGE_LIMIT),
+            )
+        )
+
+    @app.get(_HISTORY_ORDERS_PATH)
+    @app.get(_HISTORY_ARCHIVE_PATH)
+    def read_order_history(
+        request: Request,
+        instId: str | None = None,
+        instType: str | None = None,
+        after: str | None = None,
+        limit: str | None = None,
+    ) -> Any:
+        denied = _denied(request)
+        if denied is not None:
+            return denied
+        failed = _path_failed(request)
+        if failed is not None:
+            return failed
+        return okx_payload(
+            request.app.state.okx_store.book.orders(
+                inst_id=instId or "",
+                only_open=False,
+                after=after,
+                limit=_parse_limit(limit, default=_ORDER_PAGE_LIMIT),
+            )
+        )
+
     return app
+
+
+def _path_failed(request: Request) -> JSONResponse | None:
+    """只让登记过的路径失败：用于「止损查询失败、账户查询正常」这类组合。"""
+
+    if request.url.path not in request.app.state.okx_store.fail_paths:
+        return None
+    return JSONResponse(
+        status_code=500,
+        content=okx_payload([], code="50001", msg="Internal Server Error"),
+    )
 
 
 def _denied(request: Request, body: str = "") -> Response | None:

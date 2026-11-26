@@ -32,9 +32,14 @@ class TradingError(Exception):
     """所有可预期失败的基类。
 
     子类用 `http_status` 声明边界映射；捕获方先按具体子类分派，兜底再捕获本类。
+
+    `public_message` 是**给用户看**的固定文案：为 `None` 时 API 边界原样返回异常
+    消息（领域错误本来就该让用户看到，例如「未找到持仓」）。上游故障这类消息里带着
+    接口路径、errno 与 Python 异常原文，必须换成固定文案——原始信息只进日志。
     """
 
     http_status: ClassVar[int] = 500
+    public_message: ClassVar[str | None] = None
 
 
 class ValidationError(TradingError):
@@ -44,9 +49,15 @@ class ValidationError(TradingError):
 
 
 class UpstreamError(TradingError):
-    """外部依赖（交易所、行情源）报错，或返回了无法理解的数据。"""
+    """外部依赖（交易所、行情源）报错，或返回了无法理解的数据。
+
+    异常消息里带上游路径、返回码与底层网络错误（`[Errno 104] Connection reset by
+    peer` 之类），只适合进日志；对外统一一句可读文案，用户才知道该等一等还是该改
+    参数。
+    """
 
     http_status: ClassVar[int] = 502
+    public_message: ClassVar[str | None] = "上游数据源暂时不可用，请稍后重试"
 
 
 class DataUnavailable(TradingError):

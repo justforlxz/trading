@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -15,11 +15,18 @@ from fastapi.testclient import TestClient
 from app.core import AccountSnapshot, ExchangePosition, StopOrder
 from app.exchange.okx.instruments import parse_instruments
 from app.instrument import sync_instruments
-from app.positions import account_summary, position_cards, record_exchange_snapshot
+from app.positions import (
+    account_summary,
+    exchange_positions,
+    position_cards,
+    record_exchange_snapshot,
+)
 from tests.api.conftest import seed_daily
 from tests.exchange.conftest import SWAP_INSTRUMENT
 
 CAPTURED_AT = datetime(2026, 11, 25, 12, 0, tzinfo=UTC)
+#: 推送行自己的时刻：比 REST 行晚 5 秒，与生产里「推送每 5 秒、同步每 5 分钟」一致。
+PUSH_CAPTURED_AT = CAPTURED_AT + timedelta(seconds=5)
 
 
 def _snapshot(equity: str = "1000") -> AccountSnapshot:
@@ -61,14 +68,45 @@ def _position(
     )
 
 
-def _write(positions: list[ExchangePosition], *, stops: list[StopOrder] | None = None) -> None:
+def _write(
+    positions: list[ExchangePosition],
+    *,
+    stops: list[StopOrder] | None = None,
+    captured_at: datetime = CAPTURED_AT,
+) -> None:
     record_exchange_snapshot(
-        captured_at=CAPTURED_AT,
+        captured_at=captured_at,
         source="okx_rest",
         snapshot=_snapshot(),
         positions=positions,
         stops=stops if stops is not None else [],
         stops_available=stops is not None,
+    )
+
+
+def _push(
+    positions: list[ExchangePosition],
+    *,
+    captured_at: datetime = PUSH_CAPTURED_AT,
+) -> None:
+    """私有频道推送：账户行与持仓行写在同一时刻，且不带止损列。"""
+
+    record_exchange_snapshot(
+        captured_at=captured_at,
+        source="okx_ws",
+        snapshot=_snapshot(),
+        positions=positions,
+    )
+
+
+def _stop(px: str) -> StopOrder:
+    return StopOrder(
+        inst_id="AAPL-USDT-SWAP",
+        order_id="algo-1",
+        order_type="conditional",
+        side="sell",
+        stop_px=Decimal(px),
+        pos_side=None,
     )
 
 
@@ -159,6 +197,80 @@ def test_confirmed_no_stop_is_reported_as_none(client: TestClient) -> None:
     card = position_cards().items[0]
 
     assert card.stop_status == "none"
+
+
+def test_a_newer_push_keeps_the_synced_stop_state(client: TestClient) -> None:
+    """AC1 回归：推送行比 REST 行新，也不能把「问过、确认没有」改回「未取到」。
+
+    生产里推送每 5 秒写一条自己的 `captured_at`，REST 每 5 分钟才写一条，两者几乎
+    不会落在同一时刻。卡片如果取「最新一行」，读到的永远是推送行。
+    """
+
+    sync_instruments(parse_instruments([SWAP_INSTRUMENT]))
+    _write([_position("pos-1", upl="10")], stops=[])
+    _push([_position("pos-1", upl="11")])
+
+    card = position_cards().items[0]
+
+    assert card.stop_status == "none"
+    assert card.stop_px is None
+    assert card.upl == Decimal("11")
+    response = client.get("/api/positions/cards")
+    assert response.status_code == 200
+    assert response.json()["items"][0]["stop_status"] == "none"
+
+
+def test_a_newer_push_keeps_a_confirmed_stop_price(client: TestClient) -> None:
+    sync_instruments(parse_instruments([SWAP_INSTRUMENT]))
+    _write([_position("pos-1")], stops=[_stop("220")])
+    _push([_position("pos-1", mark_px="232.00")])
+
+    card = position_cards().items[0]
+
+    assert card.stop_status == "confirmed"
+    assert card.stop_px == Decimal("220")
+
+
+def test_a_position_never_synced_with_stops_stays_unavailable(client: TestClient) -> None:
+    """AC2：只有推送行时不能说成「没设止损」——推送从来不问止损。"""
+
+    sync_instruments(parse_instruments([SWAP_INSTRUMENT]))
+    _push([_position("pos-1")])
+
+    card = position_cards().items[0]
+
+    assert card.stop_status == "unavailable"
+    assert card.stop_px is None
+
+
+def test_a_later_sync_replaces_the_earlier_stop_answer(client: TestClient) -> None:
+    """取「最近一条有结论的行」：后来的同步说没有止损，就按后来的算。"""
+
+    sync_instruments(parse_instruments([SWAP_INSTRUMENT]))
+    _write([_position("pos-1")], stops=[_stop("220")])
+    _push([_position("pos-1")])
+    _write(
+        [_position("pos-1")],
+        stops=[],
+        captured_at=PUSH_CAPTURED_AT + timedelta(minutes=5),
+    )
+
+    card = position_cards().items[0]
+
+    assert card.stop_status == "none"
+    assert card.stop_px is None
+
+
+def test_exchange_positions_view_reads_the_same_stop_answer(client: TestClient) -> None:
+    """`/api/positions/exchange` 与风险层读同一份止损结论，不另立一套口径。"""
+
+    sync_instruments(parse_instruments([SWAP_INSTRUMENT]))
+    _write([_position("pos-1")], stops=[])
+    _push([_position("pos-1")])
+
+    item = exchange_positions().items[0]
+
+    assert item.stop_status == "none"
 
 
 def test_weight_is_relative_to_the_known_gross(client: TestClient) -> None:

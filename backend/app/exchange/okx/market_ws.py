@@ -71,8 +71,12 @@ __all__ = [
 DEFAULT_PUBLIC_WS_URL = "wss://ws.okx.com:443/ws/v5/public"
 #: OKX 业务地址：K 线（`candle{周期}`）只在这里推送，公共地址会以 60018 拒绝。
 DEFAULT_BUSINESS_WS_URL = "wss://ws.okx.com:443/ws/v5/business"
-#: 行情需要的三个频道；同一个 inst_id 在每个频道各订阅一次。
+#: 行情需要的三个频道；同一个 inst_id 在每个频道各订阅一次（`index-tickers` 例外，
+#: 见 `_channels_for`）。
 DEFAULT_PUBLIC_CHANNELS: tuple[str, ...] = ("tickers", "mark-price", "index-tickers")
+#: 上游按 `instId` 指认标的；永续标识带这个后缀（`AAPL-USDT-SWAP`）。
+SWAP_INST_SUFFIX = "-SWAP"
+INDEX_TICKERS_CHANNEL = "index-tickers"
 #: 上游对单次订阅请求的长度上限：多个频道的 `args` 总长度不超过 64 KB。
 MAX_SUBSCRIBE_FRAME_BYTES = 64 * 1024
 #: 给上限留的余量。上游文档只写「64 KB」，实测 61,301 字节被接受、66,227 字节被以
@@ -339,14 +343,30 @@ class OkxPublicWebSocket:
 
 
 def _frame(operation: str, inst_ids: Iterable[str], channels: Sequence[str]) -> dict[str, Any]:
-    """一条订阅帧：每个标的在每个频道各一个参数。"""
+    """一条订阅帧：每个标的在自己支持的频道上各一个参数。"""
 
     return {
         "op": operation,
         "args": [
-            {"channel": channel, "instId": inst_id} for inst_id in inst_ids for channel in channels
+            {"channel": channel, "instId": inst_id}
+            for inst_id in inst_ids
+            for channel in _channels_for(inst_id, channels)
         ],
     }
+
+
+def _channels_for(inst_id: str, channels: Sequence[str]) -> tuple[str, ...]:
+    """这个标的能订的频道。
+
+    `index-tickers` 只接受指数标识，也就是现货标识的写法（`BTC-USDT`、
+    `XAAPL-USDT`）；永续标识（`AAPL-USDT-SWAP`）没有对应的指数，订了会被上游以
+    `60018` / `51001`（`Instrument ID ... doesn't exist`）逐条拒绝，日志里刷屏而
+    永远没有推送。干脆不订：永续的指数价本来就要按它的现货配对去取。
+    """
+
+    if inst_id.endswith(SWAP_INST_SUFFIX):
+        return tuple(channel for channel in channels if channel != INDEX_TICKERS_CHANNEL)
+    return tuple(channels)
 
 
 def _parse_push(raw: str | bytes) -> list[MarketPush]:

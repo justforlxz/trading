@@ -241,6 +241,24 @@ def _reset_macro_runtime() -> Iterator[None]:
     service.reset_runtime()
 
 
+@pytest.fixture(autouse=True)
+def _offline_okx_ticker(monkeypatch: pytest.MonkeyPatch) -> None:
+    """单测不联网：持仓卡片的兜底报价默认一律失败。
+
+    只有 `app.positions.service._missing_quotes()` 会用到 `OkxClient` 的公共行情，
+    而它只在该标的库里一个 K 线来源都没有时才触发。默认让它直接失败，用例之间不会
+    因为跑不跑网络而结果不同；需要报价的用例自己用 `MockTransport` 覆盖 `OkxClient`。
+    """
+
+    from app.core import UpstreamError
+    from app.positions import service as positions_service
+
+    def _offline(**_kwargs: object) -> None:
+        raise UpstreamError("单测不联网：兜底报价被禁用")
+
+    monkeypatch.setattr(positions_service, "OkxClient", _offline)
+
+
 @pytest.fixture()
 def sync_scheduler() -> RecordingScheduler:
     """默认注入的记录型调度器；自选用例据此断言同步被请求了一次。"""

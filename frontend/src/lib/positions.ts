@@ -59,6 +59,15 @@ export function positionSideLabel(side: ExchangePosition["pos_side"]): string {
   return side === "short" ? "空" : "多";
 }
 
+/**
+ * 形态标签：同一标的的现货与永续共用产品名（`GOOGL-USDT`），靠这一个标签区分
+ * 哪张卡是现货、哪张是永续。标的还没同步时后端给 `null`，此处也不猜形态。
+ */
+export function instFormLabel(instType: PositionCard["inst_type"]): string | null {
+  if (instType === null || instType === undefined) return null;
+  return instType === "SWAP" ? "永续" : "现货";
+}
+
 export function marginModeLabel(mode: string | null | undefined): string {
   if (mode === null || mode === undefined || mode.trim() === "") return MISSING_VALUE;
   if (mode === "cross") return "全仓";
@@ -205,6 +214,26 @@ export function stopStatusTone(status: StopStatus): string {
     return "border-rose-600/40 bg-rose-500/5 text-rose-700 dark:text-rose-400";
   }
   return "border-border text-muted-foreground";
+}
+
+/**
+ * 尘埃说明：条数由后端给，页面不改写数字也不估算阈值。
+ *
+ * 没有尘埃时返回 `null`，调用方据此不占位——写「已隐藏 0 条」等于凭空多一行噪音。
+ */
+export function dustHiddenText(count: number | null | undefined): string | null {
+  if (count === null || count === undefined || count <= 0) return null;
+  return `已隐藏 ${count} 条尘埃（名义价值过低，不计入卡片与占比）`;
+}
+
+/**
+ * 价格时刻说明：同一页上的价格可能来自交易所快照、日线收盘或实时报价，时刻差得很远。
+ *
+ * 只报后端给的时刻，页面不推断新旧；没有时刻时返回 `null`，调用方不占位。
+ */
+export function quoteTimeText(at: string | null | undefined): string | null {
+  if (at === null || at === undefined || at.trim() === "") return null;
+  return `行情 ${formatBeijingTime(at)}`;
 }
 
 /** 名义合计不完整时数字前标 `≥`：已知部分不是全部。 */

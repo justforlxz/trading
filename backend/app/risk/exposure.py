@@ -9,7 +9,10 @@
 - 名义价值：交易所永续 `size * mark_px * ctVal * ctMult`，现货与手动持仓按基础数量
   `size * mark_px`；缺标的规格或价格时留空，不用 0 或相似标的价格顶替。
 - 单标的占比：同一 `display_symbol` 的持仓名义价值合计 / 组合总名义价值。现货与
-  永续是同一标的的两种形态，集中度必须合并看。
+  永续是同一标的的两种形态，价格同向变动、风险同源，**必须合并计入同一个标的**：
+  拆成两个名字算会各占一半，集中度被打折，超限也报不出来。因此 `display_symbol` 是
+  产品级名字（`AAPL-USDT`，不带 `X` 前缀与 `-SWAP` 后缀），形态区分交给
+  `inst_type`，两者分工不重叠。
 - 行业敞口：按 `instrument.sector` 汇总，未分类统一落到 `unclassified`。
 - 止损距离：多头 `(mark - stop) / mark`，空头 `(stop - mark) / mark`；负值表示价格
   已经穿过止损。`stop_distance_pct` 是百分比，`atr_distance` 是价格距离除以 ATR。

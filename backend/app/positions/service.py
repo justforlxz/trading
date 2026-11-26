@@ -6,8 +6,10 @@
 - `account_summary` / `exchange_positions` 只读库，不联网，也不返回假数字；
 - 手动持仓的当前数量与成本只在事务内更新，流水只追加，读流水时按发生时刻重放。
 
-行情价格只从已落库的 K 线取，来源按 `PRICE_SOURCES` 的优先级选择；没有行情时
-`price`、`market_value`、`unrealized_pnl` 均为 `None`，并标记
+行情价格优先从已落库的 K 线取，来源按 `PRICE_SOURCES` 的优先级选择；K 线只覆盖订阅
+与自选的标的，长尾持仓可能一行都没有，因此**现货**还有一条兜底：一个来源都查不到时
+直接读一次 OKX 公共 ticker。两个来源都带上来源与报价时刻，页面据此说明价格有多旧。
+没有行情时 `price`、`market_value`、`unrealized_pnl` 均为 `None`，并标记
 `price_status="unavailable"`，不拿相似标的价格替代。
 """
 
@@ -39,10 +41,11 @@ from app.core import (
     SystemClock,
     TradePort,
     UnprocessableEntity,
+    UpstreamError,
     ValidationError,
 )
 from app.db import session_scope
-from app.exchange import create_trade_port
+from app.exchange import ExchangeError, OkxClient, OkxMarketData, create_trade_port
 from app.instrument import (
     Instrument,
     display_symbol,
@@ -106,6 +109,11 @@ STATUS_CLOSED = "closed"
 
 #: 手动持仓的行情来源优先级；同一标的只用第一个有数据的来源。
 PRICE_SOURCES: tuple[str, ...] = ("okx", "okx_spot", "okx_swap")
+
+#: 库里一个来源都没有时的兜底来源：OKX 公共 ticker 的最新成交价。
+TICKER_SOURCE = "okx_ticker"
+#: 兜底报价的超时与重试上限。兜底只是锦上添花，不能让整页跟着等上游 10 秒 × 重试。
+TICKER_TIMEOUT_SECONDS = 3.0
 
 _HUNDRED = Decimal(100)
 #: 没算过的持仓按「未取到」处理，绝不退化成「未挂止损」。
@@ -198,10 +206,16 @@ class PositionCard:
     display_symbol: str
     name: str
     asset_class: str
+    #: 标的类别（`SPOT` / `SWAP`）：卡片据此标出「现货 / 永续」，同一标的的两种形态
+    #: 才不会显示成同一个名字。标的没同步时为 `None`，界面不猜形态。
+    inst_type: str | None
     pos_side: str
     size: Decimal
     avg_px: Decimal
     mark_px: Decimal | None
+    #: 标记价的来源与报价时刻（见 `_Quote`）：页面据此说明这个价格有多旧。
+    mark_px_source: str | None
+    mark_px_at: datetime | None
     upl: Decimal | None
     upl_ratio: Decimal | None
     lever: Decimal | None
@@ -211,6 +225,8 @@ class PositionCard:
     notional: Decimal | None
     weight_pct: Decimal | None
     stop_status: str
+    #: 该类别有没有止损概念：现货没有止损，界面要留空而不是显示「未取到」。
+    stop_supported: bool
     stop_px: Decimal | None
     stop_distance_pct: Decimal | None
     upl_curve: tuple[CurvePoint, ...]
@@ -218,11 +234,16 @@ class PositionCard:
 
 @dataclass(frozen=True, slots=True)
 class PositionCardsView:
-    """持仓卡片列表；`as_of` 与这次用的持仓快照同刻。"""
+    """持仓卡片列表；`as_of` 与这次用的持仓快照同刻。
+
+    `hidden_dust_count` 是被展示层隐藏的尘埃条数（名义价值低于阈值）：快照里一行
+    都没删，界面据此说明「已隐藏 N 条」。
+    """
 
     as_of: datetime | None
     status: str
     items: tuple[PositionCard, ...]
+    hidden_dust_count: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -239,6 +260,33 @@ class _PositionTotals:
     margin: Decimal
     notional_exact: bool
     margin_exact: bool
+
+
+@dataclass(frozen=True, slots=True)
+class _Quote:
+    """一个标的的取价结果：价格、来源与报价时刻，三者缺一不可。
+
+    `at` 是价格真正成立的时刻：K 线取收盘时刻，实时报价取上游报价时间。卡片据此
+    说明价格有多旧，不把上一周的收盘价说成当前价。
+    """
+
+    price: Decimal
+    source: str
+    at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class _CardFacts:
+    """一张持仓卡片补齐标记价后的事实；占比要等尘埃过滤完的合计才能算。"""
+
+    mark_px: Decimal | None
+    #: 标记价的来源与时刻：交易所随持仓下发的、K 线的、或兜底实时报价的。
+    mark_px_source: str | None
+    mark_px_at: datetime | None
+    upl: Decimal | None
+    upl_ratio: Decimal | None
+    notional: Decimal | None
+    stop_supported: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -567,6 +615,12 @@ def position_cards(range_key: str = "1d") -> PositionCardsView:
     排序放在后端：前端再排一次就会出现「同一份数据两种顺序」，也不符合「前端不重算」
     的约束。没有行情的持仓照样出卡片——`mark_px` / `upl` 为空，界面用骨架占位补位，
     整卡消失比空值更难察觉。
+
+    现货持仓没有上游标记价：先用该标的最近一根已收盘 K 线的收盘价补，库里一个来源都
+    查不到时再读一次 OKX 公共 ticker 兜底（见 `_quotes`）。
+    尘埃（名义价值低于 `POSITION_DUST_NOTIONAL`）只在卡片列表里隐藏，快照行原样保留
+    给对账；隐藏条数经 `hidden_dust_count` 交给界面说明，占比分母也取可见部分，因此
+    可见卡片的 `weight_pct` 合计仍是 100%。
     """
 
     with session_scope() as session:
@@ -581,15 +635,31 @@ def position_cards(range_key: str = "1d") -> PositionCardsView:
             )
         )
         stops = _stop_answers(session, [row.pos_id for row in rows])
-        totals = _position_totals(session, latest)
         status = _configured_status()
 
     instruments = get_instruments(row.inst_id for row in rows)
+    # 一批取回所有标的的最新价：按行查会退化成 N 条语句，而持仓页一次就有十几行。
+    quotes = _quotes(rows, instruments)
     curves = upl_curves(range_key)
+    threshold = _dust_threshold()
+    facts = {
+        row.pos_id: _card_facts(
+            row,
+            instruments.get(row.inst_id),
+            quotes.get(row.inst_id),
+            latest.captured_at,
+        )
+        for row in rows
+    }
+    visible = [row for row in rows if not _is_dust(facts[row.pos_id].notional, threshold)]
+    gross = sum(
+        (facts[row.pos_id].notional or Decimal(0) for row in visible),
+        Decimal(0),
+    )
     cards = []
-    for row in rows:
+    for row in visible:
+        fact = facts[row.pos_id]
         instrument = instruments.get(row.inst_id)
-        notional = _row_notional(row, instrument)
         stop = stops.get(row.pos_id, NO_STOP)
         cards.append(
             PositionCard(
@@ -598,28 +668,37 @@ def position_cards(range_key: str = "1d") -> PositionCardsView:
                 display_symbol=_display_symbol(instrument, row.inst_id),
                 name=_name(instrument, row.inst_id),
                 asset_class=_asset_class(instrument),
+                inst_type=None if instrument is None else instrument.inst_type,
                 pos_side=row.pos_side,
                 size=row.size,
                 avg_px=row.avg_px,
-                mark_px=row.mark_px,
-                upl=row.upl,
-                upl_ratio=row.upl_ratio,
+                mark_px=fact.mark_px,
+                mark_px_source=fact.mark_px_source,
+                mark_px_at=fact.mark_px_at,
+                upl=fact.upl,
+                upl_ratio=fact.upl_ratio,
                 lever=row.lever,
                 mgn_mode=row.mgn_mode,
                 liq_px=row.liq_px,
                 margin=row.margin,
-                notional=notional,
-                weight_pct=_weight_pct(notional, totals.gross),
+                notional=fact.notional,
+                weight_pct=_weight_pct(fact.notional, gross),
                 stop_status=stop.status,
+                stop_supported=fact.stop_supported,
                 stop_px=stop.px,
-                stop_distance_pct=_stop_distance_pct(row.mark_px, stop.px, row.pos_side),
+                stop_distance_pct=_stop_distance_pct(fact.mark_px, stop.px, row.pos_side),
                 upl_curve=curves.get(row.pos_id, ()),
             )
         )
     cards.sort(
         key=lambda card: (-abs(card.upl if card.upl is not None else Decimal(0)), card.pos_id)
     )
-    return PositionCardsView(latest.captured_at, status, tuple(cards))
+    return PositionCardsView(
+        latest.captured_at,
+        status,
+        tuple(cards),
+        hidden_dust_count=len(rows) - len(cards),
+    )
 
 
 def instrument_order_history(
@@ -629,8 +708,9 @@ def instrument_order_history(
 ) -> tuple[OrderRecord, ...]:
     """单个标的的挂单与历史订单，按时间倒序。
 
-    这是本模块唯一一处读侧联网：订单历史只在 OKX 侧保留（近 7 天在 `orders-history`，
-    更早在 `orders-history-archive`），没有对应的本地表可以读。上游失败抛
+    订单历史只在 OKX 侧保留（近 7 天在 `orders-history`，更早在
+    `orders-history-archive`），没有对应的本地表可以读；本模块另一处读侧联网是
+    `_missing_quotes()` 的兜底报价，两者都只在库里没有对应事实时才发请求。上游失败抛
     `ExchangeError`，接口层据此回 502，不返回空列表冒充「没有订单」。
     """
 
@@ -643,19 +723,109 @@ def instrument_order_history(
         port.close()
 
 
-def _row_notional(
+def _card_facts(
     row: ExchangePositionSnapshotRow,
+    instrument: Instrument | None,
+    quote: _Quote | None,
+    captured_at: datetime,
+) -> _CardFacts:
+    """一张卡片在算占比之前的原始事实：补齐标记价后的价格、盈亏与名义价值。
+
+    标记价与名义价值的来源不同，必须分开取：
+
+    - 标记价只在**现货**缺价时用最近价补。永续的标记价由交易所给，拿别的价格
+      冒充会与强平价、保证金口径分叉，宁可留空。
+    - 名义价值的兜底对所有类别都生效（与账户卡的 `_position_totals` 同一口径）：
+      名义价值只要求「有一个价格」，标记价缺失不影响它算得出来。
+
+    标记价的来源与时刻跟着价格一起返回：交易所随持仓下发的按快照时刻算，K 线与实时
+    报价各带自己的时刻，页面才不会把上周的收盘价当成当前价。
+    """
+
+    mark_px = row.mark_px
+    mark_px_at = captured_at if mark_px is not None else None
+    mark_px_source = row.source if mark_px is not None else None
+    if mark_px is None and _is_spot_position(instrument) and quote is not None:
+        mark_px = quote.price
+        mark_px_source = quote.source
+        mark_px_at = quote.at
+    fallback = None if quote is None else quote.price
+    upl, upl_ratio = _spot_pnl(row, instrument, mark_px)
+    return _CardFacts(
+        mark_px=mark_px,
+        mark_px_source=mark_px_source,
+        mark_px_at=mark_px_at,
+        upl=upl,
+        upl_ratio=upl_ratio,
+        notional=_notional(
+            row.size, row.mark_px if row.mark_px is not None else fallback, instrument
+        ),
+        stop_supported=_stop_supported(instrument),
+    )
+
+
+def _is_spot_position(instrument: Instrument | None) -> bool:
+    """该标的的持仓是不是由余额推导（现货）；标的没同步时不猜。"""
+
+    return instrument is not None and not trading_rules(instrument.inst_type).has_position_endpoint
+
+
+def _spot_pnl(
+    row: ExchangePositionSnapshotRow,
+    instrument: Instrument | None,
+    mark_px: Decimal | None,
+) -> tuple[Decimal | None, Decimal | None]:
+    """现货的未实现盈亏与盈亏率：只有成本价已知时才按 `(标记价 − 成本价) × 数量` 算。
+
+    余额行的 `upl` 一律不用：上游对现货余额记的 0 表示「没有持仓成本」，不是「不亏
+    不赚」，直接显示 0.00 会被读成一个结论。成本价未知时两者都留空，界面写「未提供」，
+    也不拿标记价当成本价——那算出来的是整个名义价值，不是盈亏。
+    """
+
+    if not _is_spot_position(instrument):
+        return row.upl, row.upl_ratio
+    if mark_px is None or row.avg_px <= 0:
+        return None, None
+    upl = (mark_px - row.avg_px) * row.size
+    cost = row.avg_px * abs(row.size)
+    return upl, None if cost == 0 else upl / cost
+
+
+def _stop_supported(instrument: Instrument | None) -> bool:
+    """该类别有没有止损概念。
+
+    止损委托只在有持仓接口的类别上存在（现货没有）。标的没同步时不猜，按「有」
+    处理——界面显示「未取到」，而不是断言「现货无止损」。
+    """
+
+    if instrument is None:
+        return True
+    return trading_rules(instrument.inst_type).has_position_endpoint
+
+
+def _dust_threshold() -> Decimal:
+    """尘埃阈值：名义价值低于它的持仓不进卡片列表。"""
+
+    return Decimal(str(get_settings().position_dust_notional))
+
+
+def _is_dust(notional: Decimal | None, threshold: Decimal) -> bool:
+    """算不出名义价值的行不算尘埃：不能拿「没有价格」断言它「不到 1 USDT」。"""
+
+    return notional is not None and notional < threshold
+
+
+def _notional(
+    size: Decimal,
+    price: Decimal | None,
     instrument: Instrument | None,
 ) -> Decimal | None:
     """一条交易所持仓的名义价值；缺价格或规格时返回 `None`。"""
 
-    if instrument is None:
+    if instrument is None or price is None:
         return None
-    price = row.mark_px
-    if price is None:
-        price, _ = _latest_price(row.inst_id)
     return notional_value(
-        size=row.size,
+        size=size,
         price=price,
         qty_unit=trading_rules(instrument.inst_type).qty_unit,
         ct_val=instrument.ct_val,
@@ -848,7 +1018,7 @@ def _position_totals(session: Session, latest: AccountSnapshotRow) -> _PositionT
             continue
         price = row.mark_px
         if price is None:
-            price, _ = _latest_price(row.inst_id)
+            price = _latest_price(row.inst_id)
         value = notional_value(
             size=row.size,
             price=price,
@@ -870,7 +1040,7 @@ def _position_totals(session: Session, latest: AccountSnapshotRow) -> _PositionT
         select(ManualPositionRow).where(ManualPositionRow.status == STATUS_OPEN)
     )
     for row in manual_rows:
-        price, _ = _latest_price(row.inst_id)
+        price = _latest_price(row.inst_id)
         value = notional_value(size=row.quantity, price=price, qty_unit="base")
         if value is None:
             notional_exact = False
@@ -1382,9 +1552,9 @@ def _manual_position_view(row: ManualPositionRow) -> ManualPositionView:
 def _manual_position_row(
     row: ManualPositionRow,
     instrument: Instrument | None,
-    price: tuple[Decimal | None, str | None],
+    quote: _Quote | None,
 ) -> ManualPositionView:
-    last_price, source = price
+    last_price = None if quote is None else quote.price
     market_value: Decimal | None = None
     unrealized: Decimal | None = None
     if last_price is not None:
@@ -1408,7 +1578,7 @@ def _manual_position_row(
         note=row.note,
         price=last_price,
         price_status="ok" if last_price is not None else "unavailable",
-        price_source=source,
+        price_source=None if quote is None else quote.source,
         market_value=market_value,
         unrealized_pnl=unrealized,
         created_at=row.created_at,
@@ -1453,27 +1623,84 @@ def _ledger_trade(row: ManualTradeRow) -> LedgerTrade:
     )
 
 
-def _latest_price(inst_id: str) -> tuple[Decimal | None, str | None]:
+def _latest_price(inst_id: str) -> Decimal | None:
     """单条标的最新可信价；按批读的路径走 `_latest_prices`。"""
 
-    return _latest_prices([inst_id])[inst_id]
+    quote = _latest_prices([inst_id])[inst_id]
+    return None if quote is None else quote.price
 
 
-def _latest_prices(
-    inst_ids: Sequence[str],
-) -> dict[str, tuple[Decimal | None, str | None]]:
-    """一批标的最新可信价：按 `PRICE_SOURCES` 顺序取第一个有数据的来源。"""
+def _latest_prices(inst_ids: Sequence[str]) -> dict[str, _Quote | None]:
+    """一批标的最新可信价：按 `PRICE_SOURCES` 顺序取第一个有数据的来源。
+
+    `at` 取那根 K 线的**收盘时刻**：日线的开盘与收盘差一个周期，卡片据此说明价格有多
+    旧，不把上一周的收盘价当成当前价。
+    """
 
     latest = latest_candles_by_source(inst_ids, sources=PRICE_SOURCES)
-    prices: dict[str, tuple[Decimal | None, str | None]] = {}
-    for inst_id in inst_ids:
-        prices[inst_id] = (None, None)
+    prices: dict[str, _Quote | None] = {}
+    for inst_id in dict.fromkeys(inst_ids):
+        prices[inst_id] = None
         for source in PRICE_SOURCES:
             candle = latest.get((inst_id, source))
             if candle is not None:
-                prices[inst_id] = (candle.close, candle.source)
+                prices[inst_id] = _Quote(
+                    price=candle.close,
+                    source=candle.source,
+                    at=candle.open_time + timedelta(seconds=candle.timeframe.seconds),
+                )
                 break
     return prices
+
+
+def _quotes(
+    rows: Sequence[ExchangePositionSnapshotRow],
+    instruments: Mapping[str, Instrument],
+) -> dict[str, _Quote | None]:
+    """持仓卡片用的价格：先查库，缺价的**现货**再读一次实时报价兜底。"""
+
+    prices = _latest_prices([row.inst_id for row in rows])
+    prices.update(_missing_quotes(rows, instruments, prices))
+    return prices
+
+
+def _missing_quotes(
+    rows: Sequence[ExchangePositionSnapshotRow],
+    instruments: Mapping[str, Instrument],
+    prices: Mapping[str, _Quote | None],
+) -> dict[str, _Quote]:
+    """库里一个来源都没有的现货标的：直接读一次 OKX 公共 ticker。
+
+    K 线只覆盖订阅与自选的标的，长尾持仓可能一行都没有；没有价就没有名义价值、占比，
+    也算不出它是不是尘埃。这条兜底只补**现货**：永续的标记价由交易所随持仓下发，
+    不在这里猜。取不到就整批放弃，卡片留空——兜底价不值得让页面等上游，也不编价格。
+    """
+
+    missing = [
+        inst_id
+        for inst_id, instrument in ((row.inst_id, instruments.get(row.inst_id)) for row in rows)
+        if _is_spot_position(instrument) and prices.get(inst_id) is None
+    ]
+    if not missing:
+        return {}
+    quotes: dict[str, _Quote] = {}
+    settings = get_settings().model_copy(
+        update={"okx_http_timeout_seconds": TICKER_TIMEOUT_SECONDS, "okx_http_max_retries": 0}
+    )
+    try:
+        with OkxClient(settings=settings) as client:
+            market = OkxMarketData(client)
+            for inst_id in dict.fromkeys(missing):
+                try:
+                    ticker = market.ticker_quote(inst_id)
+                except ExchangeError:
+                    # 这只标的没有报价不该拖垮整页；下一只照试。
+                    continue
+                quotes[inst_id] = _Quote(ticker.last, TICKER_SOURCE, ticker.ts)
+    except (ExchangeError, UpstreamError):
+        # 连接层面的失败：后面的标的必然一样失败，直接放弃这一批。
+        return quotes
+    return quotes
 
 
 def _display_symbol(instrument: Instrument | None, inst_id: str) -> str:

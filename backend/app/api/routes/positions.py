@@ -97,13 +97,17 @@ def get_account_equity_curve(
 def get_position_cards(
     range: Literal["1d", "1w", "1m", "6m", "1y"] = "1d",
 ) -> PositionCardsResponse:
-    """持仓卡片：已按未实现盈亏绝对值降序，含每条持仓的盈亏曲线与止损三态。"""
+    """持仓卡片：已按未实现盈亏绝对值降序，含每条持仓的盈亏曲线与止损三态。
+
+    名义价值低于配置阈值的尘埃不在 `items` 里，条数由 `hidden_dust_count` 给出。
+    """
 
     view = position_cards(range)
     return PositionCardsResponse(
         as_of=view.as_of,
         status=view.status,  # type: ignore[arg-type]
         items=[_position_card(card) for card in view.items],
+        hidden_dust_count=view.hidden_dust_count,
     )
 
 
@@ -317,10 +321,13 @@ def _position_card(card: PositionCard) -> PositionCardItem:
         display_symbol=card.display_symbol,
         name=card.name,
         asset_class=card.asset_class,
+        inst_type=card.inst_type,
         pos_side=card.pos_side,  # type: ignore[arg-type]
         size=decimal_str(card.size),
         avg_px=decimal_str(card.avg_px),
         mark_px=_optional_text(card.mark_px),
+        mark_px_source=card.mark_px_source,
+        mark_px_at=card.mark_px_at,
         upl=_optional_text(card.upl),
         upl_ratio=_optional_text(card.upl_ratio),
         lever=_optional_text(card.lever),
@@ -329,6 +336,7 @@ def _position_card(card: PositionCard) -> PositionCardItem:
         margin=_optional_text(card.margin),
         notional=_optional_text(card.notional),
         weight_pct=_optional_text(card.weight_pct),
+        stop_supported=card.stop_supported,
         stop_status=card.stop_status,  # type: ignore[arg-type]
         stop_px=_optional_text(card.stop_px),
         stop_distance_pct=_optional_text(card.stop_distance_pct),

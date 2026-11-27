@@ -900,6 +900,8 @@ export interface paths {
         /**
          * Get Position Cards
          * @description 持仓卡片：已按未实现盈亏绝对值降序，含每条持仓的盈亏曲线与止损三态。
+         *
+         *     名义价值低于配置阈值的尘埃不在 `items` 里，条数由 `hidden_dust_count` 给出。
          */
         get: operations["get_position_cards_api_positions_cards_get"];
         put?: never;
@@ -6241,6 +6243,8 @@ export interface components {
             display_symbol: string;
             /** Inst Id */
             inst_id: string;
+            /** Inst Type */
+            inst_type?: ("SPOT" | "SWAP") | null;
             /** Lever */
             lever?: string | null;
             /** Liq Px */
@@ -6249,6 +6253,10 @@ export interface components {
             margin?: string | null;
             /** Mark Px */
             mark_px?: string | null;
+            /** Mark Px At */
+            mark_px_at?: string | null;
+            /** Mark Px Source */
+            mark_px_source?: string | null;
             /** Mgn Mode */
             mgn_mode?: string | null;
             /** Name */
@@ -6273,6 +6281,8 @@ export interface components {
              * @enum {string}
              */
             stop_status: "confirmed" | "none" | "unavailable";
+            /** Stop Supported */
+            stop_supported: boolean;
             /** Upl */
             upl?: string | null;
             /** Upl Curve */
@@ -6285,17 +6295,24 @@ export interface components {
         /**
          * PositionCardsResponse
          * @description 持仓卡片列表，已按未实现盈亏绝对值降序。
+         *
+         *     `hidden_dust_count` 是展示层隐藏的尘埃条数；快照里一行都没删，`items` 合计的
+         *     `weight_pct` 因此仍是 100%。
          * @example {
          *       "as_of": "2026-11-25T13:51:00Z",
+         *       "hidden_dust_count": 0,
          *       "items": [
          *         {
          *           "asset_class": "equity_perp",
          *           "avg_px": "269.34",
          *           "display_symbol": "GOOGL-USDT",
          *           "inst_id": "GOOGL-USDT-SWAP",
+         *           "inst_type": "SWAP",
          *           "lever": "10",
          *           "margin": "57.83",
          *           "mark_px": "276.71",
+         *           "mark_px_at": "2026-11-25T13:51:00Z",
+         *           "mark_px_source": "okx_rest",
          *           "mgn_mode": "isolated",
          *           "name": "Alphabet",
          *           "notional": "578.32",
@@ -6303,6 +6320,7 @@ export interface components {
          *           "pos_side": "long",
          *           "size": "2.09",
          *           "stop_status": "none",
+         *           "stop_supported": true,
          *           "upl": "15.40",
          *           "upl_curve": [
          *             {
@@ -6324,6 +6342,11 @@ export interface components {
         PositionCardsResponse: {
             /** As Of */
             as_of?: string | null;
+            /**
+             * Hidden Dust Count
+             * @default 0
+             */
+            hidden_dust_count: number;
             /** Items */
             items: components["schemas"]["PositionCardItem"][];
             /**

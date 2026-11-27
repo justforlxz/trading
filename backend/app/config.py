@@ -87,6 +87,11 @@ class Settings(BaseSettings):
     # 按需 K 线同步在进程内的并发上限：单进程部署没有独立 worker，线程数即上限。
     on_demand_sync_max_concurrency: int = Field(default=2, ge=1)
 
+    # 持仓卡片列表的尘埃阈值（USDT）：名义价值低于它的持仓不展示。账户里转换剩下的
+    # 零头（`BTC 7.3e-9`）各占一张卡片，会把真正有意义的持仓挤掉；快照行照旧保留，
+    # 过滤只发生在卡片列表与「已隐藏 N 条」的说明上。
+    position_dust_notional: float = Field(default=1.0, ge=0)
+
     # 私有交易接口凭据。密钥只经环境变量注入，没有内建默认值，也不进仓库；
     # 未配置时私有客户端在构造阶段就报错，而不是发一次必然失败的请求。
     okx_api_key: str = ""

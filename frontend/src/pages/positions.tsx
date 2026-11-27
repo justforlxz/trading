@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "../components/ui/button";
 import { PageHeading } from "../components/layout/page-parts";
 import {
+  dustHiddenText,
   fetchAccountSummary,
   fetchEquityCurve,
   fetchPositionCards,
@@ -58,6 +59,8 @@ export default function PositionsPage() {
     () => (cards === null ? null : mergeCardUpdates(cards, livePositions)),
     [cards, livePositions],
   );
+  // 尘埃说明由后端给的条数决定；没有尘埃时不占位，页面也不自己估算阈值。
+  const dustNote = mergedCards === null ? null : dustHiddenText(mergedCards.hidden_dust_count);
 
   useEffect(() => {
     let active = true;
@@ -187,6 +190,9 @@ export default function PositionsPage() {
               按未实现盈亏绝对值排序 · 卡片含盈亏曲线
             </span>
           </div>
+          {dustNote === null ? null : (
+            <p className="mt-1 text-[11px] text-muted-foreground">{dustNote}</p>
+          )}
 
           {mergedCards === null ? (
             <p className="mt-2 rounded-md border px-3 py-6 text-center text-[11px] text-muted-foreground">

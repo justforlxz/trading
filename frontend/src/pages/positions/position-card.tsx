@@ -3,9 +3,11 @@ import {
   amountText,
   curveGeometry,
   curveStroke,
+  instFormLabel,
   percentText,
   positionSideLabel,
   priceText,
+  quoteTimeText,
   signedAmountText,
   stopStatusLabel,
   stopStatusTone,
@@ -33,6 +35,19 @@ function stopText(card: PositionCard): string {
 }
 
 /**
+ * 右上角徽标的文案与色调。
+ *
+ * 现货（`stop_supported=false`）没有止损概念：既不能说「未取到」（那是「问过、没问成」），
+ * 也不能说「未挂止损」（那会让人去挂一张现货根本没有的委托）。
+ */
+function stopBadge(card: PositionCard): { text: string; tone: string } {
+  if (!card.stop_supported) {
+    return { text: "现货无止损", tone: "border-border text-muted-foreground" };
+  }
+  return { text: stopStatusLabel(card.stop_status), tone: stopStatusTone(card.stop_status) };
+}
+
+/**
  * 一张持仓卡片。
  *
  * 没有行情的持仓**保留卡片**：价格与盈亏位换成骨架占位并标「行情待同步」。整卡消失
@@ -43,12 +58,29 @@ export function PositionCardView({ card, onShowOrders }: PositionCardViewProps) 
   const weightWidth =
     card.weight_pct == null ? 0 : Math.max(0, Math.min(100, Number(card.weight_pct) || 0));
   const geometry = curveGeometry(card.upl_curve, SPARK_WIDTH, SPARK_HEIGHT);
-
+  // 没有行情时先报行情：那条结论比「有没有止损」更该先看到。
+  const badge = hasMarketData
+    ? stopBadge(card)
+    : { text: "行情待同步", tone: "border-border text-muted-foreground" };
+  const formLabel = instFormLabel(card.inst_type);
+  // 同一页的价格可能来自交易所快照、日线收盘或实时报价；把时刻写出来，别让人以为都是当前价。
+  const quoteTime = quoteTimeText(card.mark_px_at);
   return (
     <Card className="p-3" data-position-card={card.pos_id}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate font-mono text-xs font-medium">{card.display_symbol}</p>
+          <p className="flex items-baseline gap-1.5">
+            <span className="truncate font-mono text-xs font-medium">{card.display_symbol}</span>
+            {/* 现货与永续共用产品名，形态靠这个标签区分；标的没同步时不猜。 */}
+            {formLabel === null ? null : (
+              <span
+                data-inst-form={formLabel}
+                className="shrink-0 rounded border px-1 text-[10px] text-muted-foreground"
+              >
+                {formLabel}
+              </span>
+            )}
+          </p>
           <p className="mt-0.5 text-[11px] text-muted-foreground">
             {positionSideLabel(card.pos_side)}
             {card.lever === null ? null : ` · ${card.lever}x`}
@@ -57,10 +89,10 @@ export function PositionCardView({ card, onShowOrders }: PositionCardViewProps) 
         <span
           className={cn(
             "shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium",
-            hasMarketData ? stopStatusTone(card.stop_status) : "border-border text-muted-foreground",
+            badge.tone,
           )}
         >
-          {hasMarketData ? stopStatusLabel(card.stop_status) : "行情待同步"}
+          {badge.text}
         </span>
       </div>
 
@@ -75,6 +107,9 @@ export function PositionCardView({ card, onShowOrders }: PositionCardViewProps) 
                 {signedAmountText(card.upl)}{" "}
                 <span className="text-muted-foreground">({uplRatioText(card.upl_ratio)})</span>
               </p>
+              {quoteTime === null ? null : (
+                <p className="text-[10px] text-muted-foreground">{quoteTime}</p>
+              )}
             </>
           ) : (
             <div className="w-full" data-skeleton="">
@@ -121,11 +156,11 @@ export function PositionCardView({ card, onShowOrders }: PositionCardViewProps) 
             <span className="font-mono tabular-nums"> · {percentText(card.weight_pct)}</span>
           )}
         </span>
-        {hasMarketData ? (
+        {hasMarketData && card.stop_supported ? (
           <span className={card.stop_status === "none" ? "text-rose-600 dark:text-rose-400" : ""}>
             {stopText(card)}
           </span>
-        ) : (
+        ) : hasMarketData ? null : (
           <span className="block h-2.5 w-12 animate-pulse rounded bg-muted" />
         )}
       </div>

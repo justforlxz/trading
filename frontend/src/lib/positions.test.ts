@@ -6,6 +6,8 @@ import {
   accountStatusLabel,
   curveGeometry,
   curveUnavailableText,
+  dustHiddenText,
+  quoteTimeText,
   marginModeLabel,
   marginUsageFloorPrefix,
   marginUsageText,
@@ -338,6 +340,7 @@ describe("卡片推送合并", () => {
   const CARDS: PositionCards = {
     as_of: "2026-11-14T10:00:00Z",
     status: "ok",
+    hidden_dust_count: 0,
     items: [
       {
         pos_id: "pos-1",
@@ -357,6 +360,7 @@ describe("卡片推送合并", () => {
         margin: "0",
         notional: "1851.36",
         weight_pct: "79.1",
+        stop_supported: true,
         stop_status: "confirmed",
         stop_px: "220",
         stop_distance_pct: "4.93",
@@ -442,5 +446,28 @@ describe("显示格式", () => {
     expect(signedAmountText("15.4")).toBe("+15.40");
     expect(signedAmountText("-2.18")).toBe("-2.18");
     expect(signedAmountText("0")).toBe("0.00");
+  });
+});
+
+describe("价格时刻", () => {
+  it("把后端给的时刻按北京时间写出来", () => {
+    expect(quoteTimeText("2026-11-25T13:51:00Z")).toBe("行情 2026-11-25 21:51");
+  });
+
+  it("没有时刻时不占位", () => {
+    expect(quoteTimeText(null)).toBeNull();
+    expect(quoteTimeText(undefined)).toBeNull();
+    expect(quoteTimeText("")).toBeNull();
+  });
+});
+
+describe("尘埃说明", () => {
+  it("后端给了条数就照原数说明", () => {
+    expect(dustHiddenText(3)).toBe("已隐藏 3 条尘埃（名义价值过低，不计入卡片与占比）");
+  });
+
+  it("没有尘埃时不占位", () => {
+    expect(dustHiddenText(0)).toBeNull();
+    expect(dustHiddenText(null)).toBeNull();
   });
 });

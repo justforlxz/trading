@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.api.schemas.common import (
     DataSource,
     DecimalString,
+    InstType,
     PositionSide,
     StopStatus,
     UtcDatetime,
@@ -490,10 +491,19 @@ class PositionCardItem(BaseModel):
     display_symbol: str
     name: str
     asset_class: str
+    #: 标的类别：卡片据此标出「现货 / 永续」，同一标的的两种形态才不会重名。
+    #: 标的还没同步时为 `null`，界面不猜形态。
+    inst_type: InstType | None = None
     pos_side: PositionSide
     size: DecimalString
     avg_px: DecimalString
     mark_px: DecimalString | None = None
+    #: 标记价的来源：`okx_rest` / `okx_ws` 是交易所随持仓下发的，`okx_spot` 这类是
+    #: 已落库 K 线的来源，`okx_ticker` 是库里没有 K 线时读的一次实时报价。
+    mark_px_source: str | None = None
+    #: 这个价格成立的时刻：K 线取收盘时刻，实时报价取上游报价时间，交易所随持仓
+    #: 下发的按快照时刻。两个价格来源混在一页时，靠它说明哪个是旧的。
+    mark_px_at: UtcDatetime | None = None
     upl: DecimalString | None = None
     upl_ratio: DecimalString | None = None
     lever: DecimalString | None = None
@@ -502,6 +512,8 @@ class PositionCardItem(BaseModel):
     margin: DecimalString | None = None
     notional: DecimalString | None = None
     weight_pct: DecimalString | None = None
+    #: 该类别有没有止损概念：现货没有止损，界面留空而不是显示「未取到」。
+    stop_supported: bool
     stop_status: StopStatus
     stop_px: DecimalString | None = None
     stop_distance_pct: DecimalString | None = None
@@ -509,11 +521,16 @@ class PositionCardItem(BaseModel):
 
 
 class PositionCardsResponse(BaseModel):
-    """持仓卡片列表，已按未实现盈亏绝对值降序。"""
+    """持仓卡片列表，已按未实现盈亏绝对值降序。
+
+    `hidden_dust_count` 是展示层隐藏的尘埃条数；快照里一行都没删，`items` 合计的
+    `weight_pct` 因此仍是 100%。
+    """
 
     as_of: UtcDatetime | None = None
     status: AccountStatus
     items: list[PositionCardItem]
+    hidden_dust_count: int = 0
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -521,6 +538,7 @@ class PositionCardsResponse(BaseModel):
                 {
                     "as_of": "2026-11-25T13:51:00Z",
                     "status": "ok",
+                    "hidden_dust_count": 0,
                     "items": [
                         {
                             "pos_id": "GOOGL-USDT-SWAP:long",
@@ -528,10 +546,13 @@ class PositionCardsResponse(BaseModel):
                             "display_symbol": "GOOGL-USDT",
                             "name": "Alphabet",
                             "asset_class": "equity_perp",
+                            "inst_type": "SWAP",
                             "pos_side": "long",
                             "size": "2.09",
                             "avg_px": "269.34",
                             "mark_px": "276.71",
+                            "mark_px_source": "okx_rest",
+                            "mark_px_at": "2026-11-25T13:51:00Z",
                             "upl": "15.40",
                             "upl_ratio": "0.0274",
                             "lever": "10",
@@ -540,6 +561,7 @@ class PositionCardsResponse(BaseModel):
                             "margin": "57.83",
                             "notional": "578.32",
                             "weight_pct": "79.12",
+                            "stop_supported": True,
                             "stop_status": "none",
                             "stop_px": None,
                             "stop_distance_pct": None,

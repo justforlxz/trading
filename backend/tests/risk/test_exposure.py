@@ -207,6 +207,11 @@ def test_high_leverage_uses_the_configured_threshold() -> None:
 
 
 def test_single_instrument_weight_aggregates_spot_and_swap_of_the_same_product() -> None:
+    """AC7 口径：现货与永续是同一标的的两种形态，单标的占比按产品名合并计算。
+
+    两张卡片靠 `inst_type` 区分形态，但集中度不能跟着拆开：拆开后 XAAPL 与
+    AAPL 永续各占一半权重，单独看都不超限，合并后才超限，风险就被漏报了。
+    """
     spot = _position(
         "exchange:okx-main:spot",
         symbol="XAAPL-USDT",

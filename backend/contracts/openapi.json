@@ -10731,6 +10731,21 @@
             "title": "Inst Id",
             "type": "string"
           },
+          "inst_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "SPOT",
+                  "SWAP"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inst Type"
+          },
           "lever": {
             "anyOf": [
               {
@@ -10778,6 +10793,28 @@
               }
             ],
             "title": "Mark Px"
+          },
+          "mark_px_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mark Px At"
+          },
+          "mark_px_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mark Px Source"
           },
           "mgn_mode": {
             "anyOf": [
@@ -10856,6 +10893,10 @@
             "title": "Stop Status",
             "type": "string"
           },
+          "stop_supported": {
+            "title": "Stop Supported",
+            "type": "boolean"
+          },
           "upl": {
             "anyOf": [
               {
@@ -10909,6 +10950,7 @@
           "pos_side",
           "size",
           "avg_px",
+          "stop_supported",
           "stop_status",
           "upl_curve"
         ],
@@ -10916,19 +10958,23 @@
         "type": "object"
       },
       "PositionCardsResponse": {
-        "description": "持仓卡片列表，已按未实现盈亏绝对值降序。",
+        "description": "持仓卡片列表，已按未实现盈亏绝对值降序。\n\n`hidden_dust_count` 是展示层隐藏的尘埃条数；快照里一行都没删，`items` 合计的\n`weight_pct` 因此仍是 100%。",
         "examples": [
           {
             "as_of": "2026-11-25T13:51:00Z",
+            "hidden_dust_count": 0,
             "items": [
               {
                 "asset_class": "equity_perp",
                 "avg_px": "269.34",
                 "display_symbol": "GOOGL-USDT",
                 "inst_id": "GOOGL-USDT-SWAP",
+                "inst_type": "SWAP",
                 "lever": "10",
                 "margin": "57.83",
                 "mark_px": "276.71",
+                "mark_px_at": "2026-11-25T13:51:00Z",
+                "mark_px_source": "okx_rest",
                 "mgn_mode": "isolated",
                 "name": "Alphabet",
                 "notional": "578.32",
@@ -10936,6 +10982,7 @@
                 "pos_side": "long",
                 "size": "2.09",
                 "stop_status": "none",
+                "stop_supported": true,
                 "upl": "15.40",
                 "upl_curve": [
                   {
@@ -10965,6 +11012,11 @@
               }
             ],
             "title": "As Of"
+          },
+          "hidden_dust_count": {
+            "default": 0,
+            "title": "Hidden Dust Count",
+            "type": "integer"
           },
           "items": {
             "items": {
@@ -17630,7 +17682,7 @@
     },
     "/api/positions/cards": {
       "get": {
-        "description": "持仓卡片：已按未实现盈亏绝对值降序，含每条持仓的盈亏曲线与止损三态。",
+        "description": "持仓卡片：已按未实现盈亏绝对值降序，含每条持仓的盈亏曲线与止损三态。\n\n名义价值低于配置阈值的尘埃不在 `items` 里，条数由 `hidden_dust_count` 给出。",
         "operationId": "get_position_cards_api_positions_cards_get",
         "parameters": [
           {

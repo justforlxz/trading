@@ -53,6 +53,7 @@ function card(overrides: Partial<PositionCard> = {}): PositionCard {
     display_symbol: "AAPL-USDT",
     name: "Apple",
     asset_class: "equity_perp",
+    inst_type: "SWAP",
     pos_side: "long",
     size: "8",
     avg_px: "226.80",
@@ -65,6 +66,7 @@ function card(overrides: Partial<PositionCard> = {}): PositionCard {
     margin: "0",
     notional: "1851.36",
     weight_pct: "79.1",
+    stop_supported: true,
     stop_status: "confirmed",
     stop_px: "220",
     stop_distance_pct: "4.93",
@@ -192,6 +194,80 @@ describe("持仓卡片", () => {
     expect(unavailable).toContain("未取到");
     expect(unavailable).not.toContain("未挂止损");
     expect(none).toContain("未挂止损");
+  });
+
+  it("现货卡片写明没有止损，既不是「未取到」也不是「未挂止损」", () => {
+    const html = renderToStaticMarkup(
+      createElement(PositionCardView, {
+        card: card({
+          inst_id: "XAAPL-USDT",
+          display_symbol: "AAPL-USDT",
+          inst_type: "SPOT",
+          lever: null,
+          stop_supported: false,
+          stop_status: "unavailable",
+          stop_px: null,
+          stop_distance_pct: null,
+        }),
+        onShowOrders: () => {},
+      }),
+    );
+
+    expect(html).toContain("现货无止损");
+    expect(html).not.toContain("未取到");
+    expect(html).not.toContain("未挂止损");
+    // 现货没有杠杆：徽标那一行不出现「· 3x」这类合约字段。
+    expect(html).not.toContain("· 3x");
+  });
+
+  it("同一标的的现货与永续卡片靠形态标签区分", () => {
+    const render = (overrides: Partial<PositionCard>) =>
+      renderToStaticMarkup(
+        createElement(PositionCardView, { card: card(overrides), onShowOrders: () => {} }),
+      );
+
+    const spot = render({ inst_id: "XAAPL-USDT", inst_type: "SPOT", lever: null });
+    const swap = render({ inst_id: "AAPL-USDT-SWAP", inst_type: "SWAP" });
+
+    // 产品名相同：现货与永续是同一标的的两种形态，单标的敞口要靠它合并。
+    expect(spot).toContain("AAPL-USDT");
+    expect(swap).toContain("AAPL-USDT");
+    // 形态标签不同，这就是用户分辨「哪张是现货」的依据。
+    expect(spot).toContain('data-inst-form="现货"');
+    expect(swap).toContain('data-inst-form="永续"');
+  });
+
+  it("卡片写出价格的时刻，不让日线收盘价冒充当前价", () => {
+    const html = renderToStaticMarkup(
+      createElement(PositionCardView, {
+        card: card({ mark_px_at: "2026-11-17T07:00:00Z" }),
+        onShowOrders: () => {},
+      }),
+    );
+
+    expect(html).toContain("行情 2026-11-17 15:00");
+  });
+
+  it("没有价格时刻时不占位", () => {
+    const html = renderToStaticMarkup(
+      createElement(PositionCardView, {
+        card: card({ mark_px_at: null }),
+        onShowOrders: () => {},
+      }),
+    );
+
+    expect(html).not.toContain("行情 20");
+  });
+
+  it("标的还没同步时不猜形态，卡片上不出现形态标签", () => {
+    const html = renderToStaticMarkup(
+      createElement(PositionCardView, {
+        card: card({ inst_type: null }),
+        onShowOrders: () => {},
+      }),
+    );
+
+    expect(html).not.toContain("data-inst-form");
   });
 });
 

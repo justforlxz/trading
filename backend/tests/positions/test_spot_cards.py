@@ -7,7 +7,8 @@ MKACG-1015 的现象是「15 张卡片只有 1 张有数据」：14 条现货余
 
 - 现货缺标记价时取该标的最近一根已收盘 K 线的收盘价（永续不拿收盘价冒充标记价）；
 - 库里一个来源都没有时，现货兜底读一次 OKX 公共 ticker，取不到就留空；
-- 标记价带来源与报价时刻，页面据此说明价格有多旧；
+- 标记价带来源与报价时刻，页面据此说明价格有多旧；价格时刻早于一个日线周期时
+  必须标成「过期 N 天」，不能和实时价并列展示；
 - 尘埃只在卡片列表里隐藏，快照行不删；隐藏条数经 `hidden_dust_count` 给出；
 - 现货没有止损概念（`stop_supported=False`），不能显示成「未取到」；
 - 现货的盈亏只在成本价已知时才算，上游的 0 不能读成「不亏不赚」；
@@ -24,10 +25,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import Settings, get_settings
-from app.core import AccountSnapshot, ExchangePosition
+from app.core import AccountSnapshot, Bar, ExchangePosition, Timeframe
 from app.exchange import OkxClient
 from app.exchange.okx.instruments import parse_instruments
 from app.instrument import sync_instruments
+from app.market import upsert_candles
 from app.positions import exchange_positions, position_cards, record_exchange_snapshot
 from app.positions import service as positions_service
 from tests.api.conftest import latest_opens, seed_daily
@@ -35,6 +37,7 @@ from tests.exchange.conftest import SPOT_INSTRUMENT, SWAP_INSTRUMENT
 
 CAPTURED_AT = datetime(2026, 11, 25, 12, 0, tzinfo=UTC)
 TICKER_AT = datetime(2026, 11, 26, 3, 0, tzinfo=UTC)
+NOW = datetime(2026, 11, 27, 12, 0, tzinfo=UTC)
 DAY = timedelta(days=1)
 SPOT_INST_ID = "XAAPL-USDT"
 SWAP_INST_ID = "AAPL-USDT-SWAP"
@@ -419,3 +422,79 @@ def test_spot_profit_is_unknown_when_upstream_reports_zero(client: TestClient) -
     assert card.mark_px == Decimal("352.99")
     assert card.upl is None
     assert card.upl_ratio is None
+
+
+class _FixedClock:
+    """固定时刻的时钟：过期判定用请求时刻，不用真实时间。"""
+
+    def __init__(self, moment: datetime) -> None:
+        self._moment = moment
+
+    def now(self) -> datetime:
+        return self._moment
+
+
+def _daily(inst_id: str, open_time: datetime, close: str = "352.99") -> None:
+    """写一根指定开盘时刻的日线：过期判定完全由 `open_time` 决定。"""
+
+    upsert_candles(
+        [
+            Bar(
+                inst_id=inst_id,
+                timeframe=Timeframe.parse("1d"),
+                open_time=open_time,
+                open=Decimal(close),
+                high=Decimal(close),
+                low=Decimal(close),
+                close=Decimal(close),
+                volume=Decimal("10"),
+                confirm=True,
+                source="okx_spot",
+            )
+        ]
+    )
+
+
+def test_a_stale_candle_price_is_flagged_as_expired(client: TestClient) -> None:
+    """AC3：日线停更 8 天时，卡片把最后一次已知价标成过期，并给出过期天数。
+
+    价格本身不改（改了就成了编数据），但必须能被界面区分出来：`mark_px_stale`
+    为真且 `mark_px_age_days` 给出向上取整的天数。
+    """
+
+    open_time = NOW - timedelta(days=8)
+    _daily(SPOT_INST_ID, open_time)
+    _write([_spot()])
+
+    card = position_cards(clock=_FixedClock(NOW)).items[0]
+
+    # 价格是那根 8 天前 K 线的收盘价：它是最后一次已知价，不是当前价。
+    assert card.mark_px == Decimal("352.99")
+    # 收盘时刻 = 开盘时刻 + 一个日线周期，因此过期 7 天。
+    assert card.mark_px_stale is True
+    assert card.mark_px_age_days == 7
+
+
+def test_a_fresh_candle_price_is_not_flagged(client: TestClient) -> None:
+    """一个日线周期以内的收盘价仍当当前价用，不误报过期。"""
+
+    _daily(SPOT_INST_ID, NOW - DAY - timedelta(hours=1))
+    _write([_spot()])
+
+    card = position_cards(clock=_FixedClock(NOW)).items[0]
+
+    assert card.mark_px == Decimal("352.99")
+    assert card.mark_px_stale is False
+    assert card.mark_px_age_days is None
+
+
+def test_an_exchange_mark_price_goes_stale_too(client: TestClient) -> None:
+    """过期判定只看价格时刻，不看来源：几天前的持仓快照同样是最后一次已知价。"""
+
+    _write([_swap()])
+
+    card = position_cards(clock=_FixedClock(CAPTURED_AT + timedelta(days=3))).items[0]
+
+    assert card.mark_px_source == "okx_rest"
+    assert card.mark_px_stale is True
+    assert card.mark_px_age_days == 3

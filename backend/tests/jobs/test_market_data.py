@@ -251,6 +251,50 @@ def test_equity_tick_failure_does_not_block_the_macro_tick() -> None:
     assert calls == ["macro", "equity"]
 
 
+def test_a_tick_refreshes_stale_candles_with_the_injected_queue(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """AC2：K 线刷新挂在已有轮次上，用装配时注入的按需同步队列，不另起定时器。"""
+
+    scheduler = MarketDataScheduler()
+    calls: list[str] = []
+    monkeypatch.setattr(scheduler, "run_once", lambda **_: ())
+    monkeypatch.setattr(scheduler, "run_equity_once", lambda **_: ())
+    monkeypatch.setattr(
+        jobs_module,
+        "run_candle_refresh",
+        lambda queue, **_kwargs: calls.append("refresh") or (),
+    )
+
+    scheduler._tick()
+
+    # 没有注入队列时这一步仍然走一次，由刷新自己判断「没有队列就不做事」。
+    assert calls == ["refresh"]
+
+
+def test_a_failing_candle_refresh_does_not_block_the_tick(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """刷新抛错只记日志：大盘异动评估照旧执行，调度线程不会因为这一步停摆。"""
+
+    scheduler = MarketDataScheduler()
+    scans: list[str] = []
+    monkeypatch.setattr(scheduler, "run_once", lambda **_: ())
+    monkeypatch.setattr(
+        scheduler, "run_equity_once", lambda **_: (_equity_result(bar="1d", published=1),)
+    )
+    monkeypatch.setattr(scheduler, "run_market_alert_scan", lambda: scans.append("scan"))
+
+    def broken(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("刷新写坏了")
+
+    monkeypatch.setattr(jobs_module, "run_candle_refresh", broken)
+
+    scheduler._tick()
+
+    assert scans == ["scan"]
+
+
 def _equity_result(*, bar: str, published: int) -> EquitySyncResult:
     return EquitySyncResult(
         provider="yahoo", bar=bar, status="synced", rows=1, published=published, error=None

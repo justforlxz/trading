@@ -504,6 +504,11 @@ class PositionCardItem(BaseModel):
     #: 这个价格成立的时刻：K 线取收盘时刻，实时报价取上游报价时间，交易所随持仓
     #: 下发的按快照时刻。两个价格来源混在一页时，靠它说明哪个是旧的。
     mark_px_at: UtcDatetime | None = None
+    #: 这个价格是否已经过期（价格时刻早于「一个日线周期」以前）。过期的价格是最后一次
+    #: 已知价，界面必须显式标出，不能和实时价并列展示。
+    mark_px_stale: bool = False
+    #: 过期了几天（向上取整）；没过期时为 `null`。天数由后端算，前端只负责展示。
+    mark_px_age_days: int | None = None
     upl: DecimalString | None = None
     upl_ratio: DecimalString | None = None
     lever: DecimalString | None = None
@@ -553,6 +558,8 @@ class PositionCardsResponse(BaseModel):
                             "mark_px": "276.71",
                             "mark_px_source": "okx_rest",
                             "mark_px_at": "2026-11-25T13:51:00Z",
+                            "mark_px_stale": False,
+                            "mark_px_age_days": None,
                             "upl": "15.40",
                             "upl_ratio": "0.0274",
                             "lever": "10",

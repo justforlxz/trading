@@ -112,3 +112,26 @@ def out_of_order(actual: Sequence[datetime]) -> bool:
     """序列是否非严格升序。"""
 
     return any(later <= earlier for earlier, later in pairwise(actual))
+
+
+#: 一根 K 线的收盘价还能当「当前价」用的最长时延：一个日线周期。
+#:
+#: 阈值按「一个日线周期」定，而不是按每个周期的 bar 长度定：24/7 市场每天一根日线，
+#: 超过一天的收盘价在任何周期上都不再能代表当前价。用它判断的调用方必须**显式标出
+#: 过期**，不能把一个几天前的数字和实时价并列展示。
+PRICE_MAX_AGE = timedelta(days=1)
+
+
+def stale_days(at: datetime, now: datetime, *, max_age: timedelta = PRICE_MAX_AGE) -> int | None:
+    """价格时刻 `at` 距今的整日数；未超过 `max_age` 时返回 `None`。
+
+    向上取整：「过期 8 天 5 小时」说成 8 天会让读者以为离阈值还远。`at` 晚于 `now`
+    （时钟漂移，或上游标了一个未来的时刻）一律按没过期处理，不返回负数。
+    """
+
+    if at.tzinfo is None or now.tzinfo is None:
+        raise ValueError("at/now must be timezone-aware")
+    age = now - at
+    if age <= max_age:
+        return None
+    return -(-int(age.total_seconds()) // 86400)

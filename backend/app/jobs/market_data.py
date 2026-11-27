@@ -1,12 +1,15 @@
 """市场数据的进程内定时调度器：本域**唯一**的定时来源（宏观 + 美股）。
 
 一个 tick 周期（`settings.data_sources.macro.scheduler.minute` 与
-`settings.data_sources.equity.scheduler.minute`，支持 `1m` / `5m`）依次做两件事：
+`settings.data_sources.equity.scheduler.minute`，支持 `1m` / `5m`）依次做三件事：
 
 1. **宏观**：分钟级序列每次都拉；日线结算序列按「上一个已结算美股交易日」判重，
    该日已有观测就跳过，不发上游请求。
 2. **美股**：按配置的 provider 抓 1 个窗口（Yahoo 分钟级 / Stooq 日线），
    交给 `app/equity/pipeline.py` 的中间件链落 `candles`。
+3. **OKX K 线**：有持仓与自选的标的哪个周期过期了，就交给已有的按需同步队列补一次
+   （见 `app/jobs/candle_refresh.py`）。OKX 的 K 线原本只在用户点开标的时同步，持仓
+   卡片因此会读到几天前的收盘价；这一轮把它补上，且不新增定时器。
 
 两个域各自记自己的状态：一个域的配置写坏或上游挂掉，不能让另一个域也停摆，因此
 `_tick` 分别兜住异常，健康组件也分别读两份快照。
@@ -39,6 +42,8 @@ from app.equity import (
 from app.equity import resolve_config as resolve_equity_config
 from app.equity import runtime as equity_runtime
 from app.equity import sync as equity_sync
+from app.jobs.candle_refresh import run_candle_refresh
+from app.jobs.on_demand import OnDemandSyncScheduler
 from app.macro import GRANULARITY_DAILY, SyncResult, resolve_config, runtime, sync
 from app.settings import load_settings
 
@@ -67,10 +72,18 @@ class _FixedClock:
 class MarketDataScheduler:
     """按配置周期抓宏观与美股数据；一个进程只起一条线程。"""
 
-    def __init__(self, *, clock: Clock | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        clock: Clock | None = None,
+        on_demand_sync: OnDemandSyncScheduler | None = None,
+    ) -> None:
         self._clock = clock or SystemClock()
         self._stop = Event()
         self._thread: Thread | None = None
+        # K 线刷新复用按需同步队列（去重、并发上限与失败流水都在那边）；没有队列时
+        # 这一步跳过，宏观与美股照常跑。
+        self._on_demand_sync = on_demand_sync
 
     def start(self) -> None:
         """起守护线程；重复调用只保留一条线程。"""
@@ -182,7 +195,7 @@ class MarketDataScheduler:
             self._tick()
 
     def _tick(self) -> None:
-        """跑一个完整周期；两个域各自兜住异常，一个挂掉不拖累另一个。"""
+        """跑一个完整周期；三步各自兜住异常，一步挂掉不拖累另两步。"""
 
         macro_results: tuple[SyncResult, ...] = ()
         equity_results: tuple[EquitySyncResult, ...] = ()
@@ -194,6 +207,10 @@ class MarketDataScheduler:
             equity_results = self.run_equity_once()
         except Exception:
             logger.exception("美股调度 tick 失败")
+        try:
+            run_candle_refresh(self._on_demand_sync, clock=self._clock)
+        except Exception:
+            logger.exception("OKX K 线刷新 tick 失败")
         if _settled(macro_results, equity_results):
             self.run_market_alert_scan()
 
@@ -233,9 +250,13 @@ def _equity_interval_seconds(fallback: int) -> int:
         return fallback
 
 
-def start_market_data_scheduler(*, clock: Clock | None = None) -> MarketDataScheduler:
+def start_market_data_scheduler(
+    *,
+    clock: Clock | None = None,
+    on_demand_sync: OnDemandSyncScheduler | None = None,
+) -> MarketDataScheduler:
     """创建并启动调度器；调用方负责在退出时 `shutdown()`。"""
 
-    scheduler = MarketDataScheduler(clock=clock)
+    scheduler = MarketDataScheduler(clock=clock, on_demand_sync=on_demand_sync)
     scheduler.start()
     return scheduler

@@ -16,11 +16,13 @@ from app.market.breadth import (
     resonance_strength,
 )
 from app.market.candles import (
+    PRICE_MAX_AGE,
     duplicate_open_times,
     expected_open_times,
     find_gaps,
     floor_open_time,
     out_of_order,
+    stale_days,
 )
 from app.market.correlation import (
     MIN_SAMPLES,
@@ -91,6 +93,7 @@ from app.market.sync import (
     data_range,
     latest_candle,
     latest_candles_by_source,
+    latest_open_times,
     load_candles,
     load_candles_by_source,
     sync_candles,
@@ -114,6 +117,7 @@ __all__ = [
     "MARKET_INDEXES",
     "MIN_RESONANCE_PARTICIPANTS",
     "MIN_SAMPLES",
+    "PRICE_MAX_AGE",
     "SESSION_CLOSED",
     "SESSION_POST",
     "SESSION_PRE",
@@ -160,6 +164,7 @@ __all__ = [
     "last_settled_trading_day",
     "latest_candle",
     "latest_candles_by_source",
+    "latest_open_times",
     "latest_sync_job",
     "load_candles",
     "load_candles_by_source",
@@ -179,6 +184,7 @@ __all__ = [
     "save_snapshot",
     "settlement_epoch",
     "spearman",
+    "stale_days",
     "start_sync_job",
     "sync_candles",
     "sync_summary",

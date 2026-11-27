@@ -3,6 +3,7 @@ import {
   amountText,
   curveGeometry,
   curveStroke,
+  expiredPriceText,
   instFormLabel,
   percentText,
   positionSideLabel,
@@ -65,6 +66,8 @@ export function PositionCardView({ card, onShowOrders }: PositionCardViewProps) 
   const formLabel = instFormLabel(card.inst_type);
   // 同一页的价格可能来自交易所快照、日线收盘或实时报价；把时刻写出来，别让人以为都是当前价。
   const quoteTime = quoteTimeText(card.mark_px_at);
+  // 过期的价格是最后一次已知价：写明「过期 N 天」，不能让它看起来像当前价。
+  const expired = expiredPriceText(card.mark_px_stale, card.mark_px_age_days);
   return (
     <Card className="p-3" data-position-card={card.pos_id}>
       <div className="flex items-start justify-between gap-2">
@@ -107,7 +110,11 @@ export function PositionCardView({ card, onShowOrders }: PositionCardViewProps) 
                 {signedAmountText(card.upl)}{" "}
                 <span className="text-muted-foreground">({uplRatioText(card.upl_ratio)})</span>
               </p>
-              {quoteTime === null ? null : (
+              {expired !== null ? (
+                <p className="text-[10px] text-amber-700 dark:text-amber-400" data-stale-price="">
+                  {expired}
+                </p>
+              ) : quoteTime === null ? null : (
                 <p className="text-[10px] text-muted-foreground">{quoteTime}</p>
               )}
             </>

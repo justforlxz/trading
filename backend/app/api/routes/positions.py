@@ -328,6 +328,8 @@ def _position_card(card: PositionCard) -> PositionCardItem:
         mark_px=_optional_text(card.mark_px),
         mark_px_source=card.mark_px_source,
         mark_px_at=card.mark_px_at,
+        mark_px_stale=card.mark_px_stale,
+        mark_px_age_days=card.mark_px_age_days,
         upl=_optional_text(card.upl),
         upl_ratio=_optional_text(card.upl_ratio),
         lever=_optional_text(card.lever),

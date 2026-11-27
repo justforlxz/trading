@@ -13,6 +13,7 @@
       "mark_px": "276.71",
       "mark_px_at": "2026-11-25T13:51:00Z",
       "mark_px_source": "okx_rest",
+      "mark_px_stale": false,
       "mgn_mode": "isolated",
       "name": "Alphabet",
       "notional": "578.32",

@@ -17,6 +17,9 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.api.mapping import decimal_str
 from app.api.schemas import (
+    ConditionCatalogResponse,
+    ConditionIndicator,
+    ConditionOutput,
     IndicatorCatalogResponse,
     IndicatorPoint,
     IndicatorSeries,
@@ -35,6 +38,8 @@ from app.indicators import (
 )
 from app.instrument import list_instruments
 from app.market import load_candles
+from app.strategy import ConditionIndicator as ConditionIndicatorDomain
+from app.strategy import condition_catalog
 
 __all__ = ["indicators_router"]
 
@@ -54,6 +59,19 @@ def list_indicators() -> IndicatorCatalogResponse:
     """指标目录：每条声明都来自注册表，形状与 `schemas/indicators.py` 一一对应。"""
 
     return IndicatorCatalogResponse(items=[_definition(row) for row in list_definitions()])
+
+
+@indicators_router.get("/indicators/conditions", response_model=ConditionCatalogResponse)
+def list_condition_indicators() -> ConditionCatalogResponse:
+    """回测条件的指标清单：8 个可选指标及其参数与输出。
+
+    前端下拉只读这个接口，不在界面上硬编码选项；参数默认值与取值范围和指标计算
+    同源（`app.indicators` 注册表），改默认值只需要改注册表一处。
+    """
+
+    return ConditionCatalogResponse(
+        items=[_condition_indicator(row) for row in condition_catalog()]
+    )
 
 
 @indicators_router.get("/indicators/series", response_model=IndicatorSeriesResponse)
@@ -98,6 +116,19 @@ def _definition(row: IndicatorDefinition) -> IndicatorDefinitionPayload:
         params=[_param_spec(param) for param in row.params],
         outputs=list(row.outputs),
         min_bars=row.min_length,
+    )
+
+
+def _condition_indicator(row: ConditionIndicatorDomain) -> ConditionIndicator:
+    """条件清单 → 契约声明：字段名 `name` 在接口层叫 `indicator`，与规则里的键一致。"""
+
+    return ConditionIndicator(
+        indicator=row.name,
+        title=row.title,
+        summary=row.summary,
+        outputs=[ConditionOutput(name=output.name, title=output.title) for output in row.outputs],
+        params=[_param_spec(param) for param in row.params],
+        min_bars=row.min_bars,
     )
 
 

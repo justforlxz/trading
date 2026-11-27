@@ -8,7 +8,6 @@ import pytest
 
 from app.core import Bar, Timeframe
 
-_TIMEFRAME = Timeframe.parse("1h")
 _START = datetime(2026, 1, 1, tzinfo=UTC)
 _DEFAULT_VOLUME = Decimal(1000)
 
@@ -23,9 +22,11 @@ def _build(
     highs: Sequence[Decimal | float | str] | None = None,
     lows: Sequence[Decimal | float | str] | None = None,
     volumes: Sequence[Decimal | float | str] | None = None,
+    bar: str = "1h",
 ) -> list[Bar]:
     """按收盘价造 K 线；未指定的高低价默认收盘价上下各 1，成交量默认 1000。"""
 
+    timeframe = Timeframe.parse(bar)
     bars: list[Bar] = []
     for index, raw_close in enumerate(closes):
         close = _decimal(raw_close)
@@ -35,8 +36,8 @@ def _build(
         bars.append(
             Bar(
                 inst_id="BTC-USDT",
-                timeframe=_TIMEFRAME,
-                open_time=_START + index * timedelta(hours=1),
+                timeframe=timeframe,
+                open_time=_START + index * timedelta(seconds=timeframe.seconds),
                 open=close,
                 high=high,
                 low=low,

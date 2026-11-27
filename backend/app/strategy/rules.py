@@ -1,27 +1,25 @@
 """策略规则 JSON 的校验与规范化。
 
-规则不是自然语言：每条入场/出场条件都是可序列化的比较或止损语句。校验在这里做
-一次，覆盖四件事：周期与方向取值、指标名确实在 `app.indicators` 注册表里、比较符
-只有五种、未知字段直接拒绝（不做静默丢弃）。仓位规则单独校验权重与数量。
+规则不是自然语言：每条入场/出场条件都是可序列化的比较语句。校验在这里做一次，
+覆盖四件事：周期与方向取值、条件组的结构、指标与参数是否可用、未知字段直接拒绝
+（不做静默丢弃）。仓位规则单独校验权重与数量。
 
-指标表达式采用 `MA(20)`、`RSI(14)`、`MACD(12,26,9)` 这种写法。注册表里的名字是
-小写（`sma` / `rsi` / `macd`），这里只做常见大写别名到注册名的映射；别名不属于
-第二套指标体系，计算仍由注册表提供。
+条件本身的词汇（可选指标、运算符、出场附加项）由 `app.strategy.conditions` 定义，
+这里只负责把它拼进规则、补上周期与方向。指标的计算与参数的默认值来自
+`app.indicators` 注册表：规则里不复制算法，也不复制一份默认参数表。
 """
 
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import Mapping
 from typing import Any
 
 from app.core import ValidationError
-from app.indicators import list_definitions
+from app.strategy.conditions import normalize_group
 
 __all__ = [
     "DIRECTIONS",
-    "OPERATORS",
     "TIMEFRAMES",
     "canonical_json",
     "normalize_rule",
@@ -30,23 +28,8 @@ __all__ = [
 
 TIMEFRAMES = ("1m", "5m", "15m", "1h", "4h", "1d")
 DIRECTIONS = ("long_only", "short_only", "long_short")
-OPERATORS = (">", ">=", "<", "<=", "==")
 
-# 常见的展示名 → 注册表名。注册名本身直接接受（大小写不敏感），所以注册表新增指标
-# 不需要同步这张表；这里只放与注册名不同的展示写法。
-_INDICATOR_ALIASES = {
-    "ma": "sma",
-    "boll": "bollinger",
-    "vol_ma": "volume_ma",
-}
-
-_EXPRESSION = re.compile(
-    r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(\s*([0-9]+(?:\s*,\s*[0-9]+)*)?\s*\)\s*$"
-)
 _RULE_KEYS = frozenset({"timeframe", "direction", "entry", "exit", "position_sizing"})
-_GROUP_KEYS = frozenset({"all", "any"})
-_CONDITION_KEYS = frozenset({"left", "op", "right"})
-_STOP_KEYS = frozenset({"type", "value"})
 _SIZING_KEYS = frozenset({"type", "weight", "max_positions"})
 
 
@@ -93,6 +76,8 @@ def normalize_rule(
 
     规则里的 `timeframe` / `direction` 与版本字段是同一个事实：两者都提供时必须
     一致，缺省时补成版本字段，读回时规则本身始终能回答「按什么周期、朝哪个方向」。
+    指标参数在这里补成完整参数表，存进规则的每一处指标都带齐参数，历史回测回放
+    时不需要再猜默认值。
     """
 
     if not isinstance(rule_json, Mapping):
@@ -121,8 +106,8 @@ def normalize_rule(
     result: dict[str, Any] = {
         "timeframe": timeframe,
         "direction": direction,
-        "entry": _validate_group(entry, "entry"),
-        "exit": _validate_group(exit_, "exit"),
+        "entry": normalize_group(entry, "entry"),
+        "exit": normalize_group(exit_, "exit", exit_group=True),
     }
 
     sizing = rule_json.get("position_sizing")
@@ -140,83 +125,3 @@ def _require_timeframe(value: str) -> None:
 def _require_direction(value: str) -> None:
     if value not in DIRECTIONS:
         raise ValidationError(f"不支持的方向 {value!r}; 支持: {', '.join(DIRECTIONS)}")
-
-
-def _validate_group(value: Any, path: str) -> dict[str, Any]:
-    if not isinstance(value, Mapping):
-        raise ValidationError(f"rule_json.{path} 必须是 JSON 对象")
-    unknown = sorted(set(value) - _GROUP_KEYS)
-    if unknown:
-        raise ValidationError(f"rule_json.{path} 含未知字段: {', '.join(unknown)}")
-    keys = [key for key in _GROUP_KEYS if key in value]
-    if len(keys) != 1:
-        raise ValidationError(f"rule_json.{path} 必须且只能包含 all 或 any")
-    key = keys[0]
-    conditions = value[key]
-    if not isinstance(conditions, list) or not conditions:
-        raise ValidationError(f"rule_json.{path}.{key} 必须是非空数组")
-    return {
-        key: [
-            _validate_condition(item, f"{path}.{key}[{index}]")
-            for index, item in enumerate(conditions)
-        ]
-    }
-
-
-def _validate_condition(value: Any, path: str) -> dict[str, Any]:
-    if not isinstance(value, Mapping):
-        raise ValidationError(f"rule_json.{path} 必须是 JSON 对象")
-    if "type" in value:
-        unknown = sorted(set(value) - _STOP_KEYS)
-        if unknown:
-            raise ValidationError(f"rule_json.{path} 含未知字段: {', '.join(unknown)}")
-        if value.get("type") != "drawdown_stop":
-            raise ValidationError(f"rule_json.{path} 不支持的条件类型: {value.get('type')!r}")
-        stop = value.get("value")
-        if isinstance(stop, bool) or not isinstance(stop, int | float) or float(stop) <= 0:
-            raise ValidationError(f"rule_json.{path}.value 必须是正数")
-        return {"type": "drawdown_stop", "value": stop}
-
-    unknown = sorted(set(value) - _CONDITION_KEYS)
-    if unknown:
-        raise ValidationError(f"rule_json.{path} 含未知字段: {', '.join(unknown)}")
-    missing = sorted(_CONDITION_KEYS - set(value))
-    if missing:
-        raise ValidationError(f"rule_json.{path} 缺少字段: {', '.join(missing)}")
-    operator = value.get("op")
-    if operator not in OPERATORS:
-        raise ValidationError(
-            f"rule_json.{path}.op 不支持: {operator!r}; 支持: {', '.join(OPERATORS)}"
-        )
-    return {
-        "left": _validate_operand(value.get("left"), f"{path}.left"),
-        "op": operator,
-        "right": _validate_operand(value.get("right"), f"{path}.right"),
-    }
-
-
-def _validate_operand(value: Any, path: str) -> Any:
-    if isinstance(value, bool):
-        raise ValidationError(f"rule_json.{path} 不接受布尔值")
-    if isinstance(value, int | float):
-        return value
-    if not isinstance(value, str):
-        raise ValidationError(f"rule_json.{path} 必须是数值或指标表达式")
-    match = _EXPRESSION.match(value)
-    if match is None:
-        raise ValidationError(f"rule_json.{path} 的指标表达式格式应为 NAME(参数): {value!r}")
-    raw_name = match.group(1).lower()
-    name = _INDICATOR_ALIASES.get(raw_name, raw_name)
-    definition = {item.name: item for item in list_definitions()}.get(name)
-    if definition is None:
-        raise ValidationError(f"rule_json.{path} 的指标未注册: {match.group(1)!r}")
-    raw_args = match.group(2)
-    args = [] if not raw_args else [int(item.strip()) for item in raw_args.split(",")]
-    if len(args) != len(definition.params):
-        raise ValidationError(
-            f"rule_json.{path} 的指标 {match.group(1)} 需要 {len(definition.params)} 个参数, "
-            f"实际 {len(args)} 个"
-        )
-    if any(arg < 1 for arg in args):
-        raise ValidationError(f"rule_json.{path} 的指标参数必须是正整数")
-    return value.strip()

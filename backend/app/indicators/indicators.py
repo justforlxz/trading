@@ -1,4 +1,4 @@
-"""八个内置指标的计算本体。
+"""内置指标的计算本体。
 
 全部是纯函数：只读入参、只返回新对象，不碰 IO，也不在模块里留可变的中间状态。
 `app.indicators.compute` 负责参数校验与「K 线不足则返回空序列」，这里的函数假定
@@ -19,6 +19,7 @@ _ONE = Decimal(1)
 _TWO = Decimal(2)
 _THREE = Decimal(3)
 _HUNDRED = Decimal(100)
+_DAY_SECONDS = 86400
 
 
 def _assemble(
@@ -226,6 +227,51 @@ def volume_ma(bars: Sequence[Bar], params: Mapping[str, ParamValue]) -> Series:
     )
 
 
+def close_price(bars: Sequence[Bar], params: Mapping[str, ParamValue]) -> Series:
+    """收盘价本身：条件左值里「价格」这一列，不做任何加工。"""
+
+    return _assemble("close", params, bars, ("close",), [bar.close for bar in bars])
+
+
+def volume(bars: Sequence[Bar], params: Mapping[str, ParamValue]) -> Series:
+    """成交量本身：不做加工，供条件直接比较。"""
+
+    return _assemble("volume", params, bars, ("volume",), [bar.volume for bar in bars])
+
+
+def _day_lookback(seconds: int) -> int:
+    """24 小时相当于多少根该周期的 K 线；一分钟级也只有 1440 根。"""
+
+    return max(1, _DAY_SECONDS // seconds)
+
+
+def change_24h(bars: Sequence[Bar], params: Mapping[str, ParamValue]) -> Series:
+    """24 小时涨跌幅（百分比）：与 24 小时前的收盘价比，按 K 线周期折算根数。
+
+    一天需要多少根 K 线由每根 K 线自带的周期秒数决定，因此同一份实现在 `1d` 上
+    比较前一根、在 `1h` 上比较前 24 根。凑不满 24 小时的位置是 `None`（没有基期
+    就没有涨跌幅），前一根收盘价为 0 的位置同样是 `None`。
+    """
+
+    lookback = _day_lookback(bars[0].timeframe.seconds)
+    closes = [bar.close for bar in bars]
+    column: list[Decimal | None] = [None] * min(lookback, len(closes))
+    for index in range(lookback, len(closes)):
+        base = closes[index - lookback]
+        column.append(None if base == 0 else (closes[index] - base) / base * _HUNDRED)
+    return _assemble("change_24h", params, bars, ("change_24h",), column)
+
+
+def _single_bar_warmup(params: Mapping[str, ParamValue]) -> int:
+    return 1
+
+
+def _change_24h_warmup(params: Mapping[str, ParamValue]) -> int:
+    """一根 K 线没有基期可比，至少两根才可能算出涨跌幅。"""
+
+    return 2
+
+
 def _period_warmup(params: Mapping[str, ParamValue]) -> int:
     return int(params["period"])
 
@@ -361,4 +407,46 @@ register_indicator(
     ),
     warmup=_period_warmup,
     compute=volume_ma,
+)
+
+register_indicator(
+    IndicatorDefinition(
+        name="close",
+        title="收盘价",
+        summary="每根 K 线的收盘价本身，不做加工。",
+        inputs=("close",),
+        outputs=("close",),
+        params=(),
+        min_length=1,
+    ),
+    warmup=_single_bar_warmup,
+    compute=close_price,
+)
+
+register_indicator(
+    IndicatorDefinition(
+        name="volume",
+        title="成交量",
+        summary="每根 K 线的成交量本身，不做加工。",
+        inputs=("volume",),
+        outputs=("volume",),
+        params=(),
+        min_length=1,
+    ),
+    warmup=_single_bar_warmup,
+    compute=volume,
+)
+
+register_indicator(
+    IndicatorDefinition(
+        name="change_24h",
+        title="24 小时涨跌幅",
+        summary="与 24 小时前的收盘价比, 按 K 线周期折算比较的根数; 单位是百分比。",
+        inputs=("close",),
+        outputs=("change_24h",),
+        params=(),
+        min_length=2,
+    ),
+    warmup=_change_24h_warmup,
+    compute=change_24h,
 )

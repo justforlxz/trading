@@ -70,8 +70,26 @@ def add_backtest_run(inst_id: str) -> tuple[str, str, str]:
         timeframe="1d",
         direction="long_only",
         rule_json={
-            "entry": {"all": [{"left": "MA(20)", "op": ">", "right": "MA(60)"}]},
-            "exit": {"any": [{"left": "MA(20)", "op": "<", "right": "MA(60)"}]},
+            "entry": {
+                "logic": "and",
+                "conditions": [
+                    {
+                        "left": {"indicator": "sma", "period": 20},
+                        "op": "gt",
+                        "right": {"indicator": "sma", "period": 60},
+                    }
+                ],
+            },
+            "exit": {
+                "logic": "or",
+                "conditions": [
+                    {
+                        "left": {"indicator": "sma", "period": 20},
+                        "op": "lt",
+                        "right": {"indicator": "sma", "period": 60},
+                    }
+                ],
+            },
         },
         parameters={"trend_window": 20, "momentum_window": 10, "leg_count": 1},
         instrument_ids=[inst_id],

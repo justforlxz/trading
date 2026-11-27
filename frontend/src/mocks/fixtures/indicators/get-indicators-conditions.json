@@ -1,0 +1,72 @@
+{
+  "items": [
+    {
+      "indicator": "rsi",
+      "min_bars": 15,
+      "outputs": [
+        {
+          "name": "rsi",
+          "title": "RSI"
+        }
+      ],
+      "params": [
+        {
+          "default": 14,
+          "kind": "int",
+          "maximum": 500,
+          "minimum": 1,
+          "name": "period",
+          "title": "周期"
+        }
+      ],
+      "summary": "涨跌幅的 Wilder 平滑, 全平序列无方向。",
+      "title": "RSI"
+    },
+    {
+      "indicator": "macd",
+      "min_bars": 34,
+      "outputs": [
+        {
+          "name": "macd",
+          "title": "DIF"
+        },
+        {
+          "name": "signal",
+          "title": "DEA"
+        },
+        {
+          "name": "hist",
+          "title": "柱"
+        }
+      ],
+      "params": [
+        {
+          "default": 12,
+          "kind": "int",
+          "maximum": 500,
+          "minimum": 1,
+          "name": "fast",
+          "title": "快线周期"
+        },
+        {
+          "default": 26,
+          "kind": "int",
+          "maximum": 500,
+          "minimum": 1,
+          "name": "slow",
+          "title": "慢线周期"
+        },
+        {
+          "default": 9,
+          "kind": "int",
+          "maximum": 500,
+          "minimum": 1,
+          "name": "signal",
+          "title": "信号线周期"
+        }
+      ],
+      "summary": "快慢指数均线之差, 及其信号线与柱状差。",
+      "title": "MACD"
+    }
+  ]
+}

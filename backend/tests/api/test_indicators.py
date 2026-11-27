@@ -124,7 +124,8 @@ def test_catalog_is_generated_from_registry(client: TestClient) -> None:
     items = response.json()["items"]
     expected = list_definitions()
     assert [item["name"] for item in items] == [row.name for row in expected]
-    assert len(items) == 8
+    assert len(items) == len(expected)
+    assert len(items) == 11
 
     for item in items:
         assert set(item) == {"name", "title", "summary", "params", "outputs", "min_bars"}
@@ -139,12 +140,62 @@ def test_catalog_is_generated_from_registry(client: TestClient) -> None:
 
 
 def test_catalog_unknown_subpath_is_not_found(client: TestClient) -> None:
-    """目录只发布两个端点，别的子路径按不存在处理，不回落到桩。"""
+    """目录只发布三个端点，别的子路径按不存在处理，不回落到桩。"""
 
     response = client.get("/api/indicators/nope")
 
     assert response.status_code == 404
     assert response.json()["detail"]
+
+
+def test_condition_catalog_publishes_the_eight_backtest_indicators(
+    client: TestClient,
+) -> None:
+    """回测条件的指标清单就是用户确认的八个，顺序与清单一致（AC5）。"""
+
+    response = client.get("/api/indicators/conditions")
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert [item["indicator"] for item in items] == [
+        "rsi",
+        "close",
+        "sma",
+        "atr",
+        "volume",
+        "change_24h",
+        "macd",
+        "bollinger",
+    ]
+    for item in items:
+        assert set(item) == {"indicator", "title", "summary", "outputs", "params", "min_bars"}
+        for output in item["outputs"]:
+            assert set(output) == {"name", "title"}
+
+    macd = next(item for item in items if item["indicator"] == "macd")
+    assert [(output["name"], output["title"]) for output in macd["outputs"]] == [
+        ("macd", "DIF"),
+        ("signal", "DEA"),
+        ("hist", "柱"),
+    ]
+    assert [(param["name"], param["default"]) for param in macd["params"]] == [
+        ("fast", 12),
+        ("slow", 26),
+        ("signal", 9),
+    ]
+    assert macd["min_bars"] == 34
+
+
+def test_condition_catalog_shares_the_registry_metadata(client: TestClient) -> None:
+    """清单与注册表同源：参数、输出与最小 K 线数逐项相同，不存在第二份默认值。"""
+
+    registry = {item["name"]: item for item in client.get("/api/indicators").json()["items"]}
+
+    for item in client.get("/api/indicators/conditions").json()["items"]:
+        source = registry[item["indicator"]]
+        assert item["params"] == source["params"]
+        assert [output["name"] for output in item["outputs"]] == source["outputs"]
+        assert item["min_bars"] == source["min_bars"]
 
 
 # ---------------------------------------------------------------- series
@@ -200,6 +251,21 @@ def test_series_values_fit_decimal_contract(client: TestClient) -> None:
         if value is not None and "." in value
     ]
     assert max(decimals) == 12
+
+
+def test_series_serves_the_backtest_only_indicators(indicator_data: TestClient) -> None:
+    """收盘价、成交量与 24 小时涨跌幅同样走序列接口，条件求值不必另开数据通道。"""
+
+    response = get_series(indicator_data, names="close,volume,change_24h")
+
+    assert response.status_code == 200
+    series = {item["name"]: item for item in response.json()["series"]}
+    assert set(series) == {"close", "volume", "change_24h"}
+    assert series["close"]["points"][-1]["values"]["close"] == "139"
+    assert series["volume"]["points"][-1]["values"]["volume"] == "49"
+    # 1h 周期下 24 小时是 24 根，最后一点有基期；序列与 K 线等长。
+    assert len(series["change_24h"]["points"]) == SEEDED_BARS
+    assert series["change_24h"]["points"][-1]["values"]["change_24h"] is not None
 
 
 def test_series_echoes_default_params(indicator_data: TestClient) -> None:

@@ -35,8 +35,26 @@ def make_strategy(
     rule = {
         "timeframe": bar,
         "direction": direction,
-        "entry": {"all": [{"left": "MA(20)", "op": ">", "right": "MA(60)"}]},
-        "exit": {"any": [{"left": "MA(20)", "op": "<", "right": "MA(60)"}]},
+        "entry": {
+            "logic": "and",
+            "conditions": [
+                {
+                    "left": {"indicator": "sma", "period": 20},
+                    "op": "gt",
+                    "right": {"indicator": "sma", "period": 60},
+                }
+            ],
+        },
+        "exit": {
+            "logic": "or",
+            "conditions": [
+                {
+                    "left": {"indicator": "sma", "period": 20},
+                    "op": "lt",
+                    "right": {"indicator": "sma", "period": 60},
+                }
+            ],
+        },
     }
     return create_strategy(
         name=name,

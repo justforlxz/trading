@@ -136,6 +136,9 @@ from app.api.schemas.external import (
     SystemSyncResponse,
 )
 from app.api.schemas.indicators import (
+    ConditionCatalogResponse,
+    ConditionIndicator,
+    ConditionOutput,
     IndicatorCatalogResponse,
     IndicatorDefinition,
     IndicatorPoint,
@@ -346,6 +349,9 @@ __all__ = [
     "CandleSeriesResponse",
     "ChannelSubscriptionSettings",
     "ComponentStatus",
+    "ConditionCatalogResponse",
+    "ConditionIndicator",
+    "ConditionOutput",
     "CorrelationCell",
     "CorrelationMatrixResponse",
     "CorrelationPoint",

@@ -33,6 +33,12 @@ from app.strategy.components import (
     RelativeStrength,
     Trend,
 )
+from app.strategy.conditions import (
+    ConditionIndicator,
+    ConditionOutput,
+    condition_catalog,
+    signal_series,
+)
 from app.strategy.constraints import PortfolioConstraints, check_constraints
 from app.strategy.management import (
     InstrumentStrategyRecord,
@@ -115,6 +121,8 @@ __all__ = [
     "Breadth",
     "Component",
     "ComponentSignal",
+    "ConditionIndicator",
+    "ConditionOutput",
     "CorrelationShift",
     "Directional",
     "InstanceRecord",
@@ -153,6 +161,7 @@ __all__ = [
     "build_target",
     "check_constraints",
     "check_transition",
+    "condition_catalog",
     "create_instance",
     "create_strategy",
     "create_version",
@@ -184,6 +193,7 @@ __all__ = [
     "replace_version_instruments",
     "resolve_params",
     "save_replay",
+    "signal_series",
     "summarize_user_strategies",
     "target_quantity",
     "update_instance",

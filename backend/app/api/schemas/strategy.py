@@ -81,8 +81,33 @@ _EXAMPLE_SUMMARY = {
 _RULE = {
     "timeframe": "1d",
     "direction": "long_only",
-    "entry": {"all": [{"left": "MA(20)", "op": ">", "right": "MA(60)"}]},
-    "exit": {"any": [{"left": "MA(20)", "op": "<", "right": "MA(60)"}]},
+    "entry": {
+        "logic": "and",
+        "conditions": [
+            {
+                "left": {"indicator": "rsi", "output": "rsi", "period": 14},
+                "op": "lt",
+                "right": {"value": 30},
+            },
+            {
+                "left": {"indicator": "close", "output": "close"},
+                "op": "gt",
+                "right": {"indicator": "sma", "output": "sma", "period": 20},
+            },
+        ],
+    },
+    "exit": {
+        "logic": "or",
+        "conditions": [
+            {
+                "left": {"indicator": "rsi", "output": "rsi", "period": 14},
+                "op": "gt",
+                "right": {"value": 70},
+            }
+        ],
+        "take_profit_pct": 10,
+        "stop_loss_pct": 5,
+    },
     "position_sizing": {"type": "equal_weight", "weight": 0.3333, "max_positions": 3},
 }
 

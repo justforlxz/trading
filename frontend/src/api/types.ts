@@ -517,6 +517,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/indicators/conditions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Condition Indicators
+         * @description 回测条件的指标清单：8 个可选指标及其参数与输出。
+         *
+         *     前端下拉只读这个接口，不在界面上硬编码选项；参数默认值与取值范围和指标计算
+         *     同源（`app.indicators` 注册表），改默认值只需要改注册表一处。
+         */
+        get: operations["list_condition_indicators_api_indicators_conditions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/indicators/series": {
         parameters: {
             query?: never;
@@ -3133,6 +3156,117 @@ export interface components {
             min_severity?: ("info" | "warning" | "critical") | null;
             /** Types */
             types?: string[] | null;
+        };
+        /**
+         * ConditionCatalogResponse
+         * @example {
+         *       "items": [
+         *         {
+         *           "indicator": "rsi",
+         *           "min_bars": 15,
+         *           "outputs": [
+         *             {
+         *               "name": "rsi",
+         *               "title": "RSI"
+         *             }
+         *           ],
+         *           "params": [
+         *             {
+         *               "default": 14,
+         *               "kind": "int",
+         *               "maximum": 500,
+         *               "minimum": 1,
+         *               "name": "period",
+         *               "title": "周期"
+         *             }
+         *           ],
+         *           "summary": "涨跌幅的 Wilder 平滑, 全平序列无方向。",
+         *           "title": "RSI"
+         *         },
+         *         {
+         *           "indicator": "macd",
+         *           "min_bars": 34,
+         *           "outputs": [
+         *             {
+         *               "name": "macd",
+         *               "title": "DIF"
+         *             },
+         *             {
+         *               "name": "signal",
+         *               "title": "DEA"
+         *             },
+         *             {
+         *               "name": "hist",
+         *               "title": "柱"
+         *             }
+         *           ],
+         *           "params": [
+         *             {
+         *               "default": 12,
+         *               "kind": "int",
+         *               "maximum": 500,
+         *               "minimum": 1,
+         *               "name": "fast",
+         *               "title": "快线周期"
+         *             },
+         *             {
+         *               "default": 26,
+         *               "kind": "int",
+         *               "maximum": 500,
+         *               "minimum": 1,
+         *               "name": "slow",
+         *               "title": "慢线周期"
+         *             },
+         *             {
+         *               "default": 9,
+         *               "kind": "int",
+         *               "maximum": 500,
+         *               "minimum": 1,
+         *               "name": "signal",
+         *               "title": "信号线周期"
+         *             }
+         *           ],
+         *           "summary": "快慢指数均线之差, 及其信号线与柱状差。",
+         *           "title": "MACD"
+         *         }
+         *       ]
+         *     }
+         */
+        ConditionCatalogResponse: {
+            /** Items */
+            items: components["schemas"]["ConditionIndicator"][];
+        };
+        /**
+         * ConditionIndicator
+         * @description 回测条件可用的一个指标：`indicator` 就是规则里要写的取值。
+         *
+         *     与 `IndicatorDefinition` 分开是因为两者回答的问题不同：那个是「注册表里有
+         *     哪些指标」，这个是「回测条件的左值能用哪几个指标、能选哪一列输出」。参数与
+         *     最小 K 线数由注册表提供，不另写一份。
+         */
+        ConditionIndicator: {
+            /** Indicator */
+            indicator: string;
+            /** Min Bars */
+            min_bars: number;
+            /** Outputs */
+            outputs: components["schemas"]["ConditionOutput"][];
+            /** Params */
+            params: components["schemas"]["ParamSpec"][];
+            /** Summary */
+            summary: string;
+            /** Title */
+            title: string;
+        };
+        /**
+         * ConditionOutput
+         * @description 条件左值能选到的一个输出列：`name` 写进规则，`title` 给下拉显示。
+         */
+        ConditionOutput: {
+            /** Name */
+            name: string;
+            /** Title */
+            title: string;
         };
         /**
          * CorrelationCell
@@ -7300,22 +7434,50 @@ export interface components {
          *       "rule_json": {
          *         "direction": "long_only",
          *         "entry": {
-         *           "all": [
+         *           "conditions": [
          *             {
-         *               "left": "MA(20)",
-         *               "op": ">",
-         *               "right": "MA(60)"
+         *               "left": {
+         *                 "indicator": "rsi",
+         *                 "output": "rsi",
+         *                 "period": 14
+         *               },
+         *               "op": "lt",
+         *               "right": {
+         *                 "value": 30
+         *               }
+         *             },
+         *             {
+         *               "left": {
+         *                 "indicator": "close",
+         *                 "output": "close"
+         *               },
+         *               "op": "gt",
+         *               "right": {
+         *                 "indicator": "sma",
+         *                 "output": "sma",
+         *                 "period": 20
+         *               }
          *             }
-         *           ]
+         *           ],
+         *           "logic": "and"
          *         },
          *         "exit": {
-         *           "any": [
+         *           "conditions": [
          *             {
-         *               "left": "MA(20)",
-         *               "op": "<",
-         *               "right": "MA(60)"
+         *               "left": {
+         *                 "indicator": "rsi",
+         *                 "output": "rsi",
+         *                 "period": 14
+         *               },
+         *               "op": "gt",
+         *               "right": {
+         *                 "value": 70
+         *               }
          *             }
-         *           ]
+         *           ],
+         *           "logic": "or",
+         *           "stop_loss_pct": 5,
+         *           "take_profit_pct": 10
          *         },
          *         "position_sizing": {
          *           "max_positions": 3,
@@ -7622,22 +7784,50 @@ export interface components {
          *       "rule_json": {
          *         "direction": "long_only",
          *         "entry": {
-         *           "all": [
+         *           "conditions": [
          *             {
-         *               "left": "MA(20)",
-         *               "op": ">",
-         *               "right": "MA(60)"
+         *               "left": {
+         *                 "indicator": "rsi",
+         *                 "output": "rsi",
+         *                 "period": 14
+         *               },
+         *               "op": "lt",
+         *               "right": {
+         *                 "value": 30
+         *               }
+         *             },
+         *             {
+         *               "left": {
+         *                 "indicator": "close",
+         *                 "output": "close"
+         *               },
+         *               "op": "gt",
+         *               "right": {
+         *                 "indicator": "sma",
+         *                 "output": "sma",
+         *                 "period": 20
+         *               }
          *             }
-         *           ]
+         *           ],
+         *           "logic": "and"
          *         },
          *         "exit": {
-         *           "any": [
+         *           "conditions": [
          *             {
-         *               "left": "MA(20)",
-         *               "op": "<",
-         *               "right": "MA(60)"
+         *               "left": {
+         *                 "indicator": "rsi",
+         *                 "output": "rsi",
+         *                 "period": 14
+         *               },
+         *               "op": "gt",
+         *               "right": {
+         *                 "value": 70
+         *               }
          *             }
-         *           ]
+         *           ],
+         *           "logic": "or",
+         *           "stop_loss_pct": 5,
+         *           "take_profit_pct": 10
          *         },
          *         "position_sizing": {
          *           "max_positions": 3,
@@ -7719,22 +7909,50 @@ export interface components {
          *           "rule_json": {
          *             "direction": "long_only",
          *             "entry": {
-         *               "all": [
+         *               "conditions": [
          *                 {
-         *                   "left": "MA(20)",
-         *                   "op": ">",
-         *                   "right": "MA(60)"
+         *                   "left": {
+         *                     "indicator": "rsi",
+         *                     "output": "rsi",
+         *                     "period": 14
+         *                   },
+         *                   "op": "lt",
+         *                   "right": {
+         *                     "value": 30
+         *                   }
+         *                 },
+         *                 {
+         *                   "left": {
+         *                     "indicator": "close",
+         *                     "output": "close"
+         *                   },
+         *                   "op": "gt",
+         *                   "right": {
+         *                     "indicator": "sma",
+         *                     "output": "sma",
+         *                     "period": 20
+         *                   }
          *                 }
-         *               ]
+         *               ],
+         *               "logic": "and"
          *             },
          *             "exit": {
-         *               "any": [
+         *               "conditions": [
          *                 {
-         *                   "left": "MA(20)",
-         *                   "op": "<",
-         *                   "right": "MA(60)"
+         *                   "left": {
+         *                     "indicator": "rsi",
+         *                     "output": "rsi",
+         *                     "period": 14
+         *                   },
+         *                   "op": "gt",
+         *                   "right": {
+         *                     "value": 70
+         *                   }
          *                 }
-         *               ]
+         *               ],
+         *               "logic": "or",
+         *               "stop_loss_pct": 5,
+         *               "take_profit_pct": 10
          *             },
          *             "position_sizing": {
          *               "max_positions": 3,
@@ -9007,6 +9225,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IndicatorCatalogResponse"];
+                };
+            };
+        };
+    };
+    list_condition_indicators_api_indicators_conditions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConditionCatalogResponse"];
                 };
             };
         };

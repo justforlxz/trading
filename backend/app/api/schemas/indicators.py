@@ -14,6 +14,9 @@ from app.api.schemas.common import (
 )
 
 __all__ = [
+    "ConditionCatalogResponse",
+    "ConditionIndicator",
+    "ConditionOutput",
     "IndicatorCatalogResponse",
     "IndicatorDefinition",
     "IndicatorPoint",
@@ -98,6 +101,98 @@ class IndicatorSeriesResponse(BaseModel):
                             ],
                         }
                     ],
+                }
+            ]
+        }
+    )
+
+
+class ConditionOutput(BaseModel):
+    """条件左值能选到的一个输出列：`name` 写进规则，`title` 给下拉显示。"""
+
+    name: str
+    title: str
+
+
+class ConditionIndicator(BaseModel):
+    """回测条件可用的一个指标：`indicator` 就是规则里要写的取值。
+
+    与 `IndicatorDefinition` 分开是因为两者回答的问题不同：那个是「注册表里有
+    哪些指标」，这个是「回测条件的左值能用哪几个指标、能选哪一列输出」。参数与
+    最小 K 线数由注册表提供，不另写一份。
+    """
+
+    indicator: str
+    title: str
+    summary: str
+    outputs: list[ConditionOutput]
+    params: list[ParamSpec]
+    min_bars: int
+
+
+class ConditionCatalogResponse(BaseModel):
+    items: list[ConditionIndicator]
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "items": [
+                        {
+                            "indicator": "rsi",
+                            "title": "RSI",
+                            "summary": "涨跌幅的 Wilder 平滑, 全平序列无方向。",
+                            "outputs": [{"name": "rsi", "title": "RSI"}],
+                            "params": [
+                                {
+                                    "name": "period",
+                                    "title": "周期",
+                                    "kind": "int",
+                                    "default": 14,
+                                    "minimum": 1,
+                                    "maximum": 500,
+                                }
+                            ],
+                            "min_bars": 15,
+                        },
+                        {
+                            "indicator": "macd",
+                            "title": "MACD",
+                            "summary": "快慢指数均线之差, 及其信号线与柱状差。",
+                            "outputs": [
+                                {"name": "macd", "title": "DIF"},
+                                {"name": "signal", "title": "DEA"},
+                                {"name": "hist", "title": "柱"},
+                            ],
+                            "params": [
+                                {
+                                    "name": "fast",
+                                    "title": "快线周期",
+                                    "kind": "int",
+                                    "default": 12,
+                                    "minimum": 1,
+                                    "maximum": 500,
+                                },
+                                {
+                                    "name": "slow",
+                                    "title": "慢线周期",
+                                    "kind": "int",
+                                    "default": 26,
+                                    "minimum": 1,
+                                    "maximum": 500,
+                                },
+                                {
+                                    "name": "signal",
+                                    "title": "信号线周期",
+                                    "kind": "int",
+                                    "default": 9,
+                                    "minimum": 1,
+                                    "maximum": 500,
+                                },
+                            ],
+                            "min_bars": 34,
+                        },
+                    ]
                 }
             ]
         }

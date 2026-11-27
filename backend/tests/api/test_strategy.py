@@ -27,16 +27,30 @@ RULES: dict[str, Any] = {
     "timeframe": "1d",
     "direction": "long_only",
     "entry": {
-        "all": [
-            {"left": "MA(20)", "op": ">", "right": "MA(60)"},
-            {"left": "RSI(14)", "op": "<", "right": 65},
-        ]
+        "logic": "and",
+        "conditions": [
+            {
+                "left": {"indicator": "sma", "period": 20},
+                "op": "gt",
+                "right": {"indicator": "sma", "period": 60},
+            },
+            {
+                "left": {"indicator": "rsi", "period": 14},
+                "op": "lt",
+                "right": {"value": 65},
+            },
+        ],
     },
     "exit": {
-        "any": [
-            {"left": "MA(20)", "op": "<", "right": "MA(60)"},
-            {"type": "drawdown_stop", "value": 0.08},
-        ]
+        "logic": "or",
+        "conditions": [
+            {
+                "left": {"indicator": "sma", "period": 20},
+                "op": "lt",
+                "right": {"indicator": "sma", "period": 60},
+            }
+        ],
+        "stop_loss_pct": 8,
     },
     "position_sizing": {"type": "equal_weight", "weight": 0.3333, "max_positions": 3},
 }
@@ -126,7 +140,11 @@ def test_create_strategy_returns_first_draft_version(market: TestClient) -> None
     body = detail(market, created["id"])
     assert body["current_version"] == 1
     assert body["current_version_id"] == created["version_id"]
-    assert body["rule_json"]["entry"]["all"][0]["left"] == "MA(20)"
+    assert body["rule_json"]["entry"]["conditions"][0]["left"] == {
+        "indicator": "sma",
+        "output": "sma",
+        "period": 20,
+    }
     assert body["instrument_ids"] == [INSTRUMENT]
     assert body["versions"] == [
         {
@@ -159,14 +177,32 @@ def test_list_returns_current_version_and_instrument_count(market: TestClient) -
         (
             {
                 **RULES,
-                "entry": {"all": [{"left": "NOPE(20)", "op": ">", "right": 1}]},
+                "entry": {
+                    "logic": "and",
+                    "conditions": [
+                        {
+                            "left": {"indicator": "nope", "period": 20},
+                            "op": "gt",
+                            "right": {"value": 1},
+                        }
+                    ],
+                },
             },
-            "未注册",
+            "回测可用指标",
         ),
         (
             {
                 **RULES,
-                "entry": {"all": [{"left": "MA(20)", "op": "!=", "right": 1}]},
+                "entry": {
+                    "logic": "and",
+                    "conditions": [
+                        {
+                            "left": {"indicator": "sma", "period": 20},
+                            "op": "!=",
+                            "right": {"value": 1},
+                        }
+                    ],
+                },
             },
             "op",
         ),
@@ -203,18 +239,31 @@ def test_new_version_increments_and_keeps_old_rule(market: TestClient) -> None:
     first = detail(market, created["id"])
     changed_rule = {
         **RULES,
-        "entry": {"all": [{"left": "EMA(20)", "op": ">", "right": "EMA(60)"}]},
+        "entry": {
+            "logic": "and",
+            "conditions": [
+                {
+                    "left": {"indicator": "sma", "period": 60},
+                    "op": "gt",
+                    "right": {"indicator": "sma", "period": 20},
+                }
+            ],
+        },
     }
 
     response = market.post(
         f"/api/strategies/{created['id']}/versions",
-        json={"rule_json": changed_rule, "change_note": "改用 EMA"},
+        json={"rule_json": changed_rule, "change_note": "改成 60 日均线上穿 20 日均线"},
     )
 
     assert response.status_code == 201, response.text
     version = response.json()
     assert version["version"] == 2
-    assert version["rule_json"]["entry"]["all"][0]["left"] == "EMA(20)"
+    assert version["rule_json"]["entry"]["conditions"][0]["left"] == {
+        "indicator": "sma",
+        "output": "sma",
+        "period": 60,
+    }
     after = detail(market, created["id"])
     assert after["current_version"] == 2
     assert after["versions"][0]["version"] == 2
@@ -222,7 +271,9 @@ def test_new_version_increments_and_keeps_old_rule(market: TestClient) -> None:
 
     versions = market.get(f"/api/strategies/{created['id']}/versions").json()["items"]
     old = next(item for item in versions if item["version"] == 1)
-    assert old["rule_json"]["entry"]["all"][0]["left"] == "MA(20)"
+    # 旧版本原样保留：改规则只新增版本，历史回测指向的那一版不会被覆盖。
+    assert old["rule_json"] == first["rule_json"]
+    assert old["rule_json"]["entry"]["conditions"][0]["left"]["period"] == 20
 
 
 def test_put_metadata_does_not_create_a_version(market: TestClient) -> None:
@@ -244,7 +295,19 @@ def test_put_metadata_does_not_create_a_version(market: TestClient) -> None:
 
 def test_put_with_rule_creates_a_new_version(market: TestClient) -> None:
     created = create(market)
-    changed = {**RULES, "exit": {"any": [{"left": "RSI(14)", "op": ">", "right": 70}]}}
+    changed = {
+        **RULES,
+        "exit": {
+            "logic": "or",
+            "conditions": [
+                {
+                    "left": {"indicator": "rsi", "period": 14},
+                    "op": "gt",
+                    "right": {"value": 70},
+                }
+            ],
+        },
+    }
 
     response = market.put(
         f"/api/strategies/{created['id']}",
@@ -403,6 +466,7 @@ def test_position_sizing_can_be_submitted_alone(market: TestClient, method: str)
     """只提交顶层仓位规则是正常用法，不能拿继承来的旧规则当冲突对照。"""
 
     created = create(market)
+    before = detail(market, created["id"])["rule_json"]["entry"]
     sizing = {"type": "equal_weight", "weight": 0.5, "max_positions": 2}
     if method == "put":
         response = market.put(f"/api/strategies/{created['id']}", json={"position_sizing": sizing})
@@ -416,7 +480,7 @@ def test_position_sizing_can_be_submitted_alone(market: TestClient, method: str)
     assert body["current_version"] == 2
     assert body["position_sizing"] == sizing
     # 规则其余内容沿用当前版本，只把仓位规则换成本次提交的值。
-    assert body["rule_json"]["entry"] == RULES["entry"]
+    assert body["rule_json"]["entry"] == before
     assert body["rule_json"]["position_sizing"] == sizing
 
 

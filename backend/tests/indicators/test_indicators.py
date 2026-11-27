@@ -6,7 +6,23 @@ import pytest
 
 from app.indicators import Series, compute
 
-_NAMES = ["atr", "bollinger", "ema", "macd", "rsi", "sma", "volume_ma", "vwap"]
+#: 全部内置指标，按注册表列出的顺序（字典序）。
+_NAMES = [
+    "atr",
+    "bollinger",
+    "change_24h",
+    "close",
+    "ema",
+    "macd",
+    "rsi",
+    "sma",
+    "volume",
+    "volume_ma",
+    "vwap",
+]
+
+#: 至少两根 K 线才可能有结果的那部分；收盘价与成交量一根就够，不在其中。
+_WARMUP_NAMES = [name for name in _NAMES if name not in {"close", "volume"}]
 _TOLERANCE = Decimal("1e-12")
 
 
@@ -112,7 +128,55 @@ def test_volume_ma_is_rolling_volume_mean(make_bars) -> None:
     assert _values(series, "volume_ma") == [None, Decimal("1.5"), Decimal("2.5")]
 
 
-@pytest.mark.parametrize("name", _NAMES)
+def test_close_is_the_bar_close(make_bars) -> None:
+    series = compute("close", make_bars([10, 11, 12]))
+
+    assert _values(series, "close") == [Decimal(10), Decimal(11), Decimal(12)]
+
+
+def test_volume_is_the_bar_volume(make_bars) -> None:
+    series = compute("volume", make_bars([10, 11], volumes=[3, 4]))
+
+    assert _values(series, "volume") == [Decimal(3), Decimal(4)]
+
+
+def test_change_24h_on_daily_bars_compares_the_previous_close(make_bars) -> None:
+    """日线上 24 小时就是一根 K 线：与前一根收盘价比，单位是百分比。"""
+
+    series = compute("change_24h", make_bars([10, 10, 11], bar="1d"))
+
+    assert _values(series, "change_24h") == [None, Decimal(0), Decimal(10)]
+
+
+def test_change_24h_on_hourly_bars_looks_24_bars_back(make_bars) -> None:
+    """小时线上 24 小时是 24 根：第 24 根与第 0 根比。"""
+
+    series = compute("change_24h", make_bars([10] * 24 + [11, 12], bar="1h"))
+
+    values = _values(series, "change_24h")
+    assert values[:24] == [None] * 24
+    assert values[24] == Decimal(10)
+    assert values[25] == Decimal(20)
+
+
+def test_change_24h_without_a_full_day_is_undefined(make_bars) -> None:
+    """凑不满 24 小时就没有基期：序列仍然与 K 线对齐，但每点都是 None。"""
+
+    series = compute("change_24h", make_bars([10, 11, 12], bar="1h"))
+
+    assert len(series.points) == 3
+    assert _values(series, "change_24h") == [None, None, None]
+
+
+def test_change_24h_with_a_zero_base_is_undefined(make_bars) -> None:
+    """基期收盘价为 0 时涨跌幅没有定义，不返回一个假数字。"""
+
+    series = compute("change_24h", make_bars([0, 5], bar="1d"))
+
+    assert _values(series, "change_24h") == [None, None]
+
+
+@pytest.mark.parametrize("name", _WARMUP_NAMES)
 def test_single_bar_yields_no_points(name: str, make_bars) -> None:
     series = compute(name, make_bars(["10"]))
 

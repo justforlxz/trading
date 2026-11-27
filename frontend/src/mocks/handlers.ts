@@ -28,6 +28,7 @@ import getCorrelationSeries from "./fixtures/correlation/get-correlation-series.
 import getDashboardSummary from "./fixtures/dashboard/get-dashboard-summary.json";
 import getHealth from "./fixtures/health/get-health.json";
 import getIndicators from "./fixtures/indicators/get-indicators.json";
+import getIndicatorsConditions from "./fixtures/indicators/get-indicators-conditions.json";
 import getIndicatorsSeries from "./fixtures/indicators/get-indicators-series.json";
 import getInstruments from "./fixtures/instruments/get-instruments.json";
 import getInstrumentsSearch from "./fixtures/instruments/get-instruments-search.json";
@@ -110,6 +111,7 @@ export const handlers = [
   http.get("*/api/dashboard/summary", () => HttpResponse.json(getDashboardSummary)),
   http.get("*/api/health", () => HttpResponse.json(getHealth)),
   http.get("*/api/indicators", () => HttpResponse.json(getIndicators)),
+  http.get("*/api/indicators/conditions", () => HttpResponse.json(getIndicatorsConditions)),
   http.get("*/api/indicators/series", () => HttpResponse.json(getIndicatorsSeries)),
   http.get("*/api/instruments", () => HttpResponse.json(getInstruments)),
   http.get("*/api/instruments/search", () => HttpResponse.json(getInstrumentsSearch)),

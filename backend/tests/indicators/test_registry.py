@@ -16,7 +16,20 @@ from app.indicators import (
     list_definitions,
 )
 
-_NAMES = ["atr", "bollinger", "ema", "macd", "rsi", "sma", "volume_ma", "vwap"]
+#: 全部内置指标，按注册表列出的顺序（字典序）。
+_NAMES = [
+    "atr",
+    "bollinger",
+    "change_24h",
+    "close",
+    "ema",
+    "macd",
+    "rsi",
+    "sma",
+    "volume",
+    "volume_ma",
+    "vwap",
+]
 _BAR_FIELDS = frozenset({"open", "high", "low", "close", "volume"})
 
 
@@ -124,7 +137,7 @@ def test_history_below_min_length_yields_no_points(name: str, make_bars) -> None
 
     assert series.points == ()
     assert series.name == name
-    assert series.params
+    assert set(series.params) == {param.name for param in spec.params}
 
 
 @pytest.mark.parametrize("name", _NAMES)

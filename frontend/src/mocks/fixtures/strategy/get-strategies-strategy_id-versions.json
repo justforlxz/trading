@@ -23,22 +23,50 @@
       "rule_json": {
         "direction": "long_only",
         "entry": {
-          "all": [
+          "conditions": [
             {
-              "left": "MA(20)",
-              "op": ">",
-              "right": "MA(60)"
+              "left": {
+                "indicator": "rsi",
+                "output": "rsi",
+                "period": 14
+              },
+              "op": "lt",
+              "right": {
+                "value": 30
+              }
+            },
+            {
+              "left": {
+                "indicator": "close",
+                "output": "close"
+              },
+              "op": "gt",
+              "right": {
+                "indicator": "sma",
+                "output": "sma",
+                "period": 20
+              }
             }
-          ]
+          ],
+          "logic": "and"
         },
         "exit": {
-          "any": [
+          "conditions": [
             {
-              "left": "MA(20)",
-              "op": "<",
-              "right": "MA(60)"
+              "left": {
+                "indicator": "rsi",
+                "output": "rsi",
+                "period": 14
+              },
+              "op": "gt",
+              "right": {
+                "value": 70
+              }
             }
-          ]
+          ],
+          "logic": "or",
+          "stop_loss_pct": 5,
+          "take_profit_pct": 10
         },
         "position_sizing": {
           "max_positions": 3,

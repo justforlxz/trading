@@ -80,6 +80,9 @@ class ExchangePositionSnapshotRow(Base):
     inst_id: Mapped[str] = mapped_column(String(64), nullable=False)
     pos_side: Mapped[str] = mapped_column(String(8), nullable=False)
     size: Mapped[Decimal] = mapped_column(DecimalText, nullable=False)
+    # 成本价、盈亏与盈亏率按类别来自不同的上游字段：现货是 `openAvgPx` / `spotUpl` /
+    # `spotUplRatio`，永续是 `avgPx` / `upl` / `uplRatio`。换算只在交易所适配层做一次，
+    # 读侧不再区分——读错一套就会把现货的亏损显示成「未提供」。
     avg_px: Mapped[Decimal] = mapped_column(DecimalText, nullable=False)
     mark_px: Mapped[Decimal | None] = mapped_column(DecimalText, nullable=True)
     upl: Mapped[Decimal | None] = mapped_column(DecimalText, nullable=True)

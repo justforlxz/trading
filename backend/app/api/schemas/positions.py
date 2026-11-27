@@ -484,7 +484,7 @@ class EquityCurveResponse(BaseModel):
 
 
 class PositionCardItem(BaseModel):
-    """一张持仓卡片需要的全部事实，盈亏、占比与止损距离都由后端算好。"""
+    """一张持仓卡片需要的全部事实，盈亏、投入与止损距离都由后端算好。"""
 
     pos_id: str
     inst_id: str
@@ -510,8 +510,8 @@ class PositionCardItem(BaseModel):
     mgn_mode: str | None = None
     liq_px: DecimalString | None = None
     margin: DecimalString | None = None
-    notional: DecimalString | None = None
-    weight_pct: DecimalString | None = None
+    #: 投入：现货是成本价 × 数量（上游 `openAvgPx × spotBal`），合约是保证金。
+    cost: DecimalString | None = None
     #: 该类别有没有止损概念：现货没有止损，界面留空而不是显示「未取到」。
     stop_supported: bool
     stop_status: StopStatus
@@ -523,8 +523,7 @@ class PositionCardItem(BaseModel):
 class PositionCardsResponse(BaseModel):
     """持仓卡片列表，已按未实现盈亏绝对值降序。
 
-    `hidden_dust_count` 是展示层隐藏的尘埃条数；快照里一行都没删，`items` 合计的
-    `weight_pct` 因此仍是 100%。
+    `hidden_dust_count` 是展示层隐藏的尘埃条数；快照里一行都没删。
     """
 
     as_of: UtcDatetime | None = None
@@ -559,8 +558,7 @@ class PositionCardsResponse(BaseModel):
                             "mgn_mode": "isolated",
                             "liq_px": None,
                             "margin": "57.83",
-                            "notional": "578.32",
-                            "weight_pct": "79.12",
+                            "cost": "57.83",
                             "stop_supported": True,
                             "stop_status": "none",
                             "stop_px": None,

@@ -7,6 +7,7 @@ import {
   curveGeometry,
   curveUnavailableText,
   dustHiddenText,
+  hasLiquidationPrice,
   quoteTimeText,
   marginModeLabel,
   marginUsageFloorPrefix,
@@ -288,6 +289,14 @@ describe("止损三态文案", () => {
   });
 });
 
+describe("强平价", () => {
+  it("只有永续有强平价，标的没同步时不猜", () => {
+    expect(hasLiquidationPrice("SWAP")).toBe(true);
+    expect(hasLiquidationPrice("SPOT")).toBe(false);
+    expect(hasLiquidationPrice(null)).toBe(false);
+  });
+});
+
 describe("缺失数据的标记", () => {
   it("名义与保证金不完整时带 ≥", () => {
     expect(notionalPrefix("exact")).toBe("");
@@ -358,8 +367,7 @@ describe("卡片推送合并", () => {
         mgn_mode: "isolated",
         liq_px: null,
         margin: "0",
-        notional: "1851.36",
-        weight_pct: "79.1",
+        cost: "604.80",
         stop_supported: true,
         stop_status: "confirmed",
         stop_px: "220",
@@ -463,7 +471,7 @@ describe("价格时刻", () => {
 
 describe("尘埃说明", () => {
   it("后端给了条数就照原数说明", () => {
-    expect(dustHiddenText(3)).toBe("已隐藏 3 条尘埃（名义价值过低，不计入卡片与占比）");
+    expect(dustHiddenText(3)).toBe("已隐藏 3 条尘埃（名义价值过低，不计入卡片）");
   });
 
   it("没有尘埃时不占位", () => {

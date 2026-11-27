@@ -48,7 +48,8 @@ export function AssetCardView({
     <Card className="p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] text-muted-foreground">当前资产</p>
+          {/* 口径写清楚：这个数是 OKX 的账户权益 `totalEq`，不是「累计收益」。 */}
+          <p className="text-[11px] text-muted-foreground">账户权益（OKX totalEq）</p>
           <div className="mt-1 flex items-baseline gap-2">
             <span className="font-mono text-lg font-normal tabular-nums">
               {loading ? "读取中…" : amountText(account?.equity)}

@@ -14,10 +14,14 @@
 
 现货持仓的口径（T6.3 对账要按这三条比，别处不许另立一套）：
 
-- 持仓量 `qty` = `availBal`（可用量）+ `frozenBal`（冻结量），恒为正。
-- 成本价 `avg_price` = 上游 `avgPx`；纯现货现金余额上游不下发这个字段，此时记 0，
-  表示「成本未知」，不拿现价冒充。
-- 未实现盈亏 `unrealized_pnl` = 上游 `upl`，计价币是标的的报价币。
+- 持仓量 `qty` = 上游 `spotBal`（现货余额，含冻结），恒为正。
+- 成本价 `avg_price` = 上游 `openAvgPx`（现货开仓成本价）；上游没下发时记 0，表示
+  「成本未知」，不拿现价冒充。
+- 未实现盈亏 `unrealized_pnl` = 上游 `spotUpl`，计价币是标的的报价币。
+
+现货与合约在 OKX 上是**两套字段**：`avgPx` / `upl` / `uplRatio` 只对合约有效，现货恒为空
+或 0；现货的成本价与盈亏是 `openAvgPx` / `spotUpl` / `spotUplRatio`。读错一套就会出现
+「明明亏了却显示未提供」。
 
 幂等：`clientOrderId` 在**发请求之前**写进 `order_submissions`（见 `ledger`）。重发
 同一个键时先查本地登记、再查上游有没有这张单，确认没有才会重发，因此断电重发不会
@@ -472,15 +476,15 @@ class OkxPrivateClient(TradePort):
             if product is None:
                 continue
             inst_id, quote_ccy = product
-            qty = _decimal(detail.get("availBal") or "0") + _decimal(detail.get("frozenBal") or "0")
+            qty = _spot_quantity(detail)
             if qty == 0:
                 continue
             held.append(
                 Position(
                     inst_id=inst_id,
                     qty=qty,
-                    avg_price=_decimal(detail.get("avgPx") or "0"),
-                    unrealized_pnl=Money(_decimal(detail.get("upl") or "0"), quote_ccy),
+                    avg_price=_decimal(detail.get("openAvgPx") or "0"),
+                    unrealized_pnl=Money(_decimal(detail.get("spotUpl") or "0"), quote_ccy),
                 )
             )
         return held
@@ -507,7 +511,7 @@ class OkxPrivateClient(TradePort):
             if product is None:
                 continue
             inst_id, _quote_ccy = product
-            qty = _decimal(detail.get("availBal") or "0") + _decimal(detail.get("frozenBal") or "0")
+            qty = _spot_quantity(detail)
             if qty == 0:
                 continue
             held.append(
@@ -516,10 +520,10 @@ class OkxPrivateClient(TradePort):
                     inst_id=inst_id,
                     pos_side="long",
                     size=qty,
-                    avg_px=_decimal(detail.get("avgPx") or "0"),
+                    avg_px=_decimal(detail.get("openAvgPx") or "0"),
                     mark_px=None,
-                    upl=_decimal_or_none(detail.get("upl")),
-                    upl_ratio=None,
+                    upl=_decimal_or_none(detail.get("spotUpl")),
+                    upl_ratio=_decimal_or_none(detail.get("spotUplRatio")),
                     lever=None,
                     mgn_mode=None,
                     liq_px=None,
@@ -749,6 +753,19 @@ def _signed_qty(row: dict[str, Any]) -> Decimal:
     if str(row.get("posSide") or "") == "long":
         return abs(qty)
     return qty
+
+
+def _spot_quantity(detail: dict[str, Any]) -> Decimal:
+    """现货持仓量：取上游 `spotBal`（现货余额，含冻结）。
+
+    上游没下发该字段时退回「可用 + 冻结」：这两个字段任何余额明细都有，用它推算不会
+    把持仓算成 0 条。字段存在就以它为准，不拿推算值覆盖上游给的数。
+    """
+
+    spot = _decimal_or_none(detail.get("spotBal"))
+    if spot is not None:
+        return spot
+    return _decimal(detail.get("availBal") or "0") + _decimal(detail.get("frozenBal") or "0")
 
 
 def _parse_order(row: dict[str, Any]) -> Order:

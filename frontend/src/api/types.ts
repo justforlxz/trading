@@ -6232,13 +6232,15 @@ export interface components {
         };
         /**
          * PositionCardItem
-         * @description 一张持仓卡片需要的全部事实，盈亏、占比与止损距离都由后端算好。
+         * @description 一张持仓卡片需要的全部事实，盈亏、投入与止损距离都由后端算好。
          */
         PositionCardItem: {
             /** Asset Class */
             asset_class: string;
             /** Avg Px */
             avg_px: string;
+            /** Cost */
+            cost?: string | null;
             /** Display Symbol */
             display_symbol: string;
             /** Inst Id */
@@ -6261,8 +6263,6 @@ export interface components {
             mgn_mode?: string | null;
             /** Name */
             name: string;
-            /** Notional */
-            notional?: string | null;
             /** Pos Id */
             pos_id: string;
             /**
@@ -6289,15 +6289,12 @@ export interface components {
             upl_curve: components["schemas"]["CurvePointItem"][];
             /** Upl Ratio */
             upl_ratio?: string | null;
-            /** Weight Pct */
-            weight_pct?: string | null;
         };
         /**
          * PositionCardsResponse
          * @description 持仓卡片列表，已按未实现盈亏绝对值降序。
          *
-         *     `hidden_dust_count` 是展示层隐藏的尘埃条数；快照里一行都没删，`items` 合计的
-         *     `weight_pct` 因此仍是 100%。
+         *     `hidden_dust_count` 是展示层隐藏的尘埃条数；快照里一行都没删。
          * @example {
          *       "as_of": "2026-11-25T13:51:00Z",
          *       "hidden_dust_count": 0,
@@ -6305,6 +6302,7 @@ export interface components {
          *         {
          *           "asset_class": "equity_perp",
          *           "avg_px": "269.34",
+         *           "cost": "57.83",
          *           "display_symbol": "GOOGL-USDT",
          *           "inst_id": "GOOGL-USDT-SWAP",
          *           "inst_type": "SWAP",
@@ -6315,7 +6313,6 @@ export interface components {
          *           "mark_px_source": "okx_rest",
          *           "mgn_mode": "isolated",
          *           "name": "Alphabet",
-         *           "notional": "578.32",
          *           "pos_id": "GOOGL-USDT-SWAP:long",
          *           "pos_side": "long",
          *           "size": "2.09",
@@ -6332,8 +6329,7 @@ export interface components {
          *               "value": "15.40"
          *             }
          *           ],
-         *           "upl_ratio": "0.0274",
-         *           "weight_pct": "79.12"
+         *           "upl_ratio": "0.0274"
          *         }
          *       ],
          *       "status": "ok"

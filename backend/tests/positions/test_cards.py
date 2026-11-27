@@ -64,7 +64,7 @@ def _position(
         lever=None if lever in (None, "") else Decimal(lever),
         mgn_mode="isolated",
         liq_px=None,
-        margin=Decimal("0"),
+        margin=Decimal("604.80"),
     )
 
 
@@ -147,8 +147,8 @@ def test_card_without_market_data_is_kept_with_null_numbers(client: TestClient) 
     pending = cards["pos-no-quote"]
     assert pending.mark_px is None
     assert pending.upl is None
-    assert pending.notional is None
-    assert pending.weight_pct is None
+    # 投入来自上游保证金，不依赖行情：没有价格也照样给得出来。
+    assert pending.cost == Decimal("604.80")
 
 
 def test_stop_states_reach_the_cards(client: TestClient) -> None:
@@ -273,14 +273,15 @@ def test_exchange_positions_view_reads_the_same_stop_answer(client: TestClient) 
     assert item.stop_status == "none"
 
 
-def test_weight_is_relative_to_the_known_gross(client: TestClient) -> None:
+def test_cost_is_the_swap_margin(client: TestClient) -> None:
+    """合约的「投入」是保证金（上游 `margin`），不是名义价值。"""
+
     sync_instruments(parse_instruments([SWAP_INSTRUMENT]))
     _write([_position("pos-1", size="8")])
 
     card = position_cards().items[0]
 
-    assert card.notional == Decimal("1851.36")
-    assert card.weight_pct == Decimal("100")
+    assert card.cost == Decimal("604.80")
 
 
 def test_push_without_stop_data_keeps_the_synced_stop_state(client: TestClient) -> None:

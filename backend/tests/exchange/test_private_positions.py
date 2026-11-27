@@ -4,8 +4,9 @@ MKACG-729 的两条判据：
 
 - 永续读持仓接口；现货的 `/account/positions?instType=SPOT` 上游返回 `51000`，
   必须由余额明细推导，而且**两条路径产出的字段集合相同**。
-- 现货口径显式定义：持仓量 = 可用量 + 冻结量，成本价取上游 `avgPx`（没有就记 0，
-  表示成本未知）。
+- 现货口径显式定义：持仓量取上游 `spotBal`，成本价取 `openAvgPx`，未实现盈亏取
+  `spotUpl` / `spotUplRatio`（MKACG-1024 更正：`avgPx` / `upl` 是合约字段，现货恒为空
+  或 0，读错就会出现「明明亏了却显示未提供」）。
 """
 
 from __future__ import annotations
@@ -47,16 +48,78 @@ def test_swap_positions_are_read_from_the_positions_endpoint(
 def test_spot_positions_are_derived_from_balance_details(
     trade: OkxPrivateClient, fake_okx_server: FakeOkxServer
 ) -> None:
-    """现货：持仓量 = 可用量 + 冻结量，成本取 `avgPx`，盈亏取 `upl`。"""
+    """现货：持仓量取 `spotBal`，成本取 `openAvgPx`，盈亏取 `spotUpl`。"""
 
     book = fake_okx_server.store.book
-    book.set_balance("XAAPL", available="2.5", frozen="0.5", avg_price="350", upl="7")
+    book.set_balance("XAAPL", available="2.5", frozen="0.5", open_avg_px="350", spot_upl="7")
 
     held = {position.inst_id: position for position in trade.positions()}
 
     assert held[SPOT_INST_ID].qty == Decimal("3.0")
     assert held[SPOT_INST_ID].avg_price == Decimal("350")
     assert held[SPOT_INST_ID].unrealized_pnl == Money(Decimal("7"), "USDT")
+
+
+def test_spot_snapshot_reads_the_spot_fields_not_the_swap_ones(
+    trade: OkxPrivateClient, fake_okx_server: FakeOkxServer
+) -> None:
+    """AC1 / AC2 / AC6：现货快照逐字段读 `spotBal` / `openAvgPx` / `spotUpl`。
+
+    上游对现货的 `avgPx` / `upl` 恒为空或 0（那是合约字段）。这组值取自真实账户的
+    XASTS 一条：读错一套就会把 -6.82 的亏损显示成「未提供」。
+    """
+
+    book = fake_okx_server.store.book
+    book.set_balance(
+        "XAAPL",
+        available="0.625907762",
+        open_avg_px="38.063168370798216",
+        spot_upl="-6.8243777136754975",
+        spot_upl_ratio="-0.2864493114336495",
+    )
+
+    snapshot = trade.position_snapshots()[0]
+
+    assert snapshot.inst_id == SPOT_INST_ID
+    assert snapshot.size == Decimal("0.625907762")
+    assert snapshot.avg_px == Decimal("38.063168370798216")
+    assert snapshot.upl == Decimal("-6.8243777136754975")
+    assert snapshot.upl_ratio == Decimal("-0.2864493114336495")
+    # 现货没有强平价与杠杆：不填 0 冒充。
+    assert snapshot.liq_px is None
+    assert snapshot.lever is None
+
+
+def test_spot_quantity_follows_spot_bal_over_available_plus_frozen(
+    trade: OkxPrivateClient, fake_okx_server: FakeOkxServer
+) -> None:
+    """持仓量以 `spotBal` 为准：它与「可用 + 冻结」不等时取上游给的数。
+
+    真实账户里这两个数并不总是相等（挂单占用与在途结算会拉开差距）。假服务器把
+    `spotBal` 写成 4、可用 + 冻结写成 3，只有真读 `spotBal` 才能拿到 4。
+    """
+
+    book = fake_okx_server.store.book
+    book.set_balance("XAAPL", available="2.5", frozen="0.5", spot_bal="4")
+
+    held = trade.positions()
+    snapshot = trade.position_snapshots()[0]
+
+    assert held[0].qty == Decimal("4")
+    assert snapshot.size == Decimal("4")
+
+
+def test_spot_quantity_falls_back_when_upstream_omits_spot_bal(
+    trade: OkxPrivateClient, fake_okx_server: FakeOkxServer
+) -> None:
+    """上游没下发 `spotBal` 时按「可用 + 冻结」推算，不把持仓算成 0 条。"""
+
+    book = fake_okx_server.store.book
+    book.set_balance("XAAPL", available="2.5", frozen="0.5", spot_bal="")
+
+    held = trade.positions()
+
+    assert held[0].qty == Decimal("3")
 
 
 def test_spot_positions_map_to_the_traded_quote_when_many_quotes_exist(
@@ -122,7 +185,7 @@ def test_both_position_sources_produce_the_same_field_set(
 
     book = fake_okx_server.store.book
     book.set_position(SWAP_INST_ID, qty="1", pos_side="long", avg_price="100", upl="1")
-    book.set_balance("XAAPL", available="1", avg_price="350")
+    book.set_balance("XAAPL", available="1", open_avg_px="350")
 
     held = {position.inst_id: position for position in trade.positions()}
     swap_leg = held[SWAP_INST_ID]

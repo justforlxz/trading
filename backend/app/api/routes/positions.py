@@ -334,8 +334,7 @@ def _position_card(card: PositionCard) -> PositionCardItem:
         mgn_mode=card.mgn_mode,
         liq_px=_optional_text(card.liq_px),
         margin=_optional_text(card.margin),
-        notional=_optional_text(card.notional),
-        weight_pct=_optional_text(card.weight_pct),
+        cost=_optional_text(card.cost),
         stop_supported=card.stop_supported,
         stop_status=card.stop_status,  # type: ignore[arg-type]
         stop_px=_optional_text(card.stop_px),

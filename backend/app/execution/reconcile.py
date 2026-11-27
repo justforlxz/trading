@@ -9,8 +9,8 @@
 ## 两类实际持仓，同一种形状
 
 实际持仓由 T5.2 归一成 `AccountPosition`：SWAP 读持仓接口，SPOT 由余额明细推导
-（可用量 + 冻结量）。比较时只读 `product_key` / `side` / `qty` / `avg_cost`，不看
-`inst_type`，因此两类持仓共用同一套规则。
+（数量取上游 `spotBal`，成本取 `openAvgPx`）。比较时只读 `product_key` / `side` /
+`qty` / `avg_cost`，不看 `inst_type`，因此两类持仓共用同一套规则。
 
 ## 差额口径
 

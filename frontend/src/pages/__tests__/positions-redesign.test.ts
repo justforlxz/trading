@@ -58,6 +58,10 @@ function card(overrides: Partial<PositionCard> = {}): PositionCard {
     size: "8",
     avg_px: "226.80",
     mark_px: "231.42",
+    mark_px_source: "okx_ws",
+    mark_px_at: "2026-11-25T12:00:00Z",
+    mark_px_stale: false,
+    mark_px_age_days: null,
     upl: "36.96",
     upl_ratio: "0.0204",
     lever: "3",
@@ -246,6 +250,39 @@ describe("持仓卡片", () => {
     );
 
     expect(html).toContain("行情 2026-11-17 15:00");
+  });
+
+  it("过期的价格标出「价格过期 N 天」，不冒充当前价", () => {
+    // 后端判定过期并给出天数：卡片不再写「行情 <时刻>」，而是明确说这个价过期了多久。
+    const html = renderToStaticMarkup(
+      createElement(PositionCardView, {
+        card: card({
+          mark_px_stale: true,
+          mark_px_age_days: 7,
+          mark_px_at: "2026-11-18T16:00:00Z",
+          mark_px_source: "okx_spot",
+        }),
+        onShowOrders: () => {},
+      }),
+    );
+
+    expect(html).toContain("价格过期 7 天");
+    // 过期价不写「行情 <时刻>」：两种说法并列会让人以为是实时价。
+    expect(html).not.toContain("行情 2026-11-19");
+    expect(html).toContain('data-stale-price=""');
+  });
+
+  it("没过期的价格照旧只写时刻，不出现过期字样", () => {
+    const html = renderToStaticMarkup(
+      createElement(PositionCardView, {
+        card: card({ mark_px_at: "2026-11-25T12:00:00Z" }),
+        onShowOrders: () => {},
+      }),
+    );
+
+    expect(html).toContain("行情 2026-11-25 20:00");
+    expect(html).not.toContain("价格过期");
+    expect(html).not.toContain("data-stale-price");
   });
 
   it("没有价格时刻时不占位", () => {

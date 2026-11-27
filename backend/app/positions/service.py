@@ -54,7 +54,7 @@ from app.instrument import (
     notional_value,
     trading_rules,
 )
-from app.market import latest_candles_by_source
+from app.market import latest_candles_by_source, stale_days
 from app.positions.curves import CurvePoint, upl_curves
 from app.positions.manual import LONG, SHORT, LedgerTrade, apply_trade, replay_trades
 from app.positions.model import (
@@ -90,6 +90,7 @@ __all__ = [
     "delete_manual_position",
     "exchange_position_view_from_snapshot",
     "exchange_positions",
+    "held_instruments",
     "instrument_order_history",
     "list_manual_positions",
     "list_manual_trades",
@@ -216,6 +217,10 @@ class PositionCard:
     #: 标记价的来源与报价时刻（见 `_Quote`）：页面据此说明这个价格有多旧。
     mark_px_source: str | None
     mark_px_at: datetime | None
+    #: 标记价是否已经过期，以及过期了几天。过期的价格只是**最后一次已知价**，页面必须
+    #: 显式标出，不能和实时价并列展示；没过期时 `mark_px_age_days` 为 `None`。
+    mark_px_stale: bool
+    mark_px_age_days: int | None
     upl: Decimal | None
     upl_ratio: Decimal | None
     lever: Decimal | None
@@ -283,6 +288,9 @@ class _CardFacts:
     #: 标记价的来源与时刻：交易所随持仓下发的、K 线的、或兜底实时报价的。
     mark_px_source: str | None
     mark_px_at: datetime | None
+    #: 过期判定与天数：由价格时刻与本次请求时刻相减得到，不在前端口算。
+    mark_px_stale: bool
+    mark_px_age_days: int | None
     upl: Decimal | None
     upl_ratio: Decimal | None
     notional: Decimal | None
@@ -579,6 +587,28 @@ def _ensure_instruments_synced(session: Session, symbols: set[str]) -> None:
         raise DataUnavailable(f"标的 {missing[0]} 不在标的表里, 先同步标的")
 
 
+def held_instruments() -> tuple[str, ...]:
+    """最近一次账户快照里仍有持仓的标的标识，按 `inst_id` 固定顺序；没有快照时为空。
+
+    只回答「哪些标的的行情还在被人用」，不取行情、不算盈亏：K 线刷新拿它拼出要维持
+    新鲜的标的集合（见 `app.jobs.candle_refresh`）。持仓行原样返回，不区分现货与永续，
+    也不按名义价值过滤——尘埃同样要有一个价格才知道自己是不是尘埃。
+    """
+
+    with session_scope() as session:
+        latest = _latest_account_row(session)
+        if latest is None:
+            return ()
+        return tuple(
+            session.scalars(
+                select(ExchangePositionSnapshotRow.inst_id)
+                .where(ExchangePositionSnapshotRow.captured_at == latest.captured_at)
+                .distinct()
+                .order_by(ExchangePositionSnapshotRow.inst_id)
+            )
+        )
+
+
 def exchange_positions(*, require_mapped: bool = False) -> ExchangePositionsView:
     """最近一次账户快照同一时刻的交易所持仓；不联网，状态取当前凭证配置。
 
@@ -609,7 +639,11 @@ def exchange_positions(*, require_mapped: bool = False) -> ExchangePositionsView
     return ExchangePositionsView(latest.captured_at, _configured_status(), items)
 
 
-def position_cards(range_key: str = "1d") -> PositionCardsView:
+def position_cards(
+    range_key: str = "1d",
+    *,
+    clock: Clock | None = None,
+) -> PositionCardsView:
     """持仓卡片：按未实现盈亏绝对值降序，带每条持仓的盈亏曲线与止损三态。
 
     排序放在后端：前端再排一次就会出现「同一份数据两种顺序」，也不符合「前端不重算」
@@ -618,6 +652,10 @@ def position_cards(range_key: str = "1d") -> PositionCardsView:
 
     现货持仓没有上游标记价：先用该标的最近一根已收盘 K 线的收盘价补，库里一个来源都
     查不到时再读一次 OKX 公共 ticker 兜底（见 `_quotes`）。
+
+    K 线会停更（按需同步只在用户点开标的时触发），因此每张卡都要回答「这个价过期了
+    没有」：价格时刻距 `clock` 超过 `PRICE_MAX_AGE` 就标成过期并给出天数，页面据此
+    把最后一次已知价和实时价分开说。
     尘埃（名义价值低于 `POSITION_DUST_NOTIONAL`）只在卡片列表里隐藏，快照行原样保留
     给对账；隐藏条数经 `hidden_dust_count` 交给界面说明，占比分母也取可见部分，因此
     可见卡片的 `weight_pct` 合计仍是 100%。
@@ -637,6 +675,7 @@ def position_cards(range_key: str = "1d") -> PositionCardsView:
         stops = _stop_answers(session, [row.pos_id for row in rows])
         status = _configured_status()
 
+    moment = (clock or SystemClock()).now()
     instruments = get_instruments(row.inst_id for row in rows)
     # 一批取回所有标的的最新价：按行查会退化成 N 条语句，而持仓页一次就有十几行。
     quotes = _quotes(rows, instruments)
@@ -648,6 +687,7 @@ def position_cards(range_key: str = "1d") -> PositionCardsView:
             instruments.get(row.inst_id),
             quotes.get(row.inst_id),
             latest.captured_at,
+            moment,
         )
         for row in rows
     }
@@ -675,6 +715,8 @@ def position_cards(range_key: str = "1d") -> PositionCardsView:
                 mark_px=fact.mark_px,
                 mark_px_source=fact.mark_px_source,
                 mark_px_at=fact.mark_px_at,
+                mark_px_stale=fact.mark_px_stale,
+                mark_px_age_days=fact.mark_px_age_days,
                 upl=fact.upl,
                 upl_ratio=fact.upl_ratio,
                 lever=row.lever,
@@ -728,6 +770,7 @@ def _card_facts(
     instrument: Instrument | None,
     quote: _Quote | None,
     captured_at: datetime,
+    now: datetime,
 ) -> _CardFacts:
     """一张卡片在算占比之前的原始事实：补齐标记价后的价格、盈亏与名义价值。
 
@@ -740,6 +783,10 @@ def _card_facts(
 
     标记价的来源与时刻跟着价格一起返回：交易所随持仓下发的按快照时刻算，K 线与实时
     报价各带自己的时刻，页面才不会把上周的收盘价当成当前价。
+
+    过期判定只看价格时刻，不看来源：K 线停更与上游报价本身变旧是同一件事，都表现为
+    「这个价的时刻很久以前」。过期的价格只降级成「最后一次已知价」，不删、也不换成
+    别的数字。
     """
 
     mark_px = row.mark_px
@@ -751,10 +798,13 @@ def _card_facts(
         mark_px_at = quote.at
     fallback = None if quote is None else quote.price
     upl, upl_ratio = _spot_pnl(row, instrument, mark_px)
+    age_days = None if mark_px_at is None else stale_days(mark_px_at, now)
     return _CardFacts(
         mark_px=mark_px,
         mark_px_source=mark_px_source,
         mark_px_at=mark_px_at,
+        mark_px_stale=age_days is not None,
+        mark_px_age_days=age_days,
         upl=upl,
         upl_ratio=upl_ratio,
         notional=_notional(

@@ -8,9 +8,16 @@
 - `scope`：把标的集合模式（单标的 / 手选 / Watchlist / 分组 / 全部可交易）解析成具体
   标的序列；
 - `sweep`：标的 × 参数组合 × 三段区间展开成任务，交给队列跑完并装回扫描行；
-- `on_demand`：用户进入某个标的时才同步对应周期，按「标的 + 周期」去重并限制并发。
+- `on_demand`：用户进入某个标的时才同步对应周期，按「标的 + 周期」去重并限制并发；
+- `candle_refresh`：有持仓与自选的标的哪个周期过期了就补一次，挂在已有的调度轮次里。
 """
 
+from app.jobs.candle_refresh import (
+    MAX_REFRESH_DAYS,
+    SETTLE_GRACE,
+    refresh_due,
+    run_candle_refresh,
+)
 from app.jobs.equity import (
     next_beijing_midnight,
     start_equity_snapshot_scheduler,
@@ -52,8 +59,10 @@ __all__ = [
     "DEFAULT_DAYS_BY_BAR",
     "DEFAULT_MAX_CONCURRENCY",
     "INSTRUMENTS_DATASET",
+    "MAX_REFRESH_DAYS",
     "OKX_PROVIDER",
     "SCOPE_MODES",
+    "SETTLE_GRACE",
     "SYNC_DATASETS",
     "WATCHLIST_BAR",
     "WATCHLIST_DAYS",
@@ -67,7 +76,9 @@ __all__ = [
     "TargetScope",
     "next_beijing_midnight",
     "plan_sweep",
+    "refresh_due",
     "resolve_scope",
+    "run_candle_refresh",
     "run_candle_sync",
     "run_instrument_sync",
     "run_sweep",

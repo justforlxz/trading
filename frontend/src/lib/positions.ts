@@ -236,6 +236,23 @@ export function quoteTimeText(at: string | null | undefined): string | null {
   return `行情 ${formatBeijingTime(at)}`;
 }
 
+/**
+ * 过期价格的说明：`价格过期 N 天`。
+ *
+ * 过期的价格只是**最后一次已知价**（K 线停更、上游没推新价），不能和实时价并列展示。
+ * 过期与否、过期几天都由后端算（`mark_px_stale` / `mark_px_age_days`）：前端自己拿
+ * `Date` 相减会与后端阈值口径分叉，也会随用户时区漂移。未过期时返回 `null`，
+ * 调用方继续显示「行情 <时刻>」。
+ */
+export function expiredPriceText(
+  stale: boolean | null | undefined,
+  ageDays: number | null | undefined,
+): string | null {
+  if (stale !== true) return null;
+  if (ageDays === null || ageDays === undefined) return "价格已过期";
+  return `价格过期 ${ageDays} 天`;
+}
+
 /** 名义合计不完整时数字前标 `≥`：已知部分不是全部。 */
 export function notionalPrefix(status: "exact" | "partial" | null | undefined): string {
   return status === "partial" ? "≥" : "";

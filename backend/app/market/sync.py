@@ -244,6 +244,38 @@ def latest_candle(symbol: str, *, source: str | None = None) -> Bar | None:
     return None if row is None else row.to_bar()
 
 
+def latest_open_times(
+    symbols: Sequence[str],
+    *,
+    bars: Sequence[str] | None = None,
+) -> dict[tuple[str, str], datetime]:
+    """一批标的最新的 `open_time`，键是 `(标的, 周期)`；没有 K 线的键不出现。
+
+    只回答「这条序列停更了没有」，因此只取时刻、不取价格：按 `(symbol, bar)` 聚合
+    `MAX(open_time)` 走一次索引就够了，不必把整行读回来再挑最新的那根。
+
+    `bars` 为 `None` 表示不筛周期；给了就只聚合这几条序列。K 线刷新拿它判断谁该补数据
+    （见 `app.jobs.candle_refresh`）。
+    """
+
+    wanted_symbols = _unique(symbols)
+    if not wanted_symbols:
+        return {}
+    required_bars = None if bars is None else _unique(bars)
+    if required_bars is not None and not required_bars:
+        return {}
+    statement = select(Candle.symbol, Candle.bar, func.max(Candle.open_time)).where(
+        Candle.symbol == _symbols_bindparam()
+    )
+    if required_bars is not None:
+        statement = statement.where(Candle.bar.in_(required_bars))
+    statement = statement.group_by(Candle.symbol, Candle.bar)
+    with session_scope() as session:
+        rows = session.execute(statement, {"symbols": wanted_symbols}).all()
+    # 时间列存 epoch 秒（整数），出库前换回带时区的时刻，调用方不碰整数时间。
+    return {(row[0], row[1]): from_epoch(row[2]) for row in rows}
+
+
 def load_candles_by_source(
     symbols: Sequence[str],
     bar: str,

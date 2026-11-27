@@ -97,8 +97,9 @@ async def lifespan(_app: FastAPI) -> Iterator[None]:
     apply_saved_settings()
     stop_scheduler = Event()
     scheduler = start_equity_snapshot_scheduler(stop_scheduler)
-    # 宏观数据的唯一定时源；下线时与权益快照线程一起停。
-    market_data = start_market_data_scheduler()
+    # 宏观数据的唯一定时源；下线时与权益快照线程一起停。OKX K 线刷新挂在它的轮次里，
+    # 复用按需同步队列的去重与并发上限。
+    market_data = start_market_data_scheduler(on_demand_sync=_app.state.on_demand_sync)
     _app.state.market_data_scheduler = market_data
     # 常驻订阅集合：关注列表的标的在服务启动后就订阅，与有没有浏览器无关。
     registry = watch_registry()

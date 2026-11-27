@@ -9,11 +9,13 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from app.market import (
+    PRICE_MAX_AGE,
     duplicate_open_times,
     expected_open_times,
     find_gaps,
     floor_open_time,
     out_of_order,
+    stale_days,
 )
 
 START = datetime(2026, 11, 6, 0, 0, tzinfo=UTC)
@@ -95,3 +97,24 @@ def test_out_of_order_detects_regression_and_equal_steps() -> None:
     assert out_of_order([]) is False
     assert out_of_order([later, START]) is True
     assert out_of_order([START, START]) is True
+
+
+def test_stale_days_is_none_within_one_daily_period() -> None:
+    # 一个日线周期以内都还能当当前价用：日线收盘后 23 小时仍是「今天」的价。
+    assert stale_days(START, START + PRICE_MAX_AGE) is None
+    assert stale_days(START, START + timedelta(hours=23)) is None
+    # 价格时刻在上游未来（时钟漂移）时按没过期处理，不返回负数。
+    assert stale_days(START, START - timedelta(days=2)) is None
+
+
+def test_stale_days_rounds_up_so_a_partial_day_is_not_hidden() -> None:
+    # 8 天 1 秒说成「8 天」会让人以为离阈值还远，向上取整到 9。
+    assert stale_days(START, START + timedelta(days=1, seconds=1)) == 2
+    assert stale_days(START, START + timedelta(days=8, seconds=1)) == 9
+    assert stale_days(START, START + timedelta(days=9)) == 9
+
+
+def test_stale_days_rejects_naive_timestamps() -> None:
+    naive = datetime(2026, 11, 6, 0, 0)
+    with pytest.raises(ValueError, match="timezone-aware"):
+        stale_days(naive, START)

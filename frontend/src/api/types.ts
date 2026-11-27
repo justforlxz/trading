@@ -6253,10 +6253,17 @@ export interface components {
             margin?: string | null;
             /** Mark Px */
             mark_px?: string | null;
+            /** Mark Px Age Days */
+            mark_px_age_days?: number | null;
             /** Mark Px At */
             mark_px_at?: string | null;
             /** Mark Px Source */
             mark_px_source?: string | null;
+            /**
+             * Mark Px Stale
+             * @default false
+             */
+            mark_px_stale: boolean;
             /** Mgn Mode */
             mgn_mode?: string | null;
             /** Name */
@@ -6313,6 +6320,7 @@ export interface components {
          *           "mark_px": "276.71",
          *           "mark_px_at": "2026-11-25T13:51:00Z",
          *           "mark_px_source": "okx_rest",
+         *           "mark_px_stale": false,
          *           "mgn_mode": "isolated",
          *           "name": "Alphabet",
          *           "notional": "578.32",

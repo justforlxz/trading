@@ -352,6 +352,8 @@ describe("卡片推送合并", () => {
         size: "8",
         avg_px: "226.80",
         mark_px: "231.42",
+        mark_px_stale: false,
+        mark_px_age_days: null,
         upl: "36.96",
         upl_ratio: "0.0204",
         lever: "3",

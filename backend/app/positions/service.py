@@ -195,7 +195,7 @@ class ExchangePositionsView:
 
 @dataclass(frozen=True, slots=True)
 class PositionCard:
-    """持仓卡片：一张卡需要的全部事实，盈亏与占比都由后端算好。
+    """持仓卡片：一张卡需要的全部事实，盈亏、投入与止损距离都由后端算好。
 
     `upl_curve` 是该持仓的未实现盈亏序列（来自 `exchange_position_snapshots.upl`），
     不是价格 K 线。`stop_status` 三态见 `app.positions.stops`。
@@ -222,8 +222,9 @@ class PositionCard:
     mgn_mode: str | None
     liq_px: Decimal | None
     margin: Decimal | None
-    notional: Decimal | None
-    weight_pct: Decimal | None
+    #: 投入：现货是成本价 × 数量（上游 `openAvgPx × spotBal`），合约是保证金。
+    #: 用户只问「投了多少钱」，所以这里给的是占用资金，不是名义价值。
+    cost: Decimal | None
     stop_status: str
     #: 该类别有没有止损概念：现货没有止损，界面要留空而不是显示「未取到」。
     stop_supported: bool
@@ -277,7 +278,10 @@ class _Quote:
 
 @dataclass(frozen=True, slots=True)
 class _CardFacts:
-    """一张持仓卡片补齐标记价后的事实；占比要等尘埃过滤完的合计才能算。"""
+    """一张持仓卡片补齐标记价后的事实：价格、盈亏、投入与名义价值。
+
+    名义价值只用来判断尘埃（见 `_is_dust`），不再作为卡片字段展示。
+    """
 
     mark_px: Decimal | None
     #: 标记价的来源与时刻：交易所随持仓下发的、K 线的、或兜底实时报价的。
@@ -286,6 +290,7 @@ class _CardFacts:
     upl: Decimal | None
     upl_ratio: Decimal | None
     notional: Decimal | None
+    cost: Decimal | None
     stop_supported: bool
 
 
@@ -619,8 +624,7 @@ def position_cards(range_key: str = "1d") -> PositionCardsView:
     现货持仓没有上游标记价：先用该标的最近一根已收盘 K 线的收盘价补，库里一个来源都
     查不到时再读一次 OKX 公共 ticker 兜底（见 `_quotes`）。
     尘埃（名义价值低于 `POSITION_DUST_NOTIONAL`）只在卡片列表里隐藏，快照行原样保留
-    给对账；隐藏条数经 `hidden_dust_count` 交给界面说明，占比分母也取可见部分，因此
-    可见卡片的 `weight_pct` 合计仍是 100%。
+    给对账；隐藏条数经 `hidden_dust_count` 交给界面说明。
     """
 
     with session_scope() as session:
@@ -652,10 +656,6 @@ def position_cards(range_key: str = "1d") -> PositionCardsView:
         for row in rows
     }
     visible = [row for row in rows if not _is_dust(facts[row.pos_id].notional, threshold)]
-    gross = sum(
-        (facts[row.pos_id].notional or Decimal(0) for row in visible),
-        Decimal(0),
-    )
     cards = []
     for row in visible:
         fact = facts[row.pos_id]
@@ -681,8 +681,7 @@ def position_cards(range_key: str = "1d") -> PositionCardsView:
                 mgn_mode=row.mgn_mode,
                 liq_px=row.liq_px,
                 margin=row.margin,
-                notional=fact.notional,
-                weight_pct=_weight_pct(fact.notional, gross),
+                cost=fact.cost,
                 stop_status=stop.status,
                 stop_supported=fact.stop_supported,
                 stop_px=stop.px,
@@ -729,7 +728,9 @@ def _card_facts(
     quote: _Quote | None,
     captured_at: datetime,
 ) -> _CardFacts:
-    """一张卡片在算占比之前的原始事实：补齐标记价后的价格、盈亏与名义价值。
+    """一张卡片补齐标记价后的原始事实：价格、盈亏、投入与名义价值。
+
+    名义价值只用于判断尘埃，不作为卡片字段展示。
 
     标记价与名义价值的来源不同，必须分开取：
 
@@ -750,16 +751,18 @@ def _card_facts(
         mark_px_source = quote.source
         mark_px_at = quote.at
     fallback = None if quote is None else quote.price
-    upl, upl_ratio = _spot_pnl(row, instrument, mark_px)
+    upl, upl_ratio = _profit(row, instrument)
+    notional = _notional(row.size, row.mark_px if row.mark_px is not None else fallback, instrument)
     return _CardFacts(
         mark_px=mark_px,
         mark_px_source=mark_px_source,
         mark_px_at=mark_px_at,
+        # 盈亏直接取落库值：现货那一列存的是上游 `spotUpl` / `spotUplRatio`，合约的是
+        # `upl` / `uplRatio`。这里不重算，否则页面数字与 OKX 对不上。
         upl=upl,
         upl_ratio=upl_ratio,
-        notional=_notional(
-            row.size, row.mark_px if row.mark_px is not None else fallback, instrument
-        ),
+        notional=notional,
+        cost=_cost_basis(row, instrument, notional),
         stop_supported=_stop_supported(instrument),
     )
 
@@ -770,25 +773,42 @@ def _is_spot_position(instrument: Instrument | None) -> bool:
     return instrument is not None and not trading_rules(instrument.inst_type).has_position_endpoint
 
 
-def _spot_pnl(
+def _profit(
     row: ExchangePositionSnapshotRow,
     instrument: Instrument | None,
-    mark_px: Decimal | None,
 ) -> tuple[Decimal | None, Decimal | None]:
-    """现货的未实现盈亏与盈亏率：只有成本价已知时才按 `(标记价 − 成本价) × 数量` 算。
+    """未实现盈亏与盈亏率：直接取落库值，卡片不重算。
 
-    余额行的 `upl` 一律不用：上游对现货余额记的 0 表示「没有持仓成本」，不是「不亏
-    不赚」，直接显示 0.00 会被读成一个结论。成本价未知时两者都留空，界面写「未提供」，
-    也不拿标记价当成本价——那算出来的是整个名义价值，不是盈亏。
+    落库值按类别来自不同字段（现货 `spotUpl` / `spotUplRatio`，合约 `upl` /
+    `uplRatio`），换算在交易所适配层一次做完。现货没有成本价时上游对这两个字段记的
+    0 表示「没有持仓成本」，不是「不亏不赚」：直接显示 0.00 会被读成一个结论，因此
+    两者都留空，界面写「未提供」。
     """
 
-    if not _is_spot_position(instrument):
-        return row.upl, row.upl_ratio
-    if mark_px is None or row.avg_px <= 0:
+    if _is_spot_position(instrument) and row.avg_px <= 0:
         return None, None
-    upl = (mark_px - row.avg_px) * row.size
-    cost = row.avg_px * abs(row.size)
-    return upl, None if cost == 0 else upl / cost
+    return row.upl, row.upl_ratio
+
+
+def _cost_basis(
+    row: ExchangePositionSnapshotRow,
+    instrument: Instrument | None,
+    notional: Decimal | None,
+) -> Decimal | None:
+    """投入：现货是成本价 × 数量（上游 `openAvgPx × spotBal`），合约是保证金。
+
+    合约逐仓时上游直接给 `margin`；全仓模式这个字段为空，按「名义价值 ÷ 杠杆」折算。
+    成本价未知（现货上游没下发 `openAvgPx`）或规格缺失时留空，界面写「未提供」，
+    不填 0 冒充「没投钱」。
+    """
+
+    if _is_spot_position(instrument):
+        return None if row.avg_px <= 0 else row.avg_px * abs(row.size)
+    if row.margin is not None:
+        return row.margin
+    if notional is None or not row.lever:
+        return None
+    return notional / row.lever
 
 
 def _stop_supported(instrument: Instrument | None) -> bool:
@@ -831,14 +851,6 @@ def _notional(
         ct_val=instrument.ct_val,
         ct_mult=instrument.ct_mult,
     )
-
-
-def _weight_pct(notional: Decimal | None, gross: Decimal) -> Decimal | None:
-    """占比 = 本条名义 ÷ 已知名义合计；分母为 0 时不给值。"""
-
-    if notional is None or gross <= 0:
-        return None
-    return notional / gross * _HUNDRED
 
 
 def _effective_lever(lever: Decimal | None) -> Decimal:

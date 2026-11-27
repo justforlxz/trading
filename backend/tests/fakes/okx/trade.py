@@ -174,16 +174,35 @@ class TradeBook:
         *,
         available: str,
         frozen: str = "0",
-        avg_price: str = "",
-        upl: str = "0",
+        spot_bal: str | None = None,
+        open_avg_px: str = "",
+        spot_upl: str = "0",
+        spot_upl_ratio: str = "0",
     ) -> None:
-        self._balances[currency] = {
+        """预置一条币种余额明细。
+
+        字段名与上游一致：现货的成本价与盈亏是 `openAvgPx` / `spotUpl` /
+        `spotUplRatio`，`avgPx` / `upl` 是合约字段，现货恒为空或 0。
+
+        `spot_bal` 默认按「可用 + 冻结」算，与真实上游的常见取值一致；显式给值用来
+        证明读的是 `spotBal` 而不是推算值，给空串表示这一条上游没有下发该字段。
+        """
+
+        detail = {
             "ccy": currency,
             "availBal": available,
             "frozenBal": frozen,
-            "avgPx": avg_price,
-            "upl": upl,
+            "openAvgPx": open_avg_px,
+            "spotUpl": spot_upl,
+            "spotUplRatio": spot_upl_ratio,
+            "avgPx": "",
+            "upl": "0",
         }
+        if spot_bal != "":
+            detail["spotBal"] = (
+                str(Decimal(available) + Decimal(frozen)) if spot_bal is None else spot_bal
+            )
+        self._balances[currency] = detail
 
     def set_position(
         self,

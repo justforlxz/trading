@@ -2,8 +2,8 @@
 
 判据来源（MKACG-736）：
 
-- SWAP 读持仓接口；SPOT 由余额明细推导（可用量 + 冻结量），两条路径产出同一种形状。
-- SPOT 侧出现差额时，清单里的实际数量与交易所余额明细的可用量 + 冻结量对得上。
+- SWAP 读持仓接口；SPOT 由余额明细推导（数量取上游 `spotBal`），两条路径产出同一种形状。
+- SPOT 侧出现差额时，清单里的实际数量与交易所余额明细的 `spotBal` 对得上。
 """
 
 from __future__ import annotations
@@ -55,7 +55,7 @@ def test_both_position_sources_produce_comparable_actual_positions(
 
     sync_instruments([make_ref(), make_swap_ref()])
     book = fake_okx_server.store.book
-    book.set_balance("XAAPL", available="2.5", frozen="0.5", avg_price="350")
+    book.set_balance("XAAPL", available="2.5", frozen="0.5", open_avg_px="350")
     book.set_position(SWAP_INST_ID, qty="2", pos_side="long", avg_price="99.5")
 
     trade = create_trade_port(settings=_settings(fake_okx_server), clock=ReplayClock(FROZEN_NOW))
@@ -84,7 +84,7 @@ def test_spot_quantity_difference_is_explained_by_available_plus_frozen(
 
     sync_instruments([make_ref()])
     book = fake_okx_server.store.book
-    book.set_balance("XAAPL", available="2.5", frozen="0.5", avg_price="350")
+    book.set_balance("XAAPL", available="2.5", frozen="0.5", open_avg_px="350")
 
     trade = create_trade_port(settings=_settings(fake_okx_server), clock=ReplayClock(FROZEN_NOW))
     try:

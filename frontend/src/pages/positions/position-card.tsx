@@ -3,6 +3,7 @@ import {
   amountText,
   curveGeometry,
   curveStroke,
+  hasLiquidationPrice,
   instFormLabel,
   percentText,
   positionSideLabel,
@@ -47,16 +48,27 @@ function stopBadge(card: PositionCard): { text: string; tone: string } {
   return { text: stopStatusLabel(card.stop_status), tone: stopStatusTone(card.stop_status) };
 }
 
+/** 卡片上的一行「标签 + 数值」。 */
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-1">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="font-mono tabular-nums text-foreground">{value}</dd>
+    </div>
+  );
+}
+
 /**
  * 一张持仓卡片。
+ *
+ * 字段按用户给的清单：投入、收益（金额 + 百分比）、平均买入价、最新价格，合约再加
+ * 强平价。名义价值与占比不展示——那是我们自己的权重口径，用户看不懂也不需要。
  *
  * 没有行情的持仓**保留卡片**：价格与盈亏位换成骨架占位并标「行情待同步」。整卡消失
  * 会让人以为这条持仓已经平掉，比显示空值危险得多。
  */
 export function PositionCardView({ card, onShowOrders }: PositionCardViewProps) {
   const hasMarketData = card.mark_px != null;
-  const weightWidth =
-    card.weight_pct == null ? 0 : Math.max(0, Math.min(100, Number(card.weight_pct) || 0));
   const geometry = curveGeometry(card.upl_curve, SPARK_WIDTH, SPARK_HEIGHT);
   // 没有行情时先报行情：那条结论比「有没有止损」更该先看到。
   const badge = hasMarketData
@@ -100,16 +112,13 @@ export function PositionCardView({ card, onShowOrders }: PositionCardViewProps) 
         <div className="min-w-0">
           {hasMarketData ? (
             <>
-              <p className="font-mono text-base font-normal tabular-nums">
-                {priceText(card.mark_px)}
-              </p>
-              <p className={cn("text-[11px] tabular-nums", uplTone(card.upl))}>
+              <p className={cn("font-mono text-base font-normal tabular-nums", uplTone(card.upl))}>
                 {signedAmountText(card.upl)}{" "}
-                <span className="text-muted-foreground">({uplRatioText(card.upl_ratio)})</span>
+                <span className="text-[11px] text-muted-foreground">
+                  ({uplRatioText(card.upl_ratio)})
+                </span>
               </p>
-              {quoteTime === null ? null : (
-                <p className="text-[10px] text-muted-foreground">{quoteTime}</p>
-              )}
+              <p className="text-[10px] text-muted-foreground">收益</p>
             </>
           ) : (
             <div className="w-full" data-skeleton="">
@@ -146,16 +155,18 @@ export function PositionCardView({ card, onShowOrders }: PositionCardViewProps) 
         )}
       </div>
 
+      <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+        <Field label="投入" value={amountText(card.cost)} />
+        <Field label="平均买入价" value={priceText(card.avg_px)} />
+        <Field label="最新价格" value={priceText(card.mark_px)} />
+        {/* 强平价只有合约有：现货没有杠杆，也就没有强平这回事。 */}
+        {hasLiquidationPrice(card.inst_type) ? (
+          <Field label="强平价" value={priceText(card.liq_px)} />
+        ) : null}
+      </dl>
+
       <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-        <span>
-          名义{" "}
-          <span className="font-mono tabular-nums text-foreground">
-            {amountText(card.notional)}
-          </span>
-          {card.weight_pct == null ? null : (
-            <span className="font-mono tabular-nums"> · {percentText(card.weight_pct)}</span>
-          )}
-        </span>
+        <span>{quoteTime ?? "—"}</span>
         {hasMarketData && card.stop_supported ? (
           <span className={card.stop_status === "none" ? "text-rose-600 dark:text-rose-400" : ""}>
             {stopText(card)}
@@ -163,14 +174,6 @@ export function PositionCardView({ card, onShowOrders }: PositionCardViewProps) 
         ) : hasMarketData ? null : (
           <span className="block h-2.5 w-12 animate-pulse rounded bg-muted" />
         )}
-      </div>
-
-      <div className="mt-2 h-1 w-full rounded-full bg-muted">
-        <div
-          className="h-1 rounded-full bg-primary"
-          style={{ width: `${weightWidth}%` }}
-          aria-hidden="true"
-        />
       </div>
 
       <button

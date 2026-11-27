@@ -64,8 +64,7 @@ function card(overrides: Partial<PositionCard> = {}): PositionCard {
     mgn_mode: "isolated",
     liq_px: null,
     margin: "0",
-    notional: "1851.36",
-    weight_pct: "79.1",
+    cost: "604.80",
     stop_supported: true,
     stop_status: "confirmed",
     stop_px: "220",
@@ -94,7 +93,7 @@ describe("资产卡", () => {
   it("有数据时画折线，并展示权益与次级指标", () => {
     const html = renderAsset();
 
-    expect(html).toContain("当前资产");
+    expect(html).toContain("账户权益（OKX totalEq）");
     expect(html).toContain("413.45");
     expect(html).toContain("<polyline");
     expect(html).toContain("110.94");
@@ -146,27 +145,53 @@ describe("资产卡", () => {
 });
 
 describe("持仓卡片", () => {
-  it("有行情时展示价格、盈亏、盈亏曲线与止损价位", () => {
+  it("有行情时展示收益、投入、平均买入价、最新价格与止损价位", () => {
     const html = renderToStaticMarkup(
       createElement(PositionCardView, { card: card(), onShowOrders: () => {} }),
     );
 
     expect(html).toContain("AAPL-USDT");
-    expect(html).toContain("231.42");
     expect(html).toContain("+36.96");
     expect(html).toContain("多 · 3x");
     expect(html).toContain("已设止损");
     expect(html).toContain("220");
-    expect(html).toContain("79.1%");
+    // 用户给的清单：投入 / 收益 / 平均买入价 / 最新价格 / 强平价（仅合约）。
+    expect(html).toContain("投入");
+    expect(html).toContain("604.80");
+    expect(html).toContain("平均买入价");
+    expect(html).toContain("226.8");
+    expect(html).toContain("最新价格");
+    expect(html).toContain("231.42");
+    expect(html).toContain("强平价");
     expect(html).toContain("查看订单历史");
     // 曲线来自 upl 序列，不是价格
     expect(html).toContain('data-upl-curve=""');
   });
 
+  it("不再展示名义与占比", () => {
+    const html = renderToStaticMarkup(
+      createElement(PositionCardView, { card: card(), onShowOrders: () => {} }),
+    );
+
+    expect(html).not.toContain("名义");
+    expect(html).not.toContain("占比");
+  });
+
+  it("现货没有强平价这一行", () => {
+    const html = renderToStaticMarkup(
+      createElement(PositionCardView, {
+        card: card({ inst_type: "SPOT", lever: null, liq_px: null, stop_supported: false }),
+        onShowOrders: () => {},
+      }),
+    );
+
+    expect(html).not.toContain("强平价");
+  });
+
   it("没有行情的持仓保留卡片并用骨架占位", () => {
     const html = renderToStaticMarkup(
       createElement(PositionCardView, {
-        card: card({ mark_px: null, upl: null, upl_ratio: null, notional: null, weight_pct: null }),
+        card: card({ mark_px: null, upl: null, upl_ratio: null }),
         onShowOrders: () => {},
       }),
     );

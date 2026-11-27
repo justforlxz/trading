@@ -68,6 +68,16 @@ export function instFormLabel(instType: PositionCard["inst_type"]): string | nul
   return instType === "SWAP" ? "永续" : "现货";
 }
 
+/**
+ * 这张卡有没有强平价：只有永续有杠杆，现货是全额买入。
+ *
+ * 与 `instFormLabel` 放在同一处，卡片组件里就不再写第二种 `inst_type` 分支；
+ * 标的还没同步（`null`）时不猜，按「没有」处理。
+ */
+export function hasLiquidationPrice(instType: PositionCard["inst_type"]): boolean {
+  return instType === "SWAP";
+}
+
 export function marginModeLabel(mode: string | null | undefined): string {
   if (mode === null || mode === undefined || mode.trim() === "") return MISSING_VALUE;
   if (mode === "cross") return "全仓";
@@ -223,7 +233,7 @@ export function stopStatusTone(status: StopStatus): string {
  */
 export function dustHiddenText(count: number | null | undefined): string | null {
   if (count === null || count === undefined || count <= 0) return null;
-  return `已隐藏 ${count} 条尘埃（名义价值过低，不计入卡片与占比）`;
+  return `已隐藏 ${count} 条尘埃（名义价值过低，不计入卡片）`;
 }
 
 /**

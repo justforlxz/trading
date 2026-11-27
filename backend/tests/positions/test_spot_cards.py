@@ -1,17 +1,17 @@
 """现货持仓的卡片：标记价从最近一根 K 线或公共 ticker 补、尘埃只在卡片列表里隐藏。
 
 MKACG-1015 的现象是「15 张卡片只有 1 张有数据」：14 条现货余额的 `mark_px` 为空，
-`notional` / `weight_pct` 全算不出来，界面只能显示骨架；其中大半还是名义价值不到
-1 分钱的尘埃。功能检测又补了一条：K 线只覆盖自选/订阅，长尾持仓一个来源都没有，
-于是 4 张卡永远「行情待同步」。本文件逐条钉住这些判据：
+名义价值全算不出来，界面只能显示骨架；其中大半还是名义价值不到 1 分钱的尘埃。功能
+检测又补了一条：K 线只覆盖自选/订阅，长尾持仓一个来源都没有，于是 4 张卡永远
+「行情待同步」。本文件逐条钉住这些判据：
 
 - 现货缺标记价时取该标的最近一根已收盘 K 线的收盘价（永续不拿收盘价冒充标记价）；
 - 库里一个来源都没有时，现货兜底读一次 OKX 公共 ticker，取不到就留空；
 - 标记价带来源与报价时刻，页面据此说明价格有多旧；
 - 尘埃只在卡片列表里隐藏，快照行不删；隐藏条数经 `hidden_dust_count` 给出；
 - 现货没有止损概念（`stop_supported=False`），不能显示成「未取到」；
-- 现货的盈亏只在成本价已知时才算，上游的 0 不能读成「不亏不赚」；
-- 占比分母取可见部分，可见卡片的 `weight_pct` 合计仍是 100%。
+- 现货的盈亏与投入直接取落库值（上游 `spotUpl` / `spotUplRatio` / `openAvgPx × spotBal`），
+  卡片不重算，也不把「没有成本价」显示成 0。
 """
 
 from __future__ import annotations
@@ -75,6 +75,7 @@ def _spot(
     size: str = "0.1478",
     avg_px: str = "0",
     upl: str | None = None,
+    upl_ratio: str | None = None,
 ) -> ExchangePosition:
     return ExchangePosition(
         pos_id=pos_id,
@@ -84,7 +85,7 @@ def _spot(
         avg_px=Decimal(avg_px),
         mark_px=None,
         upl=None if upl is None else Decimal(upl),
-        upl_ratio=None,
+        upl_ratio=None if upl_ratio is None else Decimal(upl_ratio),
         # 现货没有杠杆、没有强平价、没有保证金：与适配层推导出的行同一形状。
         lever=None,
         mgn_mode=None,
@@ -98,6 +99,8 @@ def _swap(
     *,
     size: str = "2",
     mark_px: str | None = "231.42",
+    #: 上游 `margin`：逐仓给值，全仓为空（`None`）。
+    margin: str | None = "154.28",
 ) -> ExchangePosition:
     return ExchangePosition(
         pos_id=pos_id,
@@ -111,7 +114,7 @@ def _swap(
         lever=Decimal("3"),
         mgn_mode="isolated",
         liq_px=None,
-        margin=Decimal("0"),
+        margin=None if margin is None else Decimal(margin),
     )
 
 
@@ -165,7 +168,7 @@ def _patch_ticker(
 
 
 def test_spot_card_takes_the_mark_price_from_the_latest_candle(client: TestClient) -> None:
-    """AC1：现货缺标记价，用库里最近一根日线的收盘价补，名义价值随之算得出来。"""
+    """AC1：现货缺标记价，用库里最近一根日线的收盘价补，最新价格随之算得出来。"""
 
     seed_daily(SPOT_INST_ID, ["340", "350", "352.99"])
     _write([_spot()])
@@ -173,7 +176,7 @@ def test_spot_card_takes_the_mark_price_from_the_latest_candle(client: TestClien
     card = position_cards().items[0]
 
     assert card.mark_px == Decimal("352.99")
-    assert card.notional == Decimal("0.1478") * Decimal("352.99")
+    assert card.mark_px_source == "okx"
 
 
 def test_swap_mark_price_is_never_taken_from_a_candle(client: TestClient) -> None:
@@ -185,19 +188,35 @@ def test_swap_mark_price_is_never_taken_from_a_candle(client: TestClient) -> Non
     card = position_cards().items[0]
 
     assert card.mark_px is None
-    # 名义价值只要求「有一个价格」，与账户卡的合计口径一致。
-    assert card.notional == Decimal("2") * Decimal("231.42")
+    # 投入取上游保证金，不随标记价缺失而变。
+    assert card.cost == Decimal("154.28")
 
 
-def test_spot_profit_is_derived_only_when_the_cost_is_known(client: TestClient) -> None:
-    """AC1：有成本价时算 `(标记价 − 成本价) × 数量`；成本未知时留空，不当成 0。"""
+def test_spot_profit_and_cost_come_from_the_upstream_fields(client: TestClient) -> None:
+    """AC1 / AC2：现货的收益与投入直接取落库值，卡片不重算。
+
+    落库值来自上游 `spotUpl` / `spotUplRatio` / `openAvgPx × spotBal`（见
+    `tests/exchange/test_private_positions.py`）。这里钉住卡片侧：负收益原样带负号，
+    投入 = 成本价 × 数量；上游没给成本价时两者都留空，显示成「未提供」而不是 0。
+    """
 
     seed_daily(SPOT_INST_ID, ["352.99"])
 
-    _write([_spot("XAAPL-USDT:long", size="2", avg_px="300")])
+    _write(
+        [
+            _spot(
+                "XAAPL-USDT:long",
+                size="2",
+                avg_px="300",
+                upl="-6.82",
+                upl_ratio="-0.0114",
+            )
+        ]
+    )
     priced = position_cards().items[0]
-    assert priced.upl == (Decimal("352.99") - Decimal("300")) * 2
-    assert priced.upl_ratio == priced.upl / (Decimal("300") * 2)
+    assert priced.upl == Decimal("-6.82")
+    assert priced.upl_ratio == Decimal("-0.0114")
+    assert priced.cost == Decimal("600")
 
     record_exchange_snapshot(
         captured_at=CAPTURED_AT,
@@ -211,6 +230,7 @@ def test_spot_profit_is_derived_only_when_the_cost_is_known(client: TestClient) 
     assert unknown.mark_px == Decimal("352.99")
     assert unknown.upl is None
     assert unknown.upl_ratio is None
+    assert unknown.cost is None
 
 
 def test_dust_is_hidden_from_the_cards_but_kept_in_the_snapshot(client: TestClient) -> None:
@@ -244,7 +264,7 @@ def test_a_row_without_any_quote_is_not_treated_as_dust(client: TestClient) -> N
     view = position_cards()
 
     assert [card.pos_id for card in view.items] == ["XAAPL-USDT:long"]
-    assert view.items[0].notional is None
+    # 算不出名义价值就不判尘埃：隐藏条数为 0，卡片照出。
     assert view.hidden_dust_count == 0
 
 
@@ -291,35 +311,43 @@ def test_spot_and_swap_of_one_product_carry_different_forms(client: TestClient) 
     assert (spot.inst_type, swap.inst_type) == ("SPOT", "SWAP")
 
 
-def test_visible_weights_still_add_up_to_one_hundred(client: TestClient) -> None:
-    """AC4：占比分母取可见部分，合计仍是 100%，且大小顺序与名义价值一致。"""
+def test_cost_is_the_money_invested_not_the_notional(client: TestClient) -> None:
+    """AC4：卡片给的是「投入」（现货成本价 × 数量、合约保证金），不是名义价值与占比。"""
 
     seed_daily(SPOT_INST_ID, ["100"])
     _write(
         [
-            _spot("XAAPL-USDT:long", size="1"),  # 名义 100
+            _spot("XAAPL-USDT:long", size="1", avg_px="80"),  # 投入 80
             _spot("XAAPL-USDT:dust", size="0.000001"),  # 尘埃，隐藏
-            _swap("AAPL-USDT-SWAP:long", size="2"),  # 名义 462.84
+            _swap("AAPL-USDT-SWAP:long", size="2"),  # 投入 = 上游保证金 154.28
         ]
     )
 
     view = position_cards()
-    weights = [card.weight_pct for card in view.items]
+    costs = {card.pos_id: card.cost for card in view.items}
 
-    assert all(weight is not None for weight in weights)
-    assert sum(weight for weight in weights if weight is not None) == pytest.approx(
-        Decimal("100"), abs=Decimal("0.1")
-    )
+    assert costs == {
+        "XAAPL-USDT:long": Decimal("80"),
+        "AAPL-USDT-SWAP:long": Decimal("154.28"),
+    }
     assert view.hidden_dust_count == 1
-    by_notional = sorted(view.items, key=lambda card: card.notional or Decimal(0), reverse=True)
-    assert [card.pos_id for card in by_notional] == [
-        card.pos_id
-        for card in sorted(view.items, key=lambda card: card.weight_pct or Decimal(0), reverse=True)
-    ]
+
+
+def test_swap_cost_falls_back_to_notional_over_leverage(client: TestClient) -> None:
+    """全仓模式上游不下发 `margin`：投入按「名义价值 ÷ 杠杆」折算，不填 0。
+
+    逐仓才给 `margin`；全仓拿到的是空字符串，直接当 0 会显示成「一分钱没投」。
+    """
+
+    _write([_swap(margin=None)])
+
+    card = position_cards().items[0]
+
+    assert card.cost == Decimal("2") * Decimal("231.42") / Decimal("3")
 
 
 def test_the_api_reports_the_hidden_dust_count(client: TestClient) -> None:
-    """AC2 契约：接口给出 `hidden_dust_count`，卡片带 `stop_supported`。"""
+    """AC2 / AC4 契约：接口给出 `hidden_dust_count` 与 `cost`，不再下发名义与占比。"""
 
     seed_daily(SPOT_INST_ID, ["352.99"])
     _write([_spot("XAAPL-USDT:dust", size="0.000001"), _spot()])
@@ -330,6 +358,9 @@ def test_the_api_reports_the_hidden_dust_count(client: TestClient) -> None:
     body = response.json()
     assert body["hidden_dust_count"] == 1
     assert body["items"][0]["stop_supported"] is False
+    assert "cost" in body["items"][0]
+    assert "notional" not in body["items"][0]
+    assert "weight_pct" not in body["items"][0]
 
 
 def test_spot_without_candles_falls_back_to_the_public_ticker(
@@ -345,7 +376,7 @@ def test_spot_without_candles_falls_back_to_the_public_ticker(
     assert card.mark_px == Decimal("26.61")
     assert card.mark_px_source == "okx_ticker"
     assert card.mark_px_at == TICKER_AT
-    assert card.notional == Decimal("0.6259") * Decimal("26.61")
+    assert card.cost is None  # 上游没给成本价：投入未知，不填 0
 
 
 def test_the_fallback_price_makes_dust_detection_work(
@@ -405,11 +436,11 @@ def test_the_fallback_is_skipped_when_upstream_is_unreachable(
 
     assert view.items[0].mark_px is None
     assert view.items[0].mark_px_source is None
-    assert view.items[0].notional is None
+    assert view.items[0].cost is None
 
 
 def test_spot_profit_is_unknown_when_upstream_reports_zero(client: TestClient) -> None:
-    """余额行上游把 `upl` 记 0（表示没有持仓成本），卡片不能显示成「不亏不赚」。"""
+    """没有成本价时上游 `spotUpl` 记 0（表示没有持仓成本），卡片不能显示成「不亏不赚」。"""
 
     seed_daily(SPOT_INST_ID, ["352.99"])
     _write([_spot(size="0.1478", avg_px="0", upl="0")])

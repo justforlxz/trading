@@ -502,7 +502,7 @@ def test_fake_okx_end_to_end_reconciles_against_venue_positions(
     """假 OKX：真实适配器下单成交，下一轮持仓仍按交易所侧实际数量求差。"""
 
     sync_instruments([make_ref()])
-    fake_okx_server.store.book.set_balance("XAAPL", available="100", avg_price="90")
+    fake_okx_server.store.book.set_balance("XAAPL", available="100", open_avg_px="90")
     fake_okx_server.store.book.set_balance("USDT", available="10000")
     fake_okx_server.store.book.set_mark_price(SPOT_INST_ID, "100")
 
